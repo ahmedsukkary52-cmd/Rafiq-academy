@@ -1,0 +1,59 @@
+class AppRoles {
+  const AppRoles._();
+
+  static const String student = 'student';
+  static const String parent = 'parent';
+  static const String teacher = 'teacher';
+  static const String supervisor = 'supervisor';
+  static const String admin = 'admin';
+
+  static const List<String> all = [student, parent, teacher, supervisor, admin];
+}
+
+class FirestoreCollections {
+  const FirestoreCollections._();
+
+  static const String users = 'users';
+  static const String studentProfiles = 'studentProfiles';
+  static const String parentProfiles = 'parentProfiles';
+  static const String teacherProfiles = 'teacherProfiles';
+  static const String supervisorProfiles = 'supervisorProfiles';
+  static const String halaqat = 'halaqat';
+  static const String reviewSchedules = 'reviewSchedules';
+  static const String recitationRecords = 'recitationRecords';
+  static const String attendanceRecords = 'attendanceRecords';
+  static const String absenceRequests = 'absenceRequests';
+  static const String achievements = 'achievements';
+  static const String assignments = 'assignments';
+  static const String payments = 'payments';
+  static const String notifications = 'notifications';
+  static const String complaints = 'complaints';
+  static const String supervisorReports = 'supervisorReports';
+}
+
+class RecitationGrades {
+  const RecitationGrades._();
+
+  static const String excellent = 'ممتاز';
+  static const String veryGood = 'جيد جداً';
+  static const String good = 'جيد';
+  static const String needsRetry = 'يحتاج إعادة';
+}
+
+class NotificationTypes {
+  const NotificationTypes._();
+
+  static const String sessionReminder = 'session_reminder';
+  static const String achievement = 'achievement';
+  static const String payment = 'payment';
+  static const String assignment = 'assignment';
+  static const String general = 'general';
+}
+
+class AppConstants {
+  const AppConstants._();
+
+  static const String appName = 'أكاديمية التحفيظ';
+  static const Duration snackBarDuration = Duration(seconds: 3);
+  static const Duration animationDuration = Duration(milliseconds: 300);
+}

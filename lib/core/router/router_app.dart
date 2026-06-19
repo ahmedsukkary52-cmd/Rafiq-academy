@@ -2,9 +2,9 @@
 // import 'package:flutter_bloc/flutter_bloc.dart';
 // import 'package:go_router/go_router.dart';
 //
+// import '../../features/auth/presentaiton/bloc/auth_bloc.dart';
+// import '../../features/auth/presentaiton/bloc/auth_state.dart';
 // import '../constants/app_constants.dart';
-// import '../../features/auth/presentation/bloc/auth_bloc.dart';
-// import '../../features/auth/presentation/pages/login_page.dart';
 // import '../../features/auth/presentation/pages/splash_page.dart';
 // import '../../features/student/presentation/pages/student_home_page.dart';
 // import '../../features/parent/presentation/pages/parent_home_page.dart';
@@ -12,7 +12,6 @@
 // import '../../features/supervisor/presentation/pages/supervisor_home_page.dart';
 // import '../../features/admin/presentation/pages/admin_home_page.dart';
 //
-// /// أسماء الـ routes في مكان واحد لتجنب الـ typos
 // class AppRoutes {
 //   const AppRoutes._();
 //
@@ -122,8 +121,6 @@
 //   }
 // }
 //
-// /// يخلي go_router يسمع لـ AuthBloc ويعيد تقييم الـ redirect
-// /// عند كل تغيير في حالة الـ auth (login / logout)
 // class _BlocListenable extends ChangeNotifier {
 //   _BlocListenable(AuthBloc bloc) {
 //     bloc.stream.listen((_) => notifyListeners());

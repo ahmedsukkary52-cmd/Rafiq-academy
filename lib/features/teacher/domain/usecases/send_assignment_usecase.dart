@@ -1,9 +1,11 @@
 import 'package:fpdart/fpdart.dart';
+import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../repositories/teacher_repository.dart';
 
+@lazySingleton
 class SendAssignmentUseCase extends UseCase<Unit, SendAssignmentParams> {
   final TeacherRepository repository;
 

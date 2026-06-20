@@ -1,0 +1,72 @@
+import 'package:equatable/equatable.dart';
+
+import '../../domain/entities/parent_entities.dart';
+
+abstract class ParentEvent extends Equatable {
+  const ParentEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
+/// تحميل معرّفات أبناء ولي الأمر
+class LoadChildrenEvent extends ParentEvent {
+  final String parentId;
+
+  const LoadChildrenEvent(this.parentId);
+
+  @override
+  List<Object?> get props => [parentId];
+}
+
+/// اختيار طفل معيّن من قائمة الأبناء (لو أكتر من ابن).
+/// بيحمّل تلقائياً تقرير الأسبوع الحالي بتاعه.
+class SelectChildEvent extends ParentEvent {
+  final String studentId;
+
+  const SelectChildEvent(this.studentId);
+
+  @override
+  List<Object?> get props => [studentId];
+}
+
+/// تحميل التقرير الأسبوعي لطالب معيّن في أسبوع معيّن
+class LoadWeeklyReportEvent extends ParentEvent {
+  final String studentId;
+  final DateTime weekStart;
+
+  const LoadWeeklyReportEvent({
+    required this.studentId,
+    required this.weekStart,
+  });
+
+  @override
+  List<Object?> get props => [studentId, weekStart];
+}
+
+/// تحميل سجل المدفوعات والاشتراكات
+class LoadPaymentsEvent extends ParentEvent {
+  final String parentId;
+
+  const LoadPaymentsEvent(this.parentId);
+
+  @override
+  List<Object?> get props => [parentId];
+}
+
+/// تقديم طلب استئذان عن حصة
+class SubmitAbsenceRequestEvent extends ParentEvent {
+  final AbsenceRequestEntity request;
+
+  const SubmitAbsenceRequestEvent(this.request);
+
+  @override
+  List<Object?> get props => [request];
+}
+
+/// إرجاع حالة إرسال طلب الاستئذان لـ idle بعد ما الـ UI يعرض النتيجة
+/// (مثلاً بعد ما يقفل الـ SnackBar)، عشان لو المستخدم فتح الفورم تاني
+/// ميشوفش نتيجة المحاولة القديمة.
+class ResetAbsenceSubmissionEvent extends ParentEvent {
+  const ResetAbsenceSubmissionEvent();
+}

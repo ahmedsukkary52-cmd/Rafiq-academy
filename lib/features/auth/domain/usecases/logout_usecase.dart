@@ -1,9 +1,11 @@
 import 'package:fpdart/fpdart.dart';
+import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../repositories/auth_repository.dart';
 
+@lazySingleton
 class LogoutUseCase extends UseCase<Unit, NoParams> {
   final AuthRepository repository;
 

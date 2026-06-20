@@ -1,10 +1,12 @@
 import 'package:fpdart/fpdart.dart';
+import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/financial_summary_entity.dart';
 import '../repositories/admin_repository.dart';
 
+@lazySingleton
 class GetFinancialSummaryUseCase
     extends UseCase<FinancialSummaryEntity, NoParams> {
   final AdminRepository repository;

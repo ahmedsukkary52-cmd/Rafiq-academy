@@ -1,11 +1,13 @@
 import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/assignment_entity.dart';
 import '../repositories/student_repository.dart';
 
+@lazySingleton
 class WatchLatestAssignmentUseCase
     extends StreamUseCase<AssignmentEntity?, StudentUidParams> {
   final StudentRepository repository;

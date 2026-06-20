@@ -1,0 +1,375 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format width=80
+
+// **************************************************************************
+// InjectableConfigGenerator
+// **************************************************************************
+
+// ignore_for_file: type=lint
+// coverage:ignore-file
+
+// ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
+import 'package:firebase_auth/firebase_auth.dart' as _i59;
+import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
+import 'package:get_it/get_it.dart' as _i174;
+import 'package:injectable/injectable.dart' as _i526;
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart'
+    as _i161;
+import 'package:rafiq_academy/core/di/di_module.dart' as _i126;
+import 'package:rafiq_academy/core/network/network_info.dart' as _i696;
+import 'package:rafiq_academy/features/admin/data/datasources/admin_remote_datasource.dart'
+    as _i543;
+import 'package:rafiq_academy/features/admin/data/datasources/admin_remote_datasource_impl.dart'
+    as _i775;
+import 'package:rafiq_academy/features/admin/data/repositories/admin_repository_impl.dart'
+    as _i99;
+import 'package:rafiq_academy/features/admin/domain/repositories/admin_repository.dart'
+    as _i255;
+import 'package:rafiq_academy/features/admin/domain/usecases/approve_new_student_usecase.dart'
+    as _i928;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_academy_stats_usecase.dart'
+    as _i488;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_complaints_usecase.dart'
+    as _i899;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_financial_summary_usecase.dart'
+    as _i369;
+import 'package:rafiq_academy/features/admin/domain/usecases/respond_to_complaint_usecase.dart'
+    as _i97;
+import 'package:rafiq_academy/features/admin/domain/usecases/send_broadcast_notification_usecase.dart'
+    as _i57;
+import 'package:rafiq_academy/features/admin/domain/usecases/toggle_account_status_usecase.dart'
+    as _i482;
+import 'package:rafiq_academy/features/admin/persentation/bloc/admin_bloc.dart'
+    as _i939;
+import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasouce_impl.dart'
+    as _i550;
+import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasource.dart'
+    as _i483;
+import 'package:rafiq_academy/features/auth/data/repositories/auth_repository_impl.dart'
+    as _i127;
+import 'package:rafiq_academy/features/auth/domain/repositories/auth_repository.dart'
+    as _i605;
+import 'package:rafiq_academy/features/auth/domain/usecases/get_current_user_usecase.dart'
+    as _i788;
+import 'package:rafiq_academy/features/auth/domain/usecases/login_with_email_usecase.dart'
+    as _i339;
+import 'package:rafiq_academy/features/auth/domain/usecases/logout_usecase.dart'
+    as _i608;
+import 'package:rafiq_academy/features/auth/presentaiton/bloc/auth_bloc.dart'
+    as _i196;
+import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart'
+    as _i892;
+import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource_impl.dart'
+    as _i430;
+import 'package:rafiq_academy/features/parent/data/repositories/parent_repository_impl.dart'
+    as _i964;
+import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart'
+    as _i493;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_children_ids_usecase.dart'
+    as _i379;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_payments_usecase.dart'
+    as _i817;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_weekly_report_usecase.dart'
+    as _i379;
+import 'package:rafiq_academy/features/parent/domain/usecases/submit_absence_request_usecase.dart'
+    as _i888;
+import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart'
+    as _i995;
+import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource.dart'
+    as _i536;
+import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource_impl.dart'
+    as _i53;
+import 'package:rafiq_academy/features/student/data/repositories/student_repository_impl.dart'
+    as _i633;
+import 'package:rafiq_academy/features/student/domain/repositories/student_repository.dart'
+    as _i724;
+import 'package:rafiq_academy/features/student/domain/usecases/get_achievements_usecase.dart'
+    as _i224;
+import 'package:rafiq_academy/features/student/domain/usecases/get_latest_assignment_usecase.dart'
+    as _i664;
+import 'package:rafiq_academy/features/student/domain/usecases/get_monthly_review_schedule_usecase.dart'
+    as _i230;
+import 'package:rafiq_academy/features/student/domain/usecases/get_recitation_records_usecase.dart'
+    as _i124;
+import 'package:rafiq_academy/features/student/domain/usecases/get_student_halaqa_usecase.dart'
+    as _i554;
+import 'package:rafiq_academy/features/student/domain/usecases/get_student_profile_usecase.dart'
+    as _i385;
+import 'package:rafiq_academy/features/student/domain/usecases/watch_latest_assignment_usecase.dart'
+    as _i914;
+import 'package:rafiq_academy/features/student/presentation/bloc/student_bloc.dart'
+    as _i303;
+import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource.dart'
+    as _i65;
+import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource_impl.dart'
+    as _i615;
+import 'package:rafiq_academy/features/supervisor/data/repositories/supervisor_repository_impl.dart'
+    as _i582;
+import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart'
+    as _i307;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_halaqat_usecase.dart'
+    as _i704;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/issue_achievement_usecase.dart'
+    as _i13;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_student_usecase.dart'
+    as _i499;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/submit_supervisor_report_usecase.dart'
+    as _i910;
+import 'package:rafiq_academy/features/supervisor/presentations/bloc/supervisor_bloc.dart'
+    as _i934;
+import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart'
+    as _i717;
+import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource_impl.dart'
+    as _i88;
+import 'package:rafiq_academy/features/teacher/data/repositories/teacher_repository_impl.dart'
+    as _i63;
+import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart'
+    as _i1050;
+import 'package:rafiq_academy/features/teacher/domain/usecases/add_recitation_record_usecase.dart'
+    as _i877;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart'
+    as _i440;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
+    as _i626;
+import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance_usecase.dart'
+    as _i642;
+import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart'
+    as _i192;
+import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
+    as _i933;
+
+extension GetItInjectableX on _i174.GetIt {
+  // initializes the registration of main-scope dependencies inside of GetIt
+  _i174.GetIt init({
+    String? environment,
+    _i526.EnvironmentFilter? environmentFilter,
+  }) {
+    final gh = _i526.GetItHelper(this, environment, environmentFilter);
+    final diModule = _$DiModule();
+    gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
+    gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
+    gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
+    gh.lazySingleton<_i161.InternetConnection>(
+      () => diModule.internetConnection,
+    );
+    gh.lazySingleton<_i483.AuthRemoteDatasource>(
+      () => _i550.AuthRemoteDatasourceImpl(
+        firebaseAuth: gh<_i59.FirebaseAuth>(),
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i65.SupervisorRemoteDatasource>(
+      () => _i615.SupervisorRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i696.NetworkInfo>(
+      () => diModule.networkInfo(gh<_i161.InternetConnection>()),
+    );
+    gh.lazySingleton<_i717.TeacherRemoteDatasource>(
+      () => _i88.TeacherRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i536.StudentRemoteDatasource>(
+      () => _i53.StudentRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i543.AdminRemoteDatasource>(
+      () => _i775.AdminRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i1050.TeacherRepository>(
+      () => _i63.TeacherRepositoryImpl(
+        remoteDatasource: gh<_i717.TeacherRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i307.SupervisorRepository>(
+      () => _i582.SupervisorRepositoryImpl(
+        remoteDatasource: gh<_i65.SupervisorRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i892.ParentRemoteDatasource>(
+      () => _i430.ParentRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i255.AdminRepository>(
+      () => _i99.AdminRepositoryImpl(
+        remoteDatasource: gh<_i543.AdminRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i493.ParentRepository>(
+      () => _i964.ParentRepositoryImpl(
+        remoteDatasource: gh<_i892.ParentRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i605.AuthRepository>(
+      () => _i127.AuthRepositoryImpl(
+        remoteDatasource: gh<_i483.AuthRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i788.GetCurrentUserUseCase>(
+      () => _i788.GetCurrentUserUseCase(gh<_i605.AuthRepository>()),
+    );
+    gh.lazySingleton<_i339.LoginWithEmailUseCase>(
+      () => _i339.LoginWithEmailUseCase(gh<_i605.AuthRepository>()),
+    );
+    gh.lazySingleton<_i608.LogoutUseCase>(
+      () => _i608.LogoutUseCase(gh<_i605.AuthRepository>()),
+    );
+    gh.lazySingleton<_i724.StudentRepository>(
+      () => _i633.StudentRepositoryImpl(
+        remoteDatasource: gh<_i536.StudentRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
+      () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i440.GetHalaqaStudentsUseCase>(
+      () => _i440.GetHalaqaStudentsUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i626.GetTeacherHalaqatUseCase>(
+      () => _i626.GetTeacherHalaqatUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i642.RecordAttendanceUseCase>(
+      () => _i642.RecordAttendanceUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i192.SendAssignmentUseCase>(
+      () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i928.ApproveNewStudentUseCase>(
+      () => _i928.ApproveNewStudentUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i488.GetAcademyStatsUseCase>(
+      () => _i488.GetAcademyStatsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i899.GetComplaintsUseCase>(
+      () => _i899.GetComplaintsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i369.GetFinancialSummaryUseCase>(
+      () => _i369.GetFinancialSummaryUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i97.RespondToComplaintUseCase>(
+      () => _i97.RespondToComplaintUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i57.SendBroadcastNotificationUseCase>(
+      () => _i57.SendBroadcastNotificationUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i482.ToggleAccountStatusUseCase>(
+      () => _i482.ToggleAccountStatusUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i704.GetSupervisedHalaqatUseCase>(
+      () => _i704.GetSupervisedHalaqatUseCase(gh<_i307.SupervisorRepository>()),
+    );
+    gh.lazySingleton<_i13.IssueAchievementUseCase>(
+      () => _i13.IssueAchievementUseCase(gh<_i307.SupervisorRepository>()),
+    );
+    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
+      () => _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
+    );
+    gh.lazySingleton<_i910.SubmitSupervisorReportUseCase>(
+      () =>
+          _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
+    );
+    gh.singleton<_i196.AuthBloc>(
+      () => _i196.AuthBloc(
+        loginWithEmail: gh<_i339.LoginWithEmailUseCase>(),
+        logout: gh<_i608.LogoutUseCase>(),
+        getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
+      ),
+    );
+    gh.singleton<_i939.AdminBloc>(
+      () => _i939.AdminBloc(
+        getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
+        getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
+        getComplaints: gh<_i899.GetComplaintsUseCase>(),
+        approveNewStudent: gh<_i928.ApproveNewStudentUseCase>(),
+        toggleAccountStatus: gh<_i482.ToggleAccountStatusUseCase>(),
+        respondToComplaint: gh<_i97.RespondToComplaintUseCase>(),
+        sendBroadcastNotification: gh<_i57.SendBroadcastNotificationUseCase>(),
+      ),
+    );
+    gh.singleton<_i933.TeacherBloc>(
+      () => _i933.TeacherBloc(
+        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
+        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
+        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
+        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i379.GetChildrenIdsUseCase>(
+      () => _i379.GetChildrenIdsUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i817.GetPaymentsUseCase>(
+      () => _i817.GetPaymentsUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i379.GetWeeklyReportUseCase>(
+      () => _i379.GetWeeklyReportUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i888.SubmitAbsenceRequestUseCase>(
+      () => _i888.SubmitAbsenceRequestUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i224.GetAchievementsUseCase>(
+      () => _i224.GetAchievementsUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i664.GetLatestAssignmentUseCase>(
+      () => _i664.GetLatestAssignmentUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i230.GetMonthlyReviewScheduleUseCase>(
+      () =>
+          _i230.GetMonthlyReviewScheduleUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i124.GetRecitationRecordsUseCase>(
+      () => _i124.GetRecitationRecordsUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i554.GetStudentHalaqaUseCase>(
+      () => _i554.GetStudentHalaqaUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i385.GetStudentProfileUseCase>(
+      () => _i385.GetStudentProfileUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i914.WatchLatestAssignmentUseCase>(
+      () => _i914.WatchLatestAssignmentUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.singleton<_i303.StudentBloc>(
+      () => _i303.StudentBloc(
+        getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
+        getMonthlyReviewSchedule: gh<_i230.GetMonthlyReviewScheduleUseCase>(),
+        getRecitationRecords: gh<_i124.GetRecitationRecordsUseCase>(),
+        getAchievements: gh<_i224.GetAchievementsUseCase>(),
+        getStudentHalaqa: gh<_i554.GetStudentHalaqaUseCase>(),
+        watchLatestAssignment: gh<_i914.WatchLatestAssignmentUseCase>(),
+      ),
+    );
+    gh.singleton<_i934.SupervisorBloc>(
+      () => _i934.SupervisorBloc(
+        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
+        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
+        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
+        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
+      ),
+    );
+    gh.singleton<_i995.ParentBloc>(
+      () => _i995.ParentBloc(
+        getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
+        getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
+        getPayments: gh<_i817.GetPaymentsUseCase>(),
+        submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
+      ),
+    );
+    return this;
+  }
+}
+
+class _$DiModule extends _i126.DiModule {}

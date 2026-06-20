@@ -1,11 +1,13 @@
 import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/user_entity.dart';
 import '../repositories/auth_repository.dart';
 
+@lazySingleton
 class LoginWithEmailUseCase extends UseCase<UserEntity, LoginParams> {
   final AuthRepository repository;
 

@@ -36,12 +36,10 @@ class ParentRepositoryImpl implements ParentRepository {
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      return Right(
-        await remoteDatasource.getWeeklyReport(
-          studentId: studentId,
-          weekStart: weekStart,
-        ),
-      );
+      return Right(await remoteDatasource.getWeeklyReport(
+        studentId: studentId,
+        weekStart: weekStart,
+      ));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }
@@ -49,8 +47,7 @@ class ParentRepositoryImpl implements ParentRepository {
 
   @override
   Future<Either<Failure, List<PaymentEntity>>> getPayments(
-    String parentId,
-  ) async {
+      String parentId,) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       return Right(await remoteDatasource.getPayments(parentId));
@@ -61,8 +58,7 @@ class ParentRepositoryImpl implements ParentRepository {
 
   @override
   Future<Either<Failure, Unit>> submitAbsenceRequest(
-    AbsenceRequestEntity request,
-  ) async {
+      AbsenceRequestEntity request,) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.submitAbsenceRequest(
@@ -84,9 +80,20 @@ class ParentRepositoryImpl implements ParentRepository {
 
   @override
   Stream<Either<Failure, List<String>>> watchChildrenAssignments(
-    String parentId,
-  ) {
+      String parentId,) {
     // TODO: implement real-time stream لما نحتاجه في الـ UI
     return const Stream.empty();
+  }
+
+  @override
+  Future<Either<Failure, PaymentInitiationEntity>> initiatePayment(
+      String paymentId,) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      final initiation = await remoteDatasource.initiatePayment(paymentId);
+      return Right(initiation);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
   }
 }

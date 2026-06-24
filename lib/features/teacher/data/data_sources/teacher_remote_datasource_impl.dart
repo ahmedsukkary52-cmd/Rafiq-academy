@@ -92,6 +92,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     required String teacherId,
   }) async {
     try {
+      // نجيب طلاب الحلقة ونبعت تكليف لكل واحد
       final halaqaDoc = await firestore
           .collection(FirestoreCollections.halaqat)
           .doc(halaqaId)

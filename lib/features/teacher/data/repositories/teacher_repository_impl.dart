@@ -87,6 +87,8 @@ class TeacherRepositoryImpl implements TeacherRepository {
           versesRange: record.versesRange,
           grade: record.grade,
           notes: record.notes,
+          studentName: record.studentName,
+          behaviorGrade: record.behaviorGrade,
         ),
       );
       return const Right(unit);

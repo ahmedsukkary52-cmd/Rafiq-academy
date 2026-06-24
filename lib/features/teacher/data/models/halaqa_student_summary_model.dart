@@ -8,6 +8,10 @@ class HalaqaStudentSummaryModel extends HalaqaStudentSummaryEntity {
     required super.name,
     super.profileImageUrl,
     super.todayAttendance,
+    super.level,
+    super.attendancePercent,
+    super.lastGradeLabel,
+    super.isAtRisk,
   });
 
   factory HalaqaStudentSummaryModel.fromFirestore(DocumentSnapshot doc) {
@@ -16,6 +20,7 @@ class HalaqaStudentSummaryModel extends HalaqaStudentSummaryEntity {
       uid: doc.id,
       name: data['name'] ?? '',
       profileImageUrl: data['profileImageUrl'] as String?,
+      level: (data['level'] ?? 1) as int,
     );
   }
 }

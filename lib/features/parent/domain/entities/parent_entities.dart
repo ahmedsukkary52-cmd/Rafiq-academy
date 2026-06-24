@@ -1,5 +1,9 @@
 import 'package:equatable/equatable.dart';
 
+// ══════════════════════════════════════════════════════════════════════════════
+// AbsenceRequestEntity - طلب استئذان من ولي الأمر
+// ══════════════════════════════════════════════════════════════════════════════
+
 enum AbsenceRequestStatus { pending, approved, rejected }
 
 class AbsenceRequestEntity extends Equatable {
@@ -22,16 +26,13 @@ class AbsenceRequestEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props => [
-    id,
-    studentId,
-    requestedBy,
-    date,
-    reason,
-    status,
-    reviewedBy,
-  ];
+  List<Object?> get props =>
+      [id, studentId, requestedBy, date, reason, status, reviewedBy];
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PaymentEntity - الرسوم والاشتراكات
+// ══════════════════════════════════════════════════════════════════════════════
 
 enum PaymentStatus { paid, due, overdue }
 
@@ -57,17 +58,13 @@ class PaymentEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props => [
-    id,
-    studentId,
-    parentId,
-    amount,
-    dueDate,
-    paidAt,
-    status,
-    method,
-  ];
+  List<Object?> get props =>
+      [id, studentId, parentId, amount, dueDate, paidAt, status, method];
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WeeklyReportEntity - التقرير الأسبوعي لولي الأمر
+// ══════════════════════════════════════════════════════════════════════════════
 
 class WeeklyReportEntity extends Equatable {
   final String studentId;
@@ -101,4 +98,27 @@ class WeeklyReportEntity extends Equatable {
     totalSessions,
     teacherNotes,
   ];
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PaymentInitiationEntity
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// نتيجة بدء عملية دفع عند Paymob - بنرجّع منها رابط صفحة الدفع الجاهزة
+/// (checkout) اللي الـ UI هيفتحه (في WebView مثلاً) لما نبني الشاشات.
+class PaymentInitiationEntity extends Equatable {
+  final String clientSecret;
+  final String publicKey;
+
+  const PaymentInitiationEntity({
+    required this.clientSecret,
+    required this.publicKey,
+  });
+
+  /// رابط صفحة الدفع الموحّدة الجاهزة من Paymob (Unified Checkout)
+  String get checkoutUrl =>
+      'https://accept.paymob.com/unifiedcheckout/?publicKey=$publicKey&clientSecret=$clientSecret';
+
+  @override
+  List<Object?> get props => [clientSecret, publicKey];
 }

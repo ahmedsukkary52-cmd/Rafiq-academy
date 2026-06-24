@@ -5,13 +5,9 @@ import '../models/halaqa_student_summary_model.dart';
 
 abstract class TeacherRemoteDatasource {
   Future<List<HalaqaModel>> getTeacherHalaqat(String teacherId);
-
   Future<List<HalaqaStudentSummaryModel>> getHalaqaStudents(String halaqaId);
-
   Future<void> recordAttendance(AttendanceRecordModel record);
-
   Future<void> addRecitationRecord(RecitationRecordModel record);
-
   Future<void> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,

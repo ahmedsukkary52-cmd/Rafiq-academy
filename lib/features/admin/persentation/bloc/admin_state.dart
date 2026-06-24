@@ -4,6 +4,8 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
+import '../../domain/entities/teacher_activity_entity.dart';
+import '../../domain/entities/teacher_management_entity.dart';
 
 class _Unset {
   const _Unset();
@@ -40,6 +42,21 @@ class AdminState extends Equatable {
   final SubmissionStatus broadcastStatus;
   final String? broadcastError;
 
+  // ── إدارة شؤون المعلمين ───────────────────────────────────────────────
+  final SectionStatus teachersStatus;
+  final List<TeacherManagementEntity> teachers;
+  final String? teachersError;
+
+  final SubmissionStatus updatePerformanceStatus;
+  final String? updatePerformanceError;
+
+  final SubmissionStatus updateQuotaStatus;
+  final String? updateQuotaError;
+
+  final SectionStatus teacherActivityStatus;
+  final TeacherActivityEntity? teacherActivity;
+  final String? teacherActivityError;
+
   const AdminState({
     this.statsStatus = SectionStatus.initial,
     this.stats,
@@ -58,6 +75,16 @@ class AdminState extends Equatable {
     this.respondComplaintError,
     this.broadcastStatus = SubmissionStatus.idle,
     this.broadcastError,
+    this.teachersStatus = SectionStatus.initial,
+    this.teachers = const [],
+    this.teachersError,
+    this.updatePerformanceStatus = SubmissionStatus.idle,
+    this.updatePerformanceError,
+    this.updateQuotaStatus = SubmissionStatus.idle,
+    this.updateQuotaError,
+    this.teacherActivityStatus = SectionStatus.initial,
+    this.teacherActivity,
+    this.teacherActivityError,
   });
 
   factory AdminState.initial() => const AdminState();
@@ -80,6 +107,16 @@ class AdminState extends Equatable {
     Object? respondComplaintError = _unset,
     SubmissionStatus? broadcastStatus,
     Object? broadcastError = _unset,
+    SectionStatus? teachersStatus,
+    List<TeacherManagementEntity>? teachers,
+    Object? teachersError = _unset,
+    SubmissionStatus? updatePerformanceStatus,
+    Object? updatePerformanceError = _unset,
+    SubmissionStatus? updateQuotaStatus,
+    Object? updateQuotaError = _unset,
+    SectionStatus? teacherActivityStatus,
+    Object? teacherActivity = _unset,
+    Object? teacherActivityError = _unset,
   }) {
     return AdminState(
       statsStatus: statsStatus ?? this.statsStatus,
@@ -118,6 +155,28 @@ class AdminState extends Equatable {
       broadcastError: identical(broadcastError, _unset)
           ? this.broadcastError
           : broadcastError as String?,
+      teachersStatus: teachersStatus ?? this.teachersStatus,
+      teachers: teachers ?? this.teachers,
+      teachersError: identical(teachersError, _unset)
+          ? this.teachersError
+          : teachersError as String?,
+      updatePerformanceStatus:
+          updatePerformanceStatus ?? this.updatePerformanceStatus,
+      updatePerformanceError: identical(updatePerformanceError, _unset)
+          ? this.updatePerformanceError
+          : updatePerformanceError as String?,
+      updateQuotaStatus: updateQuotaStatus ?? this.updateQuotaStatus,
+      updateQuotaError: identical(updateQuotaError, _unset)
+          ? this.updateQuotaError
+          : updateQuotaError as String?,
+      teacherActivityStatus:
+          teacherActivityStatus ?? this.teacherActivityStatus,
+      teacherActivity: identical(teacherActivity, _unset)
+          ? this.teacherActivity
+          : teacherActivity as TeacherActivityEntity?,
+      teacherActivityError: identical(teacherActivityError, _unset)
+          ? this.teacherActivityError
+          : teacherActivityError as String?,
     );
   }
 
@@ -140,5 +199,15 @@ class AdminState extends Equatable {
     respondComplaintError,
     broadcastStatus,
     broadcastError,
+    teachersStatus,
+    teachers,
+    teachersError,
+    updatePerformanceStatus,
+    updatePerformanceError,
+    updateQuotaStatus,
+    updateQuotaError,
+    teacherActivityStatus,
+    teacherActivity,
+    teacherActivityError,
   ];
 }

@@ -10,20 +10,25 @@ import '../entities/halaqa_students_summary_entity.dart';
 enum AttendanceStatus { present, absent, late }
 
 abstract class TeacherRepository {
+  /// الحلقات المسندة للمعلم
   Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(
     String teacherId,
   );
 
+  /// طلاب الحلقة
   Future<Either<Failure, List<HalaqaStudentSummaryEntity>>> getHalaqaStudents(
     String halaqaId,
   );
 
+  /// تسجيل الحضور لطالب معيّن
   Future<Either<Failure, Unit>> recordAttendance(AttendanceRecordEntity record);
 
+  /// تسجيل تقييم التسميع لطالب
   Future<Either<Failure, Unit>> addRecitationRecord(
     RecitationRecordEntity record,
   );
 
+  /// إرسال تكليف لطالب أو حلقة كاملة
   Future<Either<Failure, Unit>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,

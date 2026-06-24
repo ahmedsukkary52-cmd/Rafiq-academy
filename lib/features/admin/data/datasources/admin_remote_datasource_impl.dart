@@ -6,6 +6,8 @@ import '../../../../core/error/exception.dart';
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
+import '../../domain/entities/teacher_activity_entity.dart';
+import '../../domain/entities/teacher_management_entity.dart';
 import 'admin_remote_datasource.dart';
 
 @LazySingleton(as: AdminRemoteDatasource)
@@ -18,23 +20,17 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   Future<AcademyStatsEntity> getAcademyStats() async {
     try {
       final results = await Future.wait([
-        firestore
-            .collection(FirestoreCollections.users)
+        firestore.collection(FirestoreCollections.users)
             .where('role', isEqualTo: AppRoles.student)
             .where('isActive', isEqualTo: true)
-            .count()
-            .get(),
-        firestore
-            .collection(FirestoreCollections.users)
+            .count().get(),
+        firestore.collection(FirestoreCollections.users)
             .where('role', isEqualTo: AppRoles.teacher)
             .where('isActive', isEqualTo: true)
-            .count()
-            .get(),
-        firestore
-            .collection(FirestoreCollections.halaqat)
+            .count().get(),
+        firestore.collection(FirestoreCollections.halaqat)
             .where('status', isEqualTo: 'active')
-            .count()
-            .get(),
+            .count().get(),
       ]);
 
       return AcademyStatsEntity(
@@ -104,16 +100,13 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         {'isActive': true},
       );
       batch.update(
-        firestore
-            .collection(FirestoreCollections.studentProfiles)
-            .doc(studentId),
+        firestore.collection(FirestoreCollections.studentProfiles).doc(
+            studentId),
         {'halaqaId': halaqaId},
       );
       batch.update(
         firestore.collection(FirestoreCollections.halaqat).doc(halaqaId),
-        {
-          'studentIds': FieldValue.arrayUnion([studentId]),
-        },
+        {'studentIds': FieldValue.arrayUnion([studentId])},
       );
 
       await batch.commit();
@@ -128,9 +121,10 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required bool isActive,
   }) async {
     try {
-      await firestore.collection(FirestoreCollections.users).doc(uid).update({
-        'isActive': isActive,
-      });
+      await firestore
+          .collection(FirestoreCollections.users)
+          .doc(uid)
+          .update({'isActive': isActive});
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -184,16 +178,133 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String targetRole,
   }) async {
     try {
+      // 'audience' بدل 'recipientId'/'recipientRole' المنفصلين، و
+      // 'readBy' فاضية بدل 'isRead' بول واحد - متوافق مع feature
+      // الإشعارات اللي بتقرأ بنفس الـ schema ده (راجع notifications
+      // feature لو حبيت تفهم السبب: bool واحد غلط لإشعار بيوصل لآلاف
+      // المستخدمين دفعة واحدة).
       await firestore.collection(FirestoreCollections.notifications).add({
-        'recipientId': 'all',
-        'recipientRole': targetRole,
+        'audience': targetRole, // 'all' أو اسم role زي 'student'
         'title': title,
         'body': body,
         'type': NotificationTypes.general,
-        'isRead': false,
+        'readBy': <String>[],
         'hasAudioAlert': false,
-        'createdAt': Timestamp.now(),
+        'createdAt': FieldValue.serverTimestamp(),
       });
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<TeacherManagementEntity>> getAllTeachers() async {
+    try {
+      // الخطوة 1: نجيب كل المستخدمين اللي دورهم "معلم" (للاسم والصورة)
+      final usersSnap = await firestore
+          .collection(FirestoreCollections.users)
+          .where('role', isEqualTo: AppRoles.teacher)
+          .get();
+
+      if (usersSnap.docs.isEmpty) return [];
+
+      // الخطوة 2: نجيب بروفايل كل معلم (النصاب والتقييم) بالتوازي.
+      // ملاحظة: ده N قراءة منفصلة بعدد المعلمين (مش query واحد)، لأن
+      // Firestore مفيهوش joins. مقبول طالما عدد المعلمين بالعشرات،
+      // لو الأكاديمية كبرت جداً (مئات المعلمين) هنحتاج نفكر في تجميع
+      // البيانات دي مسبقاً (denormalization) بدل القراءة المباشرة.
+      final profileFutures = usersSnap.docs.map((userDoc) {
+        return firestore
+            .collection(FirestoreCollections.teacherProfiles)
+            .doc(userDoc.id)
+            .get();
+      });
+
+      final profileDocs = await Future.wait(profileFutures);
+
+      return List.generate(usersSnap.docs.length, (i) {
+        final userData = usersSnap.docs[i].data();
+        final profileData = profileDocs[i].data() as Map<String, dynamic>?;
+
+        return TeacherManagementEntity(
+          uid: usersSnap.docs[i].id,
+          name: userData['name'] ?? '',
+          profileImageUrl: userData['profileImageUrl'] as String?,
+          halaqatIds:
+          List<String>.from(profileData?['halaqatIds'] ?? const []),
+          performanceRating: (profileData?['performanceRating'] as num?)
+              ?.toDouble(),
+          weeklyQuota: (profileData?['weeklyQuota'] ?? 0) as int,
+        );
+      });
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateTeacherPerformance({
+    required String teacherId,
+    required double rating,
+  }) async {
+    try {
+      await firestore
+          .collection(FirestoreCollections.teacherProfiles)
+          .doc(teacherId)
+          .update({'performanceRating': rating});
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateTeacherQuota({
+    required String teacherId,
+    required int weeklyQuota,
+  }) async {
+    try {
+      await firestore
+          .collection(FirestoreCollections.teacherProfiles)
+          .doc(teacherId)
+          .update({'weeklyQuota': weeklyQuota});
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<TeacherActivityEntity> getTeacherActivityLog({
+    required String teacherId,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    try {
+      final snapshot = await firestore
+          .collection(FirestoreCollections.attendanceRecords)
+          .where('recordedBy', isEqualTo: teacherId)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(to))
+          .get();
+
+      // بنحوّل كل تاريخ لـ "يوم بس" (من غير وقت) ونشيل التكرار، عشان
+      // لو المعلم سجّل حضور لأكتر من طالب في نفس اليوم، يحسب يوم واحد
+      // بس في سجل النشاط مش يتكرر بعدد الطلاب.
+      final uniqueDates = <DateTime>{};
+      for (final doc in snapshot.docs) {
+        final timestamp = (doc.data())['date'] as Timestamp;
+        final date = timestamp.toDate();
+        uniqueDates.add(DateTime(date.year, date.month, date.day));
+      }
+
+      final sortedDates = uniqueDates.toList()
+        ..sort();
+
+      return TeacherActivityEntity(
+        teacherId: teacherId,
+        rangeStart: from,
+        rangeEnd: to,
+        activeDates: sortedDates,
+      );
     } catch (e) {
       throw ServerException(e.toString());
     }

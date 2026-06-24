@@ -9,7 +9,6 @@ import '../repositories/teacher_repository.dart';
 @lazySingleton
 class AddRecitationRecordUseCase extends UseCase<Unit, RecitationRecordEntity> {
   final TeacherRepository repository;
-
   AddRecitationRecordUseCase(this.repository);
 
   @override

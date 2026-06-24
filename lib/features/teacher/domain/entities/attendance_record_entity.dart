@@ -22,13 +22,6 @@ class AttendanceRecordEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props => [
-    id,
-    studentId,
-    studentName,
-    halaqaId,
-    date,
-    status,
-    recordedBy,
-  ];
+  List<Object?> get props =>
+      [id, studentId, studentName, halaqaId, date, status, recordedBy];
 }

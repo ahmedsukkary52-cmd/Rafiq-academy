@@ -9,7 +9,6 @@ import '../repositories/teacher_repository.dart';
 @lazySingleton
 class RecordAttendanceUseCase extends UseCase<Unit, AttendanceRecordEntity> {
   final TeacherRepository repository;
-
   RecordAttendanceUseCase(this.repository);
 
   @override

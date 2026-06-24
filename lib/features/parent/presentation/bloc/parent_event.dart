@@ -12,7 +12,6 @@ abstract class ParentEvent extends Equatable {
 /// تحميل معرّفات أبناء ولي الأمر
 class LoadChildrenEvent extends ParentEvent {
   final String parentId;
-
   const LoadChildrenEvent(this.parentId);
 
   @override
@@ -23,7 +22,6 @@ class LoadChildrenEvent extends ParentEvent {
 /// بيحمّل تلقائياً تقرير الأسبوع الحالي بتاعه.
 class SelectChildEvent extends ParentEvent {
   final String studentId;
-
   const SelectChildEvent(this.studentId);
 
   @override
@@ -34,7 +32,6 @@ class SelectChildEvent extends ParentEvent {
 class LoadWeeklyReportEvent extends ParentEvent {
   final String studentId;
   final DateTime weekStart;
-
   const LoadWeeklyReportEvent({
     required this.studentId,
     required this.weekStart,
@@ -47,7 +44,6 @@ class LoadWeeklyReportEvent extends ParentEvent {
 /// تحميل سجل المدفوعات والاشتراكات
 class LoadPaymentsEvent extends ParentEvent {
   final String parentId;
-
   const LoadPaymentsEvent(this.parentId);
 
   @override
@@ -57,7 +53,6 @@ class LoadPaymentsEvent extends ParentEvent {
 /// تقديم طلب استئذان عن حصة
 class SubmitAbsenceRequestEvent extends ParentEvent {
   final AbsenceRequestEntity request;
-
   const SubmitAbsenceRequestEvent(this.request);
 
   @override
@@ -69,4 +64,19 @@ class SubmitAbsenceRequestEvent extends ParentEvent {
 /// ميشوفش نتيجة المحاولة القديمة.
 class ResetAbsenceSubmissionEvent extends ParentEvent {
   const ResetAbsenceSubmissionEvent();
+}
+
+/// بدء عملية دفع لمستحق معيّن
+class InitiatePaymentEvent extends ParentEvent {
+  final String paymentId;
+
+  const InitiatePaymentEvent(this.paymentId);
+
+  @override
+  List<Object?> get props => [paymentId];
+}
+
+/// إعادة تصفير نتيجة بدء الدفع بعد ما الـ UI يفتح صفحة الدفع
+class ResetPaymentInitiationEvent extends ParentEvent {
+  const ResetPaymentInitiationEvent();
 }

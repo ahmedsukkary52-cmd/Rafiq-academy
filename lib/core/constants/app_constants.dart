@@ -1,3 +1,4 @@
+/// أدوار المستخدمين - يتطابق مع قيمة حقل [role] في Firestore
 class AppRoles {
   const AppRoles._();
 
@@ -7,9 +8,16 @@ class AppRoles {
   static const String supervisor = 'supervisor';
   static const String admin = 'admin';
 
-  static const List<String> all = [student, parent, teacher, supervisor, admin];
+  static const List<String> all = [
+    student,
+    parent,
+    teacher,
+    supervisor,
+    admin,
+  ];
 }
 
+/// أسماء collections في Firestore
 class FirestoreCollections {
   const FirestoreCollections._();
 
@@ -29,8 +37,11 @@ class FirestoreCollections {
   static const String notifications = 'notifications';
   static const String complaints = 'complaints';
   static const String supervisorReports = 'supervisorReports';
+  static const String conversations = 'conversations';
+  static const String messagesSubcollection = 'messages';
 }
 
+/// أنواع التقييمات في سجل التسميع
 class RecitationGrades {
   const RecitationGrades._();
 
@@ -40,6 +51,7 @@ class RecitationGrades {
   static const String needsRetry = 'يحتاج إعادة';
 }
 
+/// أنواع الإشعارات
 class NotificationTypes {
   const NotificationTypes._();
 
@@ -50,10 +62,11 @@ class NotificationTypes {
   static const String general = 'general';
 }
 
+/// ثوابت الـ UI العامة
 class AppConstants {
   const AppConstants._();
 
-  static const String appName = 'أكاديمية التحفيظ';
+  static const String appName = 'رفيق - أكاديمية التحفيظ';
   static const Duration snackBarDuration = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 300);
 }

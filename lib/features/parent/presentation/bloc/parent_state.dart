@@ -30,6 +30,11 @@ class ParentState extends Equatable {
   final SubmissionStatus absenceSubmissionStatus;
   final String? absenceSubmissionError;
 
+  // ── بدء عملية دفع ──────────────────────────────────────────────────────
+  final SubmissionStatus paymentInitiationStatus;
+  final PaymentInitiationEntity? paymentInitiation;
+  final String? paymentInitiationError;
+
   const ParentState({
     this.childrenStatus = SectionStatus.initial,
     this.childrenIds = const [],
@@ -43,6 +48,9 @@ class ParentState extends Equatable {
     this.paymentsError,
     this.absenceSubmissionStatus = SubmissionStatus.idle,
     this.absenceSubmissionError,
+    this.paymentInitiationStatus = SubmissionStatus.idle,
+    this.paymentInitiation,
+    this.paymentInitiationError,
   });
 
   factory ParentState.initial() => const ParentState();
@@ -60,6 +68,9 @@ class ParentState extends Equatable {
     Object? paymentsError = _unset,
     SubmissionStatus? absenceSubmissionStatus,
     Object? absenceSubmissionError = _unset,
+    SubmissionStatus? paymentInitiationStatus,
+    Object? paymentInitiation = _unset,
+    Object? paymentInitiationError = _unset,
   }) {
     return ParentState(
       childrenStatus: childrenStatus ?? this.childrenStatus,
@@ -87,6 +98,14 @@ class ParentState extends Equatable {
       absenceSubmissionError: identical(absenceSubmissionError, _unset)
           ? this.absenceSubmissionError
           : absenceSubmissionError as String?,
+      paymentInitiationStatus:
+          paymentInitiationStatus ?? this.paymentInitiationStatus,
+      paymentInitiation: identical(paymentInitiation, _unset)
+          ? this.paymentInitiation
+          : paymentInitiation as PaymentInitiationEntity?,
+      paymentInitiationError: identical(paymentInitiationError, _unset)
+          ? this.paymentInitiationError
+          : paymentInitiationError as String?,
     );
   }
 
@@ -104,5 +123,8 @@ class ParentState extends Equatable {
     paymentsError,
     absenceSubmissionStatus,
     absenceSubmissionError,
+    paymentInitiationStatus,
+    paymentInitiation,
+    paymentInitiationError,
   ];
 }

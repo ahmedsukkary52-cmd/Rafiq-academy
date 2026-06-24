@@ -10,7 +10,6 @@ import '../repositories/teacher_repository.dart';
 class GetTeacherHalaqatUseCase
     extends UseCase<List<HalaqaEntity>, TeacherIdParams> {
   final TeacherRepository repository;
-
   GetTeacherHalaqatUseCase(this.repository);
 
   @override

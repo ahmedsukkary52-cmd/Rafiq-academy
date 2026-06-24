@@ -10,6 +10,7 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
+import 'package:cloud_functions/cloud_functions.dart' as _i809;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
 import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
 import 'package:get_it/get_it.dart' as _i174;
@@ -30,16 +31,24 @@ import 'package:rafiq_academy/features/admin/domain/usecases/approve_new_student
     as _i928;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_academy_stats_usecase.dart'
     as _i488;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_all_teachers_usecase.dart'
+    as _i975;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_complaints_usecase.dart'
     as _i899;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_financial_summary_usecase.dart'
     as _i369;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_teacher_activity_log_usecase.dart'
+    as _i1063;
 import 'package:rafiq_academy/features/admin/domain/usecases/respond_to_complaint_usecase.dart'
     as _i97;
 import 'package:rafiq_academy/features/admin/domain/usecases/send_broadcast_notification_usecase.dart'
     as _i57;
 import 'package:rafiq_academy/features/admin/domain/usecases/toggle_account_status_usecase.dart'
     as _i482;
+import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_performance_usecase.dart'
+    as _i413;
+import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_quota_usecase.dart'
+    as _i1014;
 import 'package:rafiq_academy/features/admin/persentation/bloc/admin_bloc.dart'
     as _i939;
 import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasouce_impl.dart'
@@ -58,6 +67,28 @@ import 'package:rafiq_academy/features/auth/domain/usecases/logout_usecase.dart'
     as _i608;
 import 'package:rafiq_academy/features/auth/presentaiton/bloc/auth_bloc.dart'
     as _i196;
+import 'package:rafiq_academy/features/chat/data/datasources/chat_remote_datasource.dart'
+    as _i164;
+import 'package:rafiq_academy/features/chat/data/repositories/chat_repository_impl.dart'
+    as _i369;
+import 'package:rafiq_academy/features/chat/domain/repositories/chat_repository.dart'
+    as _i194;
+import 'package:rafiq_academy/features/chat/domain/usecases/chat_usecases.dart'
+    as _i337;
+import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations_bloc.dart'
+    as _i618;
+import 'package:rafiq_academy/features/chat/presentation/bloc/chat_room_bloc.dart'
+    as _i467;
+import 'package:rafiq_academy/features/notifications/data/datasources/notifications_remote_datasource.dart'
+    as _i676;
+import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
+    as _i579;
+import 'package:rafiq_academy/features/notifications/domain/repositories/notifications_repository.dart'
+    as _i587;
+import 'package:rafiq_academy/features/notifications/domain/usecases/notification_usecase.dart'
+    as _i152;
+import 'package:rafiq_academy/features/notifications/presentation/bloc/notifications_bloc.dart'
+    as _i164;
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart'
     as _i892;
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource_impl.dart'
@@ -72,6 +103,8 @@ import 'package:rafiq_academy/features/parent/domain/usecases/get_payments_useca
     as _i817;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_weekly_report_usecase.dart'
     as _i379;
+import 'package:rafiq_academy/features/parent/domain/usecases/initiate_payment_usecase.dart'
+    as _i693;
 import 'package:rafiq_academy/features/parent/domain/usecases/submit_absence_request_usecase.dart'
     as _i888;
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart'
@@ -150,6 +183,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
     gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
+    gh.lazySingleton<_i809.FirebaseFunctions>(() => diModule.firebaseFunctions);
     gh.lazySingleton<_i161.InternetConnection>(
       () => diModule.internetConnection,
     );
@@ -159,8 +193,19 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
+    gh.lazySingleton<_i892.ParentRemoteDatasource>(
+      () => _i430.ParentRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        functions: gh<_i809.FirebaseFunctions>(),
+      ),
+    );
     gh.lazySingleton<_i65.SupervisorRemoteDatasource>(
       () => _i615.SupervisorRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i676.NotificationsRemoteDatasource>(
+      () => _i676.NotificationsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
@@ -188,20 +233,26 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
+    gh.lazySingleton<_i164.ChatRemoteDatasource>(
+      () => _i164.ChatRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
     gh.lazySingleton<_i307.SupervisorRepository>(
       () => _i582.SupervisorRepositoryImpl(
         remoteDatasource: gh<_i65.SupervisorRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
-    gh.lazySingleton<_i892.ParentRemoteDatasource>(
-      () => _i430.ParentRemoteDatasourceImpl(
-        firestore: gh<_i974.FirebaseFirestore>(),
-      ),
-    );
     gh.lazySingleton<_i255.AdminRepository>(
       () => _i99.AdminRepositoryImpl(
         remoteDatasource: gh<_i543.AdminRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i194.ChatRepository>(
+      () => _i369.ChatRepositoryImpl(
+        remoteDatasource: gh<_i164.ChatRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
@@ -232,6 +283,12 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
+    gh.lazySingleton<_i587.NotificationsRepository>(
+      () => _i579.NotificationsRepositoryImpl(
+        remoteDatasource: gh<_i676.NotificationsRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
     gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
       () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -253,11 +310,17 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i488.GetAcademyStatsUseCase>(
       () => _i488.GetAcademyStatsUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.lazySingleton<_i975.GetAllTeachersUseCase>(
+      () => _i975.GetAllTeachersUseCase(gh<_i255.AdminRepository>()),
+    );
     gh.lazySingleton<_i899.GetComplaintsUseCase>(
       () => _i899.GetComplaintsUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i369.GetFinancialSummaryUseCase>(
       () => _i369.GetFinancialSummaryUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i1063.GetTeacherActivityLogUseCase>(
+      () => _i1063.GetTeacherActivityLogUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i97.RespondToComplaintUseCase>(
       () => _i97.RespondToComplaintUseCase(gh<_i255.AdminRepository>()),
@@ -267,6 +330,12 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i482.ToggleAccountStatusUseCase>(
       () => _i482.ToggleAccountStatusUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i413.UpdateTeacherPerformanceUseCase>(
+      () => _i413.UpdateTeacherPerformanceUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i1014.UpdateTeacherQuotaUseCase>(
+      () => _i1014.UpdateTeacherQuotaUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i704.GetSupervisedHalaqatUseCase>(
       () => _i704.GetSupervisedHalaqatUseCase(gh<_i307.SupervisorRepository>()),
@@ -288,16 +357,20 @@ extension GetItInjectableX on _i174.GetIt {
         getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
       ),
     );
-    gh.singleton<_i939.AdminBloc>(
-      () => _i939.AdminBloc(
-        getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
-        getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
-        getComplaints: gh<_i899.GetComplaintsUseCase>(),
-        approveNewStudent: gh<_i928.ApproveNewStudentUseCase>(),
-        toggleAccountStatus: gh<_i482.ToggleAccountStatusUseCase>(),
-        respondToComplaint: gh<_i97.RespondToComplaintUseCase>(),
-        sendBroadcastNotification: gh<_i57.SendBroadcastNotificationUseCase>(),
-      ),
+    gh.lazySingleton<_i337.WatchConversationsUseCase>(
+      () => _i337.WatchConversationsUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.WatchMessagesUseCase>(
+      () => _i337.WatchMessagesUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.GetOrCreateConversationUseCase>(
+      () => _i337.GetOrCreateConversationUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.SendMessageUseCase>(
+      () => _i337.SendMessageUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.MarkConversationAsReadUseCase>(
+      () => _i337.MarkConversationAsReadUseCase(gh<_i194.ChatRepository>()),
     );
     gh.singleton<_i933.TeacherBloc>(
       () => _i933.TeacherBloc(
@@ -308,6 +381,21 @@ extension GetItInjectableX on _i174.GetIt {
         sendAssignment: gh<_i192.SendAssignmentUseCase>(),
       ),
     );
+    gh.singleton<_i939.AdminBloc>(
+      () => _i939.AdminBloc(
+        getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
+        getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
+        getComplaints: gh<_i899.GetComplaintsUseCase>(),
+        approveNewStudent: gh<_i928.ApproveNewStudentUseCase>(),
+        toggleAccountStatus: gh<_i482.ToggleAccountStatusUseCase>(),
+        respondToComplaint: gh<_i97.RespondToComplaintUseCase>(),
+        sendBroadcastNotification: gh<_i57.SendBroadcastNotificationUseCase>(),
+        getAllTeachers: gh<_i975.GetAllTeachersUseCase>(),
+        updateTeacherPerformance: gh<_i413.UpdateTeacherPerformanceUseCase>(),
+        updateTeacherQuota: gh<_i1014.UpdateTeacherQuotaUseCase>(),
+        getTeacherActivityLog: gh<_i1063.GetTeacherActivityLogUseCase>(),
+      ),
+    );
     gh.lazySingleton<_i379.GetChildrenIdsUseCase>(
       () => _i379.GetChildrenIdsUseCase(gh<_i493.ParentRepository>()),
     );
@@ -316,6 +404,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i379.GetWeeklyReportUseCase>(
       () => _i379.GetWeeklyReportUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i693.InitiatePaymentUseCase>(
+      () => _i693.InitiatePaymentUseCase(gh<_i493.ParentRepository>()),
     );
     gh.lazySingleton<_i888.SubmitAbsenceRequestUseCase>(
       () => _i888.SubmitAbsenceRequestUseCase(gh<_i493.ParentRepository>()),
@@ -352,12 +443,10 @@ extension GetItInjectableX on _i174.GetIt {
         watchLatestAssignment: gh<_i914.WatchLatestAssignmentUseCase>(),
       ),
     );
-    gh.singleton<_i934.SupervisorBloc>(
-      () => _i934.SupervisorBloc(
-        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
-        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
-        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
-        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
+    gh.singleton<_i618.ChatConversationsBloc>(
+      () => _i618.ChatConversationsBloc(
+        watchConversations: gh<_i337.WatchConversationsUseCase>(),
+        getOrCreateConversation: gh<_i337.GetOrCreateConversationUseCase>(),
       ),
     );
     gh.singleton<_i995.ParentBloc>(
@@ -366,6 +455,46 @@ extension GetItInjectableX on _i174.GetIt {
         getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
         getPayments: gh<_i817.GetPaymentsUseCase>(),
         submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
+        initiatePayment: gh<_i693.InitiatePaymentUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i152.WatchNotificationsUseCase>(
+      () =>
+          _i152.WatchNotificationsUseCase(gh<_i587.NotificationsRepository>()),
+    );
+    gh.lazySingleton<_i152.MarkNotificationAsReadUseCase>(
+      () => _i152.MarkNotificationAsReadUseCase(
+        gh<_i587.NotificationsRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i152.MarkAllNotificationsAsReadUseCase>(
+      () => _i152.MarkAllNotificationsAsReadUseCase(
+        gh<_i587.NotificationsRepository>(),
+      ),
+    );
+    gh.singleton<_i934.SupervisorBloc>(
+      () => _i934.SupervisorBloc(
+        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
+        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
+        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
+        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
+      ),
+    );
+    gh.factoryParam<_i467.ChatRoomBloc, String, String>(
+      (conversationId, currentUserId) => _i467.ChatRoomBloc(
+        gh<_i337.WatchMessagesUseCase>(),
+        gh<_i337.SendMessageUseCase>(),
+        gh<_i337.MarkConversationAsReadUseCase>(),
+        conversationId,
+        currentUserId,
+      ),
+    );
+    gh.singleton<_i164.NotificationsBloc>(
+      () => _i164.NotificationsBloc(
+        watchNotifications: gh<_i152.WatchNotificationsUseCase>(),
+        markNotificationAsRead: gh<_i152.MarkNotificationAsReadUseCase>(),
+        markAllNotificationsAsRead:
+            gh<_i152.MarkAllNotificationsAsReadUseCase>(),
       ),
     );
     return this;

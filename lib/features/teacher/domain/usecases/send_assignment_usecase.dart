@@ -8,7 +8,6 @@ import '../repositories/teacher_repository.dart';
 @lazySingleton
 class SendAssignmentUseCase extends UseCase<Unit, SendAssignmentParams> {
   final TeacherRepository repository;
-
   SendAssignmentUseCase(this.repository);
 
   @override

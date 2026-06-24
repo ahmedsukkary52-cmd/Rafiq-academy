@@ -10,7 +10,6 @@ import '../repositories/teacher_repository.dart';
 class GetHalaqaStudentsUseCase
     extends UseCase<List<HalaqaStudentSummaryEntity>, HalaqaStudentsParams> {
   final TeacherRepository repository;
-
   GetHalaqaStudentsUseCase(this.repository);
 
   @override

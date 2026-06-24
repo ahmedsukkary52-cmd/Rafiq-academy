@@ -128,20 +128,3 @@ class ParentState extends Equatable {
     paymentInitiationError,
   ];
 }
-// todo: (Secret Key)  egy_sk_test_1ebfeaee176d7c453d02f5391204acb70d9795e8cc05e8d58852ce16c519362e
-// todo: (HMAC) 70AFB4C3E0AEED71FBDFB68AAFB3AB9B
-// todo: (Integration ID) 5488530
-// todo: (public Key) egy_pk_test_u5n0kjxAZZaFNb9W4mmJp7j034K8G5D9
-// todo: (APO Key) ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRFeU5qZ3lOU3dpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS5JSVlYTFB0R2VPanZWa2RkdUJkakFiMEhFR3YtT1RhdWpqakFIbk0zbzh3NmNhX2lITjM0VGhwZFNxLUR2ZHhLR3ZVOW5hQjNrYmlEZlgxTmt1TkxuUQ==
-
-// cd functions
-// npm install
-//
-// # سجّل الأسرار (هتاخدهم من Paymob Dashboard)
-// firebase functions:secrets:set egy_sk_test_1ebfeaee176d7c453d02f5391204acb70d9795e8cc05e8d58852ce16c519362e
-// firebase functions:secrets:set 70AFB4C3E0AEED71FBDFB68AAFB3AB9B
-// firebase functions:secrets:set egy_pk_test_u5n0kjxAZZaFNb9W4mmJp7j034K8G5D9
-// firebase functions:secrets:set 5488530
-//
-// # انشر
-// firebase deploy --only functions

@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
 import 'package:cloud_functions/cloud_functions.dart' as _i809;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
 import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
+import 'package:firebase_storage/firebase_storage.dart' as _i457;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart'
@@ -51,6 +52,14 @@ import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_quot
     as _i1014;
 import 'package:rafiq_academy/features/admin/persentation/bloc/admin_bloc.dart'
     as _i939;
+import 'package:rafiq_academy/features/analytics/data/datasources/analytics_remote_datasource.dart'
+    as _i797;
+import 'package:rafiq_academy/features/analytics/data/datasources/analytics_remote_datasource_impl.dart'
+    as _i704;
+import 'package:rafiq_academy/features/analytics/domain/repositories/analytics_repository.dart'
+    as _i656;
+import 'package:rafiq_academy/features/analytics/domain/usecases/analytics_usecases.dart'
+    as _i1010;
 import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasouce_impl.dart'
     as _i550;
 import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasource.dart'
@@ -67,6 +76,32 @@ import 'package:rafiq_academy/features/auth/domain/usecases/logout_usecase.dart'
     as _i608;
 import 'package:rafiq_academy/features/auth/presentaiton/bloc/auth_bloc.dart'
     as _i196;
+import 'package:rafiq_academy/features/awards/data/datasources/award_remote_datasource.dart'
+    as _i444;
+import 'package:rafiq_academy/features/awards/data/datasources/award_remote_datasource_impl.dart'
+    as _i982;
+import 'package:rafiq_academy/features/awards/data/repositories/awards_repository_impl.dart'
+    as _i662;
+import 'package:rafiq_academy/features/awards/data/services/certificate_pdf_generator.dart'
+    as _i649;
+import 'package:rafiq_academy/features/awards/domain/repositories/awards_repository.dart'
+    as _i888;
+import 'package:rafiq_academy/features/awards/domain/usecases/awards_usecases.dart'
+    as _i186;
+import 'package:rafiq_academy/features/awards/presentation/bloc/awards_bloc.dart'
+    as _i285;
+import 'package:rafiq_academy/features/calendar/data/datasources/calendar_remote_datasource.dart'
+    as _i537;
+import 'package:rafiq_academy/features/calendar/data/datasources/calendar_remote_datasource_impl.dart'
+    as _i209;
+import 'package:rafiq_academy/features/calendar/data/repositories/calendar_repository_impl.dart'
+    as _i763;
+import 'package:rafiq_academy/features/calendar/domain/repositories/calendar_repository.dart'
+    as _i669;
+import 'package:rafiq_academy/features/calendar/domain/usecases/calendar_usecases.dart'
+    as _i429;
+import 'package:rafiq_academy/features/calendar/presentation/bloc/calendar_bloc.dart'
+    as _i919;
 import 'package:rafiq_academy/features/chat/data/datasources/chat_remote_datasource.dart'
     as _i164;
 import 'package:rafiq_academy/features/chat/data/repositories/chat_repository_impl.dart'
@@ -79,6 +114,18 @@ import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations
     as _i618;
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_room_bloc.dart'
     as _i467;
+import 'package:rafiq_academy/features/content/data/datasources/content_library_remote_datasource.dart'
+    as _i37;
+import 'package:rafiq_academy/features/content/data/datasources/content_library_remote_datasource_impl.dart'
+    as _i752;
+import 'package:rafiq_academy/features/content/data/repositories/content_repository_impl.dart'
+    as _i669;
+import 'package:rafiq_academy/features/content/domain/repositories/content_library_repository.dart'
+    as _i283;
+import 'package:rafiq_academy/features/content/domain/usecases/content_usecases.dart'
+    as _i89;
+import 'package:rafiq_academy/features/content/presentation/bloc/content_bloc.dart'
+    as _i542;
 import 'package:rafiq_academy/features/notifications/data/datasources/notifications_remote_datasource.dart'
     as _i676;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
@@ -109,6 +156,18 @@ import 'package:rafiq_academy/features/parent/domain/usecases/submit_absence_req
     as _i888;
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart'
     as _i995;
+import 'package:rafiq_academy/features/post/data/datasources/posts_remote_datasorce_impl.dart'
+    as _i307;
+import 'package:rafiq_academy/features/post/data/datasources/posts_remote_datasource.dart'
+    as _i1073;
+import 'package:rafiq_academy/features/post/data/repositories/post_repository_impl.dart'
+    as _i251;
+import 'package:rafiq_academy/features/post/domain/repositories/posts_repository.dart'
+    as _i486;
+import 'package:rafiq_academy/features/post/domain/usecases/posts_usecases.dart'
+    as _i918;
+import 'package:rafiq_academy/features/post/presentation/bloc/posts_bloc.dart'
+    as _i532;
 import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource.dart'
     as _i536;
 import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource_impl.dart'
@@ -183,9 +242,13 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
     gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
+    gh.lazySingleton<_i457.FirebaseStorage>(() => diModule.firebaseStorage);
     gh.lazySingleton<_i809.FirebaseFunctions>(() => diModule.firebaseFunctions);
     gh.lazySingleton<_i161.InternetConnection>(
       () => diModule.internetConnection,
+    );
+    gh.lazySingleton<_i649.CertificatePdfGenerator>(
+      () => _i649.CertificatePdfGenerator(),
     );
     gh.lazySingleton<_i483.AuthRemoteDatasource>(
       () => _i550.AuthRemoteDatasourceImpl(
@@ -197,6 +260,12 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i430.ParentRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
         functions: gh<_i809.FirebaseFunctions>(),
+      ),
+    );
+    gh.lazySingleton<_i37.ContentLibraryRemoteDatasource>(
+      () => _i752.ContentLibraryRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        storage: gh<_i457.FirebaseStorage>(),
       ),
     );
     gh.lazySingleton<_i65.SupervisorRemoteDatasource>(
@@ -211,6 +280,18 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i696.NetworkInfo>(
       () => diModule.networkInfo(gh<_i161.InternetConnection>()),
+    );
+    gh.lazySingleton<_i1073.PostsRemoteDatasource>(
+      () => _i307.PostsRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        storage: gh<_i457.FirebaseStorage>(),
+      ),
+    );
+    gh.lazySingleton<_i486.PostsRepository>(
+      () => _i251.PostsRepositoryImpl(
+        remoteDatasource: gh<_i1073.PostsRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
     );
     gh.lazySingleton<_i717.TeacherRemoteDatasource>(
       () => _i88.TeacherRemoteDatasourceImpl(
@@ -227,6 +308,12 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
+    gh.lazySingleton<_i283.ContentLibraryRepository>(
+      () => _i669.ContentLibraryRepositoryImpl(
+        remoteDatasource: gh<_i37.ContentLibraryRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
     gh.lazySingleton<_i1050.TeacherRepository>(
       () => _i63.TeacherRepositoryImpl(
         remoteDatasource: gh<_i717.TeacherRemoteDatasource>(),
@@ -235,6 +322,30 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i164.ChatRemoteDatasource>(
       () => _i164.ChatRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i444.AwardsRemoteDatasource>(
+      () => _i982.AwardsRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i797.AnalyticsRemoteDatasource>(
+      () => _i704.AnalyticsRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
+      () => _i1010.GetHalaqaAnalyticsUseCase(gh<_i656.AnalyticsRepository>()),
+    );
+    gh.lazySingleton<_i1010.GetAtRiskStudentsUseCase>(
+      () => _i1010.GetAtRiskStudentsUseCase(gh<_i656.AnalyticsRepository>()),
+    );
+    gh.lazySingleton<_i1010.GetTopStudentsUseCase>(
+      () => _i1010.GetTopStudentsUseCase(gh<_i656.AnalyticsRepository>()),
+    );
+    gh.lazySingleton<_i537.CalendarRemoteDatasource>(
+      () => _i209.CalendarRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
@@ -277,6 +388,12 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i608.LogoutUseCase>(
       () => _i608.LogoutUseCase(gh<_i605.AuthRepository>()),
     );
+    gh.lazySingleton<_i669.CalendarRepository>(
+      () => _i763.CalendarRepositoryImpl(
+        remoteDatasource: gh<_i537.CalendarRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
     gh.lazySingleton<_i724.StudentRepository>(
       () => _i633.StudentRepositoryImpl(
         remoteDatasource: gh<_i536.StudentRemoteDatasource>(),
@@ -303,6 +420,36 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i192.SendAssignmentUseCase>(
       () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i918.WatchPostsUseCase>(
+      () => _i918.WatchPostsUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i918.WatchCommentsUseCase>(
+      () => _i918.WatchCommentsUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i918.CreatePostUseCase>(
+      () => _i918.CreatePostUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i918.ToggleLikeUseCase>(
+      () => _i918.ToggleLikeUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i918.AddCommentUseCase>(
+      () => _i918.AddCommentUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i918.TogglePinUseCase>(
+      () => _i918.TogglePinUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i918.DeletePostUseCase>(
+      () => _i918.DeletePostUseCase(gh<_i486.PostsRepository>()),
+    );
+    gh.lazySingleton<_i89.GetFilesUseCase>(
+      () => _i89.GetFilesUseCase(gh<_i283.ContentLibraryRepository>()),
+    );
+    gh.lazySingleton<_i89.UploadFileUseCase>(
+      () => _i89.UploadFileUseCase(gh<_i283.ContentLibraryRepository>()),
+    );
+    gh.lazySingleton<_i89.DeleteFileUseCase>(
+      () => _i89.DeleteFileUseCase(gh<_i283.ContentLibraryRepository>()),
     );
     gh.lazySingleton<_i928.ApproveNewStudentUseCase>(
       () => _i928.ApproveNewStudentUseCase(gh<_i255.AdminRepository>()),
@@ -355,6 +502,22 @@ extension GetItInjectableX on _i174.GetIt {
         loginWithEmail: gh<_i339.LoginWithEmailUseCase>(),
         logout: gh<_i608.LogoutUseCase>(),
         getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i429.GetMonthEventsUseCase>(
+      () => _i429.GetMonthEventsUseCase(gh<_i669.CalendarRepository>()),
+    );
+    gh.lazySingleton<_i429.AddCalendarEventUseCase>(
+      () => _i429.AddCalendarEventUseCase(gh<_i669.CalendarRepository>()),
+    );
+    gh.lazySingleton<_i429.DeleteCalendarEventUseCase>(
+      () => _i429.DeleteCalendarEventUseCase(gh<_i669.CalendarRepository>()),
+    );
+    gh.lazySingleton<_i888.AwardsRepository>(
+      () => _i662.AwardsRepositoryImpl(
+        remoteDatasource: gh<_i444.AwardsRemoteDatasource>(),
+        pdfGenerator: gh<_i649.CertificatePdfGenerator>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
     gh.lazySingleton<_i337.WatchConversationsUseCase>(
@@ -433,6 +596,13 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i914.WatchLatestAssignmentUseCase>(
       () => _i914.WatchLatestAssignmentUseCase(gh<_i724.StudentRepository>()),
     );
+    gh.factory<_i542.ContentLibraryBloc>(
+      () => _i542.ContentLibraryBloc(
+        getFiles: gh<_i89.GetFilesUseCase>(),
+        uploadFile: gh<_i89.UploadFileUseCase>(),
+        deleteFile: gh<_i89.DeleteFileUseCase>(),
+      ),
+    );
     gh.singleton<_i303.StudentBloc>(
       () => _i303.StudentBloc(
         getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
@@ -472,6 +642,18 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i587.NotificationsRepository>(),
       ),
     );
+    gh.lazySingleton<_i186.GetAwardsStatsUseCase>(
+      () => _i186.GetAwardsStatsUseCase(gh<_i888.AwardsRepository>()),
+    );
+    gh.lazySingleton<_i186.GetGrantedAwardsUseCase>(
+      () => _i186.GetGrantedAwardsUseCase(gh<_i888.AwardsRepository>()),
+    );
+    gh.lazySingleton<_i186.GrantAwardUseCase>(
+      () => _i186.GrantAwardUseCase(gh<_i888.AwardsRepository>()),
+    );
+    gh.lazySingleton<_i186.GenerateCertificatePdfUseCase>(
+      () => _i186.GenerateCertificatePdfUseCase(gh<_i888.AwardsRepository>()),
+    );
     gh.singleton<_i934.SupervisorBloc>(
       () => _i934.SupervisorBloc(
         getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
@@ -487,6 +669,32 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i337.MarkConversationAsReadUseCase>(),
         conversationId,
         currentUserId,
+      ),
+    );
+    gh.factory<_i919.CalendarBloc>(
+      () => _i919.CalendarBloc(
+        getMonthEvents: gh<_i429.GetMonthEventsUseCase>(),
+        addCalendarEvent: gh<_i429.AddCalendarEventUseCase>(),
+        deleteCalendarEvent: gh<_i429.DeleteCalendarEventUseCase>(),
+      ),
+    );
+    gh.singleton<_i532.PostsBloc>(
+      () => _i532.PostsBloc(
+        watchPosts: gh<_i918.WatchPostsUseCase>(),
+        watchComments: gh<_i918.WatchCommentsUseCase>(),
+        createPost: gh<_i918.CreatePostUseCase>(),
+        toggleLike: gh<_i918.ToggleLikeUseCase>(),
+        addComment: gh<_i918.AddCommentUseCase>(),
+        togglePin: gh<_i918.TogglePinUseCase>(),
+        deletePost: gh<_i918.DeletePostUseCase>(),
+      ),
+    );
+    gh.factory<_i285.AwardsBloc>(
+      () => _i285.AwardsBloc(
+        getAwardsStats: gh<_i186.GetAwardsStatsUseCase>(),
+        getGrantedAwards: gh<_i186.GetGrantedAwardsUseCase>(),
+        grantAward: gh<_i186.GrantAwardUseCase>(),
+        generateCertificatePdf: gh<_i186.GenerateCertificatePdfUseCase>(),
       ),
     );
     gh.singleton<_i164.NotificationsBloc>(

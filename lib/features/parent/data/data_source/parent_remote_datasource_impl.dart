@@ -64,8 +64,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
           .doc(studentId)
           .get();
 
-      final studentName =
-          (userDoc.data() as Map<String, dynamic>?)?['name'] ?? '';
+      final studentName = (userDoc.data())?['name'] ?? '';
 
       final attended = attendanceSnap.docs
           .where((d) => (d.data())['status'] == 'present')

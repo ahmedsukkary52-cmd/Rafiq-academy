@@ -13,11 +13,15 @@ class StudentProfileModel extends StudentProfileEntity {
     required super.overallProgressPercent,
     super.totalVersesMemorized,
     super.completedJuz,
+    super.completedSurahs,
     super.points,
     super.streakDays,
     super.level,
     required super.totalStars,
     required super.badges,
+    super.coins,
+    super.avatarId,
+    super.unlockedAvatarIds,
   });
 
   factory StudentProfileModel.fromFirestore({
@@ -39,11 +43,17 @@ class StudentProfileModel extends StudentProfileEntity {
           .toDouble(),
       totalVersesMemorized: (profile['totalVersesMemorized'] ?? 0) as int,
       completedJuz: (profile['completedJuz'] ?? 0) as int,
+      completedSurahs: (profile['completedSurahs'] ?? 0) as int,
       points: (profile['points'] ?? 0) as int,
       streakDays: (profile['streakDays'] ?? 0) as int,
       level: (profile['level'] ?? 1) as int,
       totalStars: (profile['totalStars'] ?? 0) as int,
       badges: List<String>.from(profile['badges'] ?? []),
+      coins: (profile['coins'] ?? 0) as int,
+      avatarId: (profile['avatarId'] as String?) ?? 'fox',
+      unlockedAvatarIds: profile['unlockedAvatarIds'] != null
+          ? List<String>.from(profile['unlockedAvatarIds'])
+          : const ['fox', 'panda', 'lion', 'rabbit', 'owl'],
     );
   }
 }

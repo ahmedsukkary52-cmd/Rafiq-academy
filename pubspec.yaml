@@ -41,7 +41,11 @@ dependencies:
   just_audio: ^0.9.40
 
   # ---- تقويم أكاديمي ----
-  table_calendar: ^3.1.2
+  table_calendar: ^3.2.0
+  hijri: ^3.0.0
+
+  # ---- Charts ----
+  fl_chart: ^0.70.2
 
   # ---- توليد وطباعة شهادات PDF ----
   pdf: ^3.11.1
@@ -50,10 +54,22 @@ dependencies:
   # ---- فحص الاتصال بالإنترنت ----
   internet_connection_checker_plus: ^2.5.1
 
+  # ---- تخزين تفضيلات محلية (أونبوردنج/إعدادات) ----
+  shared_preferences: ^2.3.2
+
   # ---- خطوط عربية ----
   google_fonts: ^6.2.1
 
+  # ---- تسجيل الصوت ----
+  path_provider: ^2.1.2
+
   cupertino_icons: ^1.0.8
+  record: ^6.2.1
+  
+  # ---- File Handling
+  file_picker: ^8.1.2
+  url_launcher: ^6.3.0
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:
@@ -66,3 +82,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/data/audio_durations.json

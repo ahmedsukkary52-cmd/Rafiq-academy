@@ -30,4 +30,6 @@ abstract class ChatRepository {
     required String conversationId,
     required String uid,
   });
+
+  Future<Either<Failure, ChatParticipantEntity>> getParticipant(String uid);
 }

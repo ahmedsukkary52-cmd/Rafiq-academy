@@ -43,6 +43,9 @@ class FirestoreCollections {
   static const String commentsSubcollection = 'comments';
   static const String calendarEvents = 'calendarEvents';
   static const String contentLibrary = 'contentLibrary';
+  static const String reciters = 'reciters';
+  static const String surahAudios = 'surahAudios';
+  static const String listeningProgress = 'listeningProgress';
 }
 
 /// أنواع التقييمات في سجل التسميع

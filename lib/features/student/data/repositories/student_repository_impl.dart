@@ -116,4 +116,25 @@ class StudentRepositoryImpl implements StudentRepository {
         )
         .handleError((e) => Left(ServerFailure(e.toString())));
   }
+
+  @override
+  Future<Either<Failure, Unit>> updateAvatarSelection({
+    required String studentId,
+    required String avatarId,
+    required List<String> unlockedAvatarIds,
+    required int coins,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.updateAvatarSelection(
+        studentId: studentId,
+        avatarId: avatarId,
+        unlockedAvatarIds: unlockedAvatarIds,
+        coins: coins,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
 }

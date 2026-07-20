@@ -125,6 +125,19 @@ class MarkConversationAsReadUseCase
   }
 }
 
+@lazySingleton
+class GetChatParticipantUseCase
+    extends UseCase<ChatParticipantEntity, ChatUidParams> {
+  final ChatRepository repository;
+
+  GetChatParticipantUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, ChatParticipantEntity>> call(ChatUidParams params) {
+    return repository.getParticipant(params.uid);
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Params
 // ══════════════════════════════════════════════════════════════════════════════

@@ -84,7 +84,11 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
           .limit(20)
           .get();
 
-      return snapshot.docs.map(RecitationRecordModel.fromFirestore).toList();
+      return snapshot.docs
+          .map(RecitationRecordModel.fromFirestore)
+          // تقييمات المعلم فقط — استبعِد تسميعات الطالب المنتظرة للمراجعة
+          .where((r) => !r.isPendingReview)
+          .toList();
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -116,7 +120,10 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
           .get();
 
       if (snapshot.docs.isEmpty) return null;
-      return AssignmentModel.fromFirestore(snapshot.docs.first);
+      final doc = snapshot.docs.first;
+      await _ensureHomeworkFieldsOnAssignment(doc);
+      final refreshed = await doc.reference.get();
+      return AssignmentModel.fromFirestore(refreshed);
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -150,9 +157,47 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
         .orderBy('dueDate', descending: true)
         .limit(1)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           if (snapshot.docs.isEmpty) return null;
-          return AssignmentModel.fromFirestore(snapshot.docs.first);
+          final doc = snapshot.docs.first;
+          await _ensureHomeworkFieldsOnAssignment(doc);
+          final refreshed = await doc.reference.get();
+          return AssignmentModel.fromFirestore(refreshed);
         });
+  }
+
+  /// يزرع حقول واجباتي على نفس مستند `assignments` لو ناقصة (مش collection منفصل).
+  Future<void> _ensureHomeworkFieldsOnAssignment(DocumentSnapshot doc) async {
+    final raw = doc.data();
+    if (raw is! Map<String, dynamic>) return;
+    final tasks = raw['tasks'];
+    if (tasks is List && tasks.isNotEmpty) return;
+
+    final seed = AssignmentModel.defaultHomeworkFields(
+      newMemorizationRange: raw['newMemorizationRange'] as String? ?? '',
+      reviewRange: raw['reviewRange'] as String? ?? '',
+    );
+    await doc.reference.set(seed, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> updateAvatarSelection({
+    required String studentId,
+    required String avatarId,
+    required List<String> unlockedAvatarIds,
+    required int coins,
+  }) async {
+    try {
+      await firestore
+          .collection(FirestoreCollections.studentProfiles)
+          .doc(studentId)
+          .update({
+            'avatarId': avatarId,
+            'unlockedAvatarIds': unlockedAvatarIds,
+            'coins': coins,
+          });
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
   }
 }

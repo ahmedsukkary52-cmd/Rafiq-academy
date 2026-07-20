@@ -27,6 +27,9 @@ abstract class ChatRemoteDatasource {
     required String conversationId,
     required String uid,
   });
+
+  /// قراءة بيانات مستخدم من `users/{uid}` لبناء طرف محادثة
+  Future<ChatParticipantModel> getParticipant(String uid);
 }
 
 @LazySingleton(as: ChatRemoteDatasource)
@@ -170,6 +173,30 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
       await _conversationsRef.doc(conversationId).update({
         'unreadCounts.$uid': 0,
       });
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<ChatParticipantModel> getParticipant(String uid) async {
+    try {
+      final doc = await firestore
+          .collection(FirestoreCollections.users)
+          .doc(uid)
+          .get();
+      if (!doc.exists) {
+        throw const ServerException('المستخدم غير موجود');
+      }
+      final data = doc.data() as Map<String, dynamic>;
+      return ChatParticipantModel(
+        uid: doc.id,
+        name: data['name'] as String? ?? '',
+        role: data['role'] as String? ?? '',
+        profileImageUrl: data['profileImageUrl'] as String?,
+      );
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }

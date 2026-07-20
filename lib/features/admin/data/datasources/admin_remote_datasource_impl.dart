@@ -224,7 +224,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
 
       return List.generate(usersSnap.docs.length, (i) {
         final userData = usersSnap.docs[i].data();
-        final profileData = profileDocs[i].data() as Map<String, dynamic>?;
+        final profileData = profileDocs[i].data();
 
         return TeacherManagementEntity(
           uid: usersSnap.docs[i].id,

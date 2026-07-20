@@ -4,6 +4,7 @@ import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../models/attendance_record_model.dart';
@@ -113,6 +114,11 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           'newMemorizationRange': newMemorizationRange,
           'reviewRange': reviewRange,
           'dueDate': Timestamp.fromDate(dueDate),
+          // نفس مستند التكليف يحمل حقول واجباتي (Single Source of Truth)
+          ...AssignmentModel.defaultHomeworkFields(
+            newMemorizationRange: newMemorizationRange,
+            reviewRange: reviewRange,
+          ),
         });
       }
       await batch.commit();

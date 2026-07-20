@@ -50,6 +50,10 @@ class StudentState extends Equatable {
   // ── التكليف الأخير (يتحدّث real-time عن طريق Stream) ───────────────────
   final AssignmentEntity? latestAssignment;
 
+  // ── تحديث اختيار الشخصية (avatar) ──────────────────────────────────────
+  final SectionStatus avatarUpdateStatus;
+  final String? avatarUpdateError;
+
   const StudentState({
     this.profileStatus = SectionStatus.initial,
     this.profile,
@@ -67,6 +71,8 @@ class StudentState extends Equatable {
     this.halaqa,
     this.halaqaError,
     this.latestAssignment,
+    this.avatarUpdateStatus = SectionStatus.initial,
+    this.avatarUpdateError,
   });
 
   /// الحالة الابتدائية عند فتح نافذة الطالب لأول مرة
@@ -92,6 +98,8 @@ class StudentState extends Equatable {
     Object? halaqa = _unset,
     Object? halaqaError = _unset,
     Object? latestAssignment = _unset,
+    SectionStatus? avatarUpdateStatus,
+    Object? avatarUpdateError = _unset,
   }) {
     return StudentState(
       profileStatus: profileStatus ?? this.profileStatus,
@@ -124,6 +132,10 @@ class StudentState extends Equatable {
       latestAssignment: identical(latestAssignment, _unset)
           ? this.latestAssignment
           : latestAssignment as AssignmentEntity?,
+      avatarUpdateStatus: avatarUpdateStatus ?? this.avatarUpdateStatus,
+      avatarUpdateError: identical(avatarUpdateError, _unset)
+          ? this.avatarUpdateError
+          : avatarUpdateError as String?,
     );
   }
 
@@ -145,5 +157,7 @@ class StudentState extends Equatable {
     halaqa,
     halaqaError,
     latestAssignment,
+    avatarUpdateStatus,
+    avatarUpdateError,
   ];
 }

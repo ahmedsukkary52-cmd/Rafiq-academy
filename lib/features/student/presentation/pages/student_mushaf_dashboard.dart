@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_state.dart';
 
@@ -13,7 +12,6 @@ class DashboardSurahItem {
   final int versesCount;
   final String type; // مكية or مدنية
   final int completedVerses;
-  final bool isLocked;
   final bool isCompleted;
 
   const DashboardSurahItem({
@@ -22,7 +20,6 @@ class DashboardSurahItem {
     required this.versesCount,
     required this.type,
     this.completedVerses = 0,
-    this.isLocked = false,
     this.isCompleted = false,
   });
 }
@@ -30,6 +27,7 @@ class DashboardSurahItem {
 class StudentMushafDashboard extends StatelessWidget {
   const StudentMushafDashboard({super.key});
 
+  // TODO: القفل هيتفعل لاحقاً بناءً على خطة الحفظ اللي هيحددها المعلم لكل طالب - لحد ذلك كل السور مفتوحة
   static const List<DashboardSurahItem> _surahs = [
     DashboardSurahItem(
       number: 1,
@@ -64,7 +62,6 @@ class StudentMushafDashboard extends StatelessWidget {
       name: 'القلم',
       versesCount: 52,
       type: 'مكية',
-      isLocked: true,
     ),
   ];
 
@@ -440,219 +437,169 @@ class _SurahCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget stateBadge;
-    if (item.isCompleted) {
-      stateBadge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFCFF4DF),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check, size: 12, color: Color(0xFF20AF68)),
-            SizedBox(width: 4),
-            Text(
-              'محفوظة',
+    final Widget stateBadge = item.isCompleted
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFCFF4DF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check, size: 12, color: Color(0xFF20AF68)),
+                SizedBox(width: 4),
+                Text(
+                  'محفوظة',
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF20AF68),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFCFF4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'جارٍ ⚡',
               style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF20AF68),
+                color: Color(0xFF14AEB8),
               ),
             ),
-          ],
-        ),
-      );
-    } else if (item.isLocked) {
-      stateBadge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceGrey,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Text(
-          'قريباً',
-          style: TextStyle(
-            fontFamily: 'NotoNaskhArabic',
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textHint,
+          );
+
+    final bool isInProgress = !item.isCompleted && item.completedVerses > 0;
+
+    final Color numberBgColor = item.number == 114
+        ? const Color(0xFFF5A623)
+        : item.number == 113
+        ? const Color(0xFF20AF68)
+        : const Color(0xFF14B2BA);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: isInProgress
+            ? Border.all(color: const Color(0xFF14B2BA), width: 1.5)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
-      );
-    } else {
-      stateBadge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFCFF4F6),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Text(
-          'جارٍ ⚡',
-          style: TextStyle(
-            fontFamily: 'NotoNaskhArabic',
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF14AEB8),
-          ),
-        ),
-      );
-    }
-
-    final double cardOpacity = item.isLocked ? 0.6 : 1.0;
-
-    final bool isInProgress =
-        !item.isCompleted && !item.isLocked && item.completedVerses > 0;
-
-    Color numberBgColor;
-    if (item.isLocked) {
-      numberBgColor = const Color(0xFFB8A9D4);
-    } else if (item.number == 114) {
-      numberBgColor = const Color(0xFFF5A623);
-    } else if (item.number == 113) {
-      numberBgColor = const Color(0xFF20AF68);
-    } else {
-      numberBgColor = const Color(0xFF14B2BA);
-    }
-
-    return Opacity(
-      opacity: cardOpacity,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: isInProgress
-              ? Border.all(color: const Color(0xFF14B2BA), width: 1.5)
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: InkWell(
-          onTap: () {
-            if (item.isLocked) {
-              AppSnackBar.showInfo(
-                context,
-                'ستُفتح هذه السورة قريباً بعد إتمام السورة السابقة',
-              );
-            } else {
-              context.push('/student/mushaf?surah=${item.number}');
-            }
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+        ],
+      ),
+      child: InkWell(
+        onTap: () => context.push('/student/mushaf?surah=${item.number}'),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: numberBgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${item.number}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${item.versesCount} آيات · ${item.type}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  stateBadge,
+                ],
+              ),
+              if (item.isCompleted) ...[
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: const LinearProgressIndicator(
+                    value: 1,
+                    minHeight: 4,
+                    backgroundColor: AppColors.surfaceGrey,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF14B2BA),
+                    ),
+                  ),
+                ),
+              ] else if (isInProgress && item.completedVerses > 0) ...[
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: item.completedVerses / item.versesCount,
+                    minHeight: 6,
+                    backgroundColor: AppColors.surfaceGrey,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF14B2BA),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Surah index circle
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: numberBgColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: item.isLocked
-                            ? const Icon(
-                                Icons.lock_outline_rounded,
-                                size: 16,
-                                color: Colors.white,
-                              )
-                            : Text(
-                                '${item.number}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                    Text(
+                      'تم حفظ ${item.completedVerses} آيات',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    // Details
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.name,
-                            style: AppTextStyles.titleLarge.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${item.versesCount} آيات · ${item.type}',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      '${item.completedVerses}/${item.versesCount}',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    // Badge and Lock icon
-                    Row(mainAxisSize: MainAxisSize.min, children: [stateBadge]),
                   ],
                 ),
-                // Progress Bar
-                if (item.isCompleted) ...[
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: const LinearProgressIndicator(
-                      value: 1,
-                      minHeight: 4,
-                      backgroundColor: AppColors.surfaceGrey,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF14B2BA),
-                      ),
-                    ),
-                  ),
-                ] else if (isInProgress && item.completedVerses > 0) ...[
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: item.completedVerses / item.versesCount,
-                      minHeight: 6,
-                      backgroundColor: AppColors.surfaceGrey,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFF14B2BA),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'تم حفظ ${item.completedVerses} آيات',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        '${item.completedVerses}/${item.versesCount}',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
         ),
       ),

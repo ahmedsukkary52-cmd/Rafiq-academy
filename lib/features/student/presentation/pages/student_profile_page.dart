@@ -2,32 +2,119 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
 import '../../../teacher/presentation/bloc/teacher_bloc.dart';
+import '../../domain/entities/student_profile_entity.dart';
+import '../../domain/usecases/get_student_halaqa_usecase.dart';
+import '../../domain/usecases/get_student_profile_usecase.dart';
+import '../../domain/usecases/watch_latest_assignment_usecase.dart';
 
-class StudentProfilePage extends StatelessWidget {
+class StudentProfilePage extends StatefulWidget {
   final String studentId;
 
   const StudentProfilePage({super.key, required this.studentId});
 
   @override
-  Widget build(BuildContext context) {
-    final state = context.read<TeacherBloc>().state;
-    final student = state.students.firstWhere(
-      (s) => s.uid == studentId,
-      orElse: () => state.students.isNotEmpty
-          ? state.students.first
-          : const HalaqaStudentSummaryEntity(uid: '', name: 'طالب'),
+  State<StudentProfilePage> createState() => _StudentProfilePageState();
+}
+
+class _StudentProfilePageState extends State<StudentProfilePage> {
+  SectionStatus _status = SectionStatus.initial;
+  StudentProfileEntity? _profile;
+  String? _halaqaName;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _status = SectionStatus.loading;
+      _error = null;
+    });
+
+    final result = await sl<GetStudentProfileUseCase>()(
+      StudentUidParams(widget.studentId),
     );
+
+    if (!mounted) return;
+
+    await result.fold(
+      (failure) async {
+        setState(() {
+          _status = SectionStatus.error;
+          _error = failure.message;
+          _profile = null;
+          _halaqaName = null;
+        });
+      },
+      (profile) async {
+        String? halaqaName = profile.halaqaName.trim().isNotEmpty
+            ? profile.halaqaName
+            : null;
+
+        final halaqaId = profile.halaqaId;
+        if ((halaqaName == null || halaqaName.isEmpty) &&
+            halaqaId != null &&
+            halaqaId.isNotEmpty) {
+          final halaqaResult = await sl<GetStudentHalaqaUseCase>()(
+            HalaqaIdParams(halaqaId),
+          );
+          halaqaResult.fold((_) {}, (halaqa) => halaqaName = halaqa.name);
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _status = SectionStatus.loaded;
+          _profile = profile;
+          _halaqaName = halaqaName;
+          _error = null;
+        });
+      },
+    );
+  }
+
+  String _text(String? value) {
+    if (value == null || value.trim().isEmpty) return 'غير متوفر';
+    return value.trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_status == SectionStatus.loading ||
+        _status == SectionStatus.initial) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: AppLoadingWidget(),
+      );
+    }
+
+    if (_status == SectionStatus.error || _profile == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('ملف الطالب')),
+        body: AppErrorWidget(
+          message: _error ?? 'تعذر تحميل بيانات الطالب',
+          onRetry: _load,
+        ),
+      );
+    }
+
+    final profile = _profile!;
+    final progress = (profile.overallProgressPercent / 100).clamp(0.0, 1.0);
+    final planName = _text(profile.currentPlanName);
+    final halaqaLabel = _text(_halaqaName);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // ── Header التيل ──────────────────────────────────────
           SliverAppBar(
             pinned: true,
             expandedHeight: 220,
@@ -36,35 +123,42 @@ class StudentProfilePage extends StatelessWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.access_time_rounded),
-                onPressed: () {},
+                onPressed: () =>
+                    AppSnackBar.showInfo(context, 'قريبًا'),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: _StudentProfileHeader(student: student),
+              background: _StudentProfileHeader(
+                name: profile.name,
+                level: profile.level,
+                halaqaName: halaqaLabel,
+                profileImageUrl: profile.profileImageUrl,
+              ),
             ),
           ),
-
           SliverPadding(
             padding: const EdgeInsets.all(AppSizes.paddingM),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // ── الإحصائيات الثلاث ─────────────────────────
                 Row(
                   children: [
-                    const _StatBox(value: '٣٤٠', label: 'آية حفظ'),
-                    const SizedBox(width: 12),
-                    const _StatBox(value: '١٥', label: 'يوم متتالي'),
+                    _StatBox(
+                      value: '${profile.totalVersesMemorized}',
+                      label: 'آية حفظ',
+                    ),
                     const SizedBox(width: 12),
                     _StatBox(
-                      value: '${student.attendancePercent.toInt()}%',
+                      value: '${profile.streakDays}',
+                      label: 'يوم متتالي',
+                    ),
+                    const SizedBox(width: 12),
+                    const _StatBox(
+                      value: 'غير متوفر',
                       label: 'الحضور',
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 16),
-
-                // ── أزرار الإجراءات ────────────────────────────
                 Row(
                   children: [
                     Expanded(
@@ -75,8 +169,9 @@ class StudentProfilePage extends StatelessWidget {
                           final halaqaId = teacherState.selectedHalaqaId ??
                               (teacherState.halaqat.isNotEmpty
                                   ? teacherState.halaqat.first.id
-                                  : null);
-                          if (halaqaId == null) {
+                                  : null) ??
+                              profile.halaqaId;
+                          if (halaqaId == null || halaqaId.isEmpty) {
                             AppSnackBar.showInfo(
                               context,
                               'لا توجد حلقة مسندة إليك',
@@ -105,7 +200,8 @@ class StudentProfilePage extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {},
+                        onPressed: () =>
+                            AppSnackBar.showInfo(context, 'قريبًا'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -118,10 +214,7 @@ class StudentProfilePage extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 16),
-
-                // ── معلومات الطالب ─────────────────────────────
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -141,52 +234,45 @@ class StudentProfilePage extends StatelessWidget {
                         ],
                       ),
                       const Divider(height: 20),
-                      _InfoRow(label: 'الاسم الكامل', value: student.name),
-                      const SizedBox(height: 10),
                       _InfoRow(
-                        label: 'ولي الأمر',
-                        value: 'خالد ${student.name}',
+                        label: 'الاسم الكامل',
+                        value: _text(profile.name),
                       ),
-                      const SizedBox(height: 10),
-                      const _InfoRow(label: 'الهاتف', value: '٠٥١٢٣٤٥٦٧'),
                       const SizedBox(height: 10),
                       const _InfoRow(
-                        label: 'الخطة الحالية',
-                        value: 'جزء تبارك',
+                        label: 'ولي الأمر',
+                        value: 'غير متوفر',
                       ),
+                      const SizedBox(height: 10),
+                      const _InfoRow(label: 'الهاتف', value: 'غير متوفر'),
+                      const SizedBox(height: 10),
+                      _InfoRow(label: 'الخطة الحالية', value: planName),
                       const SizedBox(height: 10),
                       const _InfoRow(
                         label: 'تاريخ الانضمام',
-                        value: 'سبتمبر ٢٠٢٤',
+                        value: 'غير متوفر',
                       ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // ── تقدم الحفظ ─────────────────────────────────
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      SectionHeader(
-                        title: 'تقدم الحفظ',
-                        actionLabel: 'التفاصيل',
-                        onAction: () {},
-                      ),
+                      const SectionHeader(title: 'تقدم الحفظ'),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '٧٨%',
+                            '${profile.overallProgressPercent.toInt()}%',
                             style: AppTextStyles.titleLarge.copyWith(
                               color: AppColors.primary,
                             ),
                           ),
-                          const Text(
-                            '٤٣٦ / ٣٤٠ آية',
+                          Text(
+                            '${profile.totalVersesMemorized} آية',
                             style: AppTextStyles.bodyMedium,
                           ),
                         ],
@@ -196,61 +282,32 @@ class StudentProfilePage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(
                           AppSizes.radiusFull,
                         ),
-                        child: const LinearProgressIndicator(
-                          value: 0.78,
+                        child: LinearProgressIndicator(
+                          value: progress,
                           minHeight: 8,
                           backgroundColor: AppColors.surfaceGrey,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                          valueColor: const AlwaysStoppedAnimation(
+                            AppColors.primary,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // ── آخر تقييم ──────────────────────────────────
-                AppCard(
+                const AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const SectionHeader(
-                        title: 'آخر تقييم',
-                        actionLabel: null,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          GradeChip(label: RecitationGrade.veryGood.label),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.gradeExcellent,
-                              borderRadius: BorderRadius.circular(
-                                AppSizes.radiusM,
-                              ),
-                            ),
-                            child: const Text(
-                              'ممتاز',
-                              style: TextStyle(
-                                fontFamily: 'NotoNaskhArabic',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
+                      SectionHeader(title: 'آخر تقييم'),
+                      SizedBox(height: 12),
+                      Text(
+                        'غير متوفر',
+                        style: AppTextStyles.bodyMedium,
                       ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 24),
               ]),
             ),
@@ -261,14 +318,18 @@ class StudentProfilePage extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Widgets
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _StudentProfileHeader extends StatelessWidget {
-  final HalaqaStudentSummaryEntity student;
+  final String name;
+  final int level;
+  final String halaqaName;
+  final String? profileImageUrl;
 
-  const _StudentProfileHeader({required this.student});
+  const _StudentProfileHeader({
+    required this.name,
+    required this.level,
+    required this.halaqaName,
+    this.profileImageUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -283,10 +344,14 @@ class _StudentProfileHeader extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            UserAvatar(name: student.name, size: AppSizes.avatarXL),
+            UserAvatar(
+              name: name,
+              imageUrl: profileImageUrl,
+              size: AppSizes.avatarXL,
+            ),
             const SizedBox(height: 12),
             Text(
-              student.name,
+              name.isNotEmpty ? name : 'طالب',
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 fontSize: 20,
@@ -296,7 +361,7 @@ class _StudentProfileHeader extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'المستوى ${student.level} · حلقة المتقدمين',
+              'المستوى $level · $halaqaName',
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 fontSize: 13,
@@ -323,7 +388,11 @@ class _StatBox extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Column(
           children: [
-            Text(value, style: AppTextStyles.headlineMedium),
+            Text(
+              value,
+              style: AppTextStyles.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 2),
             Text(label, style: AppTextStyles.labelSmall),
           ],
@@ -344,7 +413,13 @@ class _InfoRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(value, style: AppTextStyles.titleMedium),
+        Flexible(
+          child: Text(
+            value,
+            style: AppTextStyles.titleMedium,
+            textAlign: TextAlign.left,
+          ),
+        ),
         Text(
           label,
           style: AppTextStyles.bodyMedium.copyWith(

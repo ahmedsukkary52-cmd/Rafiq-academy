@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
@@ -13,6 +15,18 @@ import '../bloc/teacher_state.dart';
 class TeacherClassesPage extends StatelessWidget {
   const TeacherClassesPage({super.key});
 
+  void _comingSoon(BuildContext context) {
+    AppSnackBar.showInfo(context, 'قريبًا');
+  }
+
+  void _retryHalaqat(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+    context.read<TeacherBloc>().add(
+      LoadTeacherHalaqatEvent(authState.user.uid),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,15 +34,18 @@ class TeacherClassesPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('حلقاتي'),
         actions: [
-          IconButton(icon: const Icon(Icons.search_rounded), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () => _comingSoon(context),
+          ),
           IconButton(
             icon: const Icon(Icons.filter_list_rounded),
-            onPressed: () {},
+            onPressed: () => _comingSoon(context),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () => _comingSoon(context),
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
@@ -38,7 +55,10 @@ class TeacherClassesPage extends StatelessWidget {
             return const AppLoadingWidget();
           }
           if (state.halaqatStatus == SectionStatus.error) {
-            return AppErrorWidget(message: state.halaqatError ?? 'حدث خطأ');
+            return AppErrorWidget(
+              message: state.halaqatError ?? 'حدث خطأ',
+              onRetry: () => _retryHalaqat(context),
+            );
           }
           if (state.halaqat.isEmpty) {
             return const _EmptyHalaqat();
@@ -55,10 +75,6 @@ class TeacherClassesPage extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _HalaqaCard - كارت الحلقة (Image 7)
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _HalaqaCard extends StatelessWidget {
   final HalaqaEntity halaqa;
@@ -77,11 +93,9 @@ class _HalaqaCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // الصف العلوي: الاسم + بادج الحالة
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // أزرار الإجراءات
               Row(
                 children: [
                   _ActionChip(
@@ -97,8 +111,12 @@ class _HalaqaCard extends StatelessWidget {
                     label: 'إدارة',
                     color: AppColors.surfaceGrey,
                     textColor: AppColors.textSecondary,
-                    onTap: () =>
-                        context.push('/teacher/halaqa/${halaqa.id}/manage'),
+                    onTap: () {
+                      context.read<TeacherBloc>().add(
+                        SelectHalaqaEvent(halaqa.id),
+                      );
+                      context.push('/teacher/halaqa/${halaqa.id}');
+                    },
                   ),
                   const SizedBox(width: 8),
                   _ActionChip(
@@ -114,8 +132,6 @@ class _HalaqaCard extends StatelessWidget {
                   ),
                 ],
               ),
-
-              // بادج فعّالة
               if (halaqa.isActive)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -135,19 +151,13 @@ class _HalaqaCard extends StatelessWidget {
                 ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          // اسم الحلقة
           Text(halaqa.name, style: AppTextStyles.headlineMedium),
-
           const SizedBox(height: 6),
-
-          // المشرفة
           const Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('المشرفة: أ. سارة أحمد', style: AppTextStyles.bodyMedium),
+              Text('المشرفة: غير متوفر', style: AppTextStyles.bodyMedium),
               SizedBox(width: 4),
               Icon(
                 Icons.person_outline,
@@ -156,10 +166,7 @@ class _HalaqaCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 8),
-
-          // الجدول + عدد الطلاب
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [

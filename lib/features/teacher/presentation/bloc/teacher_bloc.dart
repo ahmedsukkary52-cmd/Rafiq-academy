@@ -6,6 +6,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../../domain/usecases/add_recitation_record_usecase.dart';
+import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
 import '../../domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
@@ -20,6 +21,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final GetTeacherHalaqatUseCase getTeacherHalaqat;
   final GetHalaqaStudentsUseCase getHalaqaStudents;
   final GetHalaqaRecitationRecordsUseCase getHalaqaRecitationRecords;
+  final GetHalaqaAttendanceForDateUseCase getHalaqaAttendanceForDate;
   final RecordAttendanceUseCase recordAttendance;
   final AddRecitationRecordUseCase addRecitationRecord;
   final SendAssignmentUseCase sendAssignment;
@@ -28,6 +30,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     required this.getTeacherHalaqat,
     required this.getHalaqaStudents,
     required this.getHalaqaRecitationRecords,
+    required this.getHalaqaAttendanceForDate,
     required this.recordAttendance,
     required this.addRecitationRecord,
     required this.sendAssignment,
@@ -36,7 +39,10 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     on<SelectHalaqaEvent>(_onSelectHalaqa);
     on<LoadHalaqaStudentsEvent>(_onLoadHalaqaStudents);
     on<LoadHalaqaEvaluationsEvent>(_onLoadEvaluations);
+    on<LoadHalaqaAttendanceEvent>(_onLoadDayAttendance);
     on<RecordAttendanceEvent>(_onRecordAttendance);
+    on<SaveDayAttendanceEvent>(_onSaveDayAttendance);
+    on<ResetAttendanceSubmissionEvent>(_onResetAttendanceSubmission);
     on<AddRecitationRecordEvent>(_onAddRecitationRecord);
     on<ResetRecitationSubmissionEvent>(_onResetRecitationSubmission);
     on<SendAssignmentEvent>(_onSendAssignment);
@@ -141,6 +147,95 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           evaluationsStatus: SectionStatus.loaded,
           evaluations: evaluations,
         ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // حضور يوم معيّن
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadDayAttendance(
+    LoadHalaqaAttendanceEvent event,
+    Emitter<TeacherState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        dayAttendanceStatus: SectionStatus.loading,
+        dayAttendanceError: null,
+      ),
+    );
+
+    final result = await getHalaqaAttendanceForDate(
+      HalaqaAttendanceDateParams(
+        halaqaId: event.halaqaId,
+        date: event.date,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          dayAttendanceStatus: SectionStatus.error,
+          dayAttendanceError: failure.message,
+        ),
+      ),
+      (records) => emit(
+        state.copyWith(
+          dayAttendanceStatus: SectionStatus.loaded,
+          dayAttendance: records,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onSaveDayAttendance(
+    SaveDayAttendanceEvent event,
+    Emitter<TeacherState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        attendanceSubmissionStatus: SubmissionStatus.submitting,
+        attendanceSubmissionError: null,
+      ),
+    );
+
+    for (final record in event.records) {
+      final result = await recordAttendance(record);
+      final failed = result.fold((f) => f.message, (_) => null);
+      if (failed != null) {
+        emit(
+          state.copyWith(
+            attendanceSubmissionStatus: SubmissionStatus.error,
+            attendanceSubmissionError: failed,
+          ),
+        );
+        return;
+      }
+    }
+
+    emit(
+      state.copyWith(attendanceSubmissionStatus: SubmissionStatus.success),
+    );
+
+    if (event.records.isNotEmpty) {
+      add(
+        LoadHalaqaAttendanceEvent(
+          halaqaId: event.records.first.halaqaId,
+          date: event.records.first.date,
+        ),
+      );
+    }
+  }
+
+  void _onResetAttendanceSubmission(
+    ResetAttendanceSubmissionEvent event,
+    Emitter<TeacherState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        attendanceSubmissionStatus: SubmissionStatus.idle,
+        attendanceSubmissionError: null,
       ),
     );
   }

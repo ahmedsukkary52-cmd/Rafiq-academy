@@ -71,6 +71,25 @@ class TeacherRepositoryImpl implements TeacherRepository {
   }
 
   @override
+  Future<Either<Failure, List<AttendanceRecordEntity>>>
+  getHalaqaAttendanceForDate({
+    required String halaqaId,
+    required DateTime date,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getHalaqaAttendanceForDate(
+          halaqaId: halaqaId,
+          date: date,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> addRecitationRecord(
     RecitationRecordEntity record,
   ) async {

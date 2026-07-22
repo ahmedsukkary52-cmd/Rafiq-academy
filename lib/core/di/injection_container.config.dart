@@ -297,6 +297,8 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/add_recitation_re
     as _i877;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_recitation_records_usecase.dart'
     as _i998;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_attendance_for_date_usecase.dart'
+    as _i997;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart'
     as _i440;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
@@ -584,6 +586,11 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i1050.TeacherRepository>(),
       ),
     );
+    gh.lazySingleton<_i997.GetHalaqaAttendanceForDateUseCase>(
+      () => _i997.GetHalaqaAttendanceForDateUseCase(
+        gh<_i1050.TeacherRepository>(),
+      ),
+    );
     gh.lazySingleton<_i440.GetHalaqaStudentsUseCase>(
       () => _i440.GetHalaqaStudentsUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -720,6 +727,8 @@ extension GetItInjectableX on _i174.GetIt {
         getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
         getHalaqaRecitationRecords:
             gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
+        getHalaqaAttendanceForDate:
+            gh<_i997.GetHalaqaAttendanceForDateUseCase>(),
         recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
         addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
         sendAssignment: gh<_i192.SendAssignmentUseCase>(),

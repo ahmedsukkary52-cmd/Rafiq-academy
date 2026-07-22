@@ -24,122 +24,189 @@ class TeacherAttendancePage extends StatefulWidget {
 
 class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   DateTime _selectedDate = DateTime.now();
-
-  // تتبع حالة كل طالب محلياً قبل الحفظ
   final Map<String, AttendanceStatus> _attendanceMap = {};
+  bool _mapSyncedForLoad = false;
 
   @override
   void initState() {
     super.initState();
-    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    final bloc = context.read<TeacherBloc>();
+    bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    _loadAttendance();
+  }
+
+  void _loadAttendance() {
+    _mapSyncedForLoad = false;
+    context.read<TeacherBloc>().add(
+      LoadHalaqaAttendanceEvent(
+        halaqaId: widget.halaqaId,
+        date: _selectedDate,
+      ),
+    );
+  }
+
+  void _changeDate(DateTime date) {
+    setState(() {
+      _selectedDate = date;
+      _attendanceMap.clear();
+      _mapSyncedForLoad = false;
+    });
+    _loadAttendance();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('الحضور والغياب'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today_outlined),
-            onPressed: _pickDate,
-          ),
-        ],
-      ),
-      body: BlocBuilder<TeacherBloc, TeacherState>(
-        builder: (context, state) {
-          if (state.studentsStatus == SectionStatus.loading) {
-            return const AppLoadingWidget();
-          }
-          if (state.studentsStatus == SectionStatus.error) {
-            return AppErrorWidget(message: state.studentsError ?? 'حدث خطأ');
-          }
-
-          final students = state.students;
-
-          // تهيئة الـ map بالقيمة الافتراضية (حاضر)
-          for (final s in students) {
-            _attendanceMap.putIfAbsent(s.uid, () => AttendanceStatus.present);
-          }
-
-          // حساب العدادات
-          final presentCount = _attendanceMap.values
-              .where((v) => v == AttendanceStatus.present)
-              .length;
-          final absentCount = _attendanceMap.values
-              .where((v) => v == AttendanceStatus.absent)
-              .length;
-          final lateCount = _attendanceMap.values
-              .where((v) => v == AttendanceStatus.late)
-              .length;
-          const excusedCount = 0; // placeholder
-
-          return Column(
-            children: [
-              // ── التاريخ المحدد ─────────────────────────────────
-              _DateNavigator(
-                date: _selectedDate,
-                onPrev: () => setState(
-                  () => _selectedDate = _selectedDate.subtract(
-                    const Duration(days: 1),
-                  ),
-                ),
-                onNext: () => setState(
-                  () => _selectedDate = _selectedDate.add(
-                    const Duration(days: 1),
-                  ),
-                ),
-              ),
-
-              // ── عدادات الحضور ──────────────────────────────────
-              _AttendanceSummaryRow(
-                present: presentCount,
-                absent: absentCount,
-                late: lateCount,
-                excused: excusedCount,
-              ),
-
-              // ── جدول الطلاب ───────────────────────────────────
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.paddingM,
-                  ),
-                  itemCount: students.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: AppColors.border),
-                  itemBuilder: (context, i) {
-                    final student = students[i];
-                    return _StudentAttendanceRow(
-                      student: student,
-                      status:
-                          _attendanceMap[student.uid] ??
-                          AttendanceStatus.present,
-                      onChanged: (status) =>
-                          setState(() => _attendanceMap[student.uid] = status),
-                    );
-                  },
-                ),
-              ),
-
-              // ── زرار الحفظ ─────────────────────────────────────
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSizes.paddingM,
-                  AppSizes.paddingM,
-                  AppSizes.paddingM,
-                  MediaQuery.of(context).padding.bottom + AppSizes.paddingM,
-                ),
-                child: AppButton(
-                  label: 'حفظ الحضور',
-                  leading: const Icon(Icons.check_rounded, size: 20),
-                  onPressed: _saveAttendance,
-                ),
-              ),
-            ],
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+          prev.attendanceSubmissionStatus != curr.attendanceSubmissionStatus ||
+          prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
+          prev.dayAttendance != curr.dayAttendance,
+      listener: (context, state) {
+        if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
+          AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
+          context.read<TeacherBloc>().add(
+            const ResetAttendanceSubmissionEvent(),
           );
-        },
+        } else if (state.attendanceSubmissionStatus ==
+            SubmissionStatus.error) {
+          AppSnackBar.showError(
+            context,
+            state.attendanceSubmissionError ?? 'فشل حفظ الحضور',
+          );
+          context.read<TeacherBloc>().add(
+            const ResetAttendanceSubmissionEvent(),
+          );
+        }
+
+        if (state.dayAttendanceStatus == SectionStatus.loaded &&
+            !_mapSyncedForLoad) {
+          setState(() {
+            _mapSyncedForLoad = true;
+            _attendanceMap.clear();
+            for (final s in state.students) {
+              _attendanceMap[s.uid] = AttendanceStatus.present;
+            }
+            for (final record in state.dayAttendance) {
+              _attendanceMap[record.studentId] = record.status;
+            }
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('الحضور والغياب'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: _pickDate,
+            ),
+          ],
+        ),
+        body: BlocBuilder<TeacherBloc, TeacherState>(
+          builder: (context, state) {
+            if (state.studentsStatus == SectionStatus.loading ||
+                state.dayAttendanceStatus == SectionStatus.loading ||
+                state.dayAttendanceStatus == SectionStatus.initial) {
+              return const AppLoadingWidget();
+            }
+            if (state.studentsStatus == SectionStatus.error) {
+              return AppErrorWidget(
+                message: state.studentsError ?? 'حدث خطأ',
+                onRetry: () {
+                  context.read<TeacherBloc>().add(
+                    LoadHalaqaStudentsEvent(widget.halaqaId),
+                  );
+                  _loadAttendance();
+                },
+              );
+            }
+            if (state.dayAttendanceStatus == SectionStatus.error) {
+              return AppErrorWidget(
+                message: state.dayAttendanceError ?? 'حدث خطأ',
+                onRetry: _loadAttendance,
+              );
+            }
+
+            final students = state.students;
+            for (final s in students) {
+              _attendanceMap.putIfAbsent(
+                s.uid,
+                () => AttendanceStatus.present,
+              );
+            }
+
+            final presentCount = _attendanceMap.values
+                .where((v) => v == AttendanceStatus.present)
+                .length;
+            final absentCount = _attendanceMap.values
+                .where((v) => v == AttendanceStatus.absent)
+                .length;
+            final lateCount = _attendanceMap.values
+                .where((v) => v == AttendanceStatus.late)
+                .length;
+            const excusedCount = 0;
+
+            final isSaving =
+                state.attendanceSubmissionStatus ==
+                SubmissionStatus.submitting;
+
+            return Column(
+              children: [
+                _DateNavigator(
+                  date: _selectedDate,
+                  onPrev: () => _changeDate(
+                    _selectedDate.subtract(const Duration(days: 1)),
+                  ),
+                  onNext: () =>
+                      _changeDate(_selectedDate.add(const Duration(days: 1))),
+                ),
+                _AttendanceSummaryRow(
+                  present: presentCount,
+                  absent: absentCount,
+                  late: lateCount,
+                  excused: excusedCount,
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.paddingM,
+                    ),
+                    itemCount: students.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: AppColors.border),
+                    itemBuilder: (context, i) {
+                      final student = students[i];
+                      return _StudentAttendanceRow(
+                        student: student,
+                        status:
+                            _attendanceMap[student.uid] ??
+                            AttendanceStatus.present,
+                        onChanged: (status) => setState(
+                          () => _attendanceMap[student.uid] = status,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSizes.paddingM,
+                    AppSizes.paddingM,
+                    AppSizes.paddingM,
+                    MediaQuery.of(context).padding.bottom + AppSizes.paddingM,
+                  ),
+                  child: AppButton(
+                    label: 'حفظ الحضور',
+                    leading: const Icon(Icons.check_rounded, size: 20),
+                    isLoading: isSaving,
+                    onPressed: isSaving ? null : _saveAttendance,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -149,30 +216,25 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     if (authState is! AuthAuthenticated) return;
 
     final bloc = context.read<TeacherBloc>();
-
-    for (final entry in _attendanceMap.entries) {
-      bloc.add(
-        RecordAttendanceEvent(
-          AttendanceRecordEntity(
-            id: '',
-            studentId: entry.key,
-            studentName: bloc.state.students
-                .firstWhere(
-                  (s) => s.uid == entry.key,
-                  orElse: () =>
-                      const HalaqaStudentSummaryEntity(uid: '', name: ''),
-                )
-                .name,
-            halaqaId: widget.halaqaId,
-            date: _selectedDate,
-            status: entry.value,
-            recordedBy: authState.user.uid,
-          ),
-        ),
+    final records = _attendanceMap.entries.map((entry) {
+      return AttendanceRecordEntity(
+        id: '',
+        studentId: entry.key,
+        studentName: bloc.state.students
+            .firstWhere(
+              (s) => s.uid == entry.key,
+              orElse: () =>
+                  const HalaqaStudentSummaryEntity(uid: '', name: ''),
+            )
+            .name,
+        halaqaId: widget.halaqaId,
+        date: _selectedDate,
+        status: entry.value,
+        recordedBy: authState.user.uid,
       );
-    }
+    }).toList();
 
-    AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
+    bloc.add(SaveDayAttendanceEvent(records));
   }
 
   Future<void> _pickDate() async {
@@ -182,13 +244,9 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       firstDate: DateTime.now().subtract(const Duration(days: 30)),
       lastDate: DateTime.now(),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked != null) _changeDate(picked);
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _DateNavigator
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _DateNavigator extends StatelessWidget {
   final DateTime date;
@@ -215,18 +273,18 @@ class _DateNavigator extends StatelessWidget {
     ];
     const months = [
       '',
-      'محرم',
-      'صفر',
-      'ربيع الأول',
-      'ربيع الثاني',
-      'جمادى الأولى',
-      'جمادى الآخرة',
-      'رجب',
-      'شعبان',
-      'رمضان',
-      'شوال',
-      'ذو القعدة',
-      'ذو الحجة',
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
     ];
 
     return Padding(
@@ -239,7 +297,7 @@ class _DateNavigator extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left_rounded),
-            onPressed: onNext, // الأحدث على اليسار (RTL)
+            onPressed: onNext,
           ),
           Text(
             '${weekdays[date.weekday]} ${date.day} ${months[date.month]} ${date.year}',
@@ -254,10 +312,6 @@ class _DateNavigator extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _AttendanceSummaryRow - العدادات الأربعة
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _AttendanceSummaryRow extends StatelessWidget {
   final int present;
@@ -350,10 +404,6 @@ class _CounterBadge extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// _StudentAttendanceRow - صف طالب واحد مع أزرار الحضور/الغياب/التأخر
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _StudentAttendanceRow extends StatelessWidget {
   final HalaqaStudentSummaryEntity student;
   final AttendanceStatus status;
@@ -371,7 +421,6 @@ class _StudentAttendanceRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          // أزرار الحضور
           Row(
             children: [
               _AttendanceButton(
@@ -396,14 +445,9 @@ class _StudentAttendanceRow extends StatelessWidget {
               ),
             ],
           ),
-
           const Spacer(),
-
-          // اسم الطالب
           Text(student.name, style: AppTextStyles.titleMedium),
           const SizedBox(width: 12),
-
-          // Avatar
           UserAvatar(name: student.name, size: AppSizes.avatarS),
         ],
       ),

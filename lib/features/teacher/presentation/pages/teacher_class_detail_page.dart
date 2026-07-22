@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
@@ -37,22 +38,35 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     super.dispose();
   }
 
+  HalaqaEntity? _findHalaqa(TeacherState state) {
+    for (final h in state.halaqat) {
+      if (h.id == widget.halaqaId) return h;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TeacherBloc, TeacherState>(
       builder: (context, state) {
-        final halaqa = state.halaqat.isEmpty
-            ? null
-            : state.halaqat.firstWhere(
-                (h) => h.id == widget.halaqaId,
-                orElse: () => state.halaqat.first,
-              );
+        final halaqa = _findHalaqa(state);
+
+        if (state.halaqatStatus == SectionStatus.loaded &&
+            state.halaqat.isNotEmpty &&
+            halaqa == null) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(title: const Text('الحلقة')),
+            body: const AppErrorWidget(
+              message: 'لم يتم العثور على بيانات الحلقة',
+            ),
+          );
+        }
 
         return Scaffold(
           backgroundColor: AppColors.background,
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              // ── Header التيل ──────────────────────────────────
               SliverAppBar(
                 pinned: true,
                 expandedHeight: 140,
@@ -60,11 +74,11 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                 foregroundColor: Colors.white,
                 title: Text(halaqa?.name ?? 'الحلقة'),
                 flexibleSpace: FlexibleSpaceBar(
-                  background: _HalaqaStatsHeader(state: state),
+                  background: _HalaqaStatsHeader(
+                    studentCount: state.students.length,
+                  ),
                 ),
               ),
-
-              // ── Tabs ─────────────────────────────────────────
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _TabBarDelegate(
@@ -94,26 +108,46 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
             body: TabBarView(
               controller: _tabController,
               children: [
-                // ── تاب الطلاب ─────────────────────────────────
                 _StudentsTab(
                   state: state,
                   searchQuery: _searchQuery,
                   onSearch: (q) => setState(() => _searchQuery = q),
                   halaqaId: widget.halaqaId,
                 ),
-                // ── تاب الحضور ─────────────────────────────────
                 Center(
                   child: AppButton(
                     label: 'فتح سجل الحضور',
-                    onPressed: () =>
-                        context.push('/teacher/attendance/${widget.halaqaId}'),
+                    onPressed: () => context.push(
+                      '/teacher/attendance/${widget.halaqaId}',
+                    ),
                     width: 200,
                   ),
                 ),
-                // Placeholders
-                const Center(child: Text('التقييمات')),
-                const Center(child: Text('المهام')),
-                const Center(child: Text('المنشورات')),
+                Center(
+                  child: AppButton(
+                    label: 'فتح التقييمات',
+                    onPressed: () => context.push(
+                      '/teacher/halaqa/${widget.halaqaId}/evaluations',
+                    ),
+                    width: 200,
+                  ),
+                ),
+                Center(
+                  child: AppButton(
+                    label: 'المهام',
+                    onPressed: () =>
+                        AppSnackBar.showInfo(context, 'قريبًا'),
+                    width: 200,
+                  ),
+                ),
+                Center(
+                  child: AppButton(
+                    label: 'المنشورات',
+                    onPressed: () =>
+                        AppSnackBar.showInfo(context, 'قريبًا'),
+                    width: 200,
+                  ),
+                ),
               ],
             ),
           ),
@@ -123,14 +157,10 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// _HalaqaStatsHeader - الإحصائيات في الأعلى
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _HalaqaStatsHeader extends StatelessWidget {
-  final TeacherState state;
+  final int studentCount;
 
-  const _HalaqaStatsHeader({required this.state});
+  const _HalaqaStatsHeader({required this.studentCount});
 
   @override
   Widget build(BuildContext context) {
@@ -143,11 +173,9 @@ class _HalaqaStatsHeader extends StatelessWidget {
           AppSizes.paddingM,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const _HeaderStat(value: '%٨٧', label: 'متوسط الأداء'),
-            const _HeaderStat(value: '%٩٢', label: 'نسبة الحضور'),
-            _HeaderStat(value: '${state.students.length}', label: 'طالب'),
+            _HeaderStat(value: '$studentCount', label: 'طالب'),
           ],
         ),
       ),
@@ -188,10 +216,6 @@ class _HeaderStat extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// _StudentsTab - قائمة الطلاب (Image 6)
-// ══════════════════════════════════════════════════════════════════════════════
-
 class _StudentsTab extends StatelessWidget {
   final TeacherState state;
   final String searchQuery;
@@ -207,17 +231,45 @@ class _StudentsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.studentsStatus == SectionStatus.loading) {
+    if (state.studentsStatus == SectionStatus.loading ||
+        state.studentsStatus == SectionStatus.initial) {
       return const AppLoadingWidget();
+    }
+
+    if (state.studentsStatus == SectionStatus.error) {
+      return AppErrorWidget(
+        message: state.studentsError ?? 'حدث خطأ',
+        onRetry: () => context.read<TeacherBloc>().add(
+          LoadHalaqaStudentsEvent(halaqaId),
+        ),
+      );
     }
 
     final students = searchQuery.isEmpty
         ? state.students
         : state.students.where((s) => s.name.contains(searchQuery)).toList();
 
+    if (state.students.isEmpty) {
+      return Column(
+        children: [
+          const Expanded(
+            child: Center(
+              child: Text(
+                'لا يوجد طلاب في هذه الحلقة',
+                style: AppTextStyles.bodyMedium,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSizes.paddingM),
+            child: _AddStudentButton(halaqaId: halaqaId),
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: [
-        // بحث
         Padding(
           padding: const EdgeInsets.all(AppSizes.paddingM),
           child: AppTextField(
@@ -229,32 +281,35 @@ class _StudentsTab extends StatelessWidget {
             ),
           ),
         ),
-
-        // القائمة
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-            itemCount: students.length + 1, // +1 لزرار إضافة طالب
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) {
-              if (i == students.length) {
-                return _AddStudentButton(halaqaId: halaqaId);
-              }
-              return _StudentCard(
-                student: students[i],
-                halaqaId: halaqaId,
-              );
-            },
-          ),
+          child: students.isEmpty
+              ? const Center(
+                  child: Text(
+                    'لا نتائج للبحث',
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.paddingM,
+                  ),
+                  itemCount: students.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    if (i == students.length) {
+                      return _AddStudentButton(halaqaId: halaqaId);
+                    }
+                    return _StudentCard(
+                      student: students[i],
+                      halaqaId: halaqaId,
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _StudentCard - كارت الطالب مع أزراره
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _StudentCard extends StatelessWidget {
   final HalaqaStudentSummaryEntity student;
@@ -262,11 +317,7 @@ class _StudentCard extends StatelessWidget {
 
   const _StudentCard({required this.student, required this.halaqaId});
 
-  Color get _levelColor {
-    if (student.attendancePercent >= 90) return AppColors.success;
-    if (student.attendancePercent >= 70) return AppColors.secondary;
-    return AppColors.error;
-  }
+  bool get _hasAttendanceData => student.attendancePercent > 0;
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +327,6 @@ class _StudentCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // الأزرار
               Row(
                 children: [
                   if (student.isAtRisk)
@@ -298,7 +348,9 @@ class _StudentCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   _OutlinedChip(
                     label: 'تقييم',
-                    onTap: () {},
+                    onTap: () => context.push(
+                      '/teacher/halaqa/$halaqaId/evaluations',
+                    ),
                     icon: Icons.rate_review_outlined,
                     color: AppColors.primary,
                   ),
@@ -312,10 +364,7 @@ class _StudentCard extends StatelessWidget {
                   ),
                 ],
               ),
-
               const Spacer(),
-
-              // الاسم + المستوى
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -323,22 +372,15 @@ class _StudentCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Text(
-                        '${student.attendancePercent.toInt()}% حضور',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: _levelColor,
+                      if (_hasAttendanceData) ...[
+                        Text(
+                          '${student.attendancePercent.toInt()}% حضور',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.success,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _levelColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 6),
+                      ],
                       _TagChip(
                         label: 'المستوى ${student.level}',
                         color: AppColors.primaryLight,
@@ -348,15 +390,10 @@ class _StudentCard extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(width: 12),
-
-              // Avatar
               UserAvatar(name: student.name),
             ],
           ),
-
-          // آخر تقييم
           if (student.lastGradeLabel != null) ...[
             const SizedBox(height: 8),
             Align(
@@ -371,9 +408,7 @@ class _StudentCard extends StatelessWidget {
               ),
             ),
           ],
-
-          // تقدم الحفظ
-          if (student.attendancePercent > 0) ...[
+          if (_hasAttendanceData) ...[
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(AppSizes.radiusFull),
@@ -381,18 +416,16 @@ class _StudentCard extends StatelessWidget {
                 value: student.attendancePercent / 100,
                 minHeight: 4,
                 backgroundColor: AppColors.surfaceGrey,
-                valueColor: AlwaysStoppedAnimation(_levelColor),
+                valueColor: const AlwaysStoppedAnimation(AppColors.success),
               ),
             ),
           ],
-
-          // زرار تواصل مع الأهل (للطلاب في خطر)
           if (student.isAtRisk) ...[
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () => AppSnackBar.showInfo(context, 'قريبًا'),
                 icon: const Icon(
                   Icons.message_outlined,
                   size: 16,
@@ -503,7 +536,7 @@ class _AddStudentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () => AppSnackBar.showInfo(context, 'قريبًا'),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
@@ -531,7 +564,6 @@ class _AddStudentButton extends StatelessWidget {
   }
 }
 
-// TabBar Delegate
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
 

@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../bloc/teacher_bloc.dart';
+import '../bloc/teacher_state.dart';
 
 class TeacherProfileTab extends StatelessWidget {
   const TeacherProfileTab({super.key});
+
+  void _comingSoon(BuildContext context) {
+    AppSnackBar.showInfo(context, 'قريبًا');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +27,6 @@ class TeacherProfileTab extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Header التيل ────────────────────────────────────
             Container(
               color: AppColors.primary,
               padding: EdgeInsets.only(
@@ -29,36 +35,40 @@ class TeacherProfileTab extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Avatar مع أيقونة التعديل
                   Stack(
                     children: [
-                      UserAvatar(
-                        name: user?.name ?? 'م',
-                        size: AppSizes.avatarXL,
+                      GestureDetector(
+                        onTap: () => _comingSoon(context),
+                        child: UserAvatar(
+                          name: user?.name ?? 'م',
+                          imageUrl: user?.profileImageUrl,
+                          size: AppSizes.avatarXL,
+                        ),
                       ),
                       Positioned(
                         bottom: 0,
                         left: 0,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.edit_rounded,
-                            color: Colors.white,
-                            size: 14,
+                        child: GestureDetector(
+                          onTap: () => _comingSoon(context),
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.edit_rounded,
+                              color: Colors.white,
+                              size: 14,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-
-                  // الاسم والوصف
                   Text(
                     'أ. ${user?.name ?? ''}',
                     style: const TextStyle(
@@ -79,7 +89,7 @@ class TeacherProfileTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Team Academy · خبرة ٨ سنوات',
+                    'غير متوفر',
                     style: TextStyle(
                       fontFamily: 'NotoNaskhArabic',
                       fontSize: 12,
@@ -89,105 +99,58 @@ class TeacherProfileTab extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              child: BlocBuilder<TeacherBloc, TeacherState>(
+                builder: (context, state) {
+                  final halaqatReady =
+                      state.halaqatStatus == SectionStatus.loaded;
+                  final halaqaCount = halaqatReady
+                      ? '${state.halaqat.length}'
+                      : 'قريبًا';
+                  final studentCount = halaqatReady
+                      ? '${state.halaqat.fold<int>(0, (sum, h) => sum + h.studentIds.length)}'
+                      : 'قريبًا';
 
-            // ── إحصائيات ────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.all(AppSizes.paddingM),
-              child: Row(
-                children: [
-                  _StatCard(value: '%٩١', label: 'رضا الأهالي'),
-                  SizedBox(width: 12),
-                  _StatCard(value: '٤٢', label: 'طالب'),
-                  SizedBox(width: 12),
-                  _StatCard(value: '٣', label: 'حلقات'),
-                ],
+                  return Row(
+                    children: [
+                      const _StatCard(value: 'قريبًا', label: 'رضا الأهالي'),
+                      const SizedBox(width: 12),
+                      _StatCard(value: studentCount, label: 'طالب'),
+                      const SizedBox(width: 12),
+                      _StatCard(value: halaqaCount, label: 'حلقات'),
+                    ],
+                  );
+                },
               ),
             ),
-
-            // ── المساعد الذكي ────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSizes.paddingM,
               ),
               child: Container(
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  color: AppColors.dark,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+                  border: Border.all(color: AppColors.border),
                 ),
                 padding: const EdgeInsets.all(AppSizes.paddingL),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        const Text(
-                          'توصيات هذا الأسبوع',
-                          style: TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                color: AppColors.primary,
-                                size: 12,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'مساعد ذكي',
-                                style: TextStyle(
-                                  fontFamily: 'NotoNaskhArabic',
-                                  fontSize: 11,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Text(
-                      'بناءً على بيانات حلقاتك',
-                      style: TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 12,
-                        color: Colors.white60,
+                    Text(
+                      'المساعد الذكي',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    const Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.end,
-                      children: [
-                        _DarkChip(label: 'متابعة ٢ طلاب في خطر'),
-                        _DarkChip(label: 'رفع ٥ تقييمات معلقة'),
-                      ],
-                    ),
+                    const SizedBox(height: 4),
+                    const Text('قريبًا', style: AppTextStyles.bodyMedium),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ── الإعدادات ────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSizes.paddingM,
@@ -201,7 +164,7 @@ class TeacherProfileTab extends StatelessWidget {
                       label: 'الوضع الليلي',
                       color: const Color(0xFF5C6BC0),
                       value: false,
-                      onChanged: (_) {},
+                      onChanged: (_) => _comingSoon(context),
                     ),
                     const Divider(height: 1),
                     _SettingToggle(
@@ -209,29 +172,31 @@ class TeacherProfileTab extends StatelessWidget {
                       label: 'الإشعارات',
                       color: AppColors.primary,
                       value: true,
-                      onChanged: (_) {},
+                      onChanged: (_) => _comingSoon(context),
                     ),
                     const Divider(height: 1),
-                    const _SettingArrow(
+                    _SettingArrow(
                       icon: Icons.language_outlined,
                       label: 'اللغة',
                       subtitle: 'العربية',
                       color: AppColors.secondary,
+                      onTap: () => _comingSoon(context),
                     ),
                     const Divider(height: 1),
-                    const _SettingArrow(
+                    _SettingArrow(
                       icon: Icons.security_outlined,
                       label: 'الخصوصية',
                       color: AppColors.success,
+                      onTap: () => _comingSoon(context),
                     ),
                     const Divider(height: 1),
-                    const _SettingArrow(
+                    _SettingArrow(
                       icon: Icons.help_outline_rounded,
                       label: 'المساعدة والدعم',
-                      color: Color(0xFF9C27B0),
+                      color: const Color(0xFF9C27B0),
+                      onTap: () => _comingSoon(context),
                     ),
                     const Divider(height: 1),
-                    // تسجيل الخروج
                     _LogoutTile(
                       onTap: () {
                         context.read<AuthBloc>().add(const LogoutEvent());
@@ -241,12 +206,9 @@ class TeacherProfileTab extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // الإصدار
             const Text(
-              'Team Academy · الإصدار ١.٢.٠١',
+              'أكاديمية رفيق',
               style: AppTextStyles.labelSmall,
             ),
             const SizedBox(height: 24),
@@ -270,36 +232,14 @@ class _StatCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Column(
           children: [
-            Text(value, style: AppTextStyles.headlineMedium),
+            Text(
+              value,
+              style: AppTextStyles.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 2),
             Text(label, style: AppTextStyles.labelSmall),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DarkChip extends StatelessWidget {
-  final String label;
-
-  const _DarkChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 12,
-          color: Colors.white,
         ),
       ),
     );
@@ -350,37 +290,42 @@ class _SettingArrow extends StatelessWidget {
   final String label;
   final Color color;
   final String? subtitle;
+  final VoidCallback onTap;
 
   const _SettingArrow({
     required this.icon,
     required this.label,
     required this.color,
+    required this.onTap,
     this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.paddingM,
-        vertical: 12,
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.chevron_left_rounded,
-            color: AppColors.textHint,
-            size: 20,
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(width: 4),
-            Text(subtitle!, style: AppTextStyles.bodyMedium),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.paddingM,
+          vertical: 12,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.chevron_left_rounded,
+              color: AppColors.textHint,
+              size: 20,
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(width: 4),
+              Text(subtitle!, style: AppTextStyles.bodyMedium),
+            ],
+            const Spacer(),
+            Text(label, style: AppTextStyles.titleMedium),
+            const SizedBox(width: 12),
+            _SettingIconBox(icon: icon, color: color),
           ],
-          const Spacer(),
-          Text(label, style: AppTextStyles.titleMedium),
-          const SizedBox(width: 12),
-          _SettingIconBox(icon: icon, color: color),
-        ],
+        ),
       ),
     );
   }

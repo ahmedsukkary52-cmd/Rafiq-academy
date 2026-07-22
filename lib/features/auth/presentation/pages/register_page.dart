@@ -21,7 +21,6 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  String _selectedRole = AppRoles.student;
   bool _obscurePass = true;
 
   @override
@@ -41,7 +40,7 @@ class _RegisterPageState extends State<RegisterPage> {
         password: _passwordCtrl.text,
         name: _nameCtrl.text.trim(),
         phone: _phoneCtrl.text.trim(),
-        role: _selectedRole,
+        role: AppRoles.student,
       ),
     );
   }
@@ -228,50 +227,6 @@ class _RegisterPageState extends State<RegisterPage> {
                                   }
                                   return null;
                                 },
-                              ),
-                              const SizedBox(height: 16),
-
-                              _buildLabel('نوع الحساب'),
-                              const SizedBox(height: 6),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceGrey,
-                                  borderRadius: BorderRadius.circular(
-                                    AppSizes.radiusM,
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedRole,
-                                    isExpanded: true,
-                                    dropdownColor: AppColors.surface,
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: AppRoles.student,
-                                        child: Text('طالب'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: AppRoles.teacher,
-                                        child: Text('معلم'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: AppRoles.parent,
-                                        child: Text('ولي أمر'),
-                                      ),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() {
-                                          _selectedRole = value;
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
                               ),
                               const SizedBox(height: 24),
 

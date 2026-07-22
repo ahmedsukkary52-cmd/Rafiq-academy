@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../student/domain/usecases/get_student_profile_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../domain/entities/parent_entities.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
 
-/// Sprint 1 — minimal parent dashboard (children list only).
+/// Parent home — children list + weekly report (Sprint 1 + 2).
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
 
@@ -22,10 +20,6 @@ class ParentHomePage extends StatefulWidget {
 }
 
 class _ParentHomePageState extends State<ParentHomePage> {
-  /// Resolved display names keyed by student uid (ParentBloc only stores ids).
-  final Map<String, String> _childNames = {};
-  List<String> _namesRequestIds = const [];
-
   @override
   void initState() {
     super.initState();
@@ -38,78 +32,42 @@ class _ParentHomePageState extends State<ParentHomePage> {
     context.read<ParentBloc>().add(LoadChildrenEvent(authState.user.uid));
   }
 
-  Future<void> _resolveChildNames(List<String> childrenIds) async {
-    if (childrenIds.isEmpty) {
-      if (_childNames.isNotEmpty) {
-        setState(() => _childNames.clear());
-      }
-      _namesRequestIds = const [];
-      return;
-    }
-
-    // Avoid re-fetching the same set while a request is in flight / already done.
-    if (_listEquals(_namesRequestIds, childrenIds) &&
-        _childNames.keys.toSet().containsAll(childrenIds)) {
-      return;
-    }
-    _namesRequestIds = List<String>.from(childrenIds);
-
-    final getProfile = sl<GetStudentProfileUseCase>();
-    final resolved = <String, String>{};
-
-    await Future.wait(
-      childrenIds.map((id) async {
-        final result = await getProfile(StudentUidParams(id));
-        result.fold(
-          (_) => resolved[id] = 'طالب',
-          (profile) => resolved[id] =
-              profile.name.trim().isEmpty ? 'طالب' : profile.name.trim(),
-        );
-      }),
-    );
-
-    if (!mounted) return;
-    if (!_listEquals(_namesRequestIds, childrenIds)) return;
-
-    setState(() {
-      _childNames
-        ..clear()
-        ..addAll(resolved);
-    });
+  void _selectChild(String studentId) {
+    context.read<ParentBloc>().add(SelectChildEvent(studentId));
   }
 
-  static bool _listEquals(List<String> a, List<String> b) {
-    if (identical(a, b)) return true;
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
+  void _retryReport() {
+    final selectedId = context
+        .read<ParentBloc>()
+        .state
+        .selectedChildId;
+    if (selectedId == null) return;
+    _selectChild(selectedId);
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
-    final parentName = authState is AuthAuthenticated
-        ? authState.user.name
-        : '';
+    final parentName =
+    authState is AuthAuthenticated ? authState.user.name : '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('نافذة ولي الأمر')),
       body: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (prev, curr) =>
+        prev.childrenStatus != curr.childrenStatus ||
             prev.childrenIds != curr.childrenIds ||
-            prev.childrenStatus != curr.childrenStatus,
+            prev.selectedChildId != curr.selectedChildId,
         listener: (context, state) {
-          if (state.childrenStatus == SectionStatus.loaded) {
-            _resolveChildNames(state.childrenIds);
+          // After children load, load the current-week report for the
+          // auto-selected child via the existing SelectChildEvent flow.
+          if (state.childrenStatus == SectionStatus.loaded &&
+              state.selectedChildId != null &&
+              state.reportStatus == SectionStatus.initial) {
+            _selectChild(state.selectedChildId!);
           }
         },
-        buildWhen: (prev, curr) =>
-            prev.childrenStatus != curr.childrenStatus ||
-            prev.childrenIds != curr.childrenIds ||
-            prev.childrenError != curr.childrenError,
         builder: (context, state) {
           if (state.childrenStatus == SectionStatus.initial ||
               state.childrenStatus == SectionStatus.loading) {
@@ -127,11 +85,53 @@ class _ParentHomePageState extends State<ParentHomePage> {
             return const _EmptyChildren();
           }
 
-          return _ChildrenDashboard(
-            parentName: parentName,
-            childrenIds: state.childrenIds,
-            childNames: _childNames,
-            onChildTap: () => AppSnackBar.showInfo(context, 'قريبًا'),
+          return ListView(
+            padding: const EdgeInsets.all(AppSizes.paddingM),
+            children: [
+              Text(
+                parentName.isEmpty ? 'ولي الأمر' : parentName,
+                style: AppTextStyles.headlineLarge,
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'الأبناء المرتبطون: ${state.childrenIds.length}',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: AppSizes.paddingM),
+              ...state.childrenIds.map((id) {
+                final isSelected = id == state.selectedChildId;
+                final name = (isSelected &&
+                    state.weeklyReport != null &&
+                    state.weeklyReport!.studentId == id &&
+                    state.weeklyReport!
+                        .studentName
+                        .trim()
+                        .isNotEmpty)
+                    ? state.weeklyReport!.studentName.trim()
+                    : 'طالب';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ChildCard(
+                    name: name,
+                    isSelected: isSelected,
+                    onTap: () => _selectChild(id),
+                  ),
+                );
+              }),
+              const SizedBox(height: AppSizes.paddingM),
+              const Text(
+                'التقرير الأسبوعي',
+                style: AppTextStyles.headlineMedium,
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 8),
+              _WeeklyReportSection(
+                state: state,
+                onRetry: _retryReport,
+              ),
+            ],
           );
         },
       ),
@@ -139,65 +139,27 @@ class _ParentHomePageState extends State<ParentHomePage> {
   }
 }
 
-class _ChildrenDashboard extends StatelessWidget {
-  final String parentName;
-  final List<String> childrenIds;
-  final Map<String, String> childNames;
-  final VoidCallback onChildTap;
-
-  const _ChildrenDashboard({
-    required this.parentName,
-    required this.childrenIds,
-    required this.childNames,
-    required this.onChildTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSizes.paddingM),
-      children: [
-        Text(
-          parentName.isEmpty ? 'ولي الأمر' : parentName,
-          style: AppTextStyles.headlineLarge,
-          textAlign: TextAlign.right,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'الأبناء المرتبطون: ${childrenIds.length}',
-          style: AppTextStyles.bodyMedium,
-          textAlign: TextAlign.right,
-        ),
-        const SizedBox(height: AppSizes.paddingM),
-        ...childrenIds.map(
-          (id) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _ChildCard(
-              name: childNames[id] ?? 'طالب',
-              onTap: onChildTap,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ChildCard extends StatelessWidget {
   final String name;
+  final bool isSelected;
   final VoidCallback onTap;
 
-  const _ChildCard({required this.name, required this.onTap});
+  const _ChildCard({
+    required this.name,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
       onTap: onTap,
+      color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : null,
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.chevron_left_rounded,
-            color: AppColors.textHint,
+            color: isSelected ? AppColors.primary : AppColors.textHint,
           ),
           const Spacer(),
           Column(
@@ -221,6 +183,195 @@ class _ChildCard extends StatelessWidget {
               Icons.person_outline_rounded,
               color: AppColors.primary,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyReportSection extends StatelessWidget {
+  final ParentState state;
+  final VoidCallback onRetry;
+
+  const _WeeklyReportSection({
+    required this.state,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.reportStatus == SectionStatus.initial ||
+        state.reportStatus == SectionStatus.loading) {
+      return const SizedBox(
+        height: 160,
+        child: AppLoadingWidget(),
+      );
+    }
+
+    if (state.reportStatus == SectionStatus.error) {
+      return AppErrorWidget(
+        message: state.reportError ?? 'تعذر تحميل التقرير',
+        onRetry: onRetry,
+      );
+    }
+
+    final report = state.weeklyReport;
+    if (report == null) {
+      return const _EmptyWeeklyReport();
+    }
+
+    final hasData = report.totalSessions > 0 ||
+        report.totalVersesMemorized > 0 ||
+        report.teacherNotes
+            .trim()
+            .isNotEmpty;
+
+    if (!hasData) {
+      return const _EmptyWeeklyReport();
+    }
+
+    return _WeeklyReportCard(report: report);
+  }
+}
+
+class _WeeklyReportCard extends StatelessWidget {
+  final WeeklyReportEntity report;
+
+  const _WeeklyReportCard({required this.report});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = report.studentName
+        .trim()
+        .isEmpty
+        ? 'طالب'
+        : report.studentName.trim();
+    final attendanceLabel = report.totalSessions == 0
+        ? '—'
+        : '${report.attendedSessions} / ${report.totalSessions}';
+    final percentLabel = report.totalSessions == 0
+        ? '—'
+        : '${report.attendancePercent.round()}%';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(name, style: AppTextStyles.titleLarge,
+              textAlign: TextAlign.right),
+          const SizedBox(height: 4),
+          Text(
+            'أسبوع يبدأ ${_formatDate(report.weekStart)}',
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.right,
+          ),
+          const SizedBox(height: AppSizes.paddingM),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricTile(
+                  label: 'الحضور',
+                  value: attendanceLabel,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MetricTile(
+                  label: 'نسبة الحضور',
+                  value: percentLabel,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MetricTile(
+                  label: 'تسميعات',
+                  value: '${report.totalVersesMemorized}',
+                ),
+              ),
+            ],
+          ),
+          if (report.teacherNotes
+              .trim()
+              .isNotEmpty) ...[
+            const SizedBox(height: AppSizes.paddingM),
+            const Text(
+              'ملاحظات المعلم',
+              style: AppTextStyles.titleMedium,
+              textAlign: TextAlign.right,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              report.teacherNotes.trim(),
+              style: AppTextStyles.bodyLarge,
+              textAlign: TextAlign.right,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime date) {
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    return '$d/$m/${date.year}';
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MetricTile({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey,
+        borderRadius: BorderRadius.circular(AppSizes.radiusM),
+      ),
+      child: Column(
+        children: [
+          Text(value, style: AppTextStyles.titleLarge),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyWeeklyReport extends StatelessWidget {
+  const _EmptyWeeklyReport();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        children: [
+          Icon(
+            Icons.assessment_outlined,
+            size: 40,
+            color: AppColors.textHint.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'لا توجد بيانات لهذا الأسبوع بعد',
+            style: AppTextStyles.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'سيظهر الحضور والتسميعات هنا عند تسجيلها من المعلم.',
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

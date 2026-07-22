@@ -65,9 +65,60 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   @override
   Future<void> recordAttendance(AttendanceRecordModel record) async {
     try {
-      await firestore
+      final dayStart = DateTime(
+        record.date.year,
+        record.date.month,
+        record.date.day,
+      );
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      final normalized = AttendanceRecordModel(
+        id: record.id,
+        studentId: record.studentId,
+        studentName: record.studentName,
+        halaqaId: record.halaqaId,
+        date: dayStart,
+        status: record.status,
+        recordedBy: record.recordedBy,
+      );
+
+      final existing = await firestore
           .collection(FirestoreCollections.attendanceRecords)
-          .add(record.toFirestore());
+          .where('halaqaId', isEqualTo: record.halaqaId)
+          .where('studentId', isEqualTo: record.studentId)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart))
+          .where('date', isLessThan: Timestamp.fromDate(dayEnd))
+          .limit(1)
+          .get();
+
+      if (existing.docs.isNotEmpty) {
+        await existing.docs.first.reference.update(normalized.toFirestore());
+      } else {
+        await firestore
+            .collection(FirestoreCollections.attendanceRecords)
+            .add(normalized.toFirestore());
+      }
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AttendanceRecordModel>> getHalaqaAttendanceForDate({
+    required String halaqaId,
+    required DateTime date,
+  }) async {
+    try {
+      final dayStart = DateTime(date.year, date.month, date.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+
+      final snapshot = await firestore
+          .collection(FirestoreCollections.attendanceRecords)
+          .where('halaqaId', isEqualTo: halaqaId)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart))
+          .where('date', isLessThan: Timestamp.fromDate(dayEnd))
+          .get();
+
+      return snapshot.docs.map(AttendanceRecordModel.fromFirestore).toList();
     } catch (e) {
       throw ServerException(e.toString());
     }

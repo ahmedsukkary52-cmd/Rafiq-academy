@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
+import '../../domain/entities/attendance_record_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 
 class _Unset {
@@ -28,8 +29,17 @@ class TeacherState extends Equatable {
   final List<RecitationRecordEntity> evaluations;
   final String? evaluationsError;
 
+  // ── حضور يوم معيّن ────────────────────────────────────────────────────
+  final SectionStatus dayAttendanceStatus;
+  final List<AttendanceRecordEntity> dayAttendance;
+  final String? dayAttendanceError;
+
   // ── تسجيل الحضور (Optimistic، عشان كده مفيهاش loading عام) ────────────
   final String? attendanceError;
+
+  // ── حفظ حضور اليوم ────────────────────────────────────────────────────
+  final SubmissionStatus attendanceSubmissionStatus;
+  final String? attendanceSubmissionError;
 
   // ── تسجيل تقييم التسميع ───────────────────────────────────────────────
   final SubmissionStatus recitationSubmissionStatus;
@@ -50,7 +60,12 @@ class TeacherState extends Equatable {
     this.evaluationsStatus = SectionStatus.initial,
     this.evaluations = const [],
     this.evaluationsError,
+    this.dayAttendanceStatus = SectionStatus.initial,
+    this.dayAttendance = const [],
+    this.dayAttendanceError,
     this.attendanceError,
+    this.attendanceSubmissionStatus = SubmissionStatus.idle,
+    this.attendanceSubmissionError,
     this.recitationSubmissionStatus = SubmissionStatus.idle,
     this.recitationSubmissionError,
     this.assignmentSubmissionStatus = SubmissionStatus.idle,
@@ -70,7 +85,12 @@ class TeacherState extends Equatable {
     SectionStatus? evaluationsStatus,
     List<RecitationRecordEntity>? evaluations,
     Object? evaluationsError = _unset,
+    SectionStatus? dayAttendanceStatus,
+    List<AttendanceRecordEntity>? dayAttendance,
+    Object? dayAttendanceError = _unset,
     Object? attendanceError = _unset,
+    SubmissionStatus? attendanceSubmissionStatus,
+    Object? attendanceSubmissionError = _unset,
     SubmissionStatus? recitationSubmissionStatus,
     Object? recitationSubmissionError = _unset,
     SubmissionStatus? assignmentSubmissionStatus,
@@ -95,9 +115,19 @@ class TeacherState extends Equatable {
       evaluationsError: identical(evaluationsError, _unset)
           ? this.evaluationsError
           : evaluationsError as String?,
+      dayAttendanceStatus: dayAttendanceStatus ?? this.dayAttendanceStatus,
+      dayAttendance: dayAttendance ?? this.dayAttendance,
+      dayAttendanceError: identical(dayAttendanceError, _unset)
+          ? this.dayAttendanceError
+          : dayAttendanceError as String?,
       attendanceError: identical(attendanceError, _unset)
           ? this.attendanceError
           : attendanceError as String?,
+      attendanceSubmissionStatus:
+          attendanceSubmissionStatus ?? this.attendanceSubmissionStatus,
+      attendanceSubmissionError: identical(attendanceSubmissionError, _unset)
+          ? this.attendanceSubmissionError
+          : attendanceSubmissionError as String?,
       recitationSubmissionStatus:
           recitationSubmissionStatus ?? this.recitationSubmissionStatus,
       recitationSubmissionError: identical(recitationSubmissionError, _unset)
@@ -123,7 +153,12 @@ class TeacherState extends Equatable {
     evaluationsStatus,
     evaluations,
     evaluationsError,
+    dayAttendanceStatus,
+    dayAttendance,
+    dayAttendanceError,
     attendanceError,
+    attendanceSubmissionStatus,
+    attendanceSubmissionError,
     recitationSubmissionStatus,
     recitationSubmissionError,
     assignmentSubmissionStatus,

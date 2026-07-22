@@ -62,6 +62,35 @@ class RecordAttendanceEvent extends TeacherEvent {
   List<Object?> get props => [record];
 }
 
+/// تحميل سجلات الحضور لحلقة في يوم معيّن
+class LoadHalaqaAttendanceEvent extends TeacherEvent {
+  final String halaqaId;
+  final DateTime date;
+
+  const LoadHalaqaAttendanceEvent({
+    required this.halaqaId,
+    required this.date,
+  });
+
+  @override
+  List<Object?> get props => [halaqaId, date];
+}
+
+/// حفظ حضور اليوم لكل الطلاب دفعة واحدة
+class SaveDayAttendanceEvent extends TeacherEvent {
+  final List<AttendanceRecordEntity> records;
+
+  const SaveDayAttendanceEvent(this.records);
+
+  @override
+  List<Object?> get props => [records];
+}
+
+/// إرجاع حالة حفظ الحضور لـ idle بعد عرض النتيجة
+class ResetAttendanceSubmissionEvent extends TeacherEvent {
+  const ResetAttendanceSubmissionEvent();
+}
+
 /// تسجيل تقييم تسميع لطالب
 class AddRecitationRecordEvent extends TeacherEvent {
   final RecitationRecordEntity record;

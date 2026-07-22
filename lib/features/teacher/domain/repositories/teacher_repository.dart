@@ -20,8 +20,15 @@ abstract class TeacherRepository {
     String halaqaId,
   );
 
-  /// تسجيل الحضور لطالب معيّن
+  /// تسجيل الحضور لطالب معيّن (upsert لنفس الحلقة/الطالب/اليوم)
   Future<Either<Failure, Unit>> recordAttendance(AttendanceRecordEntity record);
+
+  /// سجلات الحضور لحلقة في يوم معيّن
+  Future<Either<Failure, List<AttendanceRecordEntity>>>
+  getHalaqaAttendanceForDate({
+    required String halaqaId,
+    required DateTime date,
+  });
 
   /// تسجيل تقييم التسميع لطالب
   Future<Either<Failure, Unit>> addRecitationRecord(

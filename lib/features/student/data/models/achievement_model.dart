@@ -14,13 +14,28 @@ class AchievementModel extends AchievementEntity {
 
   factory AchievementModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    // Tolerate teacher Awards docs in the same collection
+    // (grantedBy / grantedAt / note) without changing that write path.
+    final title = (data['title'] as String?)?.trim().isNotEmpty == true
+        ? data['title'] as String
+        : (data['note'] as String?)?.trim().isNotEmpty == true
+            ? data['note'] as String
+            : (data['type'] as String?) ?? '';
+    final issuedBy = (data['issuedBy'] as String?)?.trim().isNotEmpty == true
+        ? data['issuedBy'] as String
+        : (data['grantedBy'] as String?) ?? '';
+    final rawDate = data['date'] ?? data['grantedAt'];
+    final date = rawDate is Timestamp
+        ? rawDate.toDate()
+        : DateTime.fromMillisecondsSinceEpoch(0);
+
     return AchievementModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
       type: _typeFromString(data['type'] ?? ''),
-      title: data['title'] ?? '',
-      issuedBy: data['issuedBy'] ?? '',
-      date: (data['date'] as Timestamp).toDate(),
+      title: title,
+      issuedBy: issuedBy,
+      date: date,
     );
   }
 

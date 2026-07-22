@@ -40,6 +40,16 @@ class LoadHalaqaStudentsEvent extends TeacherEvent {
   List<Object?> get props => [halaqaId];
 }
 
+/// تحميل تقييمات التسميع لحلقة معيّنة
+class LoadHalaqaEvaluationsEvent extends TeacherEvent {
+  final String halaqaId;
+
+  const LoadHalaqaEvaluationsEvent(this.halaqaId);
+
+  @override
+  List<Object?> get props => [halaqaId];
+}
+
 /// تسجيل حضور/غياب/تأخير لطالب بنقرة واحدة.
 /// بيتعمل لها Optimistic Update فوراً في الـ UI قبل ما الكتابة في
 /// Firestore تخلص، عشان الاستجابة تكون فورية للمعلم.

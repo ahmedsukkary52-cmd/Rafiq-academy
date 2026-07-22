@@ -6,6 +6,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../../domain/usecases/add_recitation_record_usecase.dart';
+import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
 import '../../domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
 import '../../domain/usecases/record_attendance_usecase.dart';
@@ -18,6 +19,7 @@ import 'teacher_event.dart';
 class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final GetTeacherHalaqatUseCase getTeacherHalaqat;
   final GetHalaqaStudentsUseCase getHalaqaStudents;
+  final GetHalaqaRecitationRecordsUseCase getHalaqaRecitationRecords;
   final RecordAttendanceUseCase recordAttendance;
   final AddRecitationRecordUseCase addRecitationRecord;
   final SendAssignmentUseCase sendAssignment;
@@ -25,6 +27,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   TeacherBloc({
     required this.getTeacherHalaqat,
     required this.getHalaqaStudents,
+    required this.getHalaqaRecitationRecords,
     required this.recordAttendance,
     required this.addRecitationRecord,
     required this.sendAssignment,
@@ -32,6 +35,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     on<LoadTeacherHalaqatEvent>(_onLoadHalaqat);
     on<SelectHalaqaEvent>(_onSelectHalaqa);
     on<LoadHalaqaStudentsEvent>(_onLoadHalaqaStudents);
+    on<LoadHalaqaEvaluationsEvent>(_onLoadEvaluations);
     on<RecordAttendanceEvent>(_onRecordAttendance);
     on<AddRecitationRecordEvent>(_onAddRecitationRecord);
     on<ResetRecitationSubmissionEvent>(_onResetRecitationSubmission);
@@ -101,6 +105,41 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
         state.copyWith(
           studentsStatus: SectionStatus.loaded,
           students: students,
+        ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // تقييمات الحلقة
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadEvaluations(
+    LoadHalaqaEvaluationsEvent event,
+    Emitter<TeacherState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        evaluationsStatus: SectionStatus.loading,
+        evaluationsError: null,
+      ),
+    );
+
+    final result = await getHalaqaRecitationRecords(
+      HalaqaStudentsParams(event.halaqaId),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          evaluationsStatus: SectionStatus.error,
+          evaluationsError: failure.message,
+        ),
+      ),
+      (evaluations) => emit(
+        state.copyWith(
+          evaluationsStatus: SectionStatus.loaded,
+          evaluations: evaluations,
         ),
       ),
     );
@@ -187,9 +226,12 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           recitationSubmissionError: failure.message,
         ),
       ),
-      (_) => emit(
-        state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
-      ),
+      (_) {
+        emit(
+          state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
+        );
+        add(LoadHalaqaEvaluationsEvent(event.record.halaqaId));
+      },
     );
   }
 

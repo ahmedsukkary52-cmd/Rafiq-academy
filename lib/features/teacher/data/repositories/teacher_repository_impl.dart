@@ -98,6 +98,19 @@ class TeacherRepositoryImpl implements TeacherRepository {
   }
 
   @override
+  Future<Either<Failure, List<RecitationRecordEntity>>>
+  getHalaqaRecitationRecords(String halaqaId) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getHalaqaRecitationRecords(halaqaId),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,

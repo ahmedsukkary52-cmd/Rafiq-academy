@@ -74,7 +74,8 @@ class TeacherDashboardTab extends StatelessWidget {
                       halaqaName: nextHalaqa.name,
                       studentsCount: nextHalaqa.studentIds.length,
                       meetingLink: nextHalaqa.meetingLink,
-                      onStartTap: () {},
+                      onStartTap: () =>
+                          context.push('/teacher/halaqa/${nextHalaqa.id}'),
                     ),
                   ),
                 ),
@@ -103,7 +104,6 @@ class TeacherDashboardTab extends StatelessWidget {
                   ),
                   child: SectionHeader(
                     title: 'النشاطات الأخيرة',
-                    actionLabel: 'الكل',
                   ),
                 ),
               ),
@@ -144,9 +144,30 @@ class TeacherDashboardTab extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(AppSizes.paddingM),
                   child: _SmartAssistantCard(
-                    onRaiseTap: () => context.push('/teacher/evaluations'),
-                    onAssignTap: () => context.push('/teacher/assignment'),
-                    onAtRiskTap: () => context.push('/teacher/at-risk'),
+                    onRaiseTap: () {
+                      final id = nextHalaqa?.id;
+                      if (id == null) {
+                        AppSnackBar.showInfo(
+                          context,
+                          'لا توجد حلقة مسندة إليك',
+                        );
+                        return;
+                      }
+                      context.push('/teacher/halaqa/$id/evaluations');
+                    },
+                    onAssignTap: () =>
+                        AppSnackBar.showInfo(context, 'قريبًا'),
+                    onAtRiskTap: () {
+                      final id = nextHalaqa?.id;
+                      if (id == null) {
+                        AppSnackBar.showInfo(
+                          context,
+                          'لا توجد حلقة مسندة إليك',
+                        );
+                        return;
+                      }
+                      context.push('/teacher/halaqa/$id/analytics');
+                    },
                   ),
                 ),
               ),
@@ -199,8 +220,10 @@ class _TeacherHeader extends StatelessWidget {
             children: [
               IconButton(
                 icon: const Icon(Icons.search_rounded, color: Colors.white),
-                onPressed: () {},
+                onPressed: () =>
+                    AppSnackBar.showInfo(context, 'البحث قريبًا'),
               ),
+
               Row(
                 children: [
                   // اسم + حلقة

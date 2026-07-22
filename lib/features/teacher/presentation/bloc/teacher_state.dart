@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 
 class _Unset {
@@ -22,6 +23,11 @@ class TeacherState extends Equatable {
   final List<HalaqaStudentSummaryEntity> students;
   final String? studentsError;
 
+  // ── تقييمات الحلقة ────────────────────────────────────────────────────
+  final SectionStatus evaluationsStatus;
+  final List<RecitationRecordEntity> evaluations;
+  final String? evaluationsError;
+
   // ── تسجيل الحضور (Optimistic، عشان كده مفيهاش loading عام) ────────────
   final String? attendanceError;
 
@@ -41,6 +47,9 @@ class TeacherState extends Equatable {
     this.studentsStatus = SectionStatus.initial,
     this.students = const [],
     this.studentsError,
+    this.evaluationsStatus = SectionStatus.initial,
+    this.evaluations = const [],
+    this.evaluationsError,
     this.attendanceError,
     this.recitationSubmissionStatus = SubmissionStatus.idle,
     this.recitationSubmissionError,
@@ -58,6 +67,9 @@ class TeacherState extends Equatable {
     SectionStatus? studentsStatus,
     List<HalaqaStudentSummaryEntity>? students,
     Object? studentsError = _unset,
+    SectionStatus? evaluationsStatus,
+    List<RecitationRecordEntity>? evaluations,
+    Object? evaluationsError = _unset,
     Object? attendanceError = _unset,
     SubmissionStatus? recitationSubmissionStatus,
     Object? recitationSubmissionError = _unset,
@@ -78,6 +90,11 @@ class TeacherState extends Equatable {
       studentsError: identical(studentsError, _unset)
           ? this.studentsError
           : studentsError as String?,
+      evaluationsStatus: evaluationsStatus ?? this.evaluationsStatus,
+      evaluations: evaluations ?? this.evaluations,
+      evaluationsError: identical(evaluationsError, _unset)
+          ? this.evaluationsError
+          : evaluationsError as String?,
       attendanceError: identical(attendanceError, _unset)
           ? this.attendanceError
           : attendanceError as String?,
@@ -103,6 +120,9 @@ class TeacherState extends Equatable {
     studentsStatus,
     students,
     studentsError,
+    evaluationsStatus,
+    evaluations,
+    evaluationsError,
     attendanceError,
     recitationSubmissionStatus,
     recitationSubmissionError,

@@ -28,6 +28,10 @@ abstract class TeacherRepository {
     RecitationRecordEntity record,
   );
 
+  /// تقييمات التسميع لحلقة معيّنة
+  Future<Either<Failure, List<RecitationRecordEntity>>>
+  getHalaqaRecitationRecords(String halaqaId);
+
   /// إرسال تكليف لطالب أو حلقة كاملة
   Future<Either<Failure, Unit>> sendAssignment({
     required String halaqaId,

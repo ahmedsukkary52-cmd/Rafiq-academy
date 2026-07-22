@@ -8,6 +8,9 @@ abstract class TeacherRemoteDatasource {
   Future<List<HalaqaStudentSummaryModel>> getHalaqaStudents(String halaqaId);
   Future<void> recordAttendance(AttendanceRecordModel record);
   Future<void> addRecitationRecord(RecitationRecordModel record);
+  Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
+    String halaqaId,
+  );
   Future<void> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,

@@ -25,6 +25,38 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   final _filters = const ['هذا الشهر', 'الشهر الماضي', 'الفصل كله'];
 
   @override
+  void initState() {
+    super.initState();
+    final bloc = context.read<TeacherBloc>();
+    bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    bloc.add(LoadHalaqaEvaluationsEvent(widget.halaqaId));
+  }
+
+  void _retry() {
+    context.read<TeacherBloc>().add(
+      LoadHalaqaEvaluationsEvent(widget.halaqaId),
+    );
+  }
+
+  List<RecitationRecordEntity> _filtered(
+    List<RecitationRecordEntity> records,
+  ) {
+    final now = DateTime.now();
+    if (_filterIndex == 2) return records;
+
+    final start = _filterIndex == 0
+        ? DateTime(now.year, now.month)
+        : DateTime(now.year, now.month - 1);
+    final end = _filterIndex == 0
+        ? DateTime(now.year, now.month + 1)
+        : DateTime(now.year, now.month);
+
+    return records
+        .where((r) => !r.date.isBefore(start) && r.date.isBefore(end))
+        .toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -49,7 +81,6 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         builder: (context, state) {
           return Column(
             children: [
-              // ── فلاتر الفترة ──────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   AppSizes.paddingM,
@@ -97,15 +128,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
                   }),
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ── قائمة التقييمات ────────────────────────────────
-              Expanded(
-                child: state.studentsStatus == SectionStatus.loading
-                    ? const AppLoadingWidget()
-                    : const _MockEvaluationsList(),
-              ),
+              Expanded(child: _buildList(state)),
             ],
           );
         },
@@ -113,131 +137,113 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
     );
   }
 
-  void _showAddEvaluationSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: context.read<TeacherBloc>(),
-        child: _AddEvaluationSheet(halaqaId: widget.halaqaId),
-      ),
-    );
-  }
-}
+  Widget _buildList(TeacherState state) {
+    if (state.evaluationsStatus == SectionStatus.loading ||
+        state.evaluationsStatus == SectionStatus.initial) {
+      return const AppLoadingWidget();
+    }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// قائمة تقييمات تجريبية
-// ══════════════════════════════════════════════════════════════════════════════
+    if (state.evaluationsStatus == SectionStatus.error) {
+      return AppErrorWidget(
+        message: state.evaluationsError ?? 'حدث خطأ',
+        onRetry: _retry,
+      );
+    }
 
-class _MockEvaluationsList extends StatelessWidget {
-  const _MockEvaluationsList();
-
-  @override
-  Widget build(BuildContext context) {
-    // بيانات تجريبية — ستُستبدل بـ stream حقيقي لاحقاً
-    final items = [
-      (
-        student: 'أحمد محمد',
-        date: 'يوم الأثنين، ٢٠ رمضان ١٤٤٦',
-        memGrade: RecitationGrade.excellent,
-        revGrade: RecitationGrade.veryGood,
-        behGrade: RecitationGrade.excellent,
-        notes: 'أداء استثنائي في الحفظ، ينصح بمراجعة خارج الحروف',
-        dotColor: AppColors.secondary,
-      ),
-      (
-        student: 'سارة خالد',
-        date: 'يوم الأثنين، ١٤ رمضان ١٤٤٦',
-        memGrade: RecitationGrade.excellent,
-        revGrade: RecitationGrade.excellent,
-        behGrade: RecitationGrade.veryGood,
-        notes: 'تقدم مميز. تستحق الطالبة المتفوقة هذا الأسبوع',
-        dotColor: AppColors.primary,
-      ),
-      (
-        student: 'عمر سالم',
-        date: 'يوم الأثنين، ٧ رمضان ١٤٤٦',
-        memGrade: RecitationGrade.needsRetry,
-        revGrade: RecitationGrade.needsRetry,
-        behGrade: RecitationGrade.good,
-        notes: 'يحتاج متابعة أسرية عاجلة. تم التواصل مع ولي الأمر',
-        dotColor: AppColors.error,
-      ),
-    ];
+    final items = _filtered(state.evaluations);
+    if (items.isEmpty) {
+      return const Center(
+        child: Text(
+          'لا توجد تقييمات بعد',
+          style: AppTextStyles.bodyMedium,
+        ),
+      );
+    }
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
       itemCount: items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
-        final item = items[i];
-        return _EvaluationCard(
-          studentName: item.student,
-          dateLabel: item.date,
-          memGrade: item.memGrade,
-          revGrade: item.revGrade,
-          behGrade: item.behGrade,
-          notes: item.notes,
-          dotColor: item.dotColor,
-        );
+        final record = items[i];
+        return _EvaluationCard(record: record);
       },
+    );
+  }
+
+  void _showAddEvaluationSheet(BuildContext context) {
+    final bloc = context.read<TeacherBloc>();
+    if (bloc.state.students.isEmpty) {
+      bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: _AddEvaluationSheet(halaqaId: widget.halaqaId),
+      ),
     );
   }
 }
 
 class _EvaluationCard extends StatelessWidget {
-  final String studentName;
-  final String dateLabel;
-  final RecitationGrade memGrade;
-  final RecitationGrade revGrade;
-  final RecitationGrade behGrade;
-  final String notes;
-  final Color dotColor;
+  final RecitationRecordEntity record;
 
-  const _EvaluationCard({
-    required this.studentName,
-    required this.dateLabel,
-    required this.memGrade,
-    required this.revGrade,
-    required this.behGrade,
-    required this.notes,
-    required this.dotColor,
-  });
+  const _EvaluationCard({required this.record});
+
+  Color get _dotColor {
+    final grade = record.grade;
+    if (grade == null) return AppColors.textHint;
+    return switch (grade) {
+      RecitationGrade.excellent => AppColors.secondary,
+      RecitationGrade.veryGood => AppColors.primary,
+      RecitationGrade.good => AppColors.info,
+      RecitationGrade.needsRetry => AppColors.error,
+    };
+  }
+
+  String get _dateLabel {
+    final d = record.date;
+    return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final memGrade = record.type == RecitationType.memorization
+        ? record.grade
+        : null;
+    final revGrade =
+        record.type == RecitationType.review ? record.grade : null;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Timeline dot + line
         Column(
           children: [
             Container(
               width: 12,
               height: 12,
               decoration: BoxDecoration(
-                color: dotColor,
+                color: _dotColor,
                 shape: BoxShape.circle,
               ),
             ),
-            Container(width: 2, height: 180, color: AppColors.border),
+            Container(width: 2, height: 160, color: AppColors.border),
           ],
         ),
-
         const SizedBox(width: 12),
-
-        // الكارت
         Expanded(
           child: AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // التاريخ واسم الطالب
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(dateLabel, style: AppTextStyles.labelSmall),
+                    Text(_dateLabel, style: AppTextStyles.labelSmall),
                     const SizedBox(width: 6),
                     const Icon(
                       Icons.calendar_today_outlined,
@@ -248,47 +254,49 @@ class _EvaluationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  studentName,
+                  record.studentName.isNotEmpty
+                      ? record.studentName
+                      : 'طالب',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
-
+                if (record.versesRange.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(record.versesRange, style: AppTextStyles.labelSmall),
+                ],
                 const SizedBox(height: 10),
-
-                // التقييمات الثلاث
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    _GradeBox(label: 'السلوك', grade: behGrade),
+                    _GradeBox(label: 'السلوك', grade: record.behaviorGrade),
                     const SizedBox(width: 8),
                     _GradeBox(label: 'المراجعة', grade: revGrade),
                     const SizedBox(width: 8),
                     _GradeBox(label: 'الحفظ', grade: memGrade),
                   ],
                 ),
-
-                const SizedBox(height: 10),
-
-                // الملاحظات
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        notes,
-                        style: AppTextStyles.bodyMedium,
-                        textAlign: TextAlign.right,
+                if (record.notes != null && record.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          record.notes!,
+                          style: AppTextStyles.bodyMedium,
+                          textAlign: TextAlign.right,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.info_outline_rounded,
-                      color: AppColors.info,
-                      size: 16,
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: AppColors.info,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -300,16 +308,19 @@ class _EvaluationCard extends StatelessWidget {
 
 class _GradeBox extends StatelessWidget {
   final String label;
-  final RecitationGrade grade;
+  final RecitationGrade? grade;
 
   const _GradeBox({required this.label, required this.grade});
 
-  Color get _color => switch (grade) {
-    RecitationGrade.excellent => AppColors.gradeExcellent,
-    RecitationGrade.veryGood => AppColors.gradeVeryGood,
-    RecitationGrade.good => AppColors.gradeGood,
-    RecitationGrade.needsRetry => AppColors.gradeNeedsWork,
-  };
+  Color get _color {
+    if (grade == null) return AppColors.textHint;
+    return switch (grade!) {
+      RecitationGrade.excellent => AppColors.gradeExcellent,
+      RecitationGrade.veryGood => AppColors.gradeVeryGood,
+      RecitationGrade.good => AppColors.gradeGood,
+      RecitationGrade.needsRetry => AppColors.gradeNeedsWork,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -322,7 +333,7 @@ class _GradeBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            grade.label,
+            grade.displayLabel,
             style: AppTextStyles.labelMedium.copyWith(
               color: _color,
               fontWeight: FontWeight.w700,
@@ -335,10 +346,6 @@ class _GradeBox extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _AddEvaluationSheet - Bottom Sheet لإضافة تقييم جديد
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _AddEvaluationSheet extends StatefulWidget {
   final String halaqaId;
@@ -358,8 +365,6 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
   final _versesCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
-  final _grades = RecitationGrade.values;
-
   @override
   void dispose() {
     _versesCtrl.dispose();
@@ -369,143 +374,175 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<TeacherBloc>().state;
-    final students = state.students;
-
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppSizes.radiusXL),
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+          prev.recitationSubmissionStatus != curr.recitationSubmissionStatus,
+      listener: (context, state) {
+        if (state.recitationSubmissionStatus == SubmissionStatus.success) {
+          Navigator.pop(context);
+          AppSnackBar.showSuccess(context, 'تم حفظ التقييم بنجاح');
+          context.read<TeacherBloc>().add(
+            const ResetRecitationSubmissionEvent(),
+          );
+        } else if (state.recitationSubmissionStatus ==
+            SubmissionStatus.error) {
+          AppSnackBar.showError(
+            context,
+            state.recitationSubmissionError ?? 'فشل حفظ التقييم',
+          );
+          context.read<TeacherBloc>().add(
+            const ResetRecitationSubmissionEvent(),
+          );
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusXL),
+          ),
         ),
-      ),
-      padding: EdgeInsets.only(
-        top: AppSizes.paddingL,
-        left: AppSizes.paddingM,
-        right: AppSizes.paddingM,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
+        padding: EdgeInsets.only(
+          top: AppSizes.paddingL,
+          left: AppSizes.paddingM,
+          right: AppSizes.paddingM,
+          bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            const Text('تقييم جديد', style: AppTextStyles.headlineMedium),
-            const SizedBox(height: 20),
-
-            // اختيار الطالب
-            const _Label('الطالب'),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedStudentId,
-              isExpanded: true,
-              alignment: AlignmentDirectional.centerEnd,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppColors.surfaceGrey,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              hint: const Text('اختر طالباً'),
-              items: students
-                  .map(
-                    (s) => DropdownMenuItem(
-                      value: s.uid,
-                      child: Text(s.name, textDirection: TextDirection.rtl),
+              const SizedBox(height: 16),
+              const Text('تقييم جديد', style: AppTextStyles.headlineMedium),
+              const SizedBox(height: 20),
+              const _Label('الطالب'),
+              BlocBuilder<TeacherBloc, TeacherState>(
+                builder: (context, state) {
+                  if (state.studentsStatus == SectionStatus.loading) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (state.students.isEmpty) {
+                    return Text(
+                      'لا يوجد طلاب في هذه الحلقة',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    );
+                  }
+                  return DropdownButtonFormField<String>(
+                    initialValue: _selectedStudentId != null &&
+                            state.students.any(
+                              (s) => s.uid == _selectedStudentId,
+                            )
+                        ? _selectedStudentId
+                        : null,
+                    isExpanded: true,
+                    alignment: AlignmentDirectional.centerEnd,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppColors.surfaceGrey,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedStudentId = v),
-            ),
-
-            const SizedBox(height: 16),
-
-            // نوع التقييم
-            const _Label('نوع التقييم'),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _TypeChip(
-                  label: 'مراجعة',
-                  selected: _type == RecitationType.review,
-                  onTap: () => setState(() => _type = RecitationType.review),
-                ),
-                const SizedBox(width: 8),
-                _TypeChip(
-                  label: 'حفظ',
-                  selected: _type == RecitationType.memorization,
-                  onTap: () =>
-                      setState(() => _type = RecitationType.memorization),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // نطاق الآيات
-            const _Label('نطاق الآيات'),
-            AppTextField(
-              hint: 'مثال: سورة الملك ١-١٠',
-              controller: _versesCtrl,
-            ),
-
-            const SizedBox(height: 16),
-
-            // تقييمات الثلاثة
-            const _Label('الحفظ'),
-            _GradeSelector(
-              value: _memGrade,
-              onChanged: (g) => setState(() => _memGrade = g),
-            ),
-            const SizedBox(height: 12),
-            const _Label('المراجعة'),
-            _GradeSelector(
-              value: _revGrade,
-              onChanged: (g) => setState(() => _revGrade = g),
-            ),
-            const SizedBox(height: 12),
-            const _Label('السلوك'),
-            _GradeSelector(
-              value: _behGrade,
-              onChanged: (g) => setState(() => _behGrade = g),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ملاحظات
-            const _Label('ملاحظات (اختياري)'),
-            AppTextField(hint: 'أضف ملاحظاتك هنا...', controller: _notesCtrl),
-
-            const SizedBox(height: 24),
-
-            // زرار الحفظ
-            BlocBuilder<TeacherBloc, TeacherState>(
-              builder: (context, state) {
-                final isLoading =
-                    state.recitationSubmissionStatus ==
-                    SubmissionStatus.submitting;
-                return AppButton(
-                  label: 'حفظ التقييم',
-                  isLoading: isLoading,
-                  onPressed: _selectedStudentId == null ? null : _submit,
-                );
-              },
-            ),
-          ],
+                    hint: const Text('اختر طالباً'),
+                    items: state.students
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s.uid,
+                            child: Text(
+                              s.name,
+                              textDirection: TextDirection.rtl,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedStudentId = v),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              const _Label('نوع التقييم'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  _TypeChip(
+                    label: 'مراجعة',
+                    selected: _type == RecitationType.review,
+                    onTap: () => setState(() => _type = RecitationType.review),
+                  ),
+                  const SizedBox(width: 8),
+                  _TypeChip(
+                    label: 'حفظ',
+                    selected: _type == RecitationType.memorization,
+                    onTap: () => setState(
+                      () => _type = RecitationType.memorization,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const _Label('نطاق الآيات'),
+              AppTextField(
+                hint: 'مثال: سورة الملك ١-١٠',
+                controller: _versesCtrl,
+              ),
+              const SizedBox(height: 16),
+              const _Label('الحفظ'),
+              _GradeSelector(
+                value: _memGrade,
+                onChanged: (g) => setState(() => _memGrade = g),
+              ),
+              const SizedBox(height: 12),
+              const _Label('المراجعة'),
+              _GradeSelector(
+                value: _revGrade,
+                onChanged: (g) => setState(() => _revGrade = g),
+              ),
+              const SizedBox(height: 12),
+              const _Label('السلوك'),
+              _GradeSelector(
+                value: _behGrade,
+                onChanged: (g) => setState(() => _behGrade = g),
+              ),
+              const SizedBox(height: 16),
+              const _Label('ملاحظات (اختياري)'),
+              AppTextField(
+                hint: 'أضف ملاحظاتك هنا...',
+                controller: _notesCtrl,
+              ),
+              const SizedBox(height: 24),
+              BlocBuilder<TeacherBloc, TeacherState>(
+                builder: (context, state) {
+                  final isLoading =
+                      state.recitationSubmissionStatus ==
+                      SubmissionStatus.submitting;
+                  return AppButton(
+                    label: 'حفظ التقييم',
+                    isLoading: isLoading,
+                    onPressed: _selectedStudentId == null || isLoading
+                        ? null
+                        : _submit,
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -516,23 +553,21 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
 
+    final students = context.read<TeacherBloc>().state.students;
+    final student = students.firstWhere((s) => s.uid == _selectedStudentId);
+
     context.read<TeacherBloc>().add(
       AddRecitationRecordEvent(
         RecitationRecordEntity(
           id: '',
           studentId: _selectedStudentId!,
-          studentName: context
-              .read<TeacherBloc>()
-              .state
-              .students
-              .firstWhere((s) => s.uid == _selectedStudentId!)
-              .name,
+          studentName: student.name,
           teacherId: authState.user.uid,
           halaqaId: widget.halaqaId,
           date: DateTime.now(),
           type: _type,
           versesRange: _versesCtrl.text.trim(),
-          grade: _memGrade,
+          grade: _type == RecitationType.memorization ? _memGrade : _revGrade,
           behaviorGrade: _behGrade,
           notes: _notesCtrl.text.trim().isNotEmpty
               ? _notesCtrl.text.trim()
@@ -540,9 +575,6 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
         ),
       ),
     );
-
-    Navigator.pop(context);
-    AppSnackBar.showSuccess(context, 'تم حفظ التقييم بنجاح');
   }
 }
 

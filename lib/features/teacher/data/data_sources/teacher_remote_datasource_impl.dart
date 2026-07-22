@@ -85,6 +85,26 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   }
 
   @override
+  Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
+    String halaqaId,
+  ) async {
+    try {
+      final snapshot = await firestore
+          .collection(FirestoreCollections.recitationRecords)
+          .where('halaqaId', isEqualTo: halaqaId)
+          .get();
+
+      final records = snapshot.docs
+          .map(RecitationRecordModel.fromFirestore)
+          .toList();
+      records.sort((a, b) => b.date.compareTo(a.date));
+      return records;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
   Future<void> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,

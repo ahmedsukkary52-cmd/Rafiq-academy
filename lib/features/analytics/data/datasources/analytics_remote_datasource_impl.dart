@@ -35,8 +35,8 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
           averagePerformancePercent: 0,
           attendancePercent: 0,
           totalStudents: 0,
-          performanceDistribution: {},
-          weeklyAttendance: {},
+          performanceDistribution: const {},
+          weeklyAttendance: const {},
         );
       }
 
@@ -156,7 +156,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
               .collection(FirestoreCollections.users)
               .doc(entry.key)
               .get();
-          final userData = userDoc.data() as Map<String, dynamic>? ?? {};
+          final userData = userDoc.data() ?? {};
           atRiskMap[entry.key] = AtRiskStudentEntity(
             studentId: entry.key,
             studentName: userData['name'] as String? ?? '',
@@ -187,7 +187,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
               .collection(FirestoreCollections.users)
               .doc(studentId)
               .get();
-          final userData = userDoc.data() as Map<String, dynamic>? ?? {};
+          final userData = userDoc.data() ?? {};
           atRiskMap[studentId] = AtRiskStudentEntity(
             studentId: studentId,
             studentName: userData['name'] as String? ?? '',

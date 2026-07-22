@@ -22,4 +22,11 @@ abstract class StudentRemoteDatasource {
   Future<HalaqaModel> getStudentHalaqa(String halaqaId);
 
   Stream<AssignmentModel?> watchLatestAssignment(String studentId);
+
+  Future<void> updateAvatarSelection({
+    required String studentId,
+    required String avatarId,
+    required List<String> unlockedAvatarIds,
+    required int coins,
+  });
 }

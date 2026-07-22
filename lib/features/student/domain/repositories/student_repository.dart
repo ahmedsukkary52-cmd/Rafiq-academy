@@ -33,4 +33,11 @@ abstract class StudentRepository {
   Stream<Either<Failure, AssignmentEntity?>> watchLatestAssignment(
     String studentId,
   );
+
+  Future<Either<Failure, Unit>> updateAvatarSelection({
+    required String studentId,
+    required String avatarId,
+    required List<String> unlockedAvatarIds,
+    required int coins,
+  });
 }

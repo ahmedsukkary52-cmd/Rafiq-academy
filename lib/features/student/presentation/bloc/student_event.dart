@@ -81,3 +81,21 @@ class RefreshStudentDashboardEvent extends StudentEvent {
   @override
   List<Object?> get props => [studentId];
 }
+
+/// اختيار/فتح شخصية (avatar) جديدة من متجر الشخصيات
+class UpdateAvatarSelectionEvent extends StudentEvent {
+  final String studentId;
+  final String avatarId;
+  final List<String> unlockedAvatarIds;
+  final int coins;
+
+  const UpdateAvatarSelectionEvent({
+    required this.studentId,
+    required this.avatarId,
+    required this.unlockedAvatarIds,
+    required this.coins,
+  });
+
+  @override
+  List<Object?> get props => [studentId, avatarId, unlockedAvatarIds, coins];
+}

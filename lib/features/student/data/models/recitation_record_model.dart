@@ -12,9 +12,16 @@ class RecitationRecordModel extends RecitationRecordEntity {
     required super.date,
     required super.type,
     required super.versesRange,
-    required super.grade,
-    required super.behaviorGrade,
+    super.grade,
+    super.behaviorGrade,
     super.notes,
+    super.audioUrl,
+    super.storagePath,
+    super.assignmentId,
+    super.taskId,
+    super.submittedAt,
+    super.reviewStatus,
+    super.durationSeconds,
   });
 
   factory RecitationRecordModel.fromFirestore(DocumentSnapshot doc) {
@@ -25,14 +32,22 @@ class RecitationRecordModel extends RecitationRecordEntity {
       studentName: data['studentName'] ?? '',
       teacherId: data['teacherId'] ?? '',
       halaqaId: data['halaqaId'] ?? '',
-      date: (data['date'] as Timestamp).toDate(),
+      date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       type: data['type'] == 'memorization'
           ? RecitationType.memorization
           : RecitationType.review,
       versesRange: data['versesRange'] ?? '',
-      grade: _gradeFromString(data['grade'] ?? ''),
-      behaviorGrade: _gradeFromString(data['behaviorGrade'] ?? ''),
+      grade: _gradeFromString(data['grade']),
+      behaviorGrade: _gradeFromString(data['behaviorGrade']),
       notes: data['notes'] as String?,
+      audioUrl: data['audioUrl'] as String?,
+      storagePath: data['storagePath'] as String?,
+      assignmentId: data['assignmentId'] as String?,
+      taskId: data['taskId'] as String?,
+      submittedAt: (data['submittedAt'] as Timestamp?)?.toDate(),
+      // التقييمات القديمة (من المعلم) بدون الحقل = reviewed
+      reviewStatus: data['reviewStatus'] as String? ?? 'reviewed',
+      durationSeconds: (data['durationSeconds'] as num?)?.toInt(),
     );
   }
 
@@ -44,16 +59,29 @@ class RecitationRecordModel extends RecitationRecordEntity {
     'date': Timestamp.fromDate(date),
     'type': type == RecitationType.memorization ? 'memorization' : 'review',
     'versesRange': versesRange,
-    'grade': grade.label,
-    'behaviorGrade': behaviorGrade.label,
+    // متكتبش الدرجات إلا لو المعلم قيّم فعلاً
+    if (grade != null) 'grade': grade!.label,
+    if (behaviorGrade != null) 'behaviorGrade': behaviorGrade!.label,
     if (notes != null) 'notes': notes,
+    if (audioUrl != null) 'audioUrl': audioUrl,
+    if (storagePath != null) 'storagePath': storagePath,
+    if (assignmentId != null) 'assignmentId': assignmentId,
+    if (taskId != null) 'taskId': taskId,
+    if (submittedAt != null) 'submittedAt': Timestamp.fromDate(submittedAt!),
+    'reviewStatus': reviewStatus,
+    if (durationSeconds != null) 'durationSeconds': durationSeconds,
   };
 
-  static RecitationGrade _gradeFromString(String value) => switch (value) {
-    'ممتاز' => RecitationGrade.excellent,
-    'جيد جداً' => RecitationGrade.veryGood,
-    'جيد' => RecitationGrade.good,
-    'يحتاج تحسين' => RecitationGrade.needsRetry,
-    _ => RecitationGrade.good,
-  };
+  static RecitationGrade? _gradeFromString(dynamic value) {
+    if (value == null) return null;
+    final s = value.toString().trim();
+    if (s.isEmpty) return null;
+    return switch (s) {
+      'ممتاز' => RecitationGrade.excellent,
+      'جيد جداً' => RecitationGrade.veryGood,
+      'جيد' => RecitationGrade.good,
+      'يحتاج تحسين' => RecitationGrade.needsRetry,
+      _ => null,
+    };
+  }
 }

@@ -41,8 +41,9 @@ class ContentFileEntity extends Equatable {
   });
 
   String get sizeLabel {
-    if (fileSizeMb < 1)
+    if (fileSizeMb < 1) {
       return '${(fileSizeMb * 1024).toStringAsFixed(0)} كيلوبايت';
+    }
     return '${fileSizeMb.toStringAsFixed(1)} ميجا';
   }
 

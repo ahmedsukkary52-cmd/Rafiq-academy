@@ -14,6 +14,7 @@ import 'package:cloud_functions/cloud_functions.dart' as _i809;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
 import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
 import 'package:firebase_storage/firebase_storage.dart' as _i457;
+import 'package:flutter/material.dart' as _i409;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart'
@@ -50,16 +51,36 @@ import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_perf
     as _i413;
 import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_quota_usecase.dart'
     as _i1014;
-import 'package:rafiq_academy/features/admin/persentation/bloc/admin_bloc.dart'
-    as _i939;
+import 'package:rafiq_academy/features/admin/presentation/bloc/admin_bloc.dart'
+    as _i409;
 import 'package:rafiq_academy/features/analytics/data/datasources/analytics_remote_datasource.dart'
     as _i797;
 import 'package:rafiq_academy/features/analytics/data/datasources/analytics_remote_datasource_impl.dart'
     as _i704;
+import 'package:rafiq_academy/features/analytics/data/repositories/analytics_repository_impl.dart'
+    as _i646;
 import 'package:rafiq_academy/features/analytics/domain/repositories/analytics_repository.dart'
     as _i656;
 import 'package:rafiq_academy/features/analytics/domain/usecases/analytics_usecases.dart'
     as _i1010;
+import 'package:rafiq_academy/features/analytics/presentation/bloc/analytics_bloc.dart'
+    as _i999;
+import 'package:rafiq_academy/features/audio_library/data/datasources/audio_library_remote_datasource.dart'
+    as _i1052;
+import 'package:rafiq_academy/features/audio_library/data/datasources/audio_library_remote_datasource_impl.dart'
+    as _i694;
+import 'package:rafiq_academy/features/audio_library/data/datasources/mp3quran_catalog_service.dart'
+    as _i638;
+import 'package:rafiq_academy/features/audio_library/data/repositories/audio_library_repository_impl.dart'
+    as _i4;
+import 'package:rafiq_academy/features/audio_library/data/services/audio_player_service.dart'
+    as _i297;
+import 'package:rafiq_academy/features/audio_library/domain/repositories/audio_library_repository.dart'
+    as _i174;
+import 'package:rafiq_academy/features/audio_library/domain/usecases/audio_usecases.dart'
+    as _i30;
+import 'package:rafiq_academy/features/audio_library/presentation/bloc/audio_bloc.dart'
+    as _i407;
 import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasouce_impl.dart'
     as _i550;
 import 'package:rafiq_academy/features/auth/data/datasources/auth_remote_datasource.dart'
@@ -74,8 +95,10 @@ import 'package:rafiq_academy/features/auth/domain/usecases/login_with_email_use
     as _i339;
 import 'package:rafiq_academy/features/auth/domain/usecases/logout_usecase.dart'
     as _i608;
-import 'package:rafiq_academy/features/auth/presentaiton/bloc/auth_bloc.dart'
-    as _i196;
+import 'package:rafiq_academy/features/auth/domain/usecases/register_with_email_usecase.dart'
+    as _i880;
+import 'package:rafiq_academy/features/auth/presentation/bloc/auth_bloc.dart'
+    as _i18;
 import 'package:rafiq_academy/features/awards/data/datasources/award_remote_datasource.dart'
     as _i444;
 import 'package:rafiq_academy/features/awards/data/datasources/award_remote_datasource_impl.dart'
@@ -126,6 +149,18 @@ import 'package:rafiq_academy/features/content/domain/usecases/content_usecases.
     as _i89;
 import 'package:rafiq_academy/features/content/presentation/bloc/content_bloc.dart'
     as _i542;
+import 'package:rafiq_academy/features/homework/data/datasources/homework_remote_datasource.dart'
+    as _i31;
+import 'package:rafiq_academy/features/homework/data/datasources/homework_remote_datasource_impl.dart'
+    as _i119;
+import 'package:rafiq_academy/features/homework/data/repositories/homework_repository_impl.dart'
+    as _i14;
+import 'package:rafiq_academy/features/homework/domain/repositories/homework_repository.dart'
+    as _i951;
+import 'package:rafiq_academy/features/homework/domain/usecases/homework_usecases.dart'
+    as _i81;
+import 'package:rafiq_academy/features/homework/presentation/bloc/homework_bloc.dart'
+    as _i421;
 import 'package:rafiq_academy/features/notifications/data/datasources/notifications_remote_datasource.dart'
     as _i676;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
@@ -168,6 +203,42 @@ import 'package:rafiq_academy/features/post/domain/usecases/posts_usecases.dart'
     as _i918;
 import 'package:rafiq_academy/features/post/presentation/bloc/posts_bloc.dart'
     as _i532;
+import 'package:rafiq_academy/features/progress_report/data/datasources/progress_report_remote_datasource.dart'
+    as _i102;
+import 'package:rafiq_academy/features/progress_report/data/datasources/progress_report_remote_datasource_impl.dart'
+    as _i1061;
+import 'package:rafiq_academy/features/progress_report/data/repositories/progress_report_repository_impl.dart'
+    as _i1044;
+import 'package:rafiq_academy/features/progress_report/domain/repositories/progress_report_repository.dart'
+    as _i824;
+import 'package:rafiq_academy/features/progress_report/domain/usecases/get_progress_report_usecase.dart'
+    as _i235;
+import 'package:rafiq_academy/features/progress_report/presentation/bloc/progress_report_bloc.dart'
+    as _i251;
+import 'package:rafiq_academy/features/review_schedule/data/datasources/review_schedule_remote_datasource.dart'
+    as _i333;
+import 'package:rafiq_academy/features/review_schedule/data/datasources/review_schedule_remote_datasource_impl.dart'
+    as _i590;
+import 'package:rafiq_academy/features/review_schedule/data/repositories/review_schedule_repository_impl.dart'
+    as _i255;
+import 'package:rafiq_academy/features/review_schedule/domain/repositories/review_schedule_repository.dart'
+    as _i905;
+import 'package:rafiq_academy/features/review_schedule/domain/usecases/get_review_month_usecase.dart'
+    as _i173;
+import 'package:rafiq_academy/features/review_schedule/presentation/bloc/review_schedule_bloc.dart'
+    as _i232;
+import 'package:rafiq_academy/features/schedule/data/datasources/schedule_remote_datasource.dart'
+    as _i756;
+import 'package:rafiq_academy/features/schedule/data/datasources/schedule_remote_datasource_impl.dart'
+    as _i1027;
+import 'package:rafiq_academy/features/schedule/data/repositories/schedule_repository_impl.dart'
+    as _i268;
+import 'package:rafiq_academy/features/schedule/domain/repositories/schedule_repository.dart'
+    as _i552;
+import 'package:rafiq_academy/features/schedule/domain/usecases/get_weekly_sessions_usecase.dart'
+    as _i891;
+import 'package:rafiq_academy/features/schedule/presentation/bloc/schedule_bloc.dart'
+    as _i951;
 import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource.dart'
     as _i536;
 import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource_impl.dart'
@@ -188,10 +259,14 @@ import 'package:rafiq_academy/features/student/domain/usecases/get_student_halaq
     as _i554;
 import 'package:rafiq_academy/features/student/domain/usecases/get_student_profile_usecase.dart'
     as _i385;
+import 'package:rafiq_academy/features/student/domain/usecases/update_avatar_selection_usecase.dart'
+    as _i479;
 import 'package:rafiq_academy/features/student/domain/usecases/watch_latest_assignment_usecase.dart'
     as _i914;
 import 'package:rafiq_academy/features/student/presentation/bloc/student_bloc.dart'
     as _i303;
+import 'package:rafiq_academy/features/student/presentation/pages/student_audio_library_page.dart'
+    as _i519;
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource.dart'
     as _i65;
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource_impl.dart'
@@ -208,8 +283,8 @@ import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_s
     as _i499;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/submit_supervisor_report_usecase.dart'
     as _i910;
-import 'package:rafiq_academy/features/supervisor/presentations/bloc/supervisor_bloc.dart'
-    as _i934;
+import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_bloc.dart'
+    as _i149;
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart'
     as _i717;
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource_impl.dart'
@@ -239,6 +314,9 @@ extension GetItInjectableX on _i174.GetIt {
   }) {
     final gh = _i526.GetItHelper(this, environment, environmentFilter);
     final diModule = _$DiModule();
+    gh.factory<_i638.Mp3QuranCatalogService>(
+      () => _i638.Mp3QuranCatalogService(),
+    );
     gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
     gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
@@ -247,14 +325,41 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i161.InternetConnection>(
       () => diModule.internetConnection,
     );
+    gh.lazySingleton<_i297.AudioPlayerService>(
+      () => _i297.AudioPlayerService(),
+    );
     gh.lazySingleton<_i649.CertificatePdfGenerator>(
       () => _i649.CertificatePdfGenerator(),
+    );
+    gh.lazySingleton<_i1052.AudioLibraryRemoteDatasource>(
+      () => _i694.AudioLibraryRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        mp3QuranCatalog: gh<_i638.Mp3QuranCatalogService>(),
+      ),
+    );
+    gh.lazySingleton<_i333.ReviewScheduleRemoteDatasource>(
+      () => _i590.ReviewScheduleRemoteDatasourceImpl(),
+    );
+    gh.lazySingleton<_i174.AudioLibraryRepository>(
+      () => _i4.AudioLibraryRepositoryImpl(
+        remoteDatasource: gh<_i1052.AudioLibraryRemoteDatasource>(),
+        firebaseAuth: gh<_i59.FirebaseAuth>(),
+      ),
     );
     gh.lazySingleton<_i483.AuthRemoteDatasource>(
       () => _i550.AuthRemoteDatasourceImpl(
         firebaseAuth: gh<_i59.FirebaseAuth>(),
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
+    );
+    gh.lazySingleton<_i756.ScheduleRemoteDatasource>(
+      () => _i1027.ScheduleRemoteDatasourceImpl(),
+    );
+    gh.factory<_i519.StudentAudioLibraryPage>(
+      () => _i519.StudentAudioLibraryPage(key: gh<_i409.Key>()),
+    );
+    gh.lazySingleton<_i102.ProgressReportRemoteDatasource>(
+      () => _i1061.ProgressReportRemoteDatasourceImpl(),
     );
     gh.lazySingleton<_i892.ParentRemoteDatasource>(
       () => _i430.ParentRemoteDatasourceImpl(
@@ -298,6 +403,14 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
+    gh.lazySingleton<_i552.ScheduleRepository>(
+      () => _i268.ScheduleRepositoryImpl(gh<_i756.ScheduleRemoteDatasource>()),
+    );
+    gh.lazySingleton<_i905.ReviewScheduleRepository>(
+      () => _i255.ReviewScheduleRepositoryImpl(
+        gh<_i333.ReviewScheduleRemoteDatasource>(),
+      ),
+    );
     gh.lazySingleton<_i536.StudentRemoteDatasource>(
       () => _i53.StudentRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
@@ -325,29 +438,32 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
+    gh.lazySingleton<_i31.HomeworkRemoteDatasource>(
+      () => _i119.HomeworkRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
+        gh<_i457.FirebaseStorage>(),
+      ),
+    );
     gh.lazySingleton<_i444.AwardsRemoteDatasource>(
       () => _i982.AwardsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
+    );
+    gh.factory<_i173.GetReviewMonthUseCase>(
+      () => _i173.GetReviewMonthUseCase(gh<_i905.ReviewScheduleRepository>()),
     );
     gh.lazySingleton<_i797.AnalyticsRemoteDatasource>(
       () => _i704.AnalyticsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
-    gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
-      () => _i1010.GetHalaqaAnalyticsUseCase(gh<_i656.AnalyticsRepository>()),
-    );
-    gh.lazySingleton<_i1010.GetAtRiskStudentsUseCase>(
-      () => _i1010.GetAtRiskStudentsUseCase(gh<_i656.AnalyticsRepository>()),
-    );
-    gh.lazySingleton<_i1010.GetTopStudentsUseCase>(
-      () => _i1010.GetTopStudentsUseCase(gh<_i656.AnalyticsRepository>()),
-    );
     gh.lazySingleton<_i537.CalendarRemoteDatasource>(
       () => _i209.CalendarRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
+    );
+    gh.lazySingleton<_i951.HomeworkRepository>(
+      () => _i14.HomeworkRepositoryImpl(gh<_i31.HomeworkRemoteDatasource>()),
     );
     gh.lazySingleton<_i307.SupervisorRepository>(
       () => _i582.SupervisorRepositoryImpl(
@@ -360,6 +476,30 @@ extension GetItInjectableX on _i174.GetIt {
         remoteDatasource: gh<_i543.AdminRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
+    );
+    gh.factory<_i30.GetAllRecitersUseCase>(
+      () => _i30.GetAllRecitersUseCase(gh<_i174.AudioLibraryRepository>()),
+    );
+    gh.factory<_i30.GetFavoriteRecitersUseCase>(
+      () => _i30.GetFavoriteRecitersUseCase(gh<_i174.AudioLibraryRepository>()),
+    );
+    gh.factory<_i30.ToggleFollowReciterUseCase>(
+      () => _i30.ToggleFollowReciterUseCase(gh<_i174.AudioLibraryRepository>()),
+    );
+    gh.factory<_i30.GetSurahAudiosUseCase>(
+      () => _i30.GetSurahAudiosUseCase(gh<_i174.AudioLibraryRepository>()),
+    );
+    gh.factory<_i30.SaveListeningProgressUseCase>(
+      () =>
+          _i30.SaveListeningProgressUseCase(gh<_i174.AudioLibraryRepository>()),
+    );
+    gh.factory<_i30.GetListeningProgressUseCase>(
+      () =>
+          _i30.GetListeningProgressUseCase(gh<_i174.AudioLibraryRepository>()),
+    );
+    gh.factory<_i30.GetContinueListeningUseCase>(
+      () =>
+          _i30.GetContinueListeningUseCase(gh<_i174.AudioLibraryRepository>()),
     );
     gh.lazySingleton<_i194.ChatRepository>(
       () => _i369.ChatRepositoryImpl(
@@ -379,6 +519,14 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
+    gh.lazySingleton<_i824.ProgressReportRepository>(
+      () => _i1044.ProgressReportRepositoryImpl(
+        gh<_i102.ProgressReportRemoteDatasource>(),
+      ),
+    );
+    gh.factory<_i880.RegisterWithEmailUseCase>(
+      () => _i880.RegisterWithEmailUseCase(gh<_i605.AuthRepository>()),
+    );
     gh.lazySingleton<_i788.GetCurrentUserUseCase>(
       () => _i788.GetCurrentUserUseCase(gh<_i605.AuthRepository>()),
     );
@@ -387,6 +535,14 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i608.LogoutUseCase>(
       () => _i608.LogoutUseCase(gh<_i605.AuthRepository>()),
+    );
+    gh.singleton<_i18.AuthBloc>(
+      () => _i18.AuthBloc(
+        loginWithEmail: gh<_i339.LoginWithEmailUseCase>(),
+        registerWithEmail: gh<_i880.RegisterWithEmailUseCase>(),
+        logout: gh<_i608.LogoutUseCase>(),
+        getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
+      ),
     );
     gh.lazySingleton<_i669.CalendarRepository>(
       () => _i763.CalendarRepositoryImpl(
@@ -399,6 +555,18 @@ extension GetItInjectableX on _i174.GetIt {
         remoteDatasource: gh<_i536.StudentRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
+    );
+    gh.factory<_i232.ReviewScheduleBloc>(
+      () => _i232.ReviewScheduleBloc(gh<_i173.GetReviewMonthUseCase>()),
+    );
+    gh.lazySingleton<_i656.AnalyticsRepository>(
+      () => _i646.AnalyticsRepositoryImpl(
+        remoteDatasource: gh<_i797.AnalyticsRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.factory<_i891.GetWeeklySessionsUseCase>(
+      () => _i891.GetWeeklySessionsUseCase(gh<_i552.ScheduleRepository>()),
     );
     gh.lazySingleton<_i587.NotificationsRepository>(
       () => _i579.NotificationsRepositoryImpl(
@@ -420,6 +588,10 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i192.SendAssignmentUseCase>(
       () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.factory<_i235.GetProgressReportUseCase>(
+      () =>
+          _i235.GetProgressReportUseCase(gh<_i824.ProgressReportRepository>()),
     );
     gh.lazySingleton<_i918.WatchPostsUseCase>(
       () => _i918.WatchPostsUseCase(gh<_i486.PostsRepository>()),
@@ -484,6 +656,19 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i1014.UpdateTeacherQuotaUseCase>(
       () => _i1014.UpdateTeacherQuotaUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.factory<_i407.AudioLibraryBloc>(
+      () => _i407.AudioLibraryBloc(
+        getAllReciters: gh<_i30.GetAllRecitersUseCase>(),
+        getFavoriteReciters: gh<_i30.GetFavoriteRecitersUseCase>(),
+        toggleFollowReciter: gh<_i30.ToggleFollowReciterUseCase>(),
+        getSurahAudios: gh<_i30.GetSurahAudiosUseCase>(),
+        getContinueListening: gh<_i30.GetContinueListeningUseCase>(),
+        saveListeningProgress: gh<_i30.SaveListeningProgressUseCase>(),
+        getListeningProgress: gh<_i30.GetListeningProgressUseCase>(),
+        audioPlayerService: gh<_i297.AudioPlayerService>(),
+        firebaseAuth: gh<_i59.FirebaseAuth>(),
+      ),
+    );
     gh.lazySingleton<_i704.GetSupervisedHalaqatUseCase>(
       () => _i704.GetSupervisedHalaqatUseCase(gh<_i307.SupervisorRepository>()),
     );
@@ -497,13 +682,6 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
     );
-    gh.singleton<_i196.AuthBloc>(
-      () => _i196.AuthBloc(
-        loginWithEmail: gh<_i339.LoginWithEmailUseCase>(),
-        logout: gh<_i608.LogoutUseCase>(),
-        getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
-      ),
-    );
     gh.lazySingleton<_i429.GetMonthEventsUseCase>(
       () => _i429.GetMonthEventsUseCase(gh<_i669.CalendarRepository>()),
     );
@@ -513,12 +691,37 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i429.DeleteCalendarEventUseCase>(
       () => _i429.DeleteCalendarEventUseCase(gh<_i669.CalendarRepository>()),
     );
+    gh.factory<_i81.GetLatestHomeworkUseCase>(
+      () => _i81.GetLatestHomeworkUseCase(gh<_i951.HomeworkRepository>()),
+    );
+    gh.factory<_i81.WatchLatestHomeworkUseCase>(
+      () => _i81.WatchLatestHomeworkUseCase(gh<_i951.HomeworkRepository>()),
+    );
+    gh.factory<_i81.ToggleHomeworkTaskUseCase>(
+      () => _i81.ToggleHomeworkTaskUseCase(gh<_i951.HomeworkRepository>()),
+    );
+    gh.factory<_i81.CompleteHomeworkUseCase>(
+      () => _i81.CompleteHomeworkUseCase(gh<_i951.HomeworkRepository>()),
+    );
+    gh.factory<_i81.SubmitHomeworkRecitationUseCase>(
+      () =>
+          _i81.SubmitHomeworkRecitationUseCase(gh<_i951.HomeworkRepository>()),
+    );
     gh.lazySingleton<_i888.AwardsRepository>(
       () => _i662.AwardsRepositoryImpl(
         remoteDatasource: gh<_i444.AwardsRemoteDatasource>(),
         pdfGenerator: gh<_i649.CertificatePdfGenerator>(),
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
+    );
+    gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
+      () => _i1010.GetHalaqaAnalyticsUseCase(gh<_i656.AnalyticsRepository>()),
+    );
+    gh.lazySingleton<_i1010.GetAtRiskStudentsUseCase>(
+      () => _i1010.GetAtRiskStudentsUseCase(gh<_i656.AnalyticsRepository>()),
+    );
+    gh.lazySingleton<_i1010.GetTopStudentsUseCase>(
+      () => _i1010.GetTopStudentsUseCase(gh<_i656.AnalyticsRepository>()),
     );
     gh.lazySingleton<_i337.WatchConversationsUseCase>(
       () => _i337.WatchConversationsUseCase(gh<_i194.ChatRepository>()),
@@ -535,6 +738,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i337.MarkConversationAsReadUseCase>(
       () => _i337.MarkConversationAsReadUseCase(gh<_i194.ChatRepository>()),
     );
+    gh.lazySingleton<_i337.GetChatParticipantUseCase>(
+      () => _i337.GetChatParticipantUseCase(gh<_i194.ChatRepository>()),
+    );
     gh.singleton<_i933.TeacherBloc>(
       () => _i933.TeacherBloc(
         getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
@@ -544,8 +750,15 @@ extension GetItInjectableX on _i174.GetIt {
         sendAssignment: gh<_i192.SendAssignmentUseCase>(),
       ),
     );
-    gh.singleton<_i939.AdminBloc>(
-      () => _i939.AdminBloc(
+    gh.factory<_i999.AnalyticsBloc>(
+      () => _i999.AnalyticsBloc(
+        getHalaqaAnalytics: gh<_i1010.GetHalaqaAnalyticsUseCase>(),
+        getAtRiskStudents: gh<_i1010.GetAtRiskStudentsUseCase>(),
+        getTopStudents: gh<_i1010.GetTopStudentsUseCase>(),
+      ),
+    );
+    gh.singleton<_i409.AdminBloc>(
+      () => _i409.AdminBloc(
         getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
         getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
         getComplaints: gh<_i899.GetComplaintsUseCase>(),
@@ -593,6 +806,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i385.GetStudentProfileUseCase>(
       () => _i385.GetStudentProfileUseCase(gh<_i724.StudentRepository>()),
     );
+    gh.lazySingleton<_i479.UpdateAvatarSelectionUseCase>(
+      () => _i479.UpdateAvatarSelectionUseCase(gh<_i724.StudentRepository>()),
+    );
     gh.lazySingleton<_i914.WatchLatestAssignmentUseCase>(
       () => _i914.WatchLatestAssignmentUseCase(gh<_i724.StudentRepository>()),
     );
@@ -603,21 +819,22 @@ extension GetItInjectableX on _i174.GetIt {
         deleteFile: gh<_i89.DeleteFileUseCase>(),
       ),
     );
-    gh.singleton<_i303.StudentBloc>(
-      () => _i303.StudentBloc(
-        getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
-        getMonthlyReviewSchedule: gh<_i230.GetMonthlyReviewScheduleUseCase>(),
-        getRecitationRecords: gh<_i124.GetRecitationRecordsUseCase>(),
-        getAchievements: gh<_i224.GetAchievementsUseCase>(),
-        getStudentHalaqa: gh<_i554.GetStudentHalaqaUseCase>(),
-        watchLatestAssignment: gh<_i914.WatchLatestAssignmentUseCase>(),
-      ),
-    );
     gh.singleton<_i618.ChatConversationsBloc>(
       () => _i618.ChatConversationsBloc(
         watchConversations: gh<_i337.WatchConversationsUseCase>(),
         getOrCreateConversation: gh<_i337.GetOrCreateConversationUseCase>(),
       ),
+    );
+    gh.factory<_i421.HomeworkBloc>(
+      () => _i421.HomeworkBloc(
+        watchLatestHomework: gh<_i81.WatchLatestHomeworkUseCase>(),
+        toggleHomeworkTask: gh<_i81.ToggleHomeworkTaskUseCase>(),
+        completeHomework: gh<_i81.CompleteHomeworkUseCase>(),
+        submitHomeworkRecitation: gh<_i81.SubmitHomeworkRecitationUseCase>(),
+      ),
+    );
+    gh.factory<_i951.ScheduleBloc>(
+      () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
     );
     gh.singleton<_i995.ParentBloc>(
       () => _i995.ParentBloc(
@@ -654,8 +871,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i186.GenerateCertificatePdfUseCase>(
       () => _i186.GenerateCertificatePdfUseCase(gh<_i888.AwardsRepository>()),
     );
-    gh.singleton<_i934.SupervisorBloc>(
-      () => _i934.SupervisorBloc(
+    gh.singleton<_i149.SupervisorBloc>(
+      () => _i149.SupervisorBloc(
         getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
         issueAchievement: gh<_i13.IssueAchievementUseCase>(),
         submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
@@ -676,6 +893,17 @@ extension GetItInjectableX on _i174.GetIt {
         getMonthEvents: gh<_i429.GetMonthEventsUseCase>(),
         addCalendarEvent: gh<_i429.AddCalendarEventUseCase>(),
         deleteCalendarEvent: gh<_i429.DeleteCalendarEventUseCase>(),
+      ),
+    );
+    gh.singleton<_i303.StudentBloc>(
+      () => _i303.StudentBloc(
+        getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
+        getMonthlyReviewSchedule: gh<_i230.GetMonthlyReviewScheduleUseCase>(),
+        getRecitationRecords: gh<_i124.GetRecitationRecordsUseCase>(),
+        getAchievements: gh<_i224.GetAchievementsUseCase>(),
+        getStudentHalaqa: gh<_i554.GetStudentHalaqaUseCase>(),
+        watchLatestAssignment: gh<_i914.WatchLatestAssignmentUseCase>(),
+        updateAvatarSelection: gh<_i479.UpdateAvatarSelectionUseCase>(),
       ),
     );
     gh.singleton<_i532.PostsBloc>(
@@ -703,6 +931,12 @@ extension GetItInjectableX on _i174.GetIt {
         markNotificationAsRead: gh<_i152.MarkNotificationAsReadUseCase>(),
         markAllNotificationsAsRead:
             gh<_i152.MarkAllNotificationsAsReadUseCase>(),
+      ),
+    );
+    gh.factory<_i251.ProgressReportBloc>(
+      () => _i251.ProgressReportBloc(
+        getProgressReport: gh<_i235.GetProgressReportUseCase>(),
+        getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
       ),
     );
     return this;

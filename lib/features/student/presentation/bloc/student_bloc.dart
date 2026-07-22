@@ -8,6 +8,7 @@ import '../../domain/usecases/get_monthly_review_schedule_usecase.dart';
 import '../../domain/usecases/get_recitation_records_usecase.dart';
 import '../../domain/usecases/get_student_halaqa_usecase.dart';
 import '../../domain/usecases/get_student_profile_usecase.dart';
+import '../../domain/usecases/update_avatar_selection_usecase.dart';
 import '../../domain/usecases/watch_latest_assignment_usecase.dart';
 import 'student_event.dart';
 import 'student_state.dart';
@@ -24,6 +25,7 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
   final GetAchievementsUseCase getAchievements;
   final GetStudentHalaqaUseCase getStudentHalaqa;
   final WatchLatestAssignmentUseCase watchLatestAssignment;
+  final UpdateAvatarSelectionUseCase updateAvatarSelection;
 
   StudentBloc({
     required this.getStudentProfile,
@@ -32,6 +34,7 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
     required this.getAchievements,
     required this.getStudentHalaqa,
     required this.watchLatestAssignment,
+    required this.updateAvatarSelection,
   }) : super(StudentState.initial()) {
     on<LoadStudentProfileEvent>(_onLoadProfile);
     on<LoadMonthlyReviewScheduleEvent>(_onLoadMonthlySchedule);
@@ -46,6 +49,7 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
       transformer: restartable(),
     );
     on<RefreshStudentDashboardEvent>(_onRefreshDashboard);
+    on<UpdateAvatarSelectionEvent>(_onUpdateAvatarSelection);
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -244,7 +248,6 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
         LoadRecitationRecordsEvent(event.studentId),
         emit,
       ),
-      _onLoadAchievements(LoadAchievementsEvent(event.studentId), emit),
       _onLoadMonthlySchedule(
         LoadMonthlyReviewScheduleEvent(
           studentId: event.studentId,
@@ -253,5 +256,55 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
         emit,
       ),
     ]);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // اختيار/فتح شخصية (avatar)
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onUpdateAvatarSelection(
+    UpdateAvatarSelectionEvent event,
+    Emitter<StudentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        avatarUpdateStatus: SectionStatus.loading,
+        avatarUpdateError: null,
+      ),
+    );
+
+    final result = await updateAvatarSelection(
+      UpdateAvatarSelectionParams(
+        studentId: event.studentId,
+        avatarId: event.avatarId,
+        unlockedAvatarIds: event.unlockedAvatarIds,
+        coins: event.coins,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          avatarUpdateStatus: SectionStatus.error,
+          avatarUpdateError: failure.message,
+        ),
+      ),
+      (_) {
+        emit(state.copyWith(avatarUpdateStatus: SectionStatus.loaded));
+        // نحدّث الـ profile محليًا فورًا بدل ما نستنى إعادة تحميل من Firestore
+        final current = state.profile;
+        if (current != null) {
+          emit(
+            state.copyWith(
+              profile: current.copyWith(
+                avatarId: event.avatarId,
+                unlockedAvatarIds: event.unlockedAvatarIds,
+                coins: event.coins,
+              ),
+            ),
+          );
+        }
+      },
+    );
   }
 }

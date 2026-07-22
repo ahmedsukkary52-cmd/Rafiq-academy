@@ -80,62 +80,36 @@ class TeacherDashboardTab extends StatelessWidget {
                   ),
                 ),
 
-              // ── إعلان إداري (placeholder) ───────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSizes.paddingM,
-                    16,
-                    AppSizes.paddingM,
-                    0,
-                  ),
-                  child: _AdminAnnouncementCard(),
-                ),
-              ),
-
-              // ── النشاطات الأخيرة ────────────────────────────────
+              // ── إعلان إداري — قريباً ────────────────────────────
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     AppSizes.paddingM,
                     16,
                     AppSizes.paddingM,
-                    8,
+                    0,
                   ),
-                  child: SectionHeader(
-                    title: 'النشاطات الأخيرة',
-                  ),
+                  child: _ComingSoonCard(title: 'إعلان إداري'),
                 ),
               ),
 
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.paddingM,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    const _ActivityItem(
-                      icon: Icons.check_circle_rounded,
-                      color: AppColors.primary,
-                      title: 'تقييم أحمد محمد — ممتاز',
-                      subtitle: 'سورة الملك، الآيات ١-١٠',
-                      time: 'منذ ١٣ دقيقة',
-                    ),
-                    const _ActivityItem(
-                      icon: Icons.event_note_rounded,
-                      color: AppColors.secondary,
-                      title: 'تسجيل الحضور — حلقة الفجر',
-                      subtitle: '١٢ حاضر، ٢ غائب',
-                      time: 'منذ ساعتين',
-                    ),
-                    const _ActivityItem(
-                      icon: Icons.star_rounded,
-                      color: AppColors.success,
-                      title: 'منح شارة "المتفوق" لسارة علي',
-                      subtitle: 'إنجاز حفظ جزء عم',
-                      time: 'أمس',
-                    ),
-                  ]),
+              // ── النشاطات الأخيرة — قريباً ───────────────────────
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSizes.paddingM,
+                    16,
+                    AppSizes.paddingM,
+                    0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SectionHeader(title: 'النشاطات الأخيرة'),
+                      SizedBox(height: 8),
+                      _ComingSoonCard(title: 'النشاطات'),
+                    ],
+                  ),
                 ),
               ),
 
@@ -356,20 +330,20 @@ class _TeacherStatsGrid extends StatelessWidget {
         ),
         _StatCard(
           value: '${state.halaqat.length}',
-          label: 'حصص اليوم',
+          label: 'الحلقات',
           icon: Icons.calendar_today_outlined,
           color: const Color(0xFFE8F5E9),
           iconColor: AppColors.success,
         ),
         const _StatCard(
-          value: '٨',
+          value: 'قريبًا',
           label: 'رسائل جديدة',
           icon: Icons.chat_bubble_outline_rounded,
           color: Color(0xFFF3E5F5),
           iconColor: Color(0xFF9C27B0),
         ),
         const _StatCard(
-          value: '٥',
+          value: 'قريبًا',
           label: 'مهام معلقة',
           icon: Icons.assignment_outlined,
           color: AppColors.secondaryBg,
@@ -562,95 +536,36 @@ class _CurrentSessionCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _AdminAnnouncementCard
+// _ComingSoonCard — placeholder محايد بدون بيانات مفبركة
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _AdminAnnouncementCard extends StatelessWidget {
+class _ComingSoonCard extends StatelessWidget {
+  final String title;
+
+  const _ComingSoonCard({required this.title});
+
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.secondary,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        border: Border.all(color: AppColors.border),
       ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSizes.paddingM,
-        vertical: 12,
+        vertical: 16,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            'إعلان إداري',
-            style: AppTextStyles.labelSmall.copyWith(color: Colors.white70),
-          ),
+          Text(title, style: AppTextStyles.labelMedium),
           const SizedBox(height: 4),
-          const Text(
-            'تذكير: موعد رفع التقييمات الشهرية غداً قبل الساعة ١٢ ظهراً',
-            style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          Text(
+            'قريبًا',
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textSecondary,
             ),
-            textAlign: TextAlign.right,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _ActivityItem
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _ActivityItem extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final String time;
-
-  const _ActivityItem({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.time,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          // الوقت
-          Text(time, style: AppTextStyles.labelSmall),
-          const Spacer(),
-          // التفاصيل
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(title, style: AppTextStyles.titleMedium),
-                const SizedBox(height: 2),
-                Text(subtitle, style: AppTextStyles.bodyMedium),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // أيقونة
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 18),
           ),
         ],
       ),

@@ -9,6 +9,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../teacher/presentation/bloc/teacher_bloc.dart';
 import '../../domain/entities/award_entities.dart';
 import '../bloc/awards_bloc.dart';
 import '../bloc/awards_event.dart';
@@ -387,6 +388,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     final uid = authState is AuthAuthenticated ? authState.user.uid : '';
+    final students = context.watch<TeacherBloc>().state.students;
 
     return _BottomSheet(
       title: 'منح جائزة',
@@ -433,6 +435,49 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
 
           const SizedBox(height: 16),
 
+          const Text('الطالب', style: AppTextStyles.labelLarge),
+          const SizedBox(height: 6),
+          if (students.isEmpty)
+            Text(
+              'لا يوجد طلاب محمّلون لهذه الحلقة',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceGrey,
+                borderRadius: BorderRadius.circular(AppSizes.radiusM),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _studentId != null &&
+                          students.any((s) => s.uid == _studentId)
+                      ? _studentId
+                      : null,
+                  isExpanded: true,
+                  hint: const Text(
+                    'اختر الطالب',
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                  items: students
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s.uid,
+                          child: Text(s.name, style: AppTextStyles.bodyMedium),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _studentId = value),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 16),
+
           const Text('ملاحظة (اختياري)', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           AppTextField(hint: 'مثال: ختم جزء تبارك', controller: _noteCtrl),
@@ -444,12 +489,15 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
             onPressed: _studentId == null
                 ? null
                 : () {
+                    final selected = students.firstWhere(
+                      (s) => s.uid == _studentId,
+                    );
                     context.read<AwardsBloc>().add(
                       GrantAwardEvent(
                         GrantedAwardEntity(
                           id: '',
                           studentId: _studentId!,
-                          studentName: '',
+                          studentName: selected.name,
                           type: _type,
                           note: _noteCtrl.text.trim().isEmpty
                               ? null

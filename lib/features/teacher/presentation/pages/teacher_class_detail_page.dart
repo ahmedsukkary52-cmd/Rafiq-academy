@@ -240,7 +240,10 @@ class _StudentsTab extends StatelessWidget {
               if (i == students.length) {
                 return _AddStudentButton(halaqaId: halaqaId);
               }
-              return _StudentCard(student: students[i]);
+              return _StudentCard(
+                student: students[i],
+                halaqaId: halaqaId,
+              );
             },
           ),
         ),
@@ -255,8 +258,9 @@ class _StudentsTab extends StatelessWidget {
 
 class _StudentCard extends StatelessWidget {
   final HalaqaStudentSummaryEntity student;
+  final String halaqaId;
 
-  const _StudentCard({required this.student});
+  const _StudentCard({required this.student, required this.halaqaId});
 
   Color get _levelColor {
     if (student.attendancePercent >= 90) return AppColors.success;
@@ -286,7 +290,8 @@ class _StudentCard extends StatelessWidget {
                     ),
                   _OutlinedChip(
                     label: 'منح شارة',
-                    onTap: () {},
+                    onTap: () =>
+                        context.push('/teacher/halaqa/$halaqaId/awards'),
                     icon: Icons.star_outline_rounded,
                     color: AppColors.secondary,
                   ),

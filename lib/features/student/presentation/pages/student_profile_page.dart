@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -68,7 +69,22 @@ class StudentProfilePage extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          final teacherState =
+                              context.read<TeacherBloc>().state;
+                          final halaqaId = teacherState.selectedHalaqaId ??
+                              (teacherState.halaqat.isNotEmpty
+                                  ? teacherState.halaqat.first.id
+                                  : null);
+                          if (halaqaId == null) {
+                            AppSnackBar.showInfo(
+                              context,
+                              'لا توجد حلقة مسندة إليك',
+                            );
+                            return;
+                          }
+                          context.push('/teacher/halaqa/$halaqaId/awards');
+                        },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.secondary,
                           side: const BorderSide(color: AppColors.secondary),

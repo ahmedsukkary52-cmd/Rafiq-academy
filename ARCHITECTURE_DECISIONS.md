@@ -241,3 +241,23 @@ AI agents must not redesign the architecture.
 Only implement requested functionality.
 
 Large architectural changes require explicit approval.
+
+---
+
+# ADR-011
+
+## Title
+
+Student-Only Self-Registration
+
+### Status
+
+Accepted
+
+### Decision
+
+Self-registration is currently available only for students.
+
+Teacher, Parent, Supervisor and Admin accounts are created by the academy/admin.
+
+All roles can still log in normally.

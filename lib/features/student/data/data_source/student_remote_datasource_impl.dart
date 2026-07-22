@@ -97,13 +97,17 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
   @override
   Future<List<AchievementModel>> getAchievements(String studentId) async {
     try {
+      // No orderBy('date'): teacher Awards docs use `grantedAt` instead of
+      // `date` and would be excluded from an ordered query.
       final snapshot = await firestore
           .collection(FirestoreCollections.achievements)
           .where('studentId', isEqualTo: studentId)
-          .orderBy('date', descending: true)
           .get();
 
-      return snapshot.docs.map(AchievementModel.fromFirestore).toList();
+      final achievements =
+          snapshot.docs.map(AchievementModel.fromFirestore).toList()
+            ..sort((a, b) => b.date.compareTo(a.date));
+      return achievements;
     } catch (e) {
       throw ServerException(e.toString());
     }

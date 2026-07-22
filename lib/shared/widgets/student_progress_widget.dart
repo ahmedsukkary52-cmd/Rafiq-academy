@@ -1,19 +1,20 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:rafiq_academy/shared/widgets/shared_widgets.dart';
-import 'dart:math' as math;
+
 import '../../../../shared/theme/app_theme.dart';
 
 /// كارت تقدم الحفظ.
 ///
 /// [currentSurahPercent] = نسبة آيات السورة الحالية فقط (مستقلة عن [completedSurahs]).
 /// [completedSurahs] = عدد السور المكتملة 100% (عداد منفصل).
+/// هدف الأسبوع مؤجل لخطة الحفظ — يُعرض «قريباً» بدون أرقام مفبركة.
 class StudentProgressWidget extends StatelessWidget {
   final double currentSurahPercent;
   final String currentSurahName;
   final int totalVerses;
   final int completedSurahs;
-  final int weeklyTarget;
-  final int weeklyCompleted;
   final VoidCallback? onTap;
 
   const StudentProgressWidget({
@@ -22,18 +23,11 @@ class StudentProgressWidget extends StatelessWidget {
     this.currentSurahName = '',
     required this.totalVerses,
     required this.completedSurahs,
-    required this.weeklyTarget,
-    required this.weeklyCompleted,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final weeklyPercent = weeklyTarget > 0
-        ? (weeklyCompleted / weeklyTarget).clamp(0.0, 1.0)
-        : 0.0;
-    final remaining = (weeklyTarget - weeklyCompleted).clamp(0, weeklyTarget);
-
     return AppCard(
       onTap: onTap,
       child: Row(
@@ -68,53 +62,33 @@ class StudentProgressWidget extends StatelessWidget {
 
           Container(width: 1, height: 100, color: AppColors.border),
 
-          // ── هدف الأسبوع ────────────────────────────────────────
-          // TODO: هدف الأسبوع ينتظر نظام خطة الحفظ — القيم حالياً placeholder.
-          Expanded(
+          // ── هدف الأسبوع — قريباً (خطة الحفظ) ───────────────────
+          const Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('هدف الأسبوع', style: AppTextStyles.labelMedium),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(' / $weeklyTarget', style: AppTextStyles.bodyMedium),
-                    Text(
-                      '$weeklyCompleted',
-                      style: AppTextStyles.displayMedium.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
+                Text('هدف الأسبوع', style: AppTextStyles.labelMedium),
+                SizedBox(height: 12),
+                Icon(
+                  Icons.flag_outlined,
+                  color: AppColors.textHint,
+                  size: 28,
                 ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                  child: LinearProgressIndicator(
-                    value: weeklyPercent,
-                    minHeight: 8,
-                    backgroundColor: AppColors.surfaceGrey,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                SizedBox(height: 8),
+                Text(
+                  'قريباً',
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 4),
                 Text(
-                  remaining > 0
-                      ? 'آية، يتبقى $remaining آيات'
-                      : 'أكملت هدف الأسبوع 🎉',
+                  'بعد تعيين خطة الحفظ',
                   style: AppTextStyles.labelSmall,
-                  textAlign: TextAlign.right,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(weeklyPercent * 100).toInt()}%',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.primary,
-                  ),
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -197,10 +171,7 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
-        ),
+        Text(value, style: AppTextStyles.titleMedium),
         Text(label, style: AppTextStyles.labelSmall),
       ],
     );

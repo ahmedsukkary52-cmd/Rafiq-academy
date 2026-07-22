@@ -5,6 +5,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../presentation/bloc/notifications_bloc.dart';
 import '../../presentation/bloc/notifications_event.dart';
@@ -112,7 +114,19 @@ class NotificationsPage extends StatelessWidget {
                       return const AppLoadingWidget();
                     }
                     if (state.status == SectionStatus.error) {
-                      return AppErrorWidget(message: state.error ?? 'حدث خطأ');
+                      return AppErrorWidget(
+                        message: state.error ?? 'حدث خطأ',
+                        onRetry: () {
+                          final auth = context.read<AuthBloc>().state;
+                          if (auth is! AuthAuthenticated) return;
+                          context.read<NotificationsBloc>().add(
+                            StartWatchingNotificationsEvent(
+                              uid: auth.user.uid,
+                              role: auth.user.role,
+                            ),
+                          );
+                        },
+                      );
                     }
                     if (state.notifications.isEmpty) {
                       return _EmptyNotifications();

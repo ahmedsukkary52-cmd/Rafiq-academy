@@ -6,64 +6,10 @@ import '../../../../shared/theme/app_theme.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_state.dart';
 
-class DashboardSurahItem {
-  final int number;
-  final String name;
-  final int versesCount;
-  final String type; // مكية or مدنية
-  final int completedVerses;
-  final bool isCompleted;
-
-  const DashboardSurahItem({
-    required this.number,
-    required this.name,
-    required this.versesCount,
-    required this.type,
-    this.completedVerses = 0,
-    this.isCompleted = false,
-  });
-}
-
 class StudentMushafDashboard extends StatelessWidget {
   const StudentMushafDashboard({super.key});
 
   // TODO: القفل هيتفعل لاحقاً بناءً على خطة الحفظ اللي هيحددها المعلم لكل طالب - لحد ذلك كل السور مفتوحة
-  static const List<DashboardSurahItem> _surahs = [
-    DashboardSurahItem(
-      number: 1,
-      name: 'الفاتحة',
-      versesCount: 7,
-      type: 'مكية',
-      isCompleted: true,
-    ),
-    DashboardSurahItem(
-      number: 114,
-      name: 'الناس',
-      versesCount: 6,
-      type: 'مكية',
-      isCompleted: true,
-    ),
-    DashboardSurahItem(
-      number: 113,
-      name: 'الفلق',
-      versesCount: 5,
-      type: 'مكية',
-      isCompleted: true,
-    ),
-    DashboardSurahItem(
-      number: 67,
-      name: 'الملك',
-      versesCount: 30,
-      type: 'مكية',
-      completedVerses: 21,
-    ),
-    DashboardSurahItem(
-      number: 68,
-      name: 'القلم',
-      versesCount: 52,
-      type: 'مكية',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -74,9 +20,11 @@ class StudentMushafDashboard extends StatelessWidget {
         body: BlocBuilder<StudentBloc, StudentState>(
           builder: (context, state) {
             final profile = state.profile;
-            final overallProgress = (profile?.overallProgressPercent ?? 70.0)
-                .round();
-            final completedJuz = profile?.completedJuz ?? 1;
+            // قيم حقيقية من البروفايل فقط — بدون نسب افتراضية وهمية
+            final overallProgress = profile?.overallProgressPercent.round();
+            final completedJuzLabel = profile != null
+                ? 'الختمة\n${profile.completedJuz}/٣٠'
+                : 'الختمة\n—/٣٠';
 
             return CustomScrollView(
               slivers: [
@@ -99,7 +47,6 @@ class StudentMushafDashboard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Title row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -126,7 +73,6 @@ class StudentMushafDashboard extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            // الختمة badge
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -137,7 +83,7 @@ class StudentMushafDashboard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Text(
-                                'الختمة\n$completedJuz/٣٠',
+                                completedJuzLabel,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontFamily: 'NotoNaskhArabic',
@@ -151,17 +97,16 @@ class StudentMushafDashboard extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 32),
-                        // Progress circles row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             const _ProgressCircle(
-                              percent: 40,
+                              percent: null,
                               label: 'الإتقان',
                               color: Color(0xFF2DC4B2),
                             ),
                             const _ProgressCircle(
-                              percent: 80,
+                              percent: null,
                               label: 'المراجعة',
                               color: Color(0xFFF5A623),
                             ),
@@ -179,7 +124,6 @@ class StudentMushafDashboard extends StatelessWidget {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-                // ── السور المحفوظة ──────────────────────────────────────
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   sliver: SliverToBoxAdapter(
@@ -349,19 +293,11 @@ class StudentMushafDashboard extends StatelessWidget {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-                SliverPadding(
-                  padding: const EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    bottom: 32,
-                  ),
-                  sliver: SliverList.separated(
-                    itemCount: _surahs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final item = _surahs[index];
-                      return _SurahCard(item: item);
-                    },
+                // خطة الحفظ — placeholder حتى يعيّنها المعلم
+                const SliverPadding(
+                  padding: EdgeInsets.only(left: 20, right: 20, bottom: 32),
+                  sliver: SliverToBoxAdapter(
+                    child: _MemorizationPlanPlaceholder(),
                   ),
                 ),
               ],
@@ -374,7 +310,8 @@ class StudentMushafDashboard extends StatelessWidget {
 }
 
 class _ProgressCircle extends StatelessWidget {
-  final int percent;
+  /// null = غير متاح بعد (بدون اختراع نسبة)
+  final int? percent;
   final String label;
   final Color color;
 
@@ -387,6 +324,7 @@ class _ProgressCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWhite = color == Colors.white;
+    final hasValue = percent != null;
     return Column(
       children: [
         Stack(
@@ -396,21 +334,23 @@ class _ProgressCircle extends StatelessWidget {
               width: 72,
               height: 72,
               child: CircularProgressIndicator(
-                value: percent / 100,
+                value: hasValue ? percent! / 100 : 0,
                 strokeWidth: 6,
                 backgroundColor: isWhite
                     ? Colors.white.withOpacity(0.2)
                     : Colors.white.withOpacity(0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  hasValue ? color : Colors.white.withOpacity(0.35),
+                ),
               ),
             ),
             Text(
-              '$percent%',
-              style: const TextStyle(
+              hasValue ? '$percent%' : '—',
+              style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 15,
+                fontSize: hasValue ? 15 : 18,
                 fontWeight: FontWeight.w900,
-                color: Colors.white,
+                color: Colors.white.withOpacity(hasValue ? 1 : 0.7),
               ),
             ),
           ],
@@ -425,74 +365,34 @@ class _ProgressCircle extends StatelessWidget {
             color: Colors.white.withOpacity(0.9),
           ),
         ),
+        if (!hasValue) ...[
+          const SizedBox(height: 2),
+          Text(
+            'قريباً',
+            style: TextStyle(
+              fontFamily: 'NotoNaskhArabic',
+              fontSize: 10,
+              color: Colors.white.withOpacity(0.65),
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-class _SurahCard extends StatelessWidget {
-  final DashboardSurahItem item;
-
-  const _SurahCard({required this.item});
+class _MemorizationPlanPlaceholder extends StatelessWidget {
+  const _MemorizationPlanPlaceholder();
 
   @override
   Widget build(BuildContext context) {
-    final Widget stateBadge = item.isCompleted
-        ? Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFCFF4DF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check, size: 12, color: Color(0xFF20AF68)),
-                SizedBox(width: 4),
-                Text(
-                  'محفوظة',
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF20AF68),
-                  ),
-                ),
-              ],
-            ),
-          )
-        : Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFCFF4F6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              'جارٍ ⚡',
-              style: TextStyle(
-                fontFamily: 'NotoNaskhArabic',
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF14AEB8),
-              ),
-            ),
-          );
-
-    final bool isInProgress = !item.isCompleted && item.completedVerses > 0;
-
-    final Color numberBgColor = item.number == 114
-        ? const Color(0xFFF5A623)
-        : item.number == 113
-        ? const Color(0xFF20AF68)
-        : const Color(0xFF14B2BA);
-
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: isInProgress
-            ? Border.all(color: const Color(0xFF14B2BA), width: 1.5)
-            : null,
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -501,107 +401,31 @@ class _SurahCard extends StatelessWidget {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: () => context.push('/student/mushaf?surah=${item.number}'),
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: numberBgColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${item.number}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          style: AppTextStyles.titleLarge.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${item.versesCount} آيات · ${item.type}',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  stateBadge,
-                ],
-              ),
-              if (item.isCompleted) ...[
-                const SizedBox(height: 14),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: const LinearProgressIndicator(
-                    value: 1,
-                    minHeight: 4,
-                    backgroundColor: AppColors.surfaceGrey,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF14B2BA),
-                    ),
-                  ),
-                ),
-              ] else if (isInProgress && item.completedVerses > 0) ...[
-                const SizedBox(height: 14),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: item.completedVerses / item.versesCount,
-                    minHeight: 6,
-                    backgroundColor: AppColors.surfaceGrey,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF14B2BA),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'تم حفظ ${item.completedVerses} آيات',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      '${item.completedVerses}/${item.versesCount}',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
+      child: Column(
+        children: [
+          Icon(
+            Icons.menu_book_outlined,
+            size: 40,
+            color: AppColors.textHint.withOpacity(0.7),
           ),
-        ),
+          const SizedBox(height: 14),
+          Text(
+            'خطة الحفظ',
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'ستظهر سور خطتك هنا بعد أن يعيّنها المعلم.\nيمكنك القراءة الآن من «مصحف حر كامل».',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

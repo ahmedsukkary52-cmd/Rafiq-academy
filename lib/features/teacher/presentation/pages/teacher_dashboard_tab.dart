@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../notifications/presentation/bloc/notifications_bloc.dart';
+import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
@@ -246,15 +250,20 @@ class _TeacherHeader extends StatelessWidget {
                   ),
                 ],
               ),
-              NotificationBadge(
-                count: 3,
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.notifications_outlined,
-                    color: Colors.white,
-                  ),
-                  onPressed: () {},
-                ),
+              BlocBuilder<NotificationsBloc, NotificationsState>(
+                bloc: sl<NotificationsBloc>(),
+                builder: (context, notifState) {
+                  return NotificationBadge(
+                    count: notifState.unreadCount,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.notifications_outlined,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => context.push(AppRoutes.teacherNotifs),
+                    ),
+                  );
+                },
               ),
             ],
           ),

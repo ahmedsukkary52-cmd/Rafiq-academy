@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'student_recitation_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,6 +14,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import 'student_recitation_page.dart';
 
 enum MushafMode { reading, recitation }
 
@@ -1079,7 +1079,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   int _currentPage = 1; // Current page number
   late final PageController _pageController; // Controller for PageView
   final Map<int, int> _surahStartPage = {}; // Map surah number to first page
-  late bool _isFreeMode;
 
   bool _isDarkMode = false;
   bool _showBottomPanel = false;
@@ -1144,7 +1143,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   void initState() {
     super.initState();
     _mode = widget.initialMode;
-    _isFreeMode = true; // Always free mode for full Mushaf
     _pageController = PageController(
       initialPage: 0,
     ); // Page indices start at 0, pages start at 1
@@ -1235,17 +1233,15 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     _parseSurahResponse(responseBody);
     if (mounted) setState(() => _isLoadingData = false);
 
-    // Navigate to correct page
+    // Navigate to correct page (يحترم isFreeMode + surah من الـ route)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       int targetPage;
-      if (_surahStartPage.containsKey(widget.surahNumber)) {
-        // If user came from specific surah
+      if (!widget.isFreeMode &&
+          _surahStartPage.containsKey(widget.surahNumber)) {
         targetPage = _surahStartPage[widget.surahNumber]!;
       } else if (prefs.containsKey(lastPageKey)) {
-        // Else go to last saved page
         targetPage = prefs.getInt(lastPageKey) ?? 1;
       } else {
-        // Default to page 1
         targetPage = 1;
       }
       _jumpToPage(targetPage);
@@ -1791,35 +1787,15 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('إرسال التسميع', textAlign: TextAlign.right),
-        content: Text(
-          'تم تسجيل تلاوتك لسورة ${_meta.name} بنجاح، هل تريد إرسال التسجيل الصوتي لمعلم الحلقة لتقييمه؟',
+        content: const Text(
+          'رفع التسجيل غير متاح حالياً حتى يتم تفعيل خدمة رفع الملفات.',
           textAlign: TextAlign.right,
-          style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
+          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              AppSnackBar.showSuccess(
-                context,
-                'تم إرسال التسجيل الصوتي بنجاح للمعلم! 🎉',
-              );
-              setState(() {
-                _hasRecorded = false;
-                _recordedFilePath = null;
-              });
-            },
-            child: const Text(
-              'إرسال الآن',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Text('حسناً'),
           ),
         ],
       ),

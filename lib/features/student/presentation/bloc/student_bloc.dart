@@ -248,7 +248,6 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
         LoadRecitationRecordsEvent(event.studentId),
         emit,
       ),
-      _onLoadAchievements(LoadAchievementsEvent(event.studentId), emit),
       _onLoadMonthlySchedule(
         LoadMonthlyReviewScheduleEvent(
           studentId: event.studentId,

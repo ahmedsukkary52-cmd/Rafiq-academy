@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../../shared/widgets/student_daily_task_widget.dart';
@@ -14,15 +15,14 @@ import '../../../../shared/widgets/student_last_evaluation_widget.dart';
 import '../../../../shared/widgets/student_progress_widget.dart';
 import '../../../../shared/widgets/student_quick_action_widget.dart';
 import '../../../../shared/widgets/student_session_card_widget.dart';
-import '../../domain/entities/avatar_catalog.dart';
-import '../../domain/entities/halaqa_entity.dart';
-import '../../../../core/router/router_app.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
+import '../../domain/entities/avatar_catalog.dart';
+import '../../domain/entities/halaqa_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
@@ -63,7 +63,6 @@ class _StudentHomePageState extends State<StudentHomePage> {
     context.read<StudentBloc>()
       ..add(LoadStudentProfileEvent(uid))
       ..add(LoadRecitationRecordsEvent(uid))
-      ..add(LoadAchievementsEvent(uid))
       ..add(StartWatchingAssignmentEvent(uid));
 
     // ابدأ مراقبة الإشعارات
@@ -220,9 +219,6 @@ class _StudentHomeTab extends StatelessWidget {
                     currentSurahName: profile?.currentPlanName ?? '',
                     totalVerses: profile?.totalVersesMemorized ?? 0,
                     completedSurahs: profile?.completedSurahs ?? 0,
-                    // TODO: هدف الأسبوع ينتظر نظام خطة الحفظ
-                    weeklyTarget: 20,
-                    weeklyCompleted: 16,
                     onTap: () => context.push(AppRoutes.studentProgressReport),
                   ),
                 ),

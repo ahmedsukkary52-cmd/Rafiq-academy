@@ -6,7 +6,6 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 
 const _keyAppSounds = 'pref_app_sounds';
-const _keyNotifications = 'pref_notifications';
 const _keySessionReminders = 'pref_session_reminders';
 const _keyScreenReader = 'pref_screen_reader';
 const _keyLargeTouchTargets = 'pref_large_touch_targets';
@@ -22,7 +21,6 @@ class _SettingsPageState extends State<SettingsPage> {
   SharedPreferences? _prefs;
 
   bool _appSounds = true;
-  bool _notifications = true;
   bool _sessionReminders = true;
   bool _screenReader = false;
   bool _largeTouchTargets = false;
@@ -38,7 +36,6 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _prefs = prefs;
       _appSounds = prefs.getBool(_keyAppSounds) ?? true;
-      _notifications = prefs.getBool(_keyNotifications) ?? true;
       _sessionReminders = prefs.getBool(_keySessionReminders) ?? true;
       _screenReader = prefs.getBool(_keyScreenReader) ?? false;
       _largeTouchTargets = prefs.getBool(_keyLargeTouchTargets) ?? false;
@@ -68,16 +65,17 @@ class _SettingsPageState extends State<SettingsPage> {
                     _prefs!.setBool(_keyAppSounds, v);
                   },
                 ),
-                _ToggleTile(
+                _LinkTile(
                   icon: Icons.notifications_rounded,
                   iconBg: AppColors.secondaryBg,
                   iconColor: AppColors.secondary,
                   label: 'الإشعارات',
-                  value: _notifications,
-                  onChanged: (v) {
-                    setState(() => _notifications = v);
-                    _prefs!.setBool(_keyNotifications, v);
-                  },
+                  trailing: 'قريباً',
+                  onTap: () =>
+                      AppSnackBar.showInfo(
+                        context,
+                        'تفضيلات الإشعارات قريباً',
+                      ),
                 ),
                 _ToggleTile(
                   icon: Icons.school_rounded,

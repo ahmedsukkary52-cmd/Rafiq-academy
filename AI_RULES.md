@@ -11,6 +11,37 @@
 
 ---
 
+## Existing Implementation Priority
+
+Before implementing any feature:
+
+1. Search existing implementation.
+2. Understand existing business logic.
+3. Extend it if possible.
+4. Create new code only when no suitable implementation exists.
+
+Prefer extending over rewriting.
+
+Never replace working code without explicit instruction.
+
+## Investigation Phase
+
+During an investigation:
+
+Identify facts.
+
+Identify problems.
+
+Do not redesign the architecture.
+
+Do not propose migrations.
+
+Do not decide ownership changes.
+
+Only report observations.
+
+Architectural decisions belong to the user.
+
 # 1. Read Before Coding
 
 Before implementing any feature, always read:

@@ -75,16 +75,21 @@ class _StudentHomePageState extends State<StudentHomePage> {
   Widget build(BuildContext context) {
     return BlocListener<StudentBloc, StudentState>(
       listenWhen: (previous, current) {
-        final previousHalaqaId = previous.profile?.halaqaId;
         final currentHalaqaId = current.profile?.halaqaId;
-        return currentHalaqaId != null &&
-            currentHalaqaId.isNotEmpty &&
-            previousHalaqaId != currentHalaqaId;
+        if (currentHalaqaId == null || currentHalaqaId.isEmpty) return false;
+
+        final idChanged = previous.profile?.halaqaId != currentHalaqaId;
+        final profileJustLoaded =
+            previous.profileStatus != SectionStatus.loaded &&
+                current.profileStatus == SectionStatus.loaded &&
+                current.halaqaStatus == SectionStatus.initial;
+
+        return idChanged || profileJustLoaded;
       },
       listener: (context, state) {
-        context.read<StudentBloc>().add(
-          LoadStudentHalaqaEvent(state.profile!.halaqaId!),
-        );
+        final halaqaId = state.profile?.halaqaId;
+        if (halaqaId == null || halaqaId.isEmpty) return;
+        context.read<StudentBloc>().add(LoadStudentHalaqaEvent(halaqaId));
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -93,6 +98,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
           children: [
             _StudentHomeTab(
               onTabChanged: (index) => setState(() => _currentTab = index),
+              onRetryProfile: _loadStudentData,
             ),
             const StudentMushafDashboard(),
             const StudentBadgesPage(),
@@ -116,30 +122,65 @@ class _StudentHomePageState extends State<StudentHomePage> {
 
 class _StudentHomeTab extends StatelessWidget {
   final ValueChanged<int> onTabChanged;
+  final VoidCallback onRetryProfile;
 
-  const _StudentHomeTab({required this.onTabChanged});
+  const _StudentHomeTab({
+    required this.onTabChanged,
+    required this.onRetryProfile,
+  });
+
+  void _retryHalaqa(BuildContext context, String halaqaId) {
+    context.read<StudentBloc>().add(LoadStudentHalaqaEvent(halaqaId));
+  }
+
+  Future<void> _onRefresh(BuildContext context) async {
+    final authState = context
+        .read<AuthBloc>()
+        .state;
+    if (authState is! AuthAuthenticated) return;
+
+    final bloc = context.read<StudentBloc>();
+    bloc.add(RefreshStudentDashboardEvent(authState.user.uid));
+
+    final halaqaId = bloc.state.profile?.halaqaId;
+    if (halaqaId != null && halaqaId.isNotEmpty) {
+      bloc.add(LoadStudentHalaqaEvent(halaqaId));
+    }
+
+    await Future.delayed(const Duration(milliseconds: 800));
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<StudentBloc, StudentState>(
       builder: (context, state) {
+        final waitingForProfile = state.profile == null &&
+            (state.profileStatus == SectionStatus.initial ||
+                state.profileStatus == SectionStatus.loading);
+
+        if (waitingForProfile) {
+          return const AppLoadingWidget();
+        }
+
+        if (state.profileStatus == SectionStatus.error &&
+            state.profile == null) {
+          return AppErrorWidget(
+            message: state.profileError ?? 'تعذر تحميل بيانات الطالب',
+            onRetry: onRetryProfile,
+          );
+        }
+
         final profile = state.profile;
         final avatarEmoji = AvatarCatalog.byId(
           profile?.avatarId ?? 'fox',
         ).emoji;
+        final halaqaId = profile?.halaqaId;
 
         return RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () async {
-            final authState = context.read<AuthBloc>().state;
-            if (authState is AuthAuthenticated) {
-              context.read<StudentBloc>().add(
-                RefreshStudentDashboardEvent(authState.user.uid),
-              );
-              await Future.delayed(const Duration(milliseconds: 800));
-            }
-          },
+          onRefresh: () => _onRefresh(context),
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // ── Header: عملة / نجوم / ستريك من بروفايل Firestore ──
               // TODO: منطق حساب النقاط والاستريك (gamification) يُصمَّم لاحقاً —
@@ -227,71 +268,7 @@ class _StudentHomeTab extends StatelessWidget {
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
               // ── كارت الجلسة القادمة ────────────────────────────────
-              if (state.halaqaStatus == SectionStatus.loaded &&
-                  state.halaqa != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.paddingM,
-                    ),
-                    child: StudentSessionCardWidget(
-                      halaqa: state.halaqa!,
-                      onJoinTap: () =>
-                          _openHalaqaMeeting(context, state.halaqa!),
-                      onDetailsTap: () =>
-                          context.push(AppRoutes.studentSchedule),
-                    ),
-                  ),
-                )
-              else
-                // لو مفيش حلقة محمّلة — كارت مختصر يفتح حصصي برضه
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.paddingM,
-                    ),
-                    child: AppCard(
-                      onTap: () => context.push(AppRoutes.studentSchedule),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.chevron_left,
-                            color: AppColors.textHint,
-                          ),
-                          const Spacer(),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                'حصة الحفظ اليومية',
-                                style: AppTextStyles.titleMedium,
-                              ),
-                              Text(
-                                'اضغط لعرض جدول الحصص',
-                                style: AppTextStyles.labelSmall,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.dark,
-                              borderRadius: BorderRadius.circular(
-                                AppSizes.radiusM,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.videocam_rounded,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              ..._halaqaSectionSlivers(context, state, halaqaId),
 
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
@@ -325,6 +302,111 @@ class _StudentHomeTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  List<Widget> _halaqaSectionSlivers(BuildContext context,
+      StudentState state,
+      String? halaqaId,) {
+    final hasHalaqaId = halaqaId != null && halaqaId.isNotEmpty;
+
+    if (state.halaqaStatus == SectionStatus.loaded && state.halaqa != null) {
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+            child: StudentSessionCardWidget(
+              halaqa: state.halaqa!,
+              onJoinTap: () => _openHalaqaMeeting(context, state.halaqa!),
+              onDetailsTap: () => context.push(AppRoutes.studentSchedule),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (hasHalaqaId &&
+        (state.halaqaStatus == SectionStatus.loading ||
+            state.halaqaStatus == SectionStatus.initial)) {
+      return [
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+            child: SizedBox(height: 120, child: AppLoadingWidget()),
+          ),
+        ),
+      ];
+    }
+
+    if (hasHalaqaId && state.halaqaStatus == SectionStatus.error) {
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+            child: AppCard(
+              child: Column(
+                children: [
+                  Text(
+                    state.halaqaError ?? 'تعذر تحميل بيانات الحلقة',
+                    style: AppTextStyles.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  AppButton(
+                    label: 'إعادة المحاولة',
+                    width: 160,
+                    height: 44,
+                    onPressed: () => _retryHalaqa(context, halaqaId),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+          child: AppCard(
+            onTap: () => context.push(AppRoutes.studentSchedule),
+            child: Row(
+              children: [
+                const Icon(Icons.chevron_left, color: AppColors.textHint),
+                const Spacer(),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'حصة الحفظ اليومية',
+                      style: AppTextStyles.titleMedium,
+                    ),
+                    Text(
+                      'اضغط لعرض جدول الحصص',
+                      style: AppTextStyles.labelSmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.dark,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                  ),
+                  child: const Icon(
+                    Icons.videocam_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   Future<void> _openHalaqaMeeting(

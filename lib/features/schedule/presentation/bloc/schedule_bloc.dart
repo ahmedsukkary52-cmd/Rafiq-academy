@@ -3,12 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/usecases/usecases.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../../domain/usecases/get_weekly_sessions_usecase.dart';
 
 part 'schedule_event.dart';
-
 part 'schedule_state.dart';
 
 @injectable
@@ -23,8 +21,16 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
     LoadWeeklySessionsEvent event,
     Emitter<ScheduleState> emit,
   ) async {
-    emit(state.copyWith(status: SectionStatus.loading));
-    final result = await getWeeklySessions(const NoParams());
+    emit(
+      state.copyWith(
+        status: SectionStatus.loading,
+        halaqaId: event.halaqaId,
+        clearError: true,
+      ),
+    );
+    final result = await getWeeklySessions(
+      WeeklySessionsParams(event.halaqaId),
+    );
     result.fold(
       (failure) => emit(
         state.copyWith(
@@ -33,7 +39,11 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
         ),
       ),
       (sessions) => emit(
-        state.copyWith(status: SectionStatus.loaded, sessions: sessions),
+        state.copyWith(
+          status: SectionStatus.loaded,
+          sessions: sessions,
+          clearError: true,
+        ),
       ),
     );
   }

@@ -8,5 +8,10 @@ abstract class ScheduleEvent extends Equatable {
 }
 
 class LoadWeeklySessionsEvent extends ScheduleEvent {
-  const LoadWeeklySessionsEvent();
+  final String halaqaId;
+
+  const LoadWeeklySessionsEvent(this.halaqaId);
+
+  @override
+  List<Object?> get props => [halaqaId];
 }

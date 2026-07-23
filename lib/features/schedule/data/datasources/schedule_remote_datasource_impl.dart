@@ -1,63 +1,49 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:injectable/injectable.dart';
 
-import '../../domain/entities/class_session_entity.dart';
-import '../models/class_session_model.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/error/exception.dart';
+import '../models/halaqa_schedule_source_model.dart';
 import 'schedule_remote_datasource.dart';
 
-/// TODO: ربط بـ Firestore (مثلاً collection `classSessions` أو جدول الحلقة)
-/// حالياً بيانات تجريبية لعرض الـ UI.
 @LazySingleton(as: ScheduleRemoteDatasource)
 class ScheduleRemoteDatasourceImpl implements ScheduleRemoteDatasource {
+  final FirebaseFirestore firestore;
+
+  ScheduleRemoteDatasourceImpl(this.firestore);
+
   @override
-  Future<List<ClassSessionModel>> getWeeklySessions() async {
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+  Future<HalaqaScheduleSourceModel?> getHalaqaScheduleSource(
+      String halaqaId,) async {
+    try {
+      final doc = await firestore
+          .collection(FirestoreCollections.halaqat)
+          .doc(halaqaId)
+          .get();
 
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day, 16);
-    final todayEnd = DateTime(now.year, now.month, now.day, 17);
+      if (!doc.exists) return null;
 
-    return [
-      ClassSessionModel(
-        id: 's1',
-        title: 'حصة الحفظ اليومية',
-        type: ClassSessionType.memorization,
-        startAt: todayStart,
-        endAt: todayEnd,
-        teacherName: 'الشيخ عبدالرحمن محمد',
-        status: ClassSessionStatus.live,
-        meetingLink: 'https://zoom.us/j/example',
-        topic: 'سورة الملك',
-      ),
-      ClassSessionModel(
-        id: 's2',
-        title: 'حصة المراجعة',
-        type: ClassSessionType.review,
-        startAt: todayStart.add(const Duration(days: 1)),
-        endAt: todayEnd.add(const Duration(days: 1)),
-        teacherName: 'الشيخ عبدالرحمن',
-        status: ClassSessionStatus.upcoming,
-        meetingLink: '',
-      ),
-      ClassSessionModel(
-        id: 's3',
-        title: 'حصة التجويد',
-        type: ClassSessionType.tajweed,
-        startAt: todayStart.add(const Duration(days: 3)),
-        endAt: todayEnd.add(const Duration(days: 3)),
-        teacherName: 'الشيخة سارة',
-        status: ClassSessionStatus.upcoming,
-        meetingLink: '',
-      ),
-      ClassSessionModel(
-        id: 's4',
-        title: 'حصة الحفظ اليومية',
-        type: ClassSessionType.memorization,
-        startAt: todayStart.subtract(const Duration(days: 1)),
-        endAt: todayEnd.subtract(const Duration(days: 1)),
-        teacherName: 'الشيخ عبدالرحمن محمد',
-        status: ClassSessionStatus.ended,
-        meetingLink: '',
-      ),
-    ];
+      final data = doc.data() ?? <String, dynamic>{};
+      final rawSchedule = data['schedule'] as List<dynamic>? ?? const [];
+
+      return HalaqaScheduleSourceModel(
+        halaqaId: doc.id,
+        name: (data['name'] as String?)?.trim() ?? '',
+        meetingLink: (data['meetingLink'] as String?)?.trim() ?? '',
+        schedule: rawSchedule
+            .whereType<Map>()
+            .map(
+              (e) =>
+              HalaqaScheduleSlotModel.fromMap(
+                Map<String, dynamic>.from(e),
+              ),
+        )
+            .toList(),
+      );
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
   }
 }

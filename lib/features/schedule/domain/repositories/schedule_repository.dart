@@ -1,5 +1,6 @@
 import '../entities/class_session_entity.dart';
 
 abstract class ScheduleRepository {
-  Future<List<ClassSessionEntity>> getWeeklySessions();
+  /// Weekly sessions derived from `halaqat/{halaqaId}.schedule`.
+  Future<List<ClassSessionEntity>> getWeeklySessions(String halaqaId);
 }

@@ -1,5 +1,7 @@
-import '../models/class_session_model.dart';
+import '../models/halaqa_schedule_source_model.dart';
 
 abstract class ScheduleRemoteDatasource {
-  Future<List<ClassSessionModel>> getWeeklySessions();
+  /// Reads `halaqat/{halaqaId}` schedule fields only.
+  /// Returns null when the document does not exist.
+  Future<HalaqaScheduleSourceModel?> getHalaqaScheduleSource(String halaqaId);
 }

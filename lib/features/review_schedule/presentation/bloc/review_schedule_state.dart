@@ -2,6 +2,7 @@ part of 'review_schedule_bloc.dart';
 
 class ReviewScheduleState extends Equatable {
   final SectionStatus status;
+  final String? studentId;
   final int hijriYear;
   final int hijriMonth;
   final ReviewMonthEntity? month;
@@ -11,6 +12,7 @@ class ReviewScheduleState extends Equatable {
     required this.status,
     required this.hijriYear,
     required this.hijriMonth,
+    this.studentId,
     this.month,
     this.errorMessage,
   });
@@ -26,23 +28,27 @@ class ReviewScheduleState extends Equatable {
 
   ReviewScheduleState copyWith({
     SectionStatus? status,
+    String? studentId,
     int? hijriYear,
     int? hijriMonth,
     ReviewMonthEntity? month,
     String? errorMessage,
+    bool clearError = false,
   }) {
     return ReviewScheduleState(
       status: status ?? this.status,
+      studentId: studentId ?? this.studentId,
       hijriYear: hijriYear ?? this.hijriYear,
       hijriMonth: hijriMonth ?? this.hijriMonth,
       month: month ?? this.month,
-      errorMessage: errorMessage,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
 
   @override
   List<Object?> get props => [
     status,
+    studentId,
     hijriYear,
     hijriMonth,
     month,

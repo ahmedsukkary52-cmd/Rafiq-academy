@@ -1,8 +1,10 @@
-import '../../domain/entities/review_item_entity.dart';
+import '../models/review_schedule_doc_model.dart';
 
 abstract class ReviewScheduleRemoteDatasource {
-  Future<ReviewMonthEntity> getMonth({
-    required int hijriYear,
-    required int hijriMonth,
+  /// Loads `reviewSchedules` for [studentId] with Gregorian [startInclusive, endExclusive).
+  Future<List<ReviewScheduleDocModel>> getReviewsInRange({
+    required String studentId,
+    required DateTime startInclusive,
+    required DateTime endExclusive,
   });
 }

@@ -8,7 +8,6 @@ import '../../domain/entities/review_item_entity.dart';
 import '../../domain/usecases/get_review_month_usecase.dart';
 
 part 'review_schedule_event.dart';
-
 part 'review_schedule_state.dart';
 
 @injectable
@@ -26,19 +25,36 @@ class ReviewScheduleBloc
     LoadReviewMonthEvent event,
     Emitter<ReviewScheduleState> emit,
   ) async {
-    emit(state.copyWith(status: SectionStatus.loading));
+    final studentId = event.studentId ?? state.studentId ?? '';
+    emit(
+      state.copyWith(
+        status: SectionStatus.loading,
+        studentId: studentId,
+        clearError: true,
+      ),
+    );
     final result = await getReviewMonth(
       ReviewMonthParams(
+        studentId: studentId,
         hijriYear: state.hijriYear,
         hijriMonth: state.hijriMonth,
       ),
     );
     result.fold(
       (f) => emit(
-        state.copyWith(status: SectionStatus.error, errorMessage: f.message),
+        state.copyWith(
+          status: SectionStatus.error,
+          errorMessage: f.message,
+        ),
       ),
-      (month) =>
-          emit(state.copyWith(status: SectionStatus.loaded, month: month)),
+          (month) =>
+          emit(
+            state.copyWith(
+              status: SectionStatus.loaded,
+              month: month,
+              clearError: true,
+            ),
+          ),
     );
   }
 
@@ -56,6 +72,6 @@ class ReviewScheduleBloc
       y += 1;
     }
     emit(state.copyWith(hijriYear: y, hijriMonth: m));
-    add(const LoadReviewMonthEvent());
+    add(LoadReviewMonthEvent(studentId: state.studentId));
   }
 }

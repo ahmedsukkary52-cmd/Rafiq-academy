@@ -342,7 +342,9 @@ extension GetItInjectableX on _i174.GetIt {
       ),
     );
     gh.lazySingleton<_i333.ReviewScheduleRemoteDatasource>(
-      () => _i590.ReviewScheduleRemoteDatasourceImpl(),
+      () => _i590.ReviewScheduleRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
+      ),
     );
     gh.lazySingleton<_i174.AudioLibraryRepository>(
       () => _i4.AudioLibraryRepositoryImpl(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/student_bloc.dart';
@@ -19,6 +21,10 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+
+  void _loadProfile() {
     final auth = context.read<AuthBloc>().state;
     if (auth is AuthAuthenticated) {
       context.read<StudentBloc>().add(LoadStudentProfileEvent(auth.user.uid));
@@ -33,14 +39,33 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
         backgroundColor: AppColors.background,
         body: BlocBuilder<StudentBloc, StudentState>(
           builder: (context, state) {
+            final waitingForProfile =
+                state.profile == null &&
+                (state.profileStatus == SectionStatus.initial ||
+                    state.profileStatus == SectionStatus.loading);
+
+            if (waitingForProfile) {
+              return const AppLoadingWidget();
+            }
+
+            if (state.profileStatus == SectionStatus.error &&
+                state.profile == null) {
+              return AppErrorWidget(
+                message: state.profileError ?? 'تعذر تحميل بيانات الاستمرارية',
+                onRetry: _loadProfile,
+              );
+            }
+
             final streak = state.profile?.streakDays ?? 0;
+
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _StreakHero(streak: streak)),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
-                  sliver: SliverToBoxAdapter(child: _WeekCard(streak: streak)),
-                ),
+                if (streak == 0)
+                  const SliverPadding(
+                    padding: EdgeInsets.fromLTRB(24, 28, 24, 0),
+                    sliver: SliverToBoxAdapter(child: _EmptyStreakCard()),
+                  ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(24, 30, 24, 18),
                   sliver: SliverToBoxAdapter(
@@ -87,6 +112,36 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
   ];
 }
 
+class _EmptyStreakCard extends StatelessWidget {
+  const _EmptyStreakCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Text(
+        'لا توجد أيام متواصلة حالياً\nستظهر سلسلتك هنا عند تحديثها في ملفك',
+        textAlign: TextAlign.center,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
 class _StreakHero extends StatelessWidget {
   final int streak;
 
@@ -106,7 +161,7 @@ class _StreakHero extends StatelessWidget {
               width: 210,
               height: 210,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
             ),
@@ -144,7 +199,7 @@ class _StreakHero extends StatelessWidget {
                   Text(
                     'يوم متواصل 💪',
                     style: AppTextStyles.titleLarge.copyWith(
-                      color: Colors.white.withOpacity(0.78),
+                      color: Colors.white.withValues(alpha: 0.78),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -152,89 +207,6 @@ class _StreakHero extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeekCard extends StatelessWidget {
-  final int streak;
-
-  const _WeekCard({required this.streak});
-
-  @override
-  Widget build(BuildContext context) {
-    final completed = streak >= 7 ? 7 : streak.clamp(0, 7);
-    const days = ['أح', 'إث', 'ثل', 'أر', 'خم', 'جم', 'سب'];
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                'هذا الأسبوع',
-                style: AppTextStyles.titleLarge.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '$completed/7 ✅',
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: const Color(0xFF20B96D),
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 26),
-          Row(
-            children: List.generate(days.length, (index) {
-              final active = index < completed;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: active
-                          ? const Color(0xFFE9292F)
-                          : const Color(0xFFF1F3F6),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(active ? '🔥' : '○'),
-                        const SizedBox(height: 6),
-                        Text(
-                          days[index],
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: active ? Colors.white : AppColors.textHint,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
           ),
         ],
       ),
@@ -265,7 +237,7 @@ class _MilestoneCard extends StatelessWidget {
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),

@@ -25,13 +25,23 @@ class StudentProgressReportPage extends StatelessWidget {
     return BlocProvider(
       create: (_) =>
           sl<ProgressReportBloc>()..add(LoadProgressReportEvent(uid)),
-      child: const _ProgressReportView(),
+      child: _ProgressReportView(studentId: uid),
     );
   }
 }
 
 class _ProgressReportView extends StatelessWidget {
-  const _ProgressReportView();
+  final String studentId;
+
+  const _ProgressReportView({required this.studentId});
+
+  void _retry(BuildContext context) {
+    final auth = context
+        .read<AuthBloc>()
+        .state;
+    final id = auth is AuthAuthenticated ? auth.user.uid : studentId;
+    context.read<ProgressReportBloc>().add(LoadProgressReportEvent(id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,38 +119,87 @@ class _ProgressReportView extends StatelessWidget {
               ),
               if (state.status == SectionStatus.loading ||
                   state.status == SectionStatus.initial)
-                const SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
+                const SliverFillRemaining(child: AppLoadingWidget())
+              else
+                if (state.status == SectionStatus.error)
+                  SliverFillRemaining(
+                    child: AppErrorWidget(
+                      message: state.errorMessage ?? 'تعذر تحميل تقرير التقدم',
+                      onRetry: () => _retry(context),
                   ),
                 )
               else if (state.report == null)
                 SliverFillRemaining(
-                  child: Center(
-                    child: Text(state.errorMessage ?? 'لا توجد بيانات'),
+                  child: AppErrorWidget(
+                    message: 'لا توجد بيانات',
+                    onRetry: () => _retry(context),
                   ),
                 )
               else
-                SliverPadding(
-                  padding: const EdgeInsets.all(AppSizes.paddingM),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      _SummaryRow(report: state.report!),
-                      const SizedBox(height: 12),
-                      _AttendanceCard(report: state.report!),
-                      const SizedBox(height: 12),
-                      _WeeklyChartCard(
-                        values: state.report!.weeklyVersesPerDay,
-                      ),
-                      const SizedBox(height: 12),
-                      _TeacherNotesCard(notes: state.report!.teacherNotes),
-                      const SizedBox(height: 24),
-                    ]),
-                  ),
-                ),
+                  _buildLoadedSliver(context, state.report!),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildLoadedSliver(BuildContext context, ProgressReportEntity report) {
+    final hasAttendanceActivity =
+        report.attendanceDays > 0 || report.absenceDays > 0;
+    final hasWeeklyActivity =
+    report.weeklyVersesPerDay.any((v) => v > 0);
+    final notes = report.teacherNotes.trim();
+
+    return SliverPadding(
+      padding: const EdgeInsets.all(AppSizes.paddingM),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          _SummaryRow(report: report),
+          const SizedBox(height: 12),
+          if (!hasAttendanceActivity)
+            const AppCard(
+              child: Text(
+                'لا توجد سجلات حضور في آخر ٣٠ يوماً',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium,
+              ),
+            )
+          else
+            _AttendanceCard(report: report),
+          const SizedBox(height: 12),
+          if (!hasWeeklyActivity)
+            const AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'الحفظ الأسبوعي',
+                      style: AppTextStyles.titleMedium,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'لا توجد تسميعات مسجّلة هذا الأسبوع',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                ],
+              ),
+            )
+          else
+            _WeeklyChartCard(values: report.weeklyVersesPerDay),
+          const SizedBox(height: 12),
+          _TeacherNotesCard(
+            notes: notes.isEmpty
+                ? 'لا توجد ملاحظات من المعلم حالياً'
+                : notes,
+            isPlaceholder: notes.isEmpty,
+          ),
+          const SizedBox(height: 24),
+        ]),
       ),
     );
   }
@@ -328,7 +387,7 @@ class _WeeklyChartCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                'آيات/يوم',
+                'تسميعات/يوم',
                 style: AppTextStyles.labelSmall.copyWith(
                   color: AppColors.primary,
                 ),
@@ -395,8 +454,12 @@ class _WeeklyChartCard extends StatelessWidget {
 
 class _TeacherNotesCard extends StatelessWidget {
   final String notes;
+  final bool isPlaceholder;
 
-  const _TeacherNotesCard({required this.notes});
+  const _TeacherNotesCard({
+    required this.notes,
+    this.isPlaceholder = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +487,11 @@ class _TeacherNotesCard extends StatelessWidget {
             child: Text(
               notes,
               textAlign: TextAlign.right,
-              style: AppTextStyles.bodyMedium,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: isPlaceholder
+                    ? AppColors.textSecondary
+                    : AppColors.textPrimary,
+              ),
             ),
           ),
         ],

@@ -362,7 +362,9 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i519.StudentAudioLibraryPage(key: gh<_i409.Key>()),
     );
     gh.lazySingleton<_i102.ProgressReportRemoteDatasource>(
-      () => _i1061.ProgressReportRemoteDatasourceImpl(),
+      () => _i1061.ProgressReportRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
+      ),
     );
     gh.lazySingleton<_i892.ParentRemoteDatasource>(
       () => _i430.ParentRemoteDatasourceImpl(

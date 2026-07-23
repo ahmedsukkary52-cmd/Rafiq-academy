@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/progress_report_entity.dart';
@@ -25,6 +26,8 @@ class GetProgressReportUseCase
   ) async {
     try {
       return Right(await repository.getReport(studentId: params.studentId));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

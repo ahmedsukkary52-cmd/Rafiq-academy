@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../domain/entities/achievement_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
@@ -23,6 +26,10 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
   @override
   void initState() {
     super.initState();
+    _reload();
+  }
+
+  void _reload() {
     final auth = context.read<AuthBloc>().state;
     if (auth is AuthAuthenticated) {
       context.read<StudentBloc>()
@@ -39,8 +46,37 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
         backgroundColor: AppColors.background,
         body: BlocBuilder<StudentBloc, StudentState>(
           builder: (context, state) {
+            final profileBusy =
+                state.profile == null &&
+                (state.profileStatus == SectionStatus.initial ||
+                    state.profileStatus == SectionStatus.loading);
+            final achievementsBusy =
+                state.achievementsStatus == SectionStatus.initial ||
+                state.achievementsStatus == SectionStatus.loading;
+
+            if (profileBusy || achievementsBusy) {
+              return const AppLoadingWidget();
+            }
+
+            if (state.profileStatus == SectionStatus.error &&
+                state.profile == null) {
+              return AppErrorWidget(
+                message: state.profileError ?? 'تعذر تحميل بيانات الملف',
+                onRetry: _reload,
+              );
+            }
+
+            if (state.achievementsStatus == SectionStatus.error) {
+              return AppErrorWidget(
+                message:
+                    state.achievementsError ?? 'تعذر تحميل الإنجازات والشارات',
+                onRetry: _reload,
+              );
+            }
+
             final coins = state.profile?.coins ?? 0;
             final items = _itemsFor(state);
+
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _CoinsHeader(coins: coins)),
@@ -53,22 +89,36 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                  sliver: SliverGrid.builder(
-                    itemCount: items.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.86,
+                if (items.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'لا توجد عناصر في هذا القسم حالياً',
+                          textAlign: TextAlign.center,
                         ),
-                    itemBuilder: (context, index) {
-                      return _BadgeCard(item: items[index]);
-                    },
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                    sliver: SliverGrid.builder(
+                      itemCount: items.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.86,
+                          ),
+                      itemBuilder: (context, index) {
+                        return _BadgeCard(item: items[index]);
+                      },
+                    ),
                   ),
-                ),
               ],
             );
           },
@@ -79,85 +129,128 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
 
   List<_BadgeItem> _itemsFor(StudentState state) {
     final profile = state.profile;
+    final badges = profile?.badges ?? const <String>[];
+    final achievements = state.achievements;
+    final now = DateTime.now();
+
+    bool hasBadgeId(String id) =>
+        badges.any((b) => b.trim().toLowerCase() == id.toLowerCase());
+
+    bool hasAchievementType(AchievementType type) =>
+        achievements.any((a) => a.type == type);
+
+    bool isRecentUnlock(DateTime date) =>
+        now.difference(date).inDays <= 7 && !date.isAfter(now);
+
     if (_tab == _RewardTab.certificates) {
-      return [
-        _BadgeItem(
-          icon: '📜',
-          title: 'الإجازة الأولى',
-          subtitle: 'اجتز الاختبار',
-          color: const Color(0xFF9299A3),
-          unlocked: state.achievements.any((a) => a.type.name == 'certificate'),
-        ),
-        const _BadgeItem(
-          icon: '📄',
-          title: 'شهادة التميز',
-          subtitle: 'مستوى ممتاز لثلاث مرات',
-          color: Color(0xFF24C6CF),
-        ),
-      ];
+      final certificates =
+          achievements
+              .where((a) => a.type == AchievementType.certificate)
+              .toList()
+            ..sort((a, b) => b.date.compareTo(a.date));
+
+      if (certificates.isEmpty) {
+        return const [
+          _BadgeItem(
+            icon: '📜',
+            title: 'شهادة',
+            subtitle: 'تُفتح عند منح شهادة من المعلم',
+            color: Color(0xFF9299A3),
+          ),
+        ];
+      }
+
+      return certificates
+          .map(
+            (a) => _BadgeItem(
+              icon: '📜',
+              title: a.title.isNotEmpty ? a.title : 'شهادة',
+              subtitle: 'شهادة ممنوحة',
+              color: const Color(0xFF24C6CF),
+              unlocked: true,
+              isNew: isRecentUnlock(a.date),
+            ),
+          )
+          .toList();
     }
 
     if (_tab == _RewardTab.gifts) {
+      final coins = profile?.coins ?? 0;
+      final completedJuz = profile?.completedJuz ?? 0;
       return [
         _BadgeItem(
           icon: '🎁',
           title: 'هدية التفوق',
-          subtitle: 'تفتح عند 250 عملة',
+          subtitle: 'تتطلب 250 عملة',
           color: const Color(0xFFF6C42E),
-          unlocked: (profile?.coins ?? 0) >= 250,
+          unlocked: coins >= 250 || hasBadgeId('gift_excellence'),
         ),
         _BadgeItem(
           icon: '🌙',
           title: 'مفاجأة الحفظ',
-          subtitle: 'تفتح عند إتمام جزء',
+          subtitle: 'تتطلب إتمام جزء واحد على الأقل',
           color: const Color(0xFF24C6CF),
-          unlocked: (profile?.completedJuz ?? 0) > 0,
+          unlocked: completedJuz > 0 || hasBadgeId('gift_juz'),
         ),
       ];
     }
+
+    final stars = profile?.totalStars ?? 0;
+    final streak = profile?.streakDays ?? 0;
+    final verses = profile?.totalVersesMemorized ?? 0;
+    final completedJuz = profile?.completedJuz ?? 0;
+
+    final starUnlocked = stars >= 5 || hasBadgeId('star_5');
+    final streakUnlocked = streak >= 14 || hasBadgeId('streak_14');
+    final readerUnlocked = verses > 0 || hasBadgeId('reader');
+    final weeklyUnlocked = hasBadgeId('weekly_leader');
+    final juzUnlocked = completedJuz > 0 || hasBadgeId('juz_complete');
+    final ijazaUnlocked =
+        hasAchievementType(AchievementType.certificate) ||
+        hasBadgeId('first_ijaza');
 
     return [
       _BadgeItem(
         icon: '⭐',
         title: 'نجم الحفظ',
-        subtitle: 'حفظت 5 سور',
+        subtitle: 'احصل على 5 نجوم',
         color: const Color(0xFFF6C42E),
-        unlocked: (profile?.totalStars ?? 0) >= 5,
-        isNew: true,
+        unlocked: starUnlocked,
       ),
       _BadgeItem(
         icon: '🔥',
         title: 'الثابت 14 يوم',
-        subtitle: '14 يوم متواصل',
+        subtitle: 'سجّل 14 يوم متواصل',
         color: const Color(0xFF21C1C8),
-        unlocked: (profile?.streakDays ?? 0) >= 14,
+        unlocked: streakUnlocked,
       ),
       _BadgeItem(
         icon: '📖',
         title: 'قارئ ممتاز',
-        subtitle: 'أنهيت 10 حصص',
+        subtitle: 'احفظ آية واحدة على الأقل',
         color: const Color(0xFF25AE69),
-        unlocked: (profile?.totalVersesMemorized ?? 0) > 0,
+        unlocked: readerUnlocked,
       ),
-      const _BadgeItem(
+      _BadgeItem(
         icon: '🏆',
         title: 'متصدر الأسبوع',
-        subtitle: 'المركز الأول',
-        color: Color(0xFF8149E8),
-        unlocked: true,
+        subtitle: 'تُفتح عند إضافة الشارة لملفك',
+        color: const Color(0xFF8149E8),
+        unlocked: weeklyUnlocked,
       ),
       _BadgeItem(
         icon: '🌙',
         title: 'حافظ الجزء',
-        subtitle: 'أتمم جزء عم',
+        subtitle: 'أتمم جزءًا واحدًا على الأقل',
         color: const Color(0xFF9299A3),
-        unlocked: (profile?.completedJuz ?? 0) > 0,
+        unlocked: juzUnlocked,
       ),
-      const _BadgeItem(
+      _BadgeItem(
         icon: '📜',
         title: 'الإجازة الأولى',
-        subtitle: 'اجتز الاختبار',
-        color: Color(0xFF9299A3),
+        subtitle: 'تُفتح عند منح شهادة',
+        color: const Color(0xFF9299A3),
+        unlocked: ijazaUnlocked,
       ),
     ];
   }
@@ -182,7 +275,7 @@ class _CoinsHeader extends StatelessWidget {
               width: 260,
               height: 260,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.16),
+                color: Colors.white.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
             ),
@@ -215,7 +308,7 @@ class _CoinsHeader extends StatelessWidget {
                   Text(
                     'عملاتي المتاحة 🌘',
                     style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.textPrimary.withOpacity(0.56),
+                      color: AppColors.textPrimary.withValues(alpha: 0.56),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -299,7 +392,7 @@ class _TabButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

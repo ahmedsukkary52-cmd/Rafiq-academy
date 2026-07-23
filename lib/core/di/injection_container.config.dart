@@ -295,10 +295,10 @@ import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repos
     as _i1050;
 import 'package:rafiq_academy/features/teacher/domain/usecases/add_recitation_record_usecase.dart'
     as _i877;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_attendance_for_date_usecase.dart'
+    as _i122;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_recitation_records_usecase.dart'
     as _i998;
-import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_attendance_for_date_usecase.dart'
-    as _i997;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart'
     as _i440;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
@@ -356,9 +356,6 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
-    gh.lazySingleton<_i756.ScheduleRemoteDatasource>(
-      () => _i1027.ScheduleRemoteDatasourceImpl(),
-    );
     gh.factory<_i519.StudentAudioLibraryPage>(
       () => _i519.StudentAudioLibraryPage(key: gh<_i409.Key>()),
     );
@@ -407,9 +404,6 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
-    gh.lazySingleton<_i552.ScheduleRepository>(
-      () => _i268.ScheduleRepositoryImpl(gh<_i756.ScheduleRemoteDatasource>()),
-    );
     gh.lazySingleton<_i905.ReviewScheduleRepository>(
       () => _i255.ReviewScheduleRepositoryImpl(
         gh<_i333.ReviewScheduleRemoteDatasource>(),
@@ -452,6 +446,9 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i982.AwardsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
+    );
+    gh.lazySingleton<_i756.ScheduleRemoteDatasource>(
+      () => _i1027.ScheduleRemoteDatasourceImpl(gh<_i974.FirebaseFirestore>()),
     );
     gh.factory<_i173.GetReviewMonthUseCase>(
       () => _i173.GetReviewMonthUseCase(gh<_i905.ReviewScheduleRepository>()),
@@ -569,9 +566,6 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
-    gh.factory<_i891.GetWeeklySessionsUseCase>(
-      () => _i891.GetWeeklySessionsUseCase(gh<_i552.ScheduleRepository>()),
-    );
     gh.lazySingleton<_i587.NotificationsRepository>(
       () => _i579.NotificationsRepositoryImpl(
         remoteDatasource: gh<_i676.NotificationsRemoteDatasource>(),
@@ -581,13 +575,13 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
       () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
     );
-    gh.lazySingleton<_i998.GetHalaqaRecitationRecordsUseCase>(
-      () => _i998.GetHalaqaRecitationRecordsUseCase(
+    gh.lazySingleton<_i122.GetHalaqaAttendanceForDateUseCase>(
+      () => _i122.GetHalaqaAttendanceForDateUseCase(
         gh<_i1050.TeacherRepository>(),
       ),
     );
-    gh.lazySingleton<_i997.GetHalaqaAttendanceForDateUseCase>(
-      () => _i997.GetHalaqaAttendanceForDateUseCase(
+    gh.lazySingleton<_i998.GetHalaqaRecitationRecordsUseCase>(
+      () => _i998.GetHalaqaRecitationRecordsUseCase(
         gh<_i1050.TeacherRepository>(),
       ),
     );
@@ -696,6 +690,22 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
     );
+    gh.singleton<_i933.TeacherBloc>(
+      () => _i933.TeacherBloc(
+        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
+        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
+        getHalaqaRecitationRecords:
+            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
+        getHalaqaAttendanceForDate:
+            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
+        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
+        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i552.ScheduleRepository>(
+      () => _i268.ScheduleRepositoryImpl(gh<_i756.ScheduleRemoteDatasource>()),
+    );
     gh.lazySingleton<_i429.GetMonthEventsUseCase>(
       () => _i429.GetMonthEventsUseCase(gh<_i669.CalendarRepository>()),
     );
@@ -720,19 +730,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i81.SubmitHomeworkRecitationUseCase>(
       () =>
           _i81.SubmitHomeworkRecitationUseCase(gh<_i951.HomeworkRepository>()),
-    );
-    gh.singleton<_i933.TeacherBloc>(
-      () => _i933.TeacherBloc(
-        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
-        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
-        getHalaqaRecitationRecords:
-            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
-        getHalaqaAttendanceForDate:
-            gh<_i997.GetHalaqaAttendanceForDateUseCase>(),
-        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
-        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
-        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
-      ),
     );
     gh.lazySingleton<_i888.AwardsRepository>(
       () => _i662.AwardsRepositoryImpl(
@@ -851,9 +848,6 @@ extension GetItInjectableX on _i174.GetIt {
         submitHomeworkRecitation: gh<_i81.SubmitHomeworkRecitationUseCase>(),
       ),
     );
-    gh.factory<_i951.ScheduleBloc>(
-      () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
-    );
     gh.singleton<_i995.ParentBloc>(
       () => _i995.ParentBloc(
         getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
@@ -906,6 +900,9 @@ extension GetItInjectableX on _i174.GetIt {
         currentUserId,
       ),
     );
+    gh.factory<_i891.GetWeeklySessionsUseCase>(
+      () => _i891.GetWeeklySessionsUseCase(gh<_i552.ScheduleRepository>()),
+    );
     gh.factory<_i919.CalendarBloc>(
       () => _i919.CalendarBloc(
         getMonthEvents: gh<_i429.GetMonthEventsUseCase>(),
@@ -956,6 +953,9 @@ extension GetItInjectableX on _i174.GetIt {
         getProgressReport: gh<_i235.GetProgressReportUseCase>(),
         getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
       ),
+    );
+    gh.factory<_i951.ScheduleBloc>(
+      () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
     );
     return this;
   }

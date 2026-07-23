@@ -7,6 +7,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../bloc/schedule_bloc.dart';
 
@@ -42,15 +43,26 @@ class StudentSchedulePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final halaqaId =
+        context.read<StudentBloc>().state.profile?.halaqaId?.trim() ?? '';
+
     return BlocProvider(
-      create: (_) => sl<ScheduleBloc>()..add(const LoadWeeklySessionsEvent()),
-      child: const _ScheduleView(),
+      create: (_) => sl<ScheduleBloc>()..add(LoadWeeklySessionsEvent(halaqaId)),
+      child: _ScheduleView(halaqaId: halaqaId),
     );
   }
 }
 
 class _ScheduleView extends StatelessWidget {
-  const _ScheduleView();
+  final String halaqaId;
+
+  const _ScheduleView({required this.halaqaId});
+
+  void _retry(BuildContext context) {
+    final id =
+        context.read<StudentBloc>().state.profile?.halaqaId?.trim() ?? halaqaId;
+    context.read<ScheduleBloc>().add(LoadWeeklySessionsEvent(id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,34 +85,58 @@ class _ScheduleView extends StatelessWidget {
             fontSize: 18,
           ),
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: Container(
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceGrey,
-                shape: BoxShape.circle,
-              ),
-              padding: const EdgeInsets.all(8),
-              child: const Icon(
-                Icons.calendar_today_outlined,
-                color: AppColors.textPrimary,
-                size: 18,
-              ),
-            ),
-          ),
-        ],
       ),
       body: BlocBuilder<ScheduleBloc, ScheduleState>(
         builder: (context, state) {
           if (state.status == SectionStatus.loading ||
               state.status == SectionStatus.initial) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+            return const AppLoadingWidget();
+          }
+
+          if (state.status == SectionStatus.error) {
+            return AppErrorWidget(
+              message: state.errorMessage ?? 'تعذر تحميل جدول الحصص',
+              onRetry: () => _retry(context),
             );
           }
-          if (state.status == SectionStatus.error) {
-            return Center(child: Text(state.errorMessage ?? 'حدث خطأ'));
+
+          if (halaqaId.isEmpty &&
+              (context.read<StudentBloc>().state.profile?.halaqaId?.trim() ??
+                      '')
+                  .isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'لم يتم ربطك بحلقة بعد\nسيظهر جدول الحصص هنا بعد انضمامك لحلقة',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          if (state.sessions.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'لا توجد مواعيد في جدول الحلقة حالياً',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    AppButton(
+                      label: 'إعادة المحاولة',
+                      width: 160,
+                      height: 44,
+                      onPressed: () => _retry(context),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final featured = state.featuredSession;
@@ -177,7 +213,7 @@ class _FeaturedSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeLabel =
-        'اليوم — ${_formatTime(session.startAt)} إلى ${_formatTime(session.endAt)}';
+        '${_dayLabel(session.startAt)} — ${_formatTime(session.startAt)} إلى ${_formatTime(session.endAt)}';
 
     return Container(
       padding: const EdgeInsets.all(AppSizes.paddingL),
@@ -242,18 +278,22 @@ class _FeaturedSessionCard extends StatelessWidget {
             ),
             textAlign: TextAlign.right,
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                session.teacherName,
-                style: AppTextStyles.labelSmall.copyWith(color: Colors.white70),
-              ),
-              const SizedBox(width: 6),
-              const Text('👳', style: TextStyle(fontSize: 16)),
-            ],
-          ),
+          if (session.teacherName.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  session.teacherName,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text('👳', style: TextStyle(fontSize: 16)),
+              ],
+            ),
+          ],
           const SizedBox(height: 18),
           GestureDetector(
             onTap: onJoin,
@@ -320,6 +360,9 @@ class _SessionListTile extends StatelessWidget {
     };
 
     final dayLabel = _dayLabel(session.startAt);
+    final subtitle = session.teacherName.trim().isEmpty
+        ? dayLabel
+        : '${session.teacherName} - $dayLabel';
 
     return AppCard(
       padding: const EdgeInsets.all(12),
@@ -348,10 +391,7 @@ class _SessionListTile extends StatelessWidget {
               children: [
                 Text(session.title, style: AppTextStyles.titleMedium),
                 const SizedBox(height: 2),
-                Text(
-                  '${session.teacherName} - $dayLabel',
-                  style: AppTextStyles.labelSmall,
-                ),
+                Text(subtitle, style: AppTextStyles.labelSmall),
               ],
             ),
           ),

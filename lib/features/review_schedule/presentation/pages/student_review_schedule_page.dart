@@ -7,6 +7,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/review_item_entity.dart';
 import '../bloc/review_schedule_bloc.dart';
 
@@ -15,16 +17,28 @@ class StudentReviewSchedulePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.read<AuthBloc>().state;
+    final studentId = auth is AuthAuthenticated ? auth.user.uid : '';
+
     return BlocProvider(
       create: (_) =>
-          sl<ReviewScheduleBloc>()..add(const LoadReviewMonthEvent()),
-      child: const _ReviewScheduleView(),
+          sl<ReviewScheduleBloc>()
+            ..add(LoadReviewMonthEvent(studentId: studentId)),
+      child: _ReviewScheduleView(studentId: studentId),
     );
   }
 }
 
 class _ReviewScheduleView extends StatelessWidget {
-  const _ReviewScheduleView();
+  final String studentId;
+
+  const _ReviewScheduleView({required this.studentId});
+
+  void _retry(BuildContext context) {
+    final auth = context.read<AuthBloc>().state;
+    final id = auth is AuthAuthenticated ? auth.user.uid : studentId;
+    context.read<ReviewScheduleBloc>().add(LoadReviewMonthEvent(studentId: id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +66,26 @@ class _ReviewScheduleView extends StatelessWidget {
         builder: (context, state) {
           if (state.status == SectionStatus.loading ||
               state.status == SectionStatus.initial) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+            return const AppLoadingWidget();
+          }
+
+          if (state.status == SectionStatus.error) {
+            return AppErrorWidget(
+              message: state.errorMessage ?? 'تعذر تحميل جدول المراجعة',
+              onRetry: () => _retry(context),
             );
           }
+
           final month = state.month;
           if (month == null) {
-            return Center(child: Text(state.errorMessage ?? 'لا توجد بيانات'));
+            return AppErrorWidget(
+              message: 'لا توجد بيانات',
+              onRetry: () => _retry(context),
+            );
           }
+
+          final isEmpty =
+              month.daysWithReview.isEmpty && month.weekItems.isEmpty;
 
           return ListView(
             padding: const EdgeInsets.all(AppSizes.paddingM),
@@ -100,12 +126,40 @@ class _ReviewScheduleView extends StatelessWidget {
                 child: Text('هذا الأسبوع', style: AppTextStyles.labelMedium),
               ),
               const SizedBox(height: 10),
-              ...month.weekItems.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _ReviewWeekTile(item: item),
+              if (isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'لا توجد مراجعات مجدولة في هذا الشهر',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      AppButton(
+                        label: 'إعادة المحاولة',
+                        width: 160,
+                        height: 44,
+                        onPressed: () => _retry(context),
+                      ),
+                    ],
+                  ),
+                )
+              else if (month.weekItems.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'لا توجد مراجعات في هذا الأسبوع',
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                ...month.weekItems.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _ReviewWeekTile(item: item),
+                  ),
                 ),
-              ),
             ],
           );
         },
@@ -128,11 +182,7 @@ class _HijriMonthGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final daysInMonth = HijriCalendar().getDaysInMonth(year, month);
-    final first = HijriCalendar()
-      ..hYear = year
-      ..hMonth = month
-      ..hDay = 1;
-    final gFirst = first.hijriToGregorian(year, month, 1);
+    final gFirst = HijriCalendar().hijriToGregorian(year, month, 1);
     // weekday: 1=Mon ... 7=Sun — نبدأ من الأحد في الشبكة
     final startOffset = gFirst.weekday % 7; // Sun=0
     final today = HijriCalendar.now();

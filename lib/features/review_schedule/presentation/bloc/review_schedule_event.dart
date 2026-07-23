@@ -8,7 +8,12 @@ abstract class ReviewScheduleEvent extends Equatable {
 }
 
 class LoadReviewMonthEvent extends ReviewScheduleEvent {
-  const LoadReviewMonthEvent();
+  final String? studentId;
+
+  const LoadReviewMonthEvent({this.studentId});
+
+  @override
+  List<Object?> get props => [studentId];
 }
 
 class ChangeReviewMonthEvent extends ReviewScheduleEvent {

@@ -37,61 +37,83 @@ class _HomeworkView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<HomeworkBloc, HomeworkState>(
-      listenWhen: (p, c) =>
-          p.submissionStatus != c.submissionStatus &&
-          c.submissionStatus == SubmissionStatus.success,
-      listener: (context, state) {
-        final points = state.lastEarnedPoints ?? 0;
-        showModalBottomSheet<void>(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (_) => Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('🎉', style: TextStyle(fontSize: 40)),
-                const SizedBox(height: 12),
-                const Text(
-                  'أحسنت! تم إنهاء الواجب',
-                  style: AppTextStyles.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'ربحت $points نقطة',
-                  style: AppTextStyles.headlineMedium.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      context.read<HomeworkBloc>().add(
-                        const ClearHomeworkMessageEvent(),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<HomeworkBloc, HomeworkState>(
+          listenWhen: (p, c) =>
+              p.submissionStatus != c.submissionStatus &&
+              c.submissionStatus == SubmissionStatus.success,
+          listener: (context, state) {
+            final points = state.lastEarnedPoints ?? 0;
+            showModalBottomSheet<void>(
+              context: context,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              builder: (_) => Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🎉', style: TextStyle(fontSize: 40)),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'أحسنت! تم إنهاء الواجب',
+                      style: AppTextStyles.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ربحت $points نقطة',
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        color: AppColors.primary,
                       ),
                     ),
-                    child: const Text('حسناً'),
-                  ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.read<HomeworkBloc>().add(
+                            const ClearHomeworkMessageEvent(),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusL,
+                            ),
+                          ),
+                        ),
+                        child: const Text('حسناً'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        );
-      },
+              ),
+            );
+          },
+        ),
+        BlocListener<HomeworkBloc, HomeworkState>(
+          listenWhen: (p, c) {
+            final msg = c.errorMessage;
+            if (msg == null || msg.isEmpty) return false;
+            if (msg == p.errorMessage) return false;
+            // Load failures are shown inline via AppErrorWidget.
+            if (c.status == SectionStatus.error) return false;
+            return true;
+          },
+          listener: (context, state) {
+            AppSnackBar.showError(
+              context,
+              state.errorMessage ?? 'حدث خطأ غير متوقع',
+            );
+          },
+        ),
+      ],
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -120,6 +142,22 @@ class _HomeworkView extends StatelessWidget {
                 child: CircularProgressIndicator(color: AppColors.primary),
               );
             }
+
+            if (state.status == SectionStatus.error) {
+              final auth = context.read<AuthBloc>().state;
+              final uid =
+                  state.studentId ??
+                  (auth is AuthAuthenticated ? auth.user.uid : '');
+              return AppErrorWidget(
+                message: state.errorMessage ?? 'تعذر تحميل الواجب',
+                onRetry: uid.isEmpty
+                    ? null
+                    : () => context.read<HomeworkBloc>().add(
+                        LoadHomeworkEvent(uid),
+                      ),
+              );
+            }
+
             final hw = state.homework;
             if (hw == null) {
               return const Center(
@@ -287,14 +325,18 @@ class _HomeworkView extends StatelessWidget {
     final verses = hw.reviewRange.isNotEmpty
         ? hw.reviewRange
         : hw.newMemorizationRange;
+    final nav = _resolveRecitationNavParams(
+      versesRange: verses,
+      fallbackTitle: hw.title,
+    );
 
     final success = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => StudentRecitationPage(
-          surahName: hw.title,
-          pageNumber: 1,
-          startAyah: 1,
-          endAyah: 8,
+          surahName: nav.surahName,
+          pageNumber: nav.pageNumber,
+          startAyah: nav.startAyah,
+          endAyah: nav.endAyah,
           homeworkContext: HomeworkRecitationContext(
             studentId: auth.user.uid,
             studentName: profile?.name ?? auth.user.name,
@@ -315,6 +357,104 @@ class _HomeworkView extends StatelessWidget {
       // لا شيء — HomeworkBloc watch يحدّث الواجهة
     }
   }
+}
+
+/// Navigation labels for [StudentRecitationPage] derived from assignment
+/// free-text ranges (`reviewRange` / `newMemorizationRange`).
+class _RecitationNavParams {
+  final String surahName;
+  final int pageNumber;
+  final int startAyah;
+  final int endAyah;
+
+  const _RecitationNavParams({
+    required this.surahName,
+    required this.pageNumber,
+    required this.startAyah,
+    required this.endAyah,
+  });
+}
+
+_RecitationNavParams _resolveRecitationNavParams({
+  required String versesRange,
+  required String fallbackTitle,
+}) {
+  final ayahs = _parseAyahRange(versesRange);
+  final page = _parsePageNumber(versesRange);
+  final surahFromRange = _parseSurahName(versesRange);
+  final surahName = (surahFromRange != null && surahFromRange.isNotEmpty)
+      ? surahFromRange
+      : (fallbackTitle.isNotEmpty ? fallbackTitle : 'الورد اليومي');
+
+  return _RecitationNavParams(
+    surahName: surahName,
+    pageNumber: page ?? 1,
+    startAyah: ayahs?.$1 ?? 1,
+    endAyah: ayahs?.$2 ?? 10,
+  );
+}
+
+String _normalizeIndicDigits(String input) {
+  const eastern = '٠١٢٣٤٥٦٧٨٩';
+  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  final buffer = StringBuffer();
+  for (final unit in input.runes) {
+    final ch = String.fromCharCode(unit);
+    final e = eastern.indexOf(ch);
+    if (e >= 0) {
+      buffer.write(e);
+      continue;
+    }
+    final p = persian.indexOf(ch);
+    if (p >= 0) {
+      buffer.write(p);
+      continue;
+    }
+    buffer.write(ch);
+  }
+  return buffer.toString();
+}
+
+(int, int)? _parseAyahRange(String raw) {
+  final text = _normalizeIndicDigits(raw.trim());
+  if (text.isEmpty) return null;
+
+  final range = RegExp(
+    r'(\d+)\s*(?:[-–—]|إلى|الى|to)\s*(\d+)',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (range != null) {
+    final a = int.tryParse(range.group(1)!);
+    final b = int.tryParse(range.group(2)!);
+    if (a == null || b == null || a <= 0 || b <= 0) return null;
+    return a <= b ? (a, b) : (b, a);
+  }
+
+  final single = RegExp(r'(\d+)').firstMatch(text);
+  if (single != null) {
+    final n = int.tryParse(single.group(1)!);
+    if (n != null && n > 0) return (n, n);
+  }
+  return null;
+}
+
+int? _parsePageNumber(String raw) {
+  final text = _normalizeIndicDigits(raw.trim());
+  if (text.isEmpty) return null;
+  final match = RegExp(r'صفح[ةه]\s*(\d+)').firstMatch(text);
+  if (match == null) return null;
+  final page = int.tryParse(match.group(1)!);
+  if (page == null || page <= 0) return null;
+  return page;
+}
+
+String? _parseSurahName(String raw) {
+  final match = RegExp(
+    r'سورة\s+([^\d\-–—]+?)(?:\s*(?:الآيات|آيات|آية|من|صفح)|$)',
+  ).firstMatch(raw.trim());
+  final name = match?.group(1)?.trim();
+  if (name == null || name.isEmpty) return null;
+  return name;
 }
 
 class _HomeworkHeroCard extends StatelessWidget {

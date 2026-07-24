@@ -22,7 +22,11 @@ class TeacherEvaluationsPage extends StatefulWidget {
 
 class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   int _filterIndex = 0;
-  final _filters = const ['هذا الشهر', 'الشهر الماضي', 'الفصل كله'];
+  final _filters = const ['هذا الشهر', 'الشهر الماضي', 'الكل'];
+
+  /// After first successful evaluations load, keep the list visible during reload.
+  bool _shellReady = false;
+  List<RecitationRecordEntity> _cachedEvaluations = const [];
 
   @override
   void initState() {
@@ -58,88 +62,118 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('التقييمات'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => _showAddEvaluationSheet(context),
-            icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
-            label: const Text(
-              '+ تقييم جديد',
-              style: TextStyle(
-                fontFamily: 'NotoNaskhArabic',
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+      prev.evaluationsStatus != curr.evaluationsStatus ||
+          prev.evaluations != curr.evaluations,
+      listener: (context, state) {
+        if (state.evaluationsStatus == SectionStatus.loaded) {
+          setState(() {
+            _shellReady = true;
+            _cachedEvaluations = state.evaluations;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('التقييمات'),
+          actions: [
+            TextButton.icon(
+              onPressed: () => _showAddEvaluationSheet(context),
+              icon: const Icon(
+                Icons.add_rounded,
                 color: Colors.white,
-                fontSize: 13,
+                size: 18,
+              ),
+              label: const Text(
+                '+ تقييم جديد',
+                style: TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  color: Colors.white,
+                  fontSize: 13,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: BlocBuilder<TeacherBloc, TeacherState>(
-        builder: (context, state) {
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.paddingM,
-                  AppSizes.paddingM,
-                  AppSizes.paddingM,
-                  0,
-                ),
-                child: Row(
-                  children: List.generate(_filters.length, (i) {
-                    final selected = i == _filterIndex;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _filterIndex = i),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: EdgeInsets.only(left: i < 2 ? 8 : 0),
-                          padding: const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppColors.primary
-                                : AppColors.surface,
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusFull,
-                            ),
-                            border: Border.all(
+          ],
+        ),
+        body: BlocBuilder<TeacherBloc, TeacherState>(
+          builder: (context, state) {
+            final isRefreshing =
+                _shellReady &&
+                    (state.evaluationsStatus == SectionStatus.loading);
+
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSizes.paddingM,
+                    AppSizes.paddingM,
+                    AppSizes.paddingM,
+                    0,
+                  ),
+                  child: Row(
+                    children: List.generate(_filters.length, (i) {
+                      final selected = i == _filterIndex;
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _filterIndex = i),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: EdgeInsets.only(left: i < 2 ? 8 : 0),
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            decoration: BoxDecoration(
                               color: selected
                                   ? AppColors.primary
-                                  : AppColors.border,
+                                  : AppColors.surface,
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusFull,
+                              ),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            _filters[i],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 13,
-                              color: selected
-                                  ? Colors.white
-                                  : AppColors.textSecondary,
+                            child: Text(
+                              _filters[i],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'NotoNaskhArabic',
+                                fontSize: 13,
+                                color: selected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(child: _buildList(state)),
-            ],
-          );
-        },
+                if (isRefreshing)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppColors.primary,
+                  ),
+                const SizedBox(height: 16),
+                Expanded(child: _buildList(state)),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildList(TeacherState state) {
-    if (state.evaluationsStatus == SectionStatus.loading ||
-        state.evaluationsStatus == SectionStatus.initial) {
+    final isInitialLoading =
+        !_shellReady &&
+            (state.evaluationsStatus == SectionStatus.loading ||
+                state.evaluationsStatus == SectionStatus.initial);
+
+    if (isInitialLoading) {
       return const AppLoadingWidget();
     }
 
@@ -150,7 +184,11 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
       );
     }
 
-    final items = _filtered(state.evaluations);
+    final source = state.evaluationsStatus == SectionStatus.loaded
+        ? state.evaluations
+        : _cachedEvaluations;
+    final items = _filtered(source);
+
     if (items.isEmpty) {
       return const Center(
         child: Text(
@@ -173,7 +211,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
 
   void _showAddEvaluationSheet(BuildContext context) {
     final bloc = context.read<TeacherBloc>();
-    if (bloc.state.students.isEmpty) {
+    if (bloc.state.students.isEmpty ||
+        bloc.state.studentsStatus == SectionStatus.error) {
       bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
     }
 
@@ -194,7 +233,10 @@ class _EvaluationCard extends StatelessWidget {
 
   const _EvaluationCard({required this.record});
 
+  bool get _isPending => record.isPendingReview;
+
   Color get _dotColor {
+    if (_isPending) return AppColors.secondary;
     final grade = record.grade;
     if (grade == null) return AppColors.textHint;
     return switch (grade) {
@@ -210,14 +252,11 @@ class _EvaluationCard extends StatelessWidget {
     return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
   }
 
+  String get _typeLabel =>
+      record.type == RecitationType.memorization ? 'الحفظ' : 'المراجعة';
+
   @override
   Widget build(BuildContext context) {
-    final memGrade = record.type == RecitationType.memorization
-        ? record.grade
-        : null;
-    final revGrade =
-        record.type == RecitationType.review ? record.grade : null;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -231,7 +270,7 @@ class _EvaluationCard extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
             ),
-            Container(width: 2, height: 160, color: AppColors.border),
+            Container(width: 2, height: 140, color: AppColors.border),
           ],
         ),
         const SizedBox(width: 12),
@@ -241,8 +280,28 @@ class _EvaluationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (_isPending)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondaryBg,
+                          borderRadius: BorderRadius.circular(
+                            AppSizes.radiusM,
+                          ),
+                        ),
+                        child: Text(
+                          'بانتظار المراجعة',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    const Spacer(),
                     Text(_dateLabel, style: AppTextStyles.labelSmall),
                     const SizedBox(width: 6),
                     const Icon(
@@ -265,18 +324,36 @@ class _EvaluationCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(record.versesRange, style: AppTextStyles.labelSmall),
                 ],
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    _GradeBox(label: 'السلوك', grade: record.behaviorGrade),
-                    const SizedBox(width: 8),
-                    _GradeBox(label: 'المراجعة', grade: revGrade),
-                    const SizedBox(width: 8),
-                    _GradeBox(label: 'الحفظ', grade: memGrade),
+                if (_isPending) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'تسميع مرسل من الطالب — لم يُقيَّم بعد',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ] else
+                  ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _GradeBox(
+                          label: 'السلوك',
+                          grade: record.behaviorGrade,
+                        ),
+                        const SizedBox(width: 8),
+                        _GradeBox(
+                          label: _typeLabel,
+                          grade: record.grade,
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-                if (record.notes != null && record.notes!.isNotEmpty) ...[
+                if (!_isPending &&
+                    record.notes != null &&
+                    record.notes!.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,6 +399,8 @@ class _GradeBox extends StatelessWidget {
     };
   }
 
+  String get _labelText => grade?.label ?? '—';
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -333,7 +412,7 @@ class _GradeBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            grade.displayLabel,
+            _labelText,
             style: AppTextStyles.labelMedium.copyWith(
               color: _color,
               fontWeight: FontWeight.w700,
@@ -358,8 +437,7 @@ class _AddEvaluationSheet extends StatefulWidget {
 
 class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
   String? _selectedStudentId;
-  RecitationGrade _memGrade = RecitationGrade.good;
-  RecitationGrade _revGrade = RecitationGrade.good;
+  RecitationGrade _typeGrade = RecitationGrade.good;
   RecitationGrade _behGrade = RecitationGrade.good;
   RecitationType _type = RecitationType.memorization;
   final _versesCtrl = TextEditingController();
@@ -370,6 +448,12 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
     _versesCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  void _retryStudents() {
+    context.read<TeacherBloc>().add(
+      LoadHalaqaStudentsEvent(widget.halaqaId),
+    );
   }
 
   @override
@@ -429,22 +513,60 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
               const _Label('الطالب'),
               BlocBuilder<TeacherBloc, TeacherState>(
                 builder: (context, state) {
-                  if (state.studentsStatus == SectionStatus.loading) {
+                  if (state.studentsStatus == SectionStatus.loading ||
+                      state.studentsStatus == SectionStatus.initial) {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Center(child: CircularProgressIndicator()),
                     );
                   }
+                  if (state.studentsStatus == SectionStatus.error) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          state.studentsError ?? 'فشل تحميل الطلاب',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: _retryStudents,
+                            child: const Text('إعادة المحاولة'),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
                   if (state.students.isEmpty) {
-                    return Text(
-                      'لا يوجد طلاب في هذه الحلقة',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'لا يوجد طلاب في هذه الحلقة',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: _retryStudents,
+                            child: const Text('إعادة المحاولة'),
+                          ),
+                        ),
+                      ],
                     );
                   }
                   return DropdownButtonFormField<String>(
-                    initialValue: _selectedStudentId != null &&
+                    initialValue:
+                    _selectedStudentId != null &&
                             state.students.any(
                               (s) => s.uid == _selectedStudentId,
                             )
@@ -503,16 +625,12 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
                 controller: _versesCtrl,
               ),
               const SizedBox(height: 16),
-              const _Label('الحفظ'),
-              _GradeSelector(
-                value: _memGrade,
-                onChanged: (g) => setState(() => _memGrade = g),
+              _Label(
+                _type == RecitationType.memorization ? 'الحفظ' : 'المراجعة',
               ),
-              const SizedBox(height: 12),
-              const _Label('المراجعة'),
               _GradeSelector(
-                value: _revGrade,
-                onChanged: (g) => setState(() => _revGrade = g),
+                value: _typeGrade,
+                onChanged: (g) => setState(() => _typeGrade = g),
               ),
               const SizedBox(height: 12),
               const _Label('السلوك'),
@@ -551,7 +669,10 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
   void _submit() {
     if (_selectedStudentId == null) return;
     final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) return;
+    if (authState is! AuthAuthenticated) {
+      AppSnackBar.showError(context, 'يجب تسجيل الدخول لحفظ التقييم');
+      return;
+    }
 
     final students = context.read<TeacherBloc>().state.students;
     final student = students.firstWhere((s) => s.uid == _selectedStudentId);
@@ -567,7 +688,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
           date: DateTime.now(),
           type: _type,
           versesRange: _versesCtrl.text.trim(),
-          grade: _type == RecitationType.memorization ? _memGrade : _revGrade,
+          grade: _typeGrade,
           behaviorGrade: _behGrade,
           notes: _notesCtrl.text.trim().isNotEmpty
               ? _notesCtrl.text.trim()

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
@@ -30,6 +33,15 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = context
+          .read<TeacherBloc>()
+          .state;
+      if (state.halaqatStatus == SectionStatus.initial) {
+        _retryHalaqat();
+      }
+    });
   }
 
   @override
@@ -45,23 +57,73 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     return null;
   }
 
+  void _retryHalaqat() {
+    final auth = context
+        .read<AuthBloc>()
+        .state;
+    if (auth is! AuthAuthenticated) return;
+    context.read<TeacherBloc>().add(LoadTeacherHalaqatEvent(auth.user.uid));
+  }
+
+  Future<void> _openMeetingLink(String rawLink) async {
+    final link = rawLink.trim();
+    if (link.isEmpty) {
+      AppSnackBar.showInfo(context, 'رابط الحصة غير متاح');
+      return;
+    }
+    final uri = Uri.tryParse(link);
+    if (uri == null ||
+        !(uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https'))) {
+      AppSnackBar.showError(context, 'رابط الحصة غير صالح');
+      return;
+    }
+    final launched =
+        await canLaunchUrl(uri) &&
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      AppSnackBar.showError(context, 'تعذر فتح رابط الحصة');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TeacherBloc, TeacherState>(
       builder: (context, state) {
         final halaqa = _findHalaqa(state);
 
-        if (state.halaqatStatus == SectionStatus.loaded &&
-            state.halaqat.isNotEmpty &&
-            halaqa == null) {
+        if (state.halaqatStatus == SectionStatus.loading ||
+            state.halaqatStatus == SectionStatus.initial) {
           return Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(title: const Text('الحلقة')),
-            body: const AppErrorWidget(
-              message: 'لم يتم العثور على بيانات الحلقة',
+            body: const AppLoadingWidget(),
+          );
+        }
+
+        if (state.halaqatStatus == SectionStatus.error) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(title: const Text('الحلقة')),
+            body: AppErrorWidget(
+              message: state.halaqatError ?? 'تعذر تحميل بيانات الحلقة',
+              onRetry: _retryHalaqat,
             ),
           );
         }
+
+        if (state.halaqatStatus == SectionStatus.loaded && halaqa == null) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(title: const Text('الحلقة')),
+            body: AppErrorWidget(
+              message: 'لم يتم العثور على بيانات الحلقة',
+              onRetry: _retryHalaqat,
+            ),
+          );
+        }
+
+        final scheduleLabel = halaqa == null ? null : _scheduleLabel(halaqa);
+        final meetingLink = halaqa?.meetingLink.trim() ?? '';
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -69,13 +131,22 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
                 pinned: true,
-                expandedHeight: 140,
+                expandedHeight: meetingLink.isNotEmpty || scheduleLabel != null
+                    ? 180
+                    : 140,
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 title: Text(halaqa?.name ?? 'الحلقة'),
                 flexibleSpace: FlexibleSpaceBar(
                   background: _HalaqaStatsHeader(
-                    studentCount: state.students.length,
+                    studentCount: state.studentsStatus == SectionStatus.loaded
+                        ? state.students.length
+                        : (halaqa?.studentIds.length ?? 0),
+                    scheduleLabel: scheduleLabel,
+                    meetingLink: meetingLink.isEmpty ? null : meetingLink,
+                    onJoinMeeting: meetingLink.isEmpty
+                        ? null
+                        : () => _openMeetingLink(meetingLink),
                   ),
                 ),
               ),
@@ -155,15 +226,39 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       },
     );
   }
+
+  String? _scheduleLabel(HalaqaEntity halaqa) {
+    if (halaqa.schedule.isEmpty) return null;
+    final slot = halaqa.schedule.first;
+    final day = slot.day.trim();
+    final start = slot.startTime.trim();
+    final end = slot.endTime.trim();
+    if (day.isEmpty && start.isEmpty) return null;
+    if (start.isEmpty) return day.isEmpty ? null : day;
+    if (end.isEmpty) return day.isEmpty ? start : '$day — $start';
+    return day.isEmpty ? '$start–$end' : '$day — $start–$end';
+  }
 }
 
 class _HalaqaStatsHeader extends StatelessWidget {
   final int studentCount;
+  final String? scheduleLabel;
+  final String? meetingLink;
+  final VoidCallback? onJoinMeeting;
 
-  const _HalaqaStatsHeader({required this.studentCount});
+  const _HalaqaStatsHeader({
+    required this.studentCount,
+    this.scheduleLabel,
+    this.meetingLink,
+    this.onJoinMeeting,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasSchedule =
+        scheduleLabel != null && scheduleLabel!.trim().isNotEmpty;
+    final hasLink = meetingLink != null && meetingLink!.trim().isNotEmpty;
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -172,10 +267,37 @@ class _HalaqaStatsHeader extends StatelessWidget {
           AppSizes.paddingM,
           AppSizes.paddingM,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
             _HeaderStat(value: '$studentCount', label: 'طالب'),
+            if (hasSchedule) ...[
+              const SizedBox(height: 8),
+              Text(
+                scheduleLabel!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 12,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+            if (hasLink && onJoinMeeting != null) ...[
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: onJoinMeeting,
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                icon: const Icon(Icons.videocam_outlined, size: 18),
+                label: const Text(
+                  'انضم للحصة',
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -229,6 +351,11 @@ class _StudentsTab extends StatelessWidget {
     required this.halaqaId,
   });
 
+  Future<void> _onRefresh(BuildContext context) async {
+    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(halaqaId));
+    await Future.delayed(const Duration(milliseconds: 800));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (state.studentsStatus == SectionStatus.loading ||
@@ -268,45 +395,56 @@ class _StudentsTab extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingM),
-          child: AppTextField(
-            hint: 'بحث في الطلاب...',
-            onChanged: onSearch,
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: AppColors.textHint,
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => _onRefresh(context),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppSizes.paddingM),
+            child: AppTextField(
+              hint: 'بحث في الطلاب...',
+              onChanged: onSearch,
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                color: AppColors.textHint,
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: students.isEmpty
-              ? const Center(
+          Expanded(
+            child: students.isEmpty
+                ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(height: 80),
+                Center(
                   child: Text(
                     'لا نتائج للبحث',
                     style: AppTextStyles.bodyMedium,
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.paddingM,
-                  ),
-                  itemCount: students.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) {
-                    if (i == students.length) {
-                      return _AddStudentButton(halaqaId: halaqaId);
-                    }
-                    return _StudentCard(
-                      student: students[i],
-                      halaqaId: halaqaId,
-                    );
-                  },
                 ),
-        ),
-      ],
+              ],
+            )
+                : ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSizes.paddingM,
+              ),
+              itemCount: students.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) {
+                if (i == students.length) {
+                  return _AddStudentButton(halaqaId: halaqaId);
+                }
+                return _StudentCard(
+                  student: students[i],
+                  halaqaId: halaqaId,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -317,141 +455,52 @@ class _StudentCard extends StatelessWidget {
 
   const _StudentCard({required this.student, required this.halaqaId});
 
-  bool get _hasAttendanceData => student.attendancePercent > 0;
-
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Row(
         children: [
           Row(
             children: [
-              Row(
-                children: [
-                  if (student.isAtRisk)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: _TagChip(
-                        label: 'في خطر',
-                        color: Color(0xFFFFEBEE),
-                        textColor: AppColors.error,
-                      ),
-                    ),
-                  _OutlinedChip(
-                    label: 'منح شارة',
-                    onTap: () =>
-                        context.push('/teacher/halaqa/$halaqaId/awards'),
-                    icon: Icons.star_outline_rounded,
-                    color: AppColors.secondary,
-                  ),
-                  const SizedBox(width: 8),
-                  _OutlinedChip(
-                    label: 'تقييم',
-                    onTap: () => context.push(
+              _OutlinedChip(
+                label: 'منح شارة',
+                onTap: () =>
+                    context.push('/teacher/halaqa/$halaqaId/awards'),
+                color: AppColors.secondary,
+              ),
+              const SizedBox(width: 8),
+              _OutlinedChip(
+                label: 'تقييم',
+                onTap: () =>
+                    context.push(
                       '/teacher/halaqa/$halaqaId/evaluations',
                     ),
-                    icon: Icons.rate_review_outlined,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  _OutlinedChip(
-                    label: 'الملف الشخصي',
-                    onTap: () =>
-                        context.push('/teacher/student/${student.uid}'),
-                    icon: Icons.person_outline_rounded,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
+                color: AppColors.primary,
               ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(student.name, style: AppTextStyles.titleLarge),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      if (_hasAttendanceData) ...[
-                        Text(
-                          '${student.attendancePercent.toInt()}% حضور',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.success,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      _TagChip(
-                        label: 'المستوى ${student.level}',
-                        color: AppColors.primaryLight,
-                        textColor: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ],
+              const SizedBox(width: 8),
+              _OutlinedChip(
+                label: 'الملف الشخصي',
+                onTap: () =>
+                    context.push('/teacher/student/${student.uid}'),
+                color: AppColors.textSecondary,
               ),
-              const SizedBox(width: 12),
-              UserAvatar(name: student.name),
             ],
           ),
-          if (student.lastGradeLabel != null) ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'آخر تقييم: ${student.lastGradeLabel}',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: student.isAtRisk
-                      ? AppColors.error
-                      : AppColors.textSecondary,
-                ),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(student.name, style: AppTextStyles.titleLarge),
+              const SizedBox(height: 2),
+              _TagChip(
+                label: 'المستوى ${student.level}',
+                color: AppColors.primaryLight,
+                textColor: AppColors.primary,
               ),
-            ),
-          ],
-          if (_hasAttendanceData) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-              child: LinearProgressIndicator(
-                value: student.attendancePercent / 100,
-                minHeight: 4,
-                backgroundColor: AppColors.surfaceGrey,
-                valueColor: const AlwaysStoppedAnimation(AppColors.success),
-              ),
-            ),
-          ],
-          if (student.isAtRisk) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => AppSnackBar.showInfo(context, 'قريبًا'),
-                icon: const Icon(
-                  Icons.message_outlined,
-                  size: 16,
-                  color: AppColors.error,
-                ),
-                label: const Text(
-                  'تواصل مع الأهل',
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    color: AppColors.error,
-                    fontSize: 13,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.error),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                  ),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
+          const SizedBox(width: 12),
+          UserAvatar(name: student.name),
         ],
       ),
     );
@@ -493,13 +542,11 @@ class _TagChip extends StatelessWidget {
 class _OutlinedChip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
-  final IconData icon;
   final Color color;
 
   const _OutlinedChip({
     required this.label,
     required this.onTap,
-    required this.icon,
     required this.color,
   });
 
@@ -510,9 +557,9 @@ class _OutlinedChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(AppSizes.radiusM),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Text(
           label,
@@ -541,8 +588,7 @@ class _AddStudentButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           border: Border.all(
-            color: AppColors.primary.withOpacity(0.4),
-            style: BorderStyle.solid,
+            color: AppColors.primary.withValues(alpha: 0.4),
           ),
           borderRadius: BorderRadius.circular(AppSizes.radiusL),
         ),

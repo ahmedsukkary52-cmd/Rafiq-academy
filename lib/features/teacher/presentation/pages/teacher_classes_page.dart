@@ -12,19 +12,41 @@ import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 
-class TeacherClassesPage extends StatelessWidget {
+class TeacherClassesPage extends StatefulWidget {
   const TeacherClassesPage({super.key});
+
+  @override
+  State<TeacherClassesPage> createState() => _TeacherClassesPageState();
+}
+
+class _TeacherClassesPageState extends State<TeacherClassesPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final status = context.read<TeacherBloc>().state.halaqatStatus;
+      if (status == SectionStatus.initial) {
+        _loadHalaqat();
+      }
+    });
+  }
 
   void _comingSoon(BuildContext context) {
     AppSnackBar.showInfo(context, 'قريبًا');
   }
 
-  void _retryHalaqat(BuildContext context) {
+  void _loadHalaqat() {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
     context.read<TeacherBloc>().add(
       LoadTeacherHalaqatEvent(authState.user.uid),
     );
+  }
+
+  Future<void> _onRefresh() async {
+    _loadHalaqat();
+    await Future.delayed(const Duration(milliseconds: 800));
   }
 
   @override
@@ -51,24 +73,31 @@ class TeacherClassesPage extends StatelessWidget {
       ),
       body: BlocBuilder<TeacherBloc, TeacherState>(
         builder: (context, state) {
-          if (state.halaqatStatus == SectionStatus.loading) {
+          if (state.halaqatStatus == SectionStatus.loading ||
+              state.halaqatStatus == SectionStatus.initial) {
             return const AppLoadingWidget();
           }
           if (state.halaqatStatus == SectionStatus.error) {
             return AppErrorWidget(
               message: state.halaqatError ?? 'حدث خطأ',
-              onRetry: () => _retryHalaqat(context),
+              onRetry: _loadHalaqat,
             );
           }
           if (state.halaqat.isEmpty) {
             return const _EmptyHalaqat();
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppSizes.paddingM),
-            itemCount: state.halaqat.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) => _HalaqaCard(halaqa: state.halaqat[i]),
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: _onRefresh,
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              itemCount: state.halaqat.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) =>
+                  _HalaqaCard(halaqa: state.halaqat[i]),
+            ),
           );
         },
       ),
@@ -83,11 +112,7 @@ class _HalaqaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final schedule = halaqa.schedule;
-    final daysLabel = schedule.isNotEmpty
-        ? schedule.map((s) => _dayShort(s.day)).join('، ')
-        : '';
-    final timeLabel = schedule.isNotEmpty ? schedule.first.startTime : '';
+    final scheduleLabel = _scheduleLabel(halaqa);
 
     return AppCard(
       child: Column(
@@ -105,18 +130,6 @@ class _HalaqaCard extends StatelessWidget {
                     onTap: () => context.push(
                       '/teacher/halaqa/${halaqa.id}/evaluations',
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _ActionChip(
-                    label: 'إدارة',
-                    color: AppColors.surfaceGrey,
-                    textColor: AppColors.textSecondary,
-                    onTap: () {
-                      context.read<TeacherBloc>().add(
-                        SelectHalaqaEvent(halaqa.id),
-                      );
-                      context.push('/teacher/halaqa/${halaqa.id}');
-                    },
                   ),
                   const SizedBox(width: 8),
                   _ActionChip(
@@ -153,19 +166,6 @@ class _HalaqaCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(halaqa.name, style: AppTextStyles.headlineMedium),
-          const SizedBox(height: 6),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text('المشرفة: غير متوفر', style: AppTextStyles.bodyMedium),
-              SizedBox(width: 4),
-              Icon(
-                Icons.person_outline,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
-            ],
-          ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -174,14 +174,11 @@ class _HalaqaCard extends StatelessWidget {
                 '${halaqa.studentIds.length} طالب',
                 style: AppTextStyles.labelMedium,
               ),
-              const SizedBox(width: 16),
-              if (daysLabel.isNotEmpty || timeLabel.isNotEmpty)
+              if (scheduleLabel != null) ...[
+                const SizedBox(width: 16),
                 Row(
                   children: [
-                    Text(
-                      '$daysLabel · $timeLabel م',
-                      style: AppTextStyles.labelMedium,
-                    ),
+                    Text(scheduleLabel, style: AppTextStyles.labelMedium),
                     const SizedBox(width: 4),
                     const Icon(
                       Icons.access_time_rounded,
@@ -190,11 +187,37 @@ class _HalaqaCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ],
             ],
           ),
         ],
       ),
     );
+  }
+
+  String? _scheduleLabel(HalaqaEntity halaqa) {
+    final schedule = halaqa.schedule;
+    if (schedule.isEmpty) return null;
+
+    final days = schedule
+        .map((s) => _dayShort(s.day))
+        .where((d) => d.isNotEmpty)
+        .toList();
+    final daysLabel = days.join('، ');
+
+    final first = schedule.first;
+    final start = first.startTime.trim();
+    final end = first.endTime.trim();
+    final timeLabel = start.isEmpty
+        ? ''
+        : end.isEmpty
+        ? start
+        : '$start–$end';
+
+    if (daysLabel.isEmpty && timeLabel.isEmpty) return null;
+    if (daysLabel.isEmpty) return timeLabel;
+    if (timeLabel.isEmpty) return daysLabel;
+    return '$daysLabel · $timeLabel';
   }
 
   String _dayShort(String day) => switch (day.trim()) {
@@ -205,7 +228,7 @@ class _HalaqaCard extends StatelessWidget {
     'الخميس' => 'خم',
     'الجمعة' => 'جم',
     'السبت' => 'سب',
-    _ => day,
+    _ => day.trim(),
   };
 }
 
@@ -258,7 +281,7 @@ class _EmptyHalaqat extends StatelessWidget {
           Icon(
             Icons.groups_rounded,
             size: 64,
-            color: AppColors.textHint.withOpacity(0.5),
+            color: AppColors.textHint.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           const Text(

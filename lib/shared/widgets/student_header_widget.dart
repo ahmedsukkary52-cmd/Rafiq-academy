@@ -9,7 +9,7 @@ class StudentHeaderWidget extends StatelessWidget {
   final int totalStars;
   final int streakDays;
   final VoidCallback onNotificationsTap;
-  final VoidCallback onSearchTap;
+  final VoidCallback? onSearchTap;
   final VoidCallback onAvatarTap;
   final VoidCallback? onCoinsTap;
   final VoidCallback? onStarsTap;
@@ -24,7 +24,7 @@ class StudentHeaderWidget extends StatelessWidget {
     required this.totalStars,
     required this.streakDays,
     required this.onNotificationsTap,
-    required this.onSearchTap,
+    this.onSearchTap,
     required this.onAvatarTap,
     this.onCoinsTap,
     this.onStarsTap,
@@ -62,11 +62,13 @@ class StudentHeaderWidget extends StatelessWidget {
                     badgeCount: unreadNotificationsCount,
                     onTap: onNotificationsTap,
                   ),
-                  const SizedBox(width: 8),
-                  _HeaderIconButton(
-                    icon: Icons.search_rounded,
-                    onTap: onSearchTap,
-                  ),
+                  if (onSearchTap != null) ...[
+                    const SizedBox(width: 8),
+                    _HeaderIconButton(
+                      icon: Icons.search_rounded,
+                      onTap: onSearchTap!,
+                    ),
+                  ],
                 ],
               ),
 

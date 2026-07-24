@@ -1531,46 +1531,43 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
-                Icons.favorite_border,
-                color: AppColors.primary,
-              ),
+              leading: Icon(Icons.favorite_border, color: AppColors.textHint),
               title: const Text(
                 'إضافة للمفضلة',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                AppSnackBar.showInfo(context, 'تمت الإضافة للمفضلة');
-              },
+              trailing: Text(
+                'Coming Soon',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
             ListTile(
-              leading: const Icon(
-                Icons.bookmark_border,
-                color: AppColors.primary,
-              ),
+              leading: Icon(Icons.bookmark_border, color: AppColors.textHint),
               title: const Text(
                 'حفظ إشارة مرجعية',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                AppSnackBar.showInfo(context, 'تم حفظ علامة مرجعية');
-              },
+              trailing: Text(
+                'Coming Soon',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
             ListTile(
-              leading: const Icon(
-                Icons.share_outlined,
-                color: AppColors.primary,
-              ),
+              leading: Icon(Icons.share_outlined, color: AppColors.textHint),
               title: const Text(
                 'مشاركة السورة',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                AppSnackBar.showInfo(context, 'مشاركة السورة قريباً');
-              },
+              trailing: Text(
+                'Coming Soon',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(

@@ -197,8 +197,6 @@ class _StudentHomeTab extends StatelessWidget {
                       unreadNotificationsCount: notifState.unreadCount,
                       onNotificationsTap: () =>
                           context.push('/student/notifications'),
-                      onSearchTap: () =>
-                          AppSnackBar.showInfo(context, 'البحث قريباً'),
                       onAvatarTap: () => context.push('/student/avatar'),
                       onCoinsTap: () => onTabChanged(2),
                       onStarsTap: () => context.push(AppRoutes.studentAchieve),
@@ -703,15 +701,15 @@ class _StudentProfileTab extends StatelessWidget {
                           label: 'الإعدادات',
                           onTap: () => context.push(AppRoutes.studentSettings),
                         ),
-                        _ProfileMenuItem(
+                        const _ProfileMenuItem(
                           icon: Icons.family_restroom_rounded,
                           label: 'حساب ولي الأمر',
-                          onTap: () => AppSnackBar.showInfo(context, 'قريباً'),
+                          trailing: 'Coming Soon',
                         ),
-                        _ProfileMenuItem(
+                        const _ProfileMenuItem(
                           icon: Icons.help_outline_rounded,
                           label: 'المساعدة والدعم',
-                          onTap: () => AppSnackBar.showInfo(context, 'قريباً'),
+                          trailing: 'Coming Soon',
                         ),
                       ],
                     ),
@@ -811,14 +809,16 @@ class _ProfileMenuGroup extends StatelessWidget {
 class _ProfileMenuItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isDestructive;
+  final String? trailing;
 
   const _ProfileMenuItem({
     required this.icon,
     required this.label,
-    required this.onTap,
+    this.onTap,
     this.isDestructive = false,
+    this.trailing,
   });
 
   @override
@@ -833,6 +833,13 @@ class _ProfileMenuItem extends StatelessWidget {
       title: Text(label, style: AppTextStyles.bodyLarge.copyWith(color: color)),
       trailing: isDestructive
           ? null
+          : trailing != null
+          ? Text(
+              trailing!,
+              style: AppTextStyles.labelMedium.copyWith(
+                color: AppColors.textHint,
+              ),
+            )
           : const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
     );
   }

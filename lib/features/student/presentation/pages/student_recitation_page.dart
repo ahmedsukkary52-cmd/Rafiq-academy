@@ -403,10 +403,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.more_horiz_rounded, size: 28),
-                    onPressed: () {},
-                  ),
+                  const SizedBox(width: 48),
                   Expanded(
                     child: Column(
                       children: [
@@ -565,30 +562,18 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
                     const SizedBox(height: 24),
 
-                    // Sound Waves (placeholder animation)
+                    // Recording indicator
                     if (_isRecording)
-                      SizedBox(
-                        height: 60,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(16, (index) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 3,
-                              ),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 100),
-                                width: 6,
-                                height:
-                                    (index % 3 + 1) * 12 +
-                                    (index % 2 == 0 ? 10 : 0),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00ACC1),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            );
-                          }),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'جاري التسجيل...',
+                          style: TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF00ACC1),
+                          ),
                         ),
                       ),
 

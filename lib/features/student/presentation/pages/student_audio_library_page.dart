@@ -986,7 +986,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               hasFilter
                   ? 'جرب البحث بكلمة أخرى أو اختر قارئاً آخر'
-                  : 'سيتم إضافة التلاوات قريباً',
+                  : 'لا توجد تلاوات متاحة حالياً',
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 color: AppColors.textSecondary,

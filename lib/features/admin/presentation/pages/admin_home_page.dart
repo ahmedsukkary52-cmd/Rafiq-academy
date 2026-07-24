@@ -10,9 +10,30 @@ class AdminHomePage extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('نافذة المدير')),
       body: const Center(
-        child: Text(
-          'نافذة المدير — قريباً',
-          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+        child: Padding(
+          padding: EdgeInsets.all(AppSizes.paddingL),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.admin_panel_settings_outlined,
+                size: 48,
+                color: AppColors.textHint,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'نافذة المدير',
+                style: AppTextStyles.headlineMedium,
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Coming Soon',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

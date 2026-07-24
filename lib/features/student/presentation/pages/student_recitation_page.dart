@@ -240,14 +240,18 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
   void _submitRecitation() {
     if (_recordedFilePath == null) return;
+    final isHomework = widget.homeworkContext != null;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+        title: Text(
+          isHomework ? 'إرسال التسميع' : 'حفظ التسجيل',
+          textAlign: TextAlign.right,
+        ),
         content: Text(
-          widget.homeworkContext != null
+          isHomework
               ? 'سيتم رفع التسجيل للمعلم عبر الإنترنت. هل تريد المتابعة؟'
-              : 'هل تريد إرسال التسجيل للمعلم؟',
+              : 'سيتم حفظ التسجيل على جهازك فقط. رفع التسجيل للمعلم غير متاح حالياً.',
           textAlign: TextAlign.right,
           style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
         ),
@@ -261,9 +265,9 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
               Navigator.pop(dialogContext);
               _performSubmit();
             },
-            child: const Text(
-              'إرسال',
-              style: TextStyle(
+            child: Text(
+              isHomework ? 'إرسال' : 'حفظ',
+              style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
               ),
@@ -644,7 +648,9 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                           ),
                           onPressed: _submitRecitation,
                           child: Text(
-                            'إرسال التسميع للمعلمة 👆',
+                            widget.homeworkContext != null
+                                ? 'إرسال التسميع للمعلمة'
+                                : 'حفظ التسجيل محلياً',
                             style: GoogleFonts.amiri(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,

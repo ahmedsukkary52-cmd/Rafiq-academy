@@ -1762,7 +1762,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+        title: const Text('رفع التسجيل', textAlign: TextAlign.right),
         content: const Text(
           'رفع التسجيل غير متاح حالياً حتى يتم تفعيل خدمة رفع الملفات.',
           textAlign: TextAlign.right,
@@ -2421,7 +2421,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 children: [
                   Expanded(
                     child: AppButton(
-                      label: 'إرسال التسميع للمعلمة',
+                      label: 'رفع التسجيل — Coming Soon',
                       onPressed: _submitRecitation,
                     ),
                   ),

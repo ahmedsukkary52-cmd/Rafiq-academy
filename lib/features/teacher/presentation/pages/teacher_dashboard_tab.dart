@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -10,6 +11,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
+import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
@@ -17,10 +19,17 @@ import '../../presentation/bloc/teacher_state.dart';
 class TeacherDashboardTab extends StatelessWidget {
   const TeacherDashboardTab({super.key});
 
+  void _retryHalaqat(BuildContext context) {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) return;
+    context.read<TeacherBloc>().add(LoadTeacherHalaqatEvent(auth.user.uid));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authState = context.read<AuthBloc>().state as AuthAuthenticated?;
-    final teacherName = authState?.user.name ?? '';
+    final authState = context.read<AuthBloc>().state;
+    final auth = authState is AuthAuthenticated ? authState : null;
+    final teacherName = auth?.user.name ?? '';
 
     return BlocBuilder<TeacherBloc, TeacherState>(
       builder: (context, state) {
@@ -30,126 +39,175 @@ class TeacherDashboardTab extends StatelessWidget {
         return RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () async {
-            if (authState != null) {
+            if (auth != null) {
               context.read<TeacherBloc>().add(
-                LoadTeacherHalaqatEvent(authState.user.uid),
+                LoadTeacherHalaqatEvent(auth.user.uid),
               );
               await Future.delayed(const Duration(milliseconds: 800));
             }
           },
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // ── Header ─────────────────────────────────────────
               SliverToBoxAdapter(
                 child: _TeacherHeader(
                   name: teacherName,
                   halaqaName: nextHalaqa?.name ?? '',
                 ),
               ),
-
-              // ── Stats Cards ────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSizes.paddingM,
-                    16,
-                    AppSizes.paddingM,
-                    0,
-                  ),
-                  child: _TeacherStatsGrid(state: state),
-                ),
-              ),
-
-              // ── الجلسة الحالية ─────────────────────────────────
-              if (nextHalaqa != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSizes.paddingM,
-                      16,
-                      AppSizes.paddingM,
-                      0,
-                    ),
-                    child: _CurrentSessionCard(
-                      halaqaName: nextHalaqa.name,
-                      studentsCount: nextHalaqa.studentIds.length,
-                      meetingLink: nextHalaqa.meetingLink,
-                      onStartTap: () =>
-                          context.push('/teacher/halaqa/${nextHalaqa.id}'),
-                    ),
-                  ),
-                ),
-
-              // ── إعلان إداري — قريباً ────────────────────────────
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSizes.paddingM,
-                    16,
-                    AppSizes.paddingM,
-                    0,
-                  ),
-                  child: _ComingSoonCard(title: 'إعلان إداري'),
-                ),
-              ),
-
-              // ── النشاطات الأخيرة — قريباً ───────────────────────
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSizes.paddingM,
-                    16,
-                    AppSizes.paddingM,
-                    0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SectionHeader(title: 'النشاطات الأخيرة'),
-                      SizedBox(height: 8),
-                      _ComingSoonCard(title: 'النشاطات'),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── المساعد الذكي ───────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSizes.paddingM),
-                  child: _SmartAssistantCard(
-                    onRaiseTap: () {
-                      final id = nextHalaqa?.id;
-                      if (id == null) {
-                        AppSnackBar.showInfo(
-                          context,
-                          'لا توجد حلقة مسندة إليك',
-                        );
-                        return;
-                      }
-                      context.push('/teacher/halaqa/$id/evaluations');
-                    },
-                    onAssignTap: () =>
-                        AppSnackBar.showInfo(context, 'قريبًا'),
-                    onAtRiskTap: () {
-                      final id = nextHalaqa?.id;
-                      if (id == null) {
-                        AppSnackBar.showInfo(
-                          context,
-                          'لا توجد حلقة مسندة إليك',
-                        );
-                        return;
-                      }
-                      context.push('/teacher/halaqa/$id/analytics');
-                    },
-                  ),
-                ),
-              ),
+              ..._bodySlivers(context, state, nextHalaqa),
             ],
           ),
         );
       },
     );
+  }
+
+  List<Widget> _bodySlivers(
+    BuildContext context,
+    TeacherState state,
+    HalaqaEntity? nextHalaqa,
+  ) {
+    if (state.halaqatStatus == SectionStatus.initial ||
+        state.halaqatStatus == SectionStatus.loading) {
+      return [
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: AppLoadingWidget(),
+        ),
+      ];
+    }
+
+    if (state.halaqatStatus == SectionStatus.error) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: AppErrorWidget(
+            message: state.halaqatError ?? 'تعذر تحميل الحلقات',
+            onRetry: () => _retryHalaqat(context),
+          ),
+        ),
+      ];
+    }
+
+    final totalStudents = state.halaqat.fold<int>(
+      0,
+      (sum, h) => sum + h.studentIds.length,
+    );
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            16,
+            AppSizes.paddingM,
+            0,
+          ),
+          child: _TeacherStatsRow(
+            studentsCount: totalStudents,
+            halaqatCount: state.halaqat.length,
+          ),
+        ),
+      ),
+      if (state.halaqat.isEmpty)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSizes.paddingM,
+              16,
+              AppSizes.paddingM,
+              0,
+            ),
+            child: _EmptyHalaqatCard(),
+          ),
+        )
+      else if (nextHalaqa != null)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSizes.paddingM,
+              16,
+              AppSizes.paddingM,
+              0,
+            ),
+            child: _CurrentSessionCard(
+              halaqaName: nextHalaqa.name,
+              studentsCount: nextHalaqa.studentIds.length,
+              scheduleLabel: _scheduleLabel(nextHalaqa),
+              onStartTap: () =>
+                  context.push('/teacher/halaqa/${nextHalaqa.id}'),
+            ),
+          ),
+        ),
+      const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            16,
+            AppSizes.paddingM,
+            0,
+          ),
+          child: _ComingSoonCard(title: 'إعلان إداري'),
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            16,
+            AppSizes.paddingM,
+            0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SectionHeader(title: 'النشاطات الأخيرة'),
+              SizedBox(height: 8),
+              _ComingSoonCard(title: 'النشاطات'),
+            ],
+          ),
+        ),
+      ),
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSizes.paddingM),
+          child: _SmartAssistantCard(
+            onRaiseTap: () {
+              final id = nextHalaqa?.id;
+              if (id == null) {
+                AppSnackBar.showInfo(context, 'لا توجد حلقة مسندة إليك');
+                return;
+              }
+              context.push('/teacher/halaqa/$id/evaluations');
+            },
+            onAssignTap: () => AppSnackBar.showInfo(context, 'قريبًا'),
+            onAtRiskTap: () {
+              final id = nextHalaqa?.id;
+              if (id == null) {
+                AppSnackBar.showInfo(context, 'لا توجد حلقة مسندة إليك');
+                return;
+              }
+              context.push('/teacher/halaqa/$id/analytics');
+            },
+          ),
+        ),
+      ),
+    ];
+  }
+
+  String? _scheduleLabel(HalaqaEntity halaqa) {
+    if (halaqa.schedule.isEmpty) return null;
+    final slot = halaqa.schedule.first;
+    final day = slot.day.trim();
+    final start = slot.startTime.trim();
+    final end = slot.endTime.trim();
+    if (day.isEmpty && start.isEmpty) return null;
+    if (start.isEmpty) return day.isEmpty ? null : day;
+    if (end.isEmpty) {
+      return day.isEmpty ? start : '$day — $start';
+    }
+    return day.isEmpty ? '$start–$end' : '$day — $start–$end';
   }
 }
 
@@ -298,58 +356,66 @@ class _TeacherHeader extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _TeacherStatsGrid - الأرقام الأربعة
+// _TeacherStatsRow - إحصاءات حقيقية فقط
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _TeacherStatsGrid extends StatelessWidget {
-  final TeacherState state;
+class _TeacherStatsRow extends StatelessWidget {
+  final int studentsCount;
+  final int halaqatCount;
 
-  const _TeacherStatsGrid({required this.state});
+  const _TeacherStatsRow({
+    required this.studentsCount,
+    required this.halaqatCount,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final totalStudents = state.halaqat.fold<int>(
-      0,
-      (sum, h) => sum + h.studentIds.length,
-    );
-
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 2.2,
+    return Row(
       children: [
-        _StatCard(
-          value: '$totalStudents',
-          label: 'إجمالي الطلاب',
-          icon: Icons.person_outline_rounded,
-          color: AppColors.primaryLight,
-          iconColor: AppColors.primary,
+        Expanded(
+          child: _StatCard(
+            value: '$studentsCount',
+            label: 'إجمالي الطلاب',
+            icon: Icons.person_outline_rounded,
+            color: AppColors.primaryLight,
+            iconColor: AppColors.primary,
+          ),
         ),
-        _StatCard(
-          value: '${state.halaqat.length}',
-          label: 'الحلقات',
-          icon: Icons.calendar_today_outlined,
-          color: const Color(0xFFE8F5E9),
-          iconColor: AppColors.success,
-        ),
-        const _StatCard(
-          value: 'قريبًا',
-          label: 'رسائل جديدة',
-          icon: Icons.chat_bubble_outline_rounded,
-          color: Color(0xFFF3E5F5),
-          iconColor: Color(0xFF9C27B0),
-        ),
-        const _StatCard(
-          value: 'قريبًا',
-          label: 'مهام معلقة',
-          icon: Icons.assignment_outlined,
-          color: AppColors.secondaryBg,
-          iconColor: AppColors.secondary,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            value: '$halaqatCount',
+            label: 'الحلقات',
+            icon: Icons.calendar_today_outlined,
+            color: const Color(0xFFE8F5E9),
+            iconColor: AppColors.success,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _EmptyHalaqatCard extends StatelessWidget {
+  const _EmptyHalaqatCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.paddingL),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        'لا توجد حلقات مسندة إليك حالياً',
+        textAlign: TextAlign.center,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 }
@@ -417,20 +483,20 @@ class _StatCard extends StatelessWidget {
 class _CurrentSessionCard extends StatelessWidget {
   final String halaqaName;
   final int studentsCount;
-  final String meetingLink;
+  final String? scheduleLabel;
   final VoidCallback onStartTap;
 
   const _CurrentSessionCard({
     required this.halaqaName,
     required this.studentsCount,
-    required this.meetingLink,
+    required this.scheduleLabel,
     required this.onStartTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final time = '${now.hour}:${now.minute.toString().padLeft(2, '0')} مساءً';
+    final label = scheduleLabel?.trim();
+    final hasSchedule = label != null && label.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -440,7 +506,6 @@ class _CurrentSessionCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSizes.paddingL),
       child: Row(
         children: [
-          // زرار ابدأ الجلسة
           GestureDetector(
             onTap: onStartTap,
             child: Container(
@@ -471,33 +536,32 @@ class _CurrentSessionCard extends StatelessWidget {
               ),
             ),
           ),
-
           const Spacer(),
-
-          // تفاصيل الجلسة
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    'اليوم — $time',
-                    style: const TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 12,
-                      color: Colors.white60,
+              if (hasSchedule) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontFamily: 'NotoNaskhArabic',
+                        fontSize: 12,
+                        color: Colors.white60,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.access_time_rounded,
-                    color: Colors.white60,
-                    size: 14,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.access_time_rounded,
+                      color: Colors.white60,
+                      size: 14,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
               Text(
                 halaqaName,
                 style: const TextStyle(

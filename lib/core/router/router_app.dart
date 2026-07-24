@@ -425,8 +425,10 @@ class _PlaceholderPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: Center(
-        child: Text('$title — قريباً',
-            style: const TextStyle(fontFamily: 'NotoNaskhArabic')),
+        child: Text(
+          '$title — Coming Soon',
+          style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
+        ),
       ),
     );
   }

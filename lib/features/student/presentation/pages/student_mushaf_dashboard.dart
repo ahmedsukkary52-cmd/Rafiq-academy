@@ -64,7 +64,7 @@ class StudentMushafDashboard extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'تقدم حفظك ومراجعتك',
+                                  'تقدم حفظك',
                                   style: TextStyle(
                                     fontFamily: 'NotoNaskhArabic',
                                     fontSize: 12,
@@ -101,7 +101,7 @@ class StudentMushafDashboard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             _ProgressCircle(
-                              percent: overallProgress,
+                              percent: overallProgress ?? 0,
                               label: 'الحفظ',
                               color: Colors.white,
                             ),

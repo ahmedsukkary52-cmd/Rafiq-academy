@@ -307,6 +307,8 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance
     as _i642;
 import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart'
     as _i192;
+import 'package:rafiq_academy/features/teacher/domain/usecases/update_recitation_review_usecase.dart'
+    as _i1070;
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
     as _i933;
 
@@ -341,11 +343,6 @@ extension GetItInjectableX on _i174.GetIt {
         mp3QuranCatalog: gh<_i638.Mp3QuranCatalogService>(),
       ),
     );
-    gh.lazySingleton<_i333.ReviewScheduleRemoteDatasource>(
-      () => _i590.ReviewScheduleRemoteDatasourceImpl(
-        gh<_i974.FirebaseFirestore>(),
-      ),
-    );
     gh.lazySingleton<_i174.AudioLibraryRepository>(
       () => _i4.AudioLibraryRepositoryImpl(
         remoteDatasource: gh<_i1052.AudioLibraryRemoteDatasource>(),
@@ -360,11 +357,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i519.StudentAudioLibraryPage>(
       () => _i519.StudentAudioLibraryPage(key: gh<_i409.Key>()),
-    );
-    gh.lazySingleton<_i102.ProgressReportRemoteDatasource>(
-      () => _i1061.ProgressReportRemoteDatasourceImpl(
-        gh<_i974.FirebaseFirestore>(),
-      ),
     );
     gh.lazySingleton<_i892.ParentRemoteDatasource>(
       () => _i430.ParentRemoteDatasourceImpl(
@@ -386,6 +378,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i676.NotificationsRemoteDatasource>(
       () => _i676.NotificationsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i333.ReviewScheduleRemoteDatasource>(
+      () => _i590.ReviewScheduleRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.lazySingleton<_i696.NetworkInfo>(
@@ -460,6 +457,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i797.AnalyticsRemoteDatasource>(
       () => _i704.AnalyticsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i102.ProgressReportRemoteDatasource>(
+      () => _i1061.ProgressReportRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.lazySingleton<_i537.CalendarRemoteDatasource>(
@@ -601,6 +603,10 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i192.SendAssignmentUseCase>(
       () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
     );
+    gh.lazySingleton<_i1070.UpdateRecitationReviewUseCase>(
+      () =>
+          _i1070.UpdateRecitationReviewUseCase(gh<_i1050.TeacherRepository>()),
+    );
     gh.factory<_i235.GetProgressReportUseCase>(
       () =>
           _i235.GetProgressReportUseCase(gh<_i824.ProgressReportRepository>()),
@@ -693,19 +699,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i910.SubmitSupervisorReportUseCase>(
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
-    );
-    gh.singleton<_i933.TeacherBloc>(
-      () => _i933.TeacherBloc(
-        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
-        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
-        getHalaqaRecitationRecords:
-            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
-        getHalaqaAttendanceForDate:
-            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
-        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
-        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
-        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
-      ),
     );
     gh.lazySingleton<_i552.ScheduleRepository>(
       () => _i268.ScheduleRepositoryImpl(gh<_i756.ScheduleRemoteDatasource>()),
@@ -912,6 +905,20 @@ extension GetItInjectableX on _i174.GetIt {
         getMonthEvents: gh<_i429.GetMonthEventsUseCase>(),
         addCalendarEvent: gh<_i429.AddCalendarEventUseCase>(),
         deleteCalendarEvent: gh<_i429.DeleteCalendarEventUseCase>(),
+      ),
+    );
+    gh.singleton<_i933.TeacherBloc>(
+      () => _i933.TeacherBloc(
+        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
+        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
+        getHalaqaRecitationRecords:
+            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
+        getHalaqaAttendanceForDate:
+            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
+        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
+        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
+        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
       ),
     );
     gh.singleton<_i303.StudentBloc>(

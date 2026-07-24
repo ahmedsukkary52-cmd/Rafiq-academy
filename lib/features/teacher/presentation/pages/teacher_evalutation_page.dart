@@ -206,7 +206,12 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final record = items[i];
-        return _EvaluationCard(record: record);
+        return _EvaluationCard(
+          record: record,
+          onReviewPending: record.isPendingReview
+              ? () => _showReviewPendingSheet(context, record)
+              : null,
+        );
       },
     );
   }
@@ -228,12 +233,29 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
       ),
     );
   }
+
+  void _showReviewPendingSheet(
+    BuildContext context,
+    RecitationRecordEntity record,
+  ) {
+    final bloc = context.read<TeacherBloc>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: _ReviewPendingSheet(record: record),
+      ),
+    );
+  }
 }
 
 class _EvaluationCard extends StatelessWidget {
   final RecitationRecordEntity record;
+  final VoidCallback? onReviewPending;
 
-  const _EvaluationCard({required this.record});
+  const _EvaluationCard({required this.record, this.onReviewPending});
 
   bool get _isPending => record.isPendingReview;
 
@@ -275,6 +297,7 @@ class _EvaluationCard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: AppCard(
+            onTap: onReviewPending,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -322,11 +345,22 @@ class _EvaluationCard extends StatelessWidget {
                 if (_isPending) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'تسميع مرسل من الطالب — لم يُقيَّم بعد',
+                    'تسميع مرسل من الطالب — اضغط للمراجعة',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),
                     textAlign: TextAlign.right,
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'مراجعة',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ] else ...[
                   const SizedBox(height: 10),
@@ -409,6 +443,162 @@ class _GradeBox extends StatelessWidget {
           const SizedBox(height: 2),
           Text(label, style: AppTextStyles.labelSmall),
         ],
+      ),
+    );
+  }
+}
+
+/// مراجعة تسميع معلّق — يحدّث نفس مستند recitationRecords (Slice 3).
+class _ReviewPendingSheet extends StatefulWidget {
+  final RecitationRecordEntity record;
+
+  const _ReviewPendingSheet({required this.record});
+
+  @override
+  State<_ReviewPendingSheet> createState() => _ReviewPendingSheetState();
+}
+
+class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
+  RecitationGrade _typeGrade = RecitationGrade.good;
+  RecitationGrade _behGrade = RecitationGrade.good;
+  final _notesCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _typeLabel =>
+      widget.record.type == RecitationType.memorization ? 'الحفظ' : 'المراجعة';
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+          prev.recitationSubmissionStatus != curr.recitationSubmissionStatus,
+      listener: (context, state) {
+        if (state.recitationSubmissionStatus == SubmissionStatus.success) {
+          Navigator.pop(context);
+          AppSnackBar.showSuccess(context, 'تم حفظ المراجعة بنجاح');
+          context.read<TeacherBloc>().add(
+            const ResetRecitationSubmissionEvent(),
+          );
+        } else if (state.recitationSubmissionStatus == SubmissionStatus.error) {
+          AppSnackBar.showError(
+            context,
+            state.recitationSubmissionError ?? 'فشل حفظ المراجعة',
+          );
+          context.read<TeacherBloc>().add(
+            const ResetRecitationSubmissionEvent(),
+          );
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusXL),
+          ),
+        ),
+        padding: EdgeInsets.only(
+          top: AppSizes.paddingL,
+          left: AppSizes.paddingM,
+          right: AppSizes.paddingM,
+          bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('مراجعة التسميع', style: AppTextStyles.headlineMedium),
+              const SizedBox(height: 12),
+              Text(
+                record.studentName.isNotEmpty ? record.studentName : 'طالب',
+                style: AppTextStyles.titleMedium,
+                textAlign: TextAlign.right,
+              ),
+              if (record.versesRange.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  record.versesRange,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ],
+              if ((record.audioUrl ?? '').isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'يتوفر تسجيل صوتي من الطالب',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.primaryDark,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ],
+              const SizedBox(height: 20),
+              _Label(_typeLabel),
+              _GradeSelector(
+                value: _typeGrade,
+                onChanged: (g) => setState(() => _typeGrade = g),
+              ),
+              const SizedBox(height: 12),
+              const _Label('السلوك'),
+              _GradeSelector(
+                value: _behGrade,
+                onChanged: (g) => setState(() => _behGrade = g),
+              ),
+              const SizedBox(height: 16),
+              const _Label('ملاحظات (اختياري)'),
+              AppTextField(hint: 'أضف ملاحظاتك هنا...', controller: _notesCtrl),
+              const SizedBox(height: 24),
+              BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.recitationSubmissionStatus !=
+                    current.recitationSubmissionStatus,
+                builder: (context, state) {
+                  final isLoading =
+                      state.recitationSubmissionStatus ==
+                      SubmissionStatus.submitting;
+                  return AppButton(
+                    label: 'حفظ المراجعة',
+                    isLoading: isLoading,
+                    onPressed: isLoading ? null : _submit,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    context.read<TeacherBloc>().add(
+      UpdateRecitationReviewEvent(
+        recordId: widget.record.id,
+        halaqaId: widget.record.halaqaId,
+        grade: _typeGrade,
+        behaviorGrade: _behGrade,
+        notes: _notesCtrl.text.trim().isNotEmpty
+            ? _notesCtrl.text.trim()
+            : null,
       ),
     );
   }

@@ -1,7 +1,7 @@
 # W1 — Daily Lesson & Homework Loop  
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** D8 approved (Option A + optional/deferred). **Slice 2 shipped** — continue Slice 3 (teacher reviews pending).  
+**Status:** **Slice 3 shipped** — teacher can review pending recitations. Next: Slice 4 (student sees reviewed results).  
 **File key / Figma:** Basma (Copy) — teacher class/evals + student homework/evaluations as UX reference only  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT (`assignments`)
 

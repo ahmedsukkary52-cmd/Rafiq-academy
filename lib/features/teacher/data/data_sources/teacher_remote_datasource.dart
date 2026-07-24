@@ -1,5 +1,6 @@
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
+import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../models/attendance_record_model.dart';
 import '../models/halaqa_student_summary_model.dart';
 
@@ -12,6 +13,12 @@ abstract class TeacherRemoteDatasource {
     required DateTime date,
   });
   Future<void> addRecitationRecord(RecitationRecordModel record);
+  Future<void> updateRecitationReview({
+    required String recordId,
+    required RecitationGrade grade,
+    required RecitationGrade behaviorGrade,
+    String? notes,
+  });
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
     String halaqaId,
   );

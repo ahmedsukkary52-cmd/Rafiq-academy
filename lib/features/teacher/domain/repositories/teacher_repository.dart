@@ -35,6 +35,11 @@ abstract class TeacherRepository {
     RecitationRecordEntity record,
   );
 
+  /// مراجعة تسميع معلّق (نفس المستند — لا إنشاء جديد)
+  Future<Either<Failure, Unit>> updateRecitationReview(
+    UpdateRecitationReviewParams params,
+  );
+
   /// تقييمات التسميع لحلقة معيّنة
   Future<Either<Failure, List<RecitationRecordEntity>>>
   getHalaqaRecitationRecords(String halaqaId);
@@ -90,4 +95,23 @@ class SendAssignmentParams extends Equatable {
     dueDate,
     teacherId,
   ];
+}
+
+class UpdateRecitationReviewParams extends Equatable {
+  final String recordId;
+  final String halaqaId;
+  final RecitationGrade grade;
+  final RecitationGrade behaviorGrade;
+  final String? notes;
+
+  const UpdateRecitationReviewParams({
+    required this.recordId,
+    required this.halaqaId,
+    required this.grade,
+    required this.behaviorGrade,
+    this.notes,
+  });
+
+  @override
+  List<Object?> get props => [recordId, halaqaId, grade, behaviorGrade, notes];
 }

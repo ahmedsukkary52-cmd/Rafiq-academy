@@ -12,6 +12,7 @@ import '../../domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
 import '../../domain/usecases/record_attendance_usecase.dart';
 import '../../domain/usecases/send_assignment_usecase.dart';
+import '../../domain/usecases/update_recitation_review_usecase.dart';
 import 'teacher_event.dart';
 
 /// @singleton لنفس سبب باقي الـ Blocs: نافذة المعلم متوقع تتنقل بين
@@ -24,6 +25,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final GetHalaqaAttendanceForDateUseCase getHalaqaAttendanceForDate;
   final RecordAttendanceUseCase recordAttendance;
   final AddRecitationRecordUseCase addRecitationRecord;
+  final UpdateRecitationReviewUseCase updateRecitationReview;
   final SendAssignmentUseCase sendAssignment;
 
   TeacherBloc({
@@ -33,6 +35,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     required this.getHalaqaAttendanceForDate,
     required this.recordAttendance,
     required this.addRecitationRecord,
+    required this.updateRecitationReview,
     required this.sendAssignment,
   }) : super(TeacherState.initial()) {
     on<LoadTeacherHalaqatEvent>(_onLoadHalaqat);
@@ -44,6 +47,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     on<SaveDayAttendanceEvent>(_onSaveDayAttendance);
     on<ResetAttendanceSubmissionEvent>(_onResetAttendanceSubmission);
     on<AddRecitationRecordEvent>(_onAddRecitationRecord);
+    on<UpdateRecitationReviewEvent>(_onUpdateRecitationReview);
     on<ResetRecitationSubmissionEvent>(_onResetRecitationSubmission);
     on<SendAssignmentEvent>(_onSendAssignment);
     on<ResetAssignmentSubmissionEvent>(_onResetAssignmentSubmission);
@@ -167,10 +171,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     );
 
     final result = await getHalaqaAttendanceForDate(
-      HalaqaAttendanceDateParams(
-        halaqaId: event.halaqaId,
-        date: event.date,
-      ),
+      HalaqaAttendanceDateParams(halaqaId: event.halaqaId, date: event.date),
     );
 
     result.fold(
@@ -214,9 +215,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       }
     }
 
-    emit(
-      state.copyWith(attendanceSubmissionStatus: SubmissionStatus.success),
-    );
+    emit(state.copyWith(attendanceSubmissionStatus: SubmissionStatus.success));
 
     if (event.records.isNotEmpty) {
       add(
@@ -326,6 +325,43 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
         );
         add(LoadHalaqaEvaluationsEvent(event.record.halaqaId));
+      },
+    );
+  }
+
+  Future<void> _onUpdateRecitationReview(
+    UpdateRecitationReviewEvent event,
+    Emitter<TeacherState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        recitationSubmissionStatus: SubmissionStatus.submitting,
+        recitationSubmissionError: null,
+      ),
+    );
+
+    final result = await updateRecitationReview(
+      UpdateRecitationReviewParams(
+        recordId: event.recordId,
+        halaqaId: event.halaqaId,
+        grade: event.grade,
+        behaviorGrade: event.behaviorGrade,
+        notes: event.notes,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          recitationSubmissionStatus: SubmissionStatus.error,
+          recitationSubmissionError: failure.message,
+        ),
+      ),
+      (_) {
+        emit(
+          state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
+        );
+        add(LoadHalaqaEvaluationsEvent(event.halaqaId));
       },
     );
   }

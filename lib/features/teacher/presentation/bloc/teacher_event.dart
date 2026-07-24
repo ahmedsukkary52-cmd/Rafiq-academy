@@ -67,10 +67,7 @@ class LoadHalaqaAttendanceEvent extends TeacherEvent {
   final String halaqaId;
   final DateTime date;
 
-  const LoadHalaqaAttendanceEvent({
-    required this.halaqaId,
-    required this.date,
-  });
+  const LoadHalaqaAttendanceEvent({required this.halaqaId, required this.date});
 
   @override
   List<Object?> get props => [halaqaId, date];
@@ -99,6 +96,26 @@ class AddRecitationRecordEvent extends TeacherEvent {
 
   @override
   List<Object?> get props => [record];
+}
+
+/// مراجعة تسميع معلّق (تحديث نفس السجل)
+class UpdateRecitationReviewEvent extends TeacherEvent {
+  final String recordId;
+  final String halaqaId;
+  final RecitationGrade grade;
+  final RecitationGrade behaviorGrade;
+  final String? notes;
+
+  const UpdateRecitationReviewEvent({
+    required this.recordId,
+    required this.halaqaId,
+    required this.grade,
+    required this.behaviorGrade,
+    this.notes,
+  });
+
+  @override
+  List<Object?> get props => [recordId, halaqaId, grade, behaviorGrade, notes];
 }
 
 /// إرجاع حالة إرسال التسميع لـ idle بعد ما الـ UI يعرض النتيجة

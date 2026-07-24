@@ -7,6 +7,7 @@ import '../../../../core/error/exception.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
+import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../models/attendance_record_model.dart';
 import '../models/halaqa_student_summary_model.dart';
 
@@ -130,6 +131,46 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
       await firestore
           .collection(FirestoreCollections.recitationRecords)
           .add(record.toFirestore());
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateRecitationReview({
+    required String recordId,
+    required RecitationGrade grade,
+    required RecitationGrade behaviorGrade,
+    String? notes,
+  }) async {
+    try {
+      final ref = firestore
+          .collection(FirestoreCollections.recitationRecords)
+          .doc(recordId);
+
+      await firestore.runTransaction((txn) async {
+        final snap = await txn.get(ref);
+        if (!snap.exists) {
+          throw const ServerException('سجل التسميع غير موجود');
+        }
+        final data = snap.data()!;
+        final status = data['reviewStatus'] as String? ?? 'reviewed';
+        if (status != 'pending') {
+          throw const ServerException('تم تقييم هذا التسميع مسبقاً');
+        }
+
+        final trimmed = notes?.trim();
+        txn.update(ref, {
+          'reviewStatus': 'reviewed',
+          'grade': grade.label,
+          'behaviorGrade': behaviorGrade.label,
+          'notes': (trimmed != null && trimmed.isNotEmpty)
+              ? trimmed
+              : FieldValue.delete(),
+        });
+      });
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }

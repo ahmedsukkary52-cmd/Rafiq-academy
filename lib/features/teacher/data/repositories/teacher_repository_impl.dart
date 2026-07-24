@@ -117,13 +117,29 @@ class TeacherRepositoryImpl implements TeacherRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> updateRecitationReview(
+    UpdateRecitationReviewParams params,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.updateRecitationReview(
+        recordId: params.recordId,
+        grade: params.grade,
+        behaviorGrade: params.behaviorGrade,
+        notes: params.notes,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
   getHalaqaRecitationRecords(String halaqaId) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      return Right(
-        await remoteDatasource.getHalaqaRecitationRecords(halaqaId),
-      );
+      return Right(await remoteDatasource.getHalaqaRecitationRecords(halaqaId));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

@@ -80,11 +80,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  String _text(String? value) {
-    if (value == null || value.trim().isEmpty) return 'غير متوفر';
-    return value.trim();
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_status == SectionStatus.loading ||
@@ -108,8 +103,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
     final profile = _profile!;
     final progress = (profile.overallProgressPercent / 100).clamp(0.0, 1.0);
-    final planName = _text(profile.currentPlanName);
-    final halaqaLabel = _text(_halaqaName);
+    final planName = profile.currentPlanName
+        .trim()
+        .isEmpty
+        ? 'لا توجد خطة حالية'
+        : profile.currentPlanName.trim();
+    final halaqaLabel = (_halaqaName == null || _halaqaName!.trim().isEmpty)
+        ? 'لا توجد حلقة'
+        : _halaqaName!.trim();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -120,13 +121,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             expandedHeight: 220,
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.access_time_rounded),
-                onPressed: () =>
-                    AppSnackBar.showInfo(context, 'قريبًا'),
-              ),
-            ],
             flexibleSpace: FlexibleSpaceBar(
               background: _StudentProfileHeader(
                 name: profile.name,
@@ -151,68 +145,46 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       value: '${profile.streakDays}',
                       label: 'يوم متتالي',
                     ),
-                    const SizedBox(width: 12),
-                    const _StatBox(
-                      value: 'غير متوفر',
-                      label: 'الحضور',
-                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          final teacherState =
-                              context.read<TeacherBloc>().state;
-                          final halaqaId = teacherState.selectedHalaqaId ??
-                              (teacherState.halaqat.isNotEmpty
-                                  ? teacherState.halaqat.first.id
-                                  : null) ??
-                              profile.halaqaId;
-                          if (halaqaId == null || halaqaId.isEmpty) {
-                            AppSnackBar.showInfo(
-                              context,
-                              'لا توجد حلقة مسندة إليك',
-                            );
-                            return;
-                          }
-                          context.push('/teacher/halaqa/$halaqaId/awards');
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.secondary,
-                          side: const BorderSide(color: AppColors.secondary),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusL,
-                            ),
-                          ),
-                        ),
-                        icon: const Icon(Icons.star_border_rounded, size: 18),
-                        label: const Text(
-                          'منح جائزة',
-                          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final teacherState = context
+                          .read<TeacherBloc>()
+                          .state;
+                      final halaqaId = teacherState.selectedHalaqaId ??
+                          (teacherState.halaqat.isNotEmpty
+                              ? teacherState.halaqat.first.id
+                              : null) ??
+                          profile.halaqaId;
+                      if (halaqaId == null || halaqaId.isEmpty) {
+                        AppSnackBar.showInfo(
+                          context,
+                          'لا توجد حلقة مسندة إليك',
+                        );
+                        return;
+                      }
+                      context.push('/teacher/halaqa/$halaqaId/awards');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.secondary,
+                      side: const BorderSide(color: AppColors.secondary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.radiusL,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () =>
-                            AppSnackBar.showInfo(context, 'قريبًا'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: const Icon(Icons.message_outlined, size: 18),
-                        label: const Text(
-                          'تواصل مع الأهل',
-                          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-                        ),
-                      ),
+                    icon: const Icon(Icons.star_border_rounded, size: 18),
+                    label: const Text(
+                      'منح جائزة',
+                      style: TextStyle(fontFamily: 'NotoNaskhArabic'),
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 AppCard(
@@ -236,22 +208,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       const Divider(height: 20),
                       _InfoRow(
                         label: 'الاسم الكامل',
-                        value: _text(profile.name),
+                        value: profile.name
+                            .trim()
+                            .isEmpty
+                            ? 'طالب'
+                            : profile.name.trim(),
                       ),
-                      const SizedBox(height: 10),
-                      const _InfoRow(
-                        label: 'ولي الأمر',
-                        value: 'غير متوفر',
-                      ),
-                      const SizedBox(height: 10),
-                      const _InfoRow(label: 'الهاتف', value: 'غير متوفر'),
                       const SizedBox(height: 10),
                       _InfoRow(label: 'الخطة الحالية', value: planName),
-                      const SizedBox(height: 10),
-                      const _InfoRow(
-                        label: 'تاريخ الانضمام',
-                        value: 'غير متوفر',
-                      ),
                     ],
                   ),
                 ),
@@ -262,20 +226,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                     children: [
                       const SectionHeader(title: 'تقدم الحفظ'),
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${profile.overallProgressPercent.toInt()}%',
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: AppColors.primary,
-                            ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${profile.overallProgressPercent.toInt()}%',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            color: AppColors.primary,
                           ),
-                          Text(
-                            '${profile.totalVersesMemorized} آية',
-                            style: AppTextStyles.bodyMedium,
-                          ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ClipRRect(
@@ -290,20 +248,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                             AppColors.primary,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      SectionHeader(title: 'آخر تقييم'),
-                      SizedBox(height: 12),
-                      Text(
-                        'غير متوفر',
-                        style: AppTextStyles.bodyMedium,
                       ),
                     ],
                   ),

@@ -159,6 +159,8 @@ class _StudentHomeTab extends StatelessWidget {
           previous.halaqaStatus != current.halaqaStatus ||
           previous.halaqaError != current.halaqaError ||
           previous.latestAssignment != current.latestAssignment ||
+          previous.latestAssignmentStatus != current.latestAssignmentStatus ||
+          previous.latestAssignmentError != current.latestAssignmentError ||
           previous.recitationRecords != current.recitationRecords ||
           previous.recitationStatus != current.recitationStatus,
       builder: (context, state) {
@@ -248,9 +250,23 @@ class _StudentHomeTab extends StatelessWidget {
                   ),
                   child: StudentDailyTaskWidget(
                     assignment: state.latestAssignment,
+                    status: state.latestAssignmentStatus,
+                    errorMessage: state.latestAssignmentError,
                     onCardTap: () => context.push(AppRoutes.studentHomework),
                     onReadTap: () => context.push(AppRoutes.studentHomework),
-                    onListenTap: () => context.push(AppRoutes.studentAudio),
+                    onListenTap: () => context.push(
+                      state.latestAssignment != null
+                          ? AppRoutes.studentHomework
+                          : AppRoutes.studentAudio,
+                    ),
+                    onRetry: () {
+                      final auth = context.read<AuthBloc>().state;
+                      if (auth is AuthAuthenticated) {
+                        context.read<StudentBloc>().add(
+                          StartWatchingAssignmentEvent(auth.user.uid),
+                        );
+                      }
+                    },
                   ),
                 ),
               ),

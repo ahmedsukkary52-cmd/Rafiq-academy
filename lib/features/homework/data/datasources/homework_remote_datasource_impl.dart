@@ -148,6 +148,17 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
           'تم إنهاء هذا الواجب — لا يمكن تعديل المهام',
         );
       }
+
+      final target = assignment.tasks.where((t) => t.id == taskId);
+      if (target.isEmpty) {
+        throw const ServerException('المهمة غير موجودة');
+      }
+      if (target.first.kind == 'recitation') {
+        throw const ServerException(
+          'مهمة التسميع تُكمَّل بإرسال تسجيل صوتي فقط — لا يمكن تعليمها يدوياً',
+        );
+      }
+
       final updatedTasks = assignment.tasks.map((t) {
         if (t.id != taskId) return t;
         return AssignmentTaskEntity(
@@ -194,7 +205,7 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
 
         final homework = _toHomework(AssignmentModel.fromFirestore(snap));
         if (!homework.allCompleted) {
-          throw const ServerException('لم تكتمل كل المهام بعد');
+          throw const ServerException('لم تكتمل المهام المطلوبة بعد');
         }
 
         final points = homework.earnedPoints;
@@ -229,6 +240,12 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
   @override
   Future<HomeworkEntity> submitRecitation(SubmitRecitationParams params) async {
     try {
+      if (!AppCapabilities.audioUploadsEnabled) {
+        throw const ServerException(
+          'رفع التسجيل غير متاح حالياً حتى يتم تفعيل خدمة رفع الملفات.',
+        );
+      }
+
       final file = File(params.localFilePath);
       if (!file.existsSync()) {
         throw const ServerException('ملف التسجيل غير موجود');

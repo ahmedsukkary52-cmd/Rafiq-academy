@@ -221,12 +221,24 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
     StartWatchingAssignmentEvent event,
     Emitter<StudentState> emit,
   ) async {
+    emit(
+      state.copyWith(
+        latestAssignmentStatus: SectionStatus.loading,
+        latestAssignmentError: null,
+      ),
+    );
     await emit.forEach(
       watchLatestAssignment(StudentUidParams(event.studentId)),
       onData: (either) => either.fold(
-        (failure) => state,
-        // لو فشل الـ stream نتجاهل ونحافظ على آخر حالة معروفة
-        (assignment) => state.copyWith(latestAssignment: assignment),
+        (failure) => state.copyWith(
+          latestAssignmentStatus: SectionStatus.error,
+          latestAssignmentError: failure.message,
+        ),
+        (assignment) => state.copyWith(
+          latestAssignmentStatus: SectionStatus.loaded,
+          latestAssignment: assignment,
+          latestAssignmentError: null,
+        ),
       ),
     );
   }
@@ -256,6 +268,8 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
         emit,
       ),
     ]);
+    // Re-attach assignment watch so pull-to-refresh recovers from stream errors.
+    add(StartWatchingAssignmentEvent(event.studentId));
   }
 
   // ══════════════════════════════════════════════════════════════════════

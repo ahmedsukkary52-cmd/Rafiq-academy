@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/constants/app_constants.dart';
+
 enum HomeworkTaskKind { reading, listening, review, recitation, quiz, other }
 
 class HomeworkAttachmentEntity extends Equatable {
@@ -50,6 +52,11 @@ class HomeworkTaskEntity extends Equatable {
     required this.kind,
     this.recitationRecordId,
   });
+
+  /// Recitation is optional/deferred until Storage uploads are enabled (D8).
+  bool get isDeferredRecitation =>
+      kind == HomeworkTaskKind.recitation &&
+      !AppCapabilities.audioUploadsEnabled;
 
   HomeworkTaskEntity copyWith({bool? isCompleted, String? recitationRecordId}) {
     return HomeworkTaskEntity(
@@ -104,17 +111,28 @@ class HomeworkEntity extends Equatable {
     this.completedAt,
   });
 
-  int get completedCount => tasks.where((t) => t.isCompleted).length;
+  /// Tasks that must be done before «إنهاء الواجب» (D8).
+  /// When [AppCapabilities.audioUploadsEnabled] is true, recitation is included.
+  List<HomeworkTaskEntity> get requiredTasks => tasks
+      .where(
+        (t) =>
+            AppCapabilities.audioUploadsEnabled ||
+            t.kind != HomeworkTaskKind.recitation,
+      )
+      .toList();
 
-  int get totalCount => tasks.length;
+  int get completedCount => requiredTasks.where((t) => t.isCompleted).length;
+
+  int get totalCount => requiredTasks.length;
 
   double get progress => totalCount == 0 ? 0 : completedCount / totalCount;
 
+  /// True when every **required** task is complete (not deferred recitation).
   bool get allCompleted =>
-      tasks.isNotEmpty && tasks.every((t) => t.isCompleted);
+      requiredTasks.isNotEmpty && requiredTasks.every((t) => t.isCompleted);
 
   int get earnedPoints =>
-      tasks.where((t) => t.isCompleted).fold(0, (s, t) => s + t.points);
+      requiredTasks.where((t) => t.isCompleted).fold(0, (s, t) => s + t.points);
 
   HomeworkEntity copyWith({
     List<HomeworkTaskEntity>? tasks,

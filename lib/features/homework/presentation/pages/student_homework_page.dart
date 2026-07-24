@@ -168,13 +168,29 @@ class _HomeworkView extends StatelessWidget {
 
             final hw = state.homework;
             if (hw == null) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'لا يوجد واجب حالياً\nسيظهر هنا نفس تكليف «درس اليوم» من المعلم',
-                    textAlign: TextAlign.center,
-                  ),
+              return RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: () async {
+                  final auth = context.read<AuthBloc>().state;
+                  final uid =
+                      state.studentId ??
+                      (auth is AuthAuthenticated ? auth.user.uid : '');
+                  if (uid.isEmpty) return;
+                  context.read<HomeworkBloc>().add(LoadHomeworkEvent(uid));
+                  await Future<void>.delayed(const Duration(milliseconds: 600));
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: const [
+                    SizedBox(height: 120),
+                    Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'لا يوجد واجب حالياً\nسيظهر هنا نفس تكليف «درس اليوم» من المعلم',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
@@ -182,77 +198,92 @@ class _HomeworkView extends StatelessWidget {
             return Column(
               children: [
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(AppSizes.paddingM),
-                    children: [
-                      _HomeworkHeroCard(homework: hw),
-                      const SizedBox(height: 20),
-                      const Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          'المهام المطلوبة',
-                          style: AppTextStyles.titleMedium,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...hw.tasks.map(
-                        (task) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _TaskTile(
-                            task: task,
-                            readOnly: hw.isSubmitted,
-                            subtitle:
-                                task.kind == HomeworkTaskKind.recitation &&
-                                    task.isCompleted &&
-                                    (task.recitationRecordId ?? '').isNotEmpty
-                                ? 'تم الإرسال — في انتظار مراجعة المعلم'
-                                : null,
-                            onToggle: hw.isSubmitted
-                                ? null
-                                : () {
-                                    if (task.kind ==
-                                        HomeworkTaskKind.recitation) {
-                                      _openRecitation(context, task, hw);
-                                    } else {
-                                      context.read<HomeworkBloc>().add(
-                                        ToggleTaskEvent(task.id),
-                                      );
-                                    }
-                                  },
-                          ),
-                        ),
-                      ),
-                      if (hw.teacherVoiceNote != null) ...[
-                        const SizedBox(height: 12),
+                  child: RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () async {
+                      final auth = context.read<AuthBloc>().state;
+                      final uid =
+                          state.studentId ??
+                          (auth is AuthAuthenticated ? auth.user.uid : '');
+                      if (uid.isEmpty) return;
+                      context.read<HomeworkBloc>().add(LoadHomeworkEvent(uid));
+                      await Future<void>.delayed(
+                        const Duration(milliseconds: 600),
+                      );
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(AppSizes.paddingM),
+                      children: [
+                        _HomeworkHeroCard(homework: hw),
+                        const SizedBox(height: 20),
                         const Align(
                           alignment: Alignment.centerRight,
                           child: Text(
-                            'ملاحظة صوتية من المعلم',
+                            'المهام',
                             style: AppTextStyles.titleMedium,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        _TeacherVoiceNoteCard(note: hw.teacherVoiceNote!),
-                      ],
-                      if (hw.attachments.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            'مرفقات',
-                            style: AppTextStyles.titleMedium,
+                        const SizedBox(height: 10),
+                        ...hw.tasks.map(
+                          (task) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _TaskTile(
+                              task: task,
+                              readOnly: hw.isSubmitted,
+                              subtitle: _taskSubtitle(task),
+                              deferred: task.isDeferredRecitation,
+                              onToggle: hw.isSubmitted
+                                  ? null
+                                  : () {
+                                      if (task.isDeferredRecitation) {
+                                        _showDeferredRecitationInfo(context);
+                                        return;
+                                      }
+                                      if (task.kind ==
+                                          HomeworkTaskKind.recitation) {
+                                        _openRecitation(context, task, hw);
+                                      } else {
+                                        context.read<HomeworkBloc>().add(
+                                          ToggleTaskEvent(task.id),
+                                        );
+                                      }
+                                    },
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        ...hw.attachments.map(
-                          (a) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _AttachmentTile(attachment: a),
+                        if (hw.teacherVoiceNote != null) ...[
+                          const SizedBox(height: 12),
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'ملاحظة صوتية من المعلم',
+                              style: AppTextStyles.titleMedium,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          _TeacherVoiceNoteCard(note: hw.teacherVoiceNote!),
+                        ],
+                        if (hw.attachments.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'مرفقات',
+                              style: AppTextStyles.titleMedium,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...hw.attachments.map(
+                            (a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _AttachmentTile(attachment: a),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 80),
                       ],
-                      const SizedBox(height: 80),
-                    ],
+                    ),
                   ),
                 ),
                 SafeArea(
@@ -318,6 +349,11 @@ class _HomeworkView extends StatelessWidget {
   ) async {
     if (hw.isSubmitted) return;
 
+    if (task.isDeferredRecitation) {
+      _showDeferredRecitationInfo(context);
+      return;
+    }
+
     // الأبسط: بعد الإرسال الناجح لا نفتح التسجيل تاني — نعرض حالة الانتظار فقط
     if (task.isCompleted && (task.recitationRecordId ?? '').isNotEmpty) {
       AppSnackBar.showInfo(context, 'تم الإرسال — في انتظار مراجعة المعلم');
@@ -364,6 +400,38 @@ class _HomeworkView extends StatelessWidget {
     if (success == true && context.mounted) {
       // لا شيء — HomeworkBloc watch يحدّث الواجهة
     }
+  }
+
+  String? _taskSubtitle(HomeworkTaskEntity task) {
+    if (task.isDeferredRecitation) {
+      return 'اختياري مؤجل — سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات';
+    }
+    if (task.kind == HomeworkTaskKind.recitation &&
+        task.isCompleted &&
+        (task.recitationRecordId ?? '').isNotEmpty) {
+      return 'تم الإرسال — في انتظار مراجعة المعلم';
+    }
+    return null;
+  }
+
+  void _showDeferredRecitationInfo(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('التسميع الصوتي', textAlign: TextAlign.right),
+        content: const Text(
+          'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -526,18 +594,20 @@ class _TaskTile extends StatelessWidget {
   final HomeworkTaskEntity task;
   final VoidCallback? onToggle;
   final bool readOnly;
+  final bool deferred;
   final String? subtitle;
 
   const _TaskTile({
     required this.task,
     required this.onToggle,
     this.readOnly = false,
+    this.deferred = false,
     this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final muted = readOnly;
+    final muted = readOnly || deferred;
     return Opacity(
       opacity: muted ? 0.72 : 1,
       child: AppCard(
@@ -552,7 +622,7 @@ class _TaskTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppSizes.radiusFull),
               ),
               child: Text(
-                '${task.points}+',
+                deferred ? 'مؤجل' : '${task.points}+',
                 style: AppTextStyles.labelSmall.copyWith(
                   color: muted ? AppColors.textSecondary : AppColors.secondary,
                   fontWeight: FontWeight.w700,
@@ -571,7 +641,7 @@ class _TaskTile extends StatelessWidget {
                       color: task.isCompleted || muted
                           ? AppColors.textSecondary
                           : AppColors.textPrimary,
-                      decoration: task.isCompleted
+                      decoration: task.isCompleted && !deferred
                           ? TextDecoration.lineThrough
                           : null,
                     ),
@@ -582,7 +652,9 @@ class _TaskTile extends StatelessWidget {
                       subtitle!,
                       textAlign: TextAlign.right,
                       style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.primaryDark,
+                        color: deferred
+                            ? AppColors.textSecondary
+                            : AppColors.primaryDark,
                       ),
                     ),
                   ],
@@ -594,19 +666,25 @@ class _TaskTile extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: task.isCompleted
+                color: task.isCompleted && !deferred
                     ? AppColors.success
                     : Colors.transparent,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: task.isCompleted
+                  color: task.isCompleted && !deferred
                       ? AppColors.success
                       : AppColors.textHint,
                   width: 2,
                 ),
               ),
-              child: task.isCompleted
+              child: task.isCompleted && !deferred
                   ? const Icon(Icons.check, color: Colors.white, size: 16)
+                  : deferred
+                  ? const Icon(
+                      Icons.schedule,
+                      color: AppColors.textHint,
+                      size: 16,
+                    )
                   : null,
             ),
           ],

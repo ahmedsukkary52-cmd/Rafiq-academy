@@ -10,6 +10,7 @@ import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -224,6 +225,28 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   void _submitRecitation() {
     if (_recordedFilePath == null) return;
     final isHomework = widget.homeworkContext != null;
+
+    if (isHomework && !AppCapabilities.audioUploadsEnabled) {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+          content: const Text(
+            'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -274,6 +297,16 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
           _hasRecorded = false;
           _recordedFilePath = null;
         });
+      }
+      return;
+    }
+
+    if (!AppCapabilities.audioUploadsEnabled) {
+      if (mounted) {
+        AppSnackBar.showInfo(
+          context,
+          'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
+        );
       }
       return;
     }

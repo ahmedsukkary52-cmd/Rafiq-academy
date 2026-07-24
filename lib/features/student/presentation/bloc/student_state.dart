@@ -48,7 +48,9 @@ class StudentState extends Equatable {
   final String? halaqaError;
 
   // ── التكليف الأخير (يتحدّث real-time عن طريق Stream) ───────────────────
+  final SectionStatus latestAssignmentStatus;
   final AssignmentEntity? latestAssignment;
+  final String? latestAssignmentError;
 
   // ── تحديث اختيار الشخصية (avatar) ──────────────────────────────────────
   final SectionStatus avatarUpdateStatus;
@@ -70,7 +72,9 @@ class StudentState extends Equatable {
     this.halaqaStatus = SectionStatus.initial,
     this.halaqa,
     this.halaqaError,
+    this.latestAssignmentStatus = SectionStatus.initial,
     this.latestAssignment,
+    this.latestAssignmentError,
     this.avatarUpdateStatus = SectionStatus.initial,
     this.avatarUpdateError,
   });
@@ -97,7 +101,9 @@ class StudentState extends Equatable {
     SectionStatus? halaqaStatus,
     Object? halaqa = _unset,
     Object? halaqaError = _unset,
+    SectionStatus? latestAssignmentStatus,
     Object? latestAssignment = _unset,
+    Object? latestAssignmentError = _unset,
     SectionStatus? avatarUpdateStatus,
     Object? avatarUpdateError = _unset,
   }) {
@@ -129,9 +135,14 @@ class StudentState extends Equatable {
       halaqaError: identical(halaqaError, _unset)
           ? this.halaqaError
           : halaqaError as String?,
+      latestAssignmentStatus:
+          latestAssignmentStatus ?? this.latestAssignmentStatus,
       latestAssignment: identical(latestAssignment, _unset)
           ? this.latestAssignment
           : latestAssignment as AssignmentEntity?,
+      latestAssignmentError: identical(latestAssignmentError, _unset)
+          ? this.latestAssignmentError
+          : latestAssignmentError as String?,
       avatarUpdateStatus: avatarUpdateStatus ?? this.avatarUpdateStatus,
       avatarUpdateError: identical(avatarUpdateError, _unset)
           ? this.avatarUpdateError
@@ -156,7 +167,9 @@ class StudentState extends Equatable {
     halaqaStatus,
     halaqa,
     halaqaError,
+    latestAssignmentStatus,
     latestAssignment,
+    latestAssignmentError,
     avatarUpdateStatus,
     avatarUpdateError,
   ];

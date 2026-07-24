@@ -108,13 +108,16 @@ class StudentRepositoryImpl implements StudentRepository {
   @override
   Stream<Either<Failure, AssignmentEntity?>> watchLatestAssignment(
     String studentId,
-  ) {
-    return remoteDatasource
-        .watchLatestAssignment(studentId)
-        .map<Either<Failure, AssignmentEntity?>>(
-          (assignment) => Right(assignment),
-        )
-        .handleError((e) => Left(ServerFailure(e.toString())));
+  ) async* {
+    try {
+      await for (final assignment in remoteDatasource.watchLatestAssignment(
+        studentId,
+      )) {
+        yield Right(assignment);
+      }
+    } catch (e) {
+      yield Left(ServerFailure(e.toString()));
+    }
   }
 
   @override

@@ -1,7 +1,7 @@
 # W1 — Daily Lesson & Homework Loop  
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (with slice reorder + D7). Implementation in progress.  
+**Status:** D8 approved (Option A + optional/deferred). **Slice 2 shipped** — continue Slice 3 (teacher reviews pending).  
 **File key / Figma:** Basma (Copy) — teacher class/evals + student homework/evaluations as UX reference only  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT (`assignments`)
 
@@ -189,9 +189,10 @@ Teacher UI (missing assign) ──X──► TeacherBloc.SendAssignmentEvent
 | | |
 |--|--|
 | **Why blocked** | Blaze not approved (`STUDENT_STATUS.md`) |
-| **Reuse** | Existing submit path when Storage enabled |
-| **Minimal add for W1** | Honest disabled/empty for recitation upload; keep reading/listening/complete usable |
+| **Reuse** | Existing submit path when Storage enabled; mushaf already shows honest “رفع التسجيل غير متاح حالياً” |
+| **Minimal add for W1** | Honest disabled/empty for homework recitation upload; keep reading/listening/complete usable |
 | **Category** | **Verified** infra decision; enabling Storage = **Product decision** |
+| **Slice 2 discovery** | **Resolved by D8 Option A:** Recitation is **optional/deferred** while uploads are off — visible with honest copy, never blocks finish, never auto-completed, never creates pending without real audio. Flip `AppCapabilities.audioUploadsEnabled` when Storage is on so recitation becomes required again without redesigning W1. |
 
 ### G5 — Parent visibility  
 | | |
@@ -376,6 +377,7 @@ Per standing rules: all actors can complete their part · no fake seeds · archi
 | D5 | W1 complete without Storage | Verified | **Yes** |
 | D6 | Parent visibility via weekly report honesty only | Inference | **Yes** |
 | D7 | Assignment versioning | **Verified** (reuse current code) | See below |
+| D8 | Homework finish vs recitation while Storage off | **Product decision** | **Approved — Option A + deferred** |
 
 ### D7 — Assignment versioning (Verified — reuse)
 
@@ -390,9 +392,27 @@ Current implementation already defines behavior. **Do not invent a new model.**
 
 **Implication for Slice 1:** Teacher assign UI sets `dueDate` (typically end of selected day). New assigns become “current” when their `dueDate` is newest. Tie-breaking among equal `dueDate` values is Firestore-undefined — accept existing behavior; do not add versioning fields unless a later product decision requires it.
 
+### D8 — Homework completion without Storage (Approved — Option A + refinement)
+
+**Resolution:** Recitation is **optional / deferred** while Firebase Storage uploads are disabled — not a failed required task.
+
+| Rule | Behavior |
+|------|----------|
+| Required to finish today’s homework | **Reading + listening** only (`AppCapabilities.audioUploadsEnabled == false`) |
+| Recitation task | Stays visible; marked deferred with honest copy: uploads unavailable until enabled |
+| Blocks finish? | **No** |
+| Auto-complete recitation? | **Never** |
+| Pending `recitationRecords` without real audio? | **Never** |
+| Fake uploaded audio? | **Never** |
+| When Storage enabled later | Set `AppCapabilities.audioUploadsEnabled = true` → recitation becomes **required** for finish on the same workflow (no W1 redesign) |
+
+**Copy (student-facing):** Arabic UI equivalent of: “Audio submission will be available when uploads are enabled.”
+
+**Implication:** Slice 3 review UI still ships (live «تقييم جديد» + pending cards for real Storage submits). Homework pending volume stays near zero until Blaze.
+
 ---
 
 ## Approval gate
 
-Design + D1–D7 reflected. **Pre-Slice complete.** Slice 1 (teacher assign UI) in progress.  
+D8 approved. **Slice 2** implements honest non-audio complete + Home/Homework hardening.  
 If implementation discovers a flawed assumption: stop, update this doc, then continue.

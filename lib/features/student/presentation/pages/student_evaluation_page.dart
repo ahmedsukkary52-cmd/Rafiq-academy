@@ -71,22 +71,43 @@ class _StudentEvaluationsPageState extends State<StudentEvaluationsPage> {
                   ),
                   _EvaluationMetrics(records: records),
                   Expanded(
-                    child: records.isEmpty
-                        ? const _EmptyEvaluations()
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-                            itemCount: records.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 22),
-                            itemBuilder: (context, index) {
-                              return _EvaluationTimelineItem(
-                                record: records[index],
-                                color: index.isEven
-                                    ? AppColors.secondary
-                                    : const Color(0xFF28C5CF),
-                              );
-                            },
-                          ),
+                    child: RefreshIndicator(
+                      color: AppColors.primary,
+                      onRefresh: () async {
+                        _reload();
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 600),
+                        );
+                      },
+                      child: records.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: const [
+                                SizedBox(height: 48),
+                                _EmptyEvaluations(),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                28,
+                                24,
+                                28,
+                              ),
+                              itemCount: records.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 22),
+                              itemBuilder: (context, index) {
+                                return _EvaluationTimelineItem(
+                                  record: records[index],
+                                  color: index.isEven
+                                      ? AppColors.secondary
+                                      : const Color(0xFF28C5CF),
+                                );
+                              },
+                            ),
+                    ),
                   ),
                 ],
               );
@@ -542,9 +563,11 @@ class _EmptyEvaluations extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24),
       child: Text(
-        'لا توجد تقييمات في هذه الفترة',
+        'لا توجد تقييمات معتمدة في هذه الفترة.\nالتسميعات بانتظار مراجعة المعلم لا تظهر هنا.',
+        textAlign: TextAlign.center,
         style: AppTextStyles.bodyLarge,
       ),
     );

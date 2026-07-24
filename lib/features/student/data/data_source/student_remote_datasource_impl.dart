@@ -81,13 +81,16 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
           .collection(FirestoreCollections.recitationRecords)
           .where('studentId', isEqualTo: studentId)
           .orderBy('date', descending: true)
-          .limit(20)
+          // Fetch extra so client-side pending filter still surfaces reviewed grades
+          // when recent homework submits are waiting on the teacher.
+          .limit(50)
           .get();
 
       return snapshot.docs
           .map(RecitationRecordModel.fromFirestore)
           // تقييمات المعلم فقط — استبعِد تسميعات الطالب المنتظرة للمراجعة
           .where((r) => !r.isPendingReview)
+          .take(20)
           .toList();
     } catch (e) {
       throw ServerException(e.toString());

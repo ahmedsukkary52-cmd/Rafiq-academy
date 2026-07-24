@@ -356,7 +356,10 @@ class _HomeworkView extends StatelessWidget {
 
     // الأبسط: بعد الإرسال الناجح لا نفتح التسجيل تاني — نعرض حالة الانتظار فقط
     if (task.isCompleted && (task.recitationRecordId ?? '').isNotEmpty) {
-      AppSnackBar.showInfo(context, 'تم الإرسال — في انتظار مراجعة المعلم');
+      AppSnackBar.showInfo(
+        context,
+        'تم إرسال التسميع — راجع صفحة التقييمات بعد مراجعة المعلم',
+      );
       return;
     }
 
@@ -409,7 +412,7 @@ class _HomeworkView extends StatelessWidget {
     if (task.kind == HomeworkTaskKind.recitation &&
         task.isCompleted &&
         (task.recitationRecordId ?? '').isNotEmpty) {
-      return 'تم الإرسال — في انتظار مراجعة المعلم';
+      return 'تم إرسال التسميع — النتيجة تظهر في التقييمات بعد مراجعة المعلم';
     }
     return null;
   }

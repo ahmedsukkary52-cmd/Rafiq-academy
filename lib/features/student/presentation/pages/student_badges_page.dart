@@ -90,14 +90,15 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
                   ),
                 ),
                 if (items.isEmpty)
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
                       child: Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(24),
                         child: Text(
-                          'لا توجد عناصر في هذا القسم حالياً',
+                          _emptyMessageForTab(),
                           textAlign: TextAlign.center,
+                          style: AppTextStyles.bodyMedium,
                         ),
                       ),
                     ),
@@ -127,17 +128,19 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
     );
   }
 
+  String _emptyMessageForTab() {
+    return switch (_tab) {
+      _RewardTab.gifts => 'الهدايا — Coming Soon',
+      _RewardTab.certificates => 'لا توجد شهادات ممنوحة حالياً',
+      _RewardTab.badges => 'لا توجد شارات مكتسبة حالياً',
+    };
+  }
+
   List<_BadgeItem> _itemsFor(StudentState state) {
     final profile = state.profile;
     final badges = profile?.badges ?? const <String>[];
     final achievements = state.achievements;
     final now = DateTime.now();
-
-    bool hasBadgeId(String id) =>
-        badges.any((b) => b.trim().toLowerCase() == id.toLowerCase());
-
-    bool hasAchievementType(AchievementType type) =>
-        achievements.any((a) => a.type == type);
 
     bool isRecentUnlock(DateTime date) =>
         now.difference(date).inDays <= 7 && !date.isAfter(now);
@@ -148,17 +151,6 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
               .where((a) => a.type == AchievementType.certificate)
               .toList()
             ..sort((a, b) => b.date.compareTo(a.date));
-
-      if (certificates.isEmpty) {
-        return const [
-          _BadgeItem(
-            icon: '📜',
-            title: 'شهادة',
-            subtitle: 'تُفتح عند منح شهادة من المعلم',
-            color: Color(0xFF9299A3),
-          ),
-        ];
-      }
 
       return certificates
           .map(
@@ -175,84 +167,48 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
     }
 
     if (_tab == _RewardTab.gifts) {
-      final coins = profile?.coins ?? 0;
-      final completedJuz = profile?.completedJuz ?? 0;
-      return [
-        _BadgeItem(
-          icon: '🎁',
-          title: 'هدية التفوق',
-          subtitle: 'تتطلب 250 عملة',
-          color: const Color(0xFFF6C42E),
-          unlocked: coins >= 250 || hasBadgeId('gift_excellence'),
-        ),
-        _BadgeItem(
-          icon: '🌙',
-          title: 'مفاجأة الحفظ',
-          subtitle: 'تتطلب إتمام جزء واحد على الأقل',
-          color: const Color(0xFF24C6CF),
-          unlocked: completedJuz > 0 || hasBadgeId('gift_juz'),
-        ),
-      ];
+      // No gift catalog is backed by backend data yet.
+      return const [];
     }
 
-    final stars = profile?.totalStars ?? 0;
-    final streak = profile?.streakDays ?? 0;
-    final verses = profile?.totalVersesMemorized ?? 0;
-    final completedJuz = profile?.completedJuz ?? 0;
+    final badgeAchievements =
+        achievements.where((a) => a.type == AchievementType.badge).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
-    final starUnlocked = stars >= 5 || hasBadgeId('star_5');
-    final streakUnlocked = streak >= 14 || hasBadgeId('streak_14');
-    final readerUnlocked = verses > 0 || hasBadgeId('reader');
-    final weeklyUnlocked = hasBadgeId('weekly_leader');
-    final juzUnlocked = completedJuz > 0 || hasBadgeId('juz_complete');
-    final ijazaUnlocked =
-        hasAchievementType(AchievementType.certificate) ||
-        hasBadgeId('first_ijaza');
+    final fromAchievements = badgeAchievements
+        .map(
+          (a) => _BadgeItem(
+            icon: '🎖️',
+            title: a.title.isNotEmpty ? a.title : 'شارة',
+            subtitle: 'شارة مكتسبة',
+            color: const Color(0xFFF6C42E),
+            unlocked: true,
+            isNew: isRecentUnlock(a.date),
+          ),
+        )
+        .toList();
 
-    return [
-      _BadgeItem(
-        icon: '⭐',
-        title: 'نجم الحفظ',
-        subtitle: 'احصل على 5 نجوم',
-        color: const Color(0xFFF6C42E),
-        unlocked: starUnlocked,
-      ),
-      _BadgeItem(
-        icon: '🔥',
-        title: 'الثابت 14 يوم',
-        subtitle: 'سجّل 14 يوم متواصل',
-        color: const Color(0xFF21C1C8),
-        unlocked: streakUnlocked,
-      ),
-      _BadgeItem(
-        icon: '📖',
-        title: 'قارئ ممتاز',
-        subtitle: 'احفظ آية واحدة على الأقل',
-        color: const Color(0xFF25AE69),
-        unlocked: readerUnlocked,
-      ),
-      _BadgeItem(
-        icon: '🏆',
-        title: 'متصدر الأسبوع',
-        subtitle: 'تُفتح عند إضافة الشارة لملفك',
-        color: const Color(0xFF8149E8),
-        unlocked: weeklyUnlocked,
-      ),
-      _BadgeItem(
-        icon: '🌙',
-        title: 'حافظ الجزء',
-        subtitle: 'أتمم جزءًا واحدًا على الأقل',
-        color: const Color(0xFF9299A3),
-        unlocked: juzUnlocked,
-      ),
-      _BadgeItem(
-        icon: '📜',
-        title: 'الإجازة الأولى',
-        subtitle: 'تُفتح عند منح شهادة',
-        color: const Color(0xFF9299A3),
-        unlocked: ijazaUnlocked,
-      ),
-    ];
+    final achievementTitles = badgeAchievements
+        .map((a) => a.title.trim().toLowerCase())
+        .where((t) => t.isNotEmpty)
+        .toSet();
+
+    final fromProfile = badges
+        .map((b) => b.trim())
+        .where((b) => b.isNotEmpty)
+        .where((b) => !achievementTitles.contains(b.toLowerCase()))
+        .map(
+          (b) => _BadgeItem(
+            icon: '🏅',
+            title: b,
+            subtitle: 'شارة في الملف',
+            color: const Color(0xFF25AE69),
+            unlocked: true,
+          ),
+        )
+        .toList();
+
+    return [...fromAchievements, ...fromProfile];
   }
 }
 

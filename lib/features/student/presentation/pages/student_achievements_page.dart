@@ -231,7 +231,7 @@ class _Header extends StatelessWidget {
                 const SizedBox(width: 12),
                 _StatTile(
                   value: '$memorizationAccuracy%',
-                  label: 'دقة الحفظ',
+                  label: 'نسبة التقدم',
                   color: const Color(0xFF34D18B),
                 ),
               ],
@@ -327,7 +327,10 @@ class _AchievementRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
             ),
             alignment: Alignment.center,
-            child: Text(_iconFor(achievement.type), style: const TextStyle(fontSize: 30)),
+            child: Text(
+              _iconFor(achievement.type),
+              style: const TextStyle(fontSize: 30),
+            ),
           ),
           const SizedBox(width: 18),
           Expanded(
@@ -342,10 +345,7 @@ class _AchievementRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'بواسطة $issuer',
-                  style: AppTextStyles.bodyMedium,
-                ),
+                Text('بواسطة $issuer', style: AppTextStyles.bodyMedium),
                 const SizedBox(height: 2),
                 Text(
                   dateLabel,
@@ -369,16 +369,16 @@ class _AchievementRow extends StatelessWidget {
   }
 
   static String _iconFor(AchievementType type) => switch (type) {
-        AchievementType.star => '⭐',
-        AchievementType.badge => '🎖️',
-        AchievementType.certificate => '📜',
-      };
+    AchievementType.star => '⭐',
+    AchievementType.badge => '🎖️',
+    AchievementType.certificate => '📜',
+  };
 
   static String _typeLabel(AchievementType type) => switch (type) {
-        AchievementType.star => 'نجمة',
-        AchievementType.badge => 'شارة',
-        AchievementType.certificate => 'شهادة',
-      };
+    AchievementType.star => 'نجمة',
+    AchievementType.badge => 'شارة',
+    AchievementType.certificate => 'شهادة',
+  };
 
   static String _formatDate(DateTime date) {
     final d = date.day.toString().padLeft(2, '0');

@@ -956,8 +956,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     0x0650,
   ]);
 
-  static const String _lastFreeSurahKey = 'last_free_mushaf_surah';
-
   static const List<String> _allSurahNames = [
     'الفاتحة',
     'البقرة',
@@ -1117,7 +1115,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   ReciterInfo _selectedReciter = _reciters.first;
 
   final List<TapGestureRecognizer> _ayahRecognizers = [];
-  SurahMeta? _dynamicMeta;
 
   SurahMeta get _meta {
     if (_groupedByPage.isEmpty) {
@@ -1296,15 +1293,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     final sortedPages = pageMap.keys.toList()..sort();
     _groupedByPage = sortedPages.map((page) => pageMap[page]!).toList();
 
-    // Set initial meta to first surah
-    _dynamicMeta = SurahMeta(
-      number: 1,
-      name: _allSurahNames.first,
-      juz: '',
-      type: 'مكية',
-      versesCount: 7,
-    );
-
     _rebuildAyahRecognizers();
   }
 
@@ -1330,7 +1318,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       return ayah.text;
     }
     var text = ayah.text;
-    debugPrint('=== Original Ayah Text (length:${text.length}): "$text" ===');
 
     // Build Bismillah from the EXACT character codes from your log!
     final bismillah = String.fromCharCodes([
@@ -1374,21 +1361,13 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       0x0650,
     ]);
 
-    debugPrint(
-      '=== Built Bismillah (length:${bismillah.length}): "$bismillah" ===',
-    );
-
     // Try to remove it
     if (text.startsWith(bismillah)) {
       text = text.substring(bismillah.length).trim();
-      debugPrint('=== After Bismillah Removal: "$text" ===');
     } else {
       final trimmedText = text.trimLeft();
       if (trimmedText.startsWith(bismillah)) {
         text = trimmedText.substring(bismillah.length).trim();
-        debugPrint('=== After Bismillah Removal (trimmed): "$text" ===');
-      } else {
-        debugPrint('=== Still no match! ===');
       }
     }
     return text;
@@ -1887,7 +1866,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               isDarkMode: _isDarkMode,
               onReadingTap: () => setState(() => _mode = MushafMode.reading),
               onRecitationTap: () {
-                debugPrint('Recitation tapped! Navigating...');
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -1971,7 +1949,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       },
       itemBuilder: (context, pageIndex) {
         final pageAyahs = _groupedByPage[pageIndex];
-        final pageNumber = pageAyahs.first.page;
         return _MushafPageFrame(
           isDarkMode: _isDarkMode,
           child: Column(
@@ -2591,147 +2568,6 @@ class _ModeTabButton extends StatelessWidget {
   }
 }
 
-class _SurahHeader extends StatelessWidget {
-  final SurahMeta meta;
-  final bool isDarkMode;
-  final String Function(int) toArabicDigits;
-  final VoidCallback onMoreTap;
-
-  const _SurahHeader({
-    required this.meta,
-    required this.isDarkMode,
-    required this.toArabicDigits,
-    required this.onMoreTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final headerBg = isDarkMode ? AppColors.darkCard : const Color(0xFFF2E8C9);
-    final primaryTextColor = isDarkMode ? Colors.white : AppColors.textPrimary;
-    final secondaryTextColor = isDarkMode
-        ? Colors.white60
-        : AppColors.textSecondary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: headerBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDarkMode ? Colors.white10 : const Color(0xFFE2D6AC),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (meta.juz.isNotEmpty)
-                  Text(
-                    meta.juz,
-                    style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  'سورة ${meta.name}',
-                  style: GoogleFonts.amiri(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: primaryTextColor,
-                  ),
-                ),
-                Text(
-                  meta.type.isNotEmpty
-                      ? '${meta.type} · ${toArabicDigits(meta.versesCount)} آية'
-                      : '${toArabicDigits(meta.versesCount)} آية',
-                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onMoreTap,
-            icon: Icon(Icons.more_horiz_rounded, color: secondaryTextColor),
-            tooltip: 'المزيد',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FreeMushafSurahBar extends StatelessWidget {
-  final int selectedSurah;
-  final bool isDarkMode;
-  final ScrollController scrollController;
-  final ValueChanged<int> onSurahSelected;
-
-  const _FreeMushafSurahBar({
-    required this.selectedSurah,
-    required this.isDarkMode,
-    required this.scrollController,
-    required this.onSurahSelected,
-  });
-
-  static const List<String> _names = _StudentMushafPageState._allSurahNames;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDarkMode ? AppColors.darkCard : const Color(0xFF1A3D36);
-
-    return Container(
-      color: bg,
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
-      child: SizedBox(
-        height: 44,
-        child: ListView.separated(
-          controller: scrollController,
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: _names.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 6),
-          itemBuilder: (context, index) {
-            final number = index + 1;
-            final selected = number == selectedSurah;
-            return GestureDetector(
-              onTap: () => onSurahSelected(number),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.primary
-                      : Colors.white.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: selected
-                        ? AppColors.primary
-                        : Colors.white.withOpacity(0.2),
-                  ),
-                ),
-                child: Text(
-                  _names[index],
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
-                    color: Colors.white.withOpacity(selected ? 1 : 0.85),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
 class _MushafPageFrame extends StatelessWidget {
   final bool isDarkMode;
   final Widget child;
@@ -2763,111 +2599,6 @@ class _MushafPageFrame extends StatelessWidget {
         ],
       ),
       child: child,
-    );
-  }
-}
-
-class _OrnateSurahBanner extends StatelessWidget {
-  final String name;
-  final int verseCount;
-  final String Function(int) toArabicDigits;
-
-  const _OrnateSurahBanner({
-    required this.name,
-    required this.verseCount,
-    required this.toArabicDigits,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFFD4AF37), // Gold color
-            Color(0xFFB8954F),
-            Color(0xFFD4AF37),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF8B6914), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFB8954F).withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Decorative elements
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 6,
-            child: Container(height: 2, color: const Color(0xFF8B6914)),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 6,
-            child: Container(height: 2, color: const Color(0xFF8B6914)),
-          ),
-          // Surah name
-          Text(
-            '﷽ سورة $name ﷽',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.amiri(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF3D2E10),
-              height: 1.4,
-            ),
-          ),
-          // Side decorations
-          Positioned(
-            left: 12,
-            child: _BannerDot(label: toArabicDigits(verseCount)),
-          ),
-          Positioned(
-            right: 12,
-            child: _BannerDot(label: toArabicDigits(verseCount)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BannerDot extends StatelessWidget {
-  final String label;
-
-  const _BannerDot({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFFFAF6EB),
-        border: Border.all(color: const Color(0xFFB8954F)),
-      ),
-      child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF3D2E10),
-          ),
-        ),
-      ),
     );
   }
 }

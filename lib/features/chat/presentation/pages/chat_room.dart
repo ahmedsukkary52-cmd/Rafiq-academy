@@ -96,14 +96,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       color: Colors.white,
                     ),
                   ),
-                  const Text(
-                    'متصل الآن',
-                    style: TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 11,
-                      color: Colors.white70,
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(width: 10),
@@ -115,12 +107,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.more_vert_rounded),
-              onPressed: () {},
-            ),
-          ],
         ),
         body: Column(
           children: [

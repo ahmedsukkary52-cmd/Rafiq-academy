@@ -416,22 +416,12 @@ class _AtRiskCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  TextButton(
-                    onPressed: () {},
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                      ),
-                    ),
-                    child: const Text(
-                      'تواصل',
-                      style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+                  Text(
+                    'Coming Soon',
+                    style: TextStyle(
+                      fontFamily: 'NotoNaskhArabic',
+                      fontSize: 13,
+                      color: AppColors.textHint,
                     ),
                   ),
                   const Spacer(),

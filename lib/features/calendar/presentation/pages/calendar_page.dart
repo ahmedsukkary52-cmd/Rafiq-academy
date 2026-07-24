@@ -82,6 +82,12 @@ class _CalendarPageState extends State<CalendarPage> {
             ],
           ),
           body: BlocBuilder<CalendarBloc, CalendarState>(
+            buildWhen: (previous, current) =>
+                previous.eventsStatus != current.eventsStatus ||
+                previous.monthEvents != current.monthEvents ||
+                previous.eventsError != current.eventsError ||
+                previous.focusedMonth != current.focusedMonth ||
+                previous.selectedDay != current.selectedDay,
             builder: (context, state) {
               final eventsByDay = <DateTime, List<CalendarEventEntity>>{};
               for (final event in state.monthEvents) {
@@ -89,6 +95,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     .putIfAbsent(event.dateOnly, () => <CalendarEventEntity>[])
                     .add(event);
               }
+              final dayEvents = state.selectedDayEvents;
 
               return Column(
                 children: [
@@ -203,7 +210,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
                   // ── أحداث اليوم المختار ─────────────────────────
                   Expanded(
-                    child: state.selectedDayEvents.isEmpty
+                    child: dayEvents.isEmpty
                         ? const Center(
                             child: Text(
                               'لا توجد أحداث في هذا اليوم',
@@ -215,11 +222,11 @@ class _CalendarPageState extends State<CalendarPage> {
                               horizontal: AppSizes.paddingM,
                               vertical: 8,
                             ),
-                            itemCount: state.selectedDayEvents.length,
+                            itemCount: dayEvents.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 8),
                             itemBuilder: (context, i) {
-                              final event = state.selectedDayEvents[i];
+                              final event = dayEvents[i];
                               return _EventCard(event: event);
                             },
                           ),

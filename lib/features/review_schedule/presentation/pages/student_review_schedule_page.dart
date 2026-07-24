@@ -63,6 +63,10 @@ class _ReviewScheduleView extends StatelessWidget {
         ),
       ),
       body: BlocBuilder<ReviewScheduleBloc, ReviewScheduleState>(
+        buildWhen: (previous, current) =>
+            previous.status != current.status ||
+            previous.month != current.month ||
+            previous.errorMessage != current.errorMessage,
         builder: (context, state) {
           if (state.status == SectionStatus.loading ||
               state.status == SectionStatus.initial) {

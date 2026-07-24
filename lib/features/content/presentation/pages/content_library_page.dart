@@ -179,7 +179,13 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
           ],
         ),
         body: BlocBuilder<ContentLibraryBloc, ContentLibraryState>(
+          buildWhen: (previous, current) =>
+              previous.filesStatus != current.filesStatus ||
+              previous.allFiles != current.allFiles ||
+              previous.activeFilter != current.activeFilter ||
+              previous.filesError != current.filesError,
           builder: (context, state) {
+            final files = state.filteredFiles;
             return Column(
               children: [
                 // ── بحث ─────────────────────────────────────────
@@ -250,38 +256,43 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
 
                 const SizedBox(height: 12),
 
-                // ── upload progress ───────────────────────────────
-                if (state.uploadProgress != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.paddingM,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'جارٍ الرفع... ${(state.uploadProgress! * 100).toInt()}%',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: AppColors.primary,
+                // ── upload progress (isolated from file list rebuilds) ──
+                BlocSelector<ContentLibraryBloc, ContentLibraryState, double?>(
+                  selector: (s) => s.uploadProgress,
+                  builder: (context, progress) {
+                    if (progress == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.paddingM,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'جارٍ الرفع... ${(progress * 100).toInt()}%',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: AppColors.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        LinearProgressIndicator(
-                          value: state.uploadProgress,
-                          valueColor: const AlwaysStoppedAnimation(
-                            AppColors.primary,
+                          const SizedBox(height: 4),
+                          LinearProgressIndicator(
+                            value: progress,
+                            valueColor: const AlwaysStoppedAnimation(
+                              AppColors.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    ),
-                  ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    );
+                  },
+                ),
 
                 // ── الملفات ──────────────────────────────────────
                 Expanded(
                   child: state.filesStatus == SectionStatus.loading
                       ? const AppLoadingWidget()
-                      : state.filteredFiles.isEmpty
+                      : files.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -319,10 +330,10 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                                 crossAxisSpacing: 12,
                                 childAspectRatio: 0.85,
                               ),
-                          itemCount: state.filteredFiles.length,
+                          itemCount: files.length,
                           itemBuilder: (context, i) => _FileCard(
-                            file: state.filteredFiles[i],
-                            onTap: () => _openFile(state.filteredFiles[i]),
+                            file: files[i],
+                            onTap: () => _openFile(files[i]),
                           ),
                         ),
                 ),

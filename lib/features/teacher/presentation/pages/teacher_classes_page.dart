@@ -57,6 +57,10 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('حلقاتي')),
       body: BlocBuilder<TeacherBloc, TeacherState>(
+        buildWhen: (previous, current) =>
+            previous.halaqatStatus != current.halaqatStatus ||
+            previous.halaqat != current.halaqat ||
+            previous.halaqatError != current.halaqatError,
         builder: (context, state) {
           if (state.halaqatStatus == SectionStatus.loading ||
               state.halaqatStatus == SectionStatus.initial) {

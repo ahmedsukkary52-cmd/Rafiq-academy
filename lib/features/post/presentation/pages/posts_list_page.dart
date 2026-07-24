@@ -83,6 +83,10 @@ class _PostsListPageState extends State<PostsListPage> {
           ],
         ),
         body: BlocBuilder<PostsBloc, PostsState>(
+          buildWhen: (previous, current) =>
+              previous.postsStatus != current.postsStatus ||
+              previous.posts != current.posts ||
+              previous.postsError != current.postsError,
           builder: (context, state) {
             if (state.postsStatus == SectionStatus.loading) {
               return const AppLoadingWidget();

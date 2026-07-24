@@ -46,6 +46,10 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
       appBar: AppBar(title: const Text('الرسائل')),
       body: BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
         bloc: sl<ChatConversationsBloc>(),
+        buildWhen: (previous, current) =>
+            previous.conversationsStatus != current.conversationsStatus ||
+            previous.conversations != current.conversations ||
+            previous.conversationsError != current.conversationsError,
         builder: (context, state) {
           final authState = context.read<AuthBloc>().state;
           final currentUid = authState is AuthAuthenticated

@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -135,6 +136,13 @@ class _HomeworkView extends StatelessWidget {
           ),
         ),
         body: BlocBuilder<HomeworkBloc, HomeworkState>(
+          buildWhen: (previous, current) =>
+              previous.status != current.status ||
+              previous.homework != current.homework ||
+              previous.errorMessage != current.errorMessage ||
+              previous.studentId != current.studentId ||
+              previous.submissionStatus != current.submissionStatus ||
+              previous.lastEarnedPoints != current.lastEarnedPoints,
           builder: (context, state) {
             if (state.status == SectionStatus.loading ||
                 state.status == SectionStatus.initial) {
@@ -468,7 +476,7 @@ class _HomeworkHeroCard extends StatelessWidget {
     final hours = remaining.inHours.clamp(0, 99);
     final dueLabel = homework.isSubmitted
         ? '✅ تم إنهاء الواجب'
-        : '🕒 ينتهي الساعة ${_formatClock(homework.dueAt)} — متبقي $hours ساعات';
+        : '🕒 ينتهي الساعة ${formatTimeHm12Ar(homework.dueAt)} — متبقي $hours ساعات';
 
     return Container(
       padding: const EdgeInsets.all(AppSizes.paddingL),
@@ -511,12 +519,6 @@ class _HomeworkHeroCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatClock(DateTime dt) {
-    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '$h:$m ${dt.hour < 12 ? 'ص' : 'م'}';
   }
 }
 
@@ -664,8 +666,7 @@ class _TeacherVoiceNoteCardState extends State<_TeacherVoiceNoteCard> {
   @override
   Widget build(BuildContext context) {
     final secs = widget.note.duration.inSeconds;
-    final label =
-        '${(secs ~/ 60).toString().padLeft(1, '0')}:${(secs % 60).toString().padLeft(2, '0')}';
+    final label = formatSecondsMmSs(secs);
 
     return Container(
       padding: const EdgeInsets.all(14),

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -42,9 +43,7 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
     );
   }
 
-  List<RecitationRecordEntity> _filtered(
-    List<RecitationRecordEntity> records,
-  ) {
+  List<RecitationRecordEntity> _filtered(List<RecitationRecordEntity> records) {
     final now = DateTime.now();
     if (_filterIndex == 2) return records;
 
@@ -64,7 +63,7 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   Widget build(BuildContext context) {
     return BlocListener<TeacherBloc, TeacherState>(
       listenWhen: (prev, curr) =>
-      prev.evaluationsStatus != curr.evaluationsStatus ||
+          prev.evaluationsStatus != curr.evaluationsStatus ||
           prev.evaluations != curr.evaluations,
       listener: (context, state) {
         if (state.evaluationsStatus == SectionStatus.loaded) {
@@ -98,10 +97,16 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
           ],
         ),
         body: BlocBuilder<TeacherBloc, TeacherState>(
+          buildWhen: (previous, current) =>
+              previous.evaluationsStatus != current.evaluationsStatus ||
+              previous.evaluations != current.evaluations ||
+              previous.evaluationsError != current.evaluationsError ||
+              previous.studentsStatus != current.studentsStatus ||
+              previous.students != current.students,
           builder: (context, state) {
             final isRefreshing =
                 _shellReady &&
-                    (state.evaluationsStatus == SectionStatus.loading);
+                (state.evaluationsStatus == SectionStatus.loading);
 
             return Column(
               children: [
@@ -170,8 +175,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   Widget _buildList(TeacherState state) {
     final isInitialLoading =
         !_shellReady &&
-            (state.evaluationsStatus == SectionStatus.loading ||
-                state.evaluationsStatus == SectionStatus.initial);
+        (state.evaluationsStatus == SectionStatus.loading ||
+            state.evaluationsStatus == SectionStatus.initial);
 
     if (isInitialLoading) {
       return const AppLoadingWidget();
@@ -191,10 +196,7 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
 
     if (items.isEmpty) {
       return const Center(
-        child: Text(
-          'لا توجد تقييمات بعد',
-          style: AppTextStyles.bodyMedium,
-        ),
+        child: Text('لا توجد تقييمات بعد', style: AppTextStyles.bodyMedium),
       );
     }
 
@@ -247,10 +249,7 @@ class _EvaluationCard extends StatelessWidget {
     };
   }
 
-  String get _dateLabel {
-    final d = record.date;
-    return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
-  }
+  String get _dateLabel => formatDateYmd(record.date);
 
   String get _typeLabel =>
       record.type == RecitationType.memorization ? 'الحفظ' : 'المراجعة';
@@ -289,9 +288,7 @@ class _EvaluationCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.secondaryBg,
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusM,
-                          ),
+                          borderRadius: BorderRadius.circular(AppSizes.radiusM),
                         ),
                         child: Text(
                           'بانتظار المراجعة',
@@ -313,9 +310,7 @@ class _EvaluationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  record.studentName.isNotEmpty
-                      ? record.studentName
-                      : 'طالب',
+                  record.studentName.isNotEmpty ? record.studentName : 'طالب',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -333,24 +328,17 @@ class _EvaluationCard extends StatelessWidget {
                     ),
                     textAlign: TextAlign.right,
                   ),
-                ] else
-                  ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _GradeBox(
-                          label: 'السلوك',
-                          grade: record.behaviorGrade,
-                        ),
-                        const SizedBox(width: 8),
-                        _GradeBox(
-                          label: _typeLabel,
-                          grade: record.grade,
-                        ),
-                      ],
-                    ),
-                  ],
+                ] else ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _GradeBox(label: 'السلوك', grade: record.behaviorGrade),
+                      const SizedBox(width: 8),
+                      _GradeBox(label: _typeLabel, grade: record.grade),
+                    ],
+                  ),
+                ],
                 if (!_isPending &&
                     record.notes != null &&
                     record.notes!.isNotEmpty) ...[
@@ -451,9 +439,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
   }
 
   void _retryStudents() {
-    context.read<TeacherBloc>().add(
-      LoadHalaqaStudentsEvent(widget.halaqaId),
-    );
+    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
   }
 
   @override
@@ -468,8 +454,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
           context.read<TeacherBloc>().add(
             const ResetRecitationSubmissionEvent(),
           );
-        } else if (state.recitationSubmissionStatus ==
-            SubmissionStatus.error) {
+        } else if (state.recitationSubmissionStatus == SubmissionStatus.error) {
           AppSnackBar.showError(
             context,
             state.recitationSubmissionError ?? 'فشل حفظ التقييم',
@@ -512,6 +497,10 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
               const SizedBox(height: 20),
               const _Label('الطالب'),
               BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.studentsStatus != current.studentsStatus ||
+                    previous.students != current.students ||
+                    previous.studentsError != current.studentsError,
                 builder: (context, state) {
                   if (state.studentsStatus == SectionStatus.loading ||
                       state.studentsStatus == SectionStatus.initial) {
@@ -566,7 +555,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
                   }
                   return DropdownButtonFormField<String>(
                     initialValue:
-                    _selectedStudentId != null &&
+                        _selectedStudentId != null &&
                             state.students.any(
                               (s) => s.uid == _selectedStudentId,
                             )
@@ -612,9 +601,8 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
                   _TypeChip(
                     label: 'حفظ',
                     selected: _type == RecitationType.memorization,
-                    onTap: () => setState(
-                      () => _type = RecitationType.memorization,
-                    ),
+                    onTap: () =>
+                        setState(() => _type = RecitationType.memorization),
                   ),
                 ],
               ),
@@ -640,12 +628,12 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
               ),
               const SizedBox(height: 16),
               const _Label('ملاحظات (اختياري)'),
-              AppTextField(
-                hint: 'أضف ملاحظاتك هنا...',
-                controller: _notesCtrl,
-              ),
+              AppTextField(hint: 'أضف ملاحظاتك هنا...', controller: _notesCtrl),
               const SizedBox(height: 24),
               BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.recitationSubmissionStatus !=
+                    current.recitationSubmissionStatus,
                 builder: (context, state) {
                   final isLoading =
                       state.recitationSubmissionStatus ==

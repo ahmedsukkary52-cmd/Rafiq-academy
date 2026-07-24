@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -380,11 +381,7 @@ class _AchievementRow extends StatelessWidget {
     AchievementType.certificate => 'شهادة',
   };
 
-  static String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d/$m/${date.year}';
-  }
+  static String _formatDate(DateTime date) => formatDateDmy(date);
 }
 
 class _HeaderButton extends StatelessWidget {

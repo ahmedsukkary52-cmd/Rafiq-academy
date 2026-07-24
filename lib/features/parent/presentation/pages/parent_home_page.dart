@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -37,10 +38,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
   }
 
   void _retryReport() {
-    final selectedId = context
-        .read<ParentBloc>()
-        .state
-        .selectedChildId;
+    final selectedId = context.read<ParentBloc>().state.selectedChildId;
     if (selectedId == null) return;
     _selectChild(selectedId);
   }
@@ -48,15 +46,16 @@ class _ParentHomePageState extends State<ParentHomePage> {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
-    final parentName =
-    authState is AuthAuthenticated ? authState.user.name : '';
+    final parentName = authState is AuthAuthenticated
+        ? authState.user.name
+        : '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('نافذة ولي الأمر')),
       body: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (prev, curr) =>
-        prev.childrenStatus != curr.childrenStatus ||
+            prev.childrenStatus != curr.childrenStatus ||
             prev.childrenIds != curr.childrenIds ||
             prev.selectedChildId != curr.selectedChildId,
         listener: (context, state) {
@@ -102,13 +101,11 @@ class _ParentHomePageState extends State<ParentHomePage> {
               const SizedBox(height: AppSizes.paddingM),
               ...state.childrenIds.map((id) {
                 final isSelected = id == state.selectedChildId;
-                final name = (isSelected &&
-                    state.weeklyReport != null &&
-                    state.weeklyReport!.studentId == id &&
-                    state.weeklyReport!
-                        .studentName
-                        .trim()
-                        .isNotEmpty)
+                final name =
+                    (isSelected &&
+                        state.weeklyReport != null &&
+                        state.weeklyReport!.studentId == id &&
+                        state.weeklyReport!.studentName.trim().isNotEmpty)
                     ? state.weeklyReport!.studentName.trim()
                     : 'طالب';
                 return Padding(
@@ -127,10 +124,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
                 textAlign: TextAlign.right,
               ),
               const SizedBox(height: 8),
-              _WeeklyReportSection(
-                state: state,
-                onRetry: _retryReport,
-              ),
+              _WeeklyReportSection(state: state, onRetry: _retryReport),
             ],
           );
         },
@@ -194,19 +188,13 @@ class _WeeklyReportSection extends StatelessWidget {
   final ParentState state;
   final VoidCallback onRetry;
 
-  const _WeeklyReportSection({
-    required this.state,
-    required this.onRetry,
-  });
+  const _WeeklyReportSection({required this.state, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     if (state.reportStatus == SectionStatus.initial ||
         state.reportStatus == SectionStatus.loading) {
-      return const SizedBox(
-        height: 160,
-        child: AppLoadingWidget(),
-      );
+      return const SizedBox(height: 160, child: AppLoadingWidget());
     }
 
     if (state.reportStatus == SectionStatus.error) {
@@ -221,11 +209,10 @@ class _WeeklyReportSection extends StatelessWidget {
       return const _EmptyWeeklyReport();
     }
 
-    final hasData = report.totalSessions > 0 ||
+    final hasData =
+        report.totalSessions > 0 ||
         report.totalVersesMemorized > 0 ||
-        report.teacherNotes
-            .trim()
-            .isNotEmpty;
+        report.teacherNotes.trim().isNotEmpty;
 
     if (!hasData) {
       return const _EmptyWeeklyReport();
@@ -242,9 +229,7 @@ class _WeeklyReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = report.studentName
-        .trim()
-        .isEmpty
+    final name = report.studentName.trim().isEmpty
         ? 'طالب'
         : report.studentName.trim();
     final attendanceLabel = report.totalSessions == 0
@@ -258,8 +243,11 @@ class _WeeklyReportCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(name, style: AppTextStyles.titleLarge,
-              textAlign: TextAlign.right),
+          Text(
+            name,
+            style: AppTextStyles.titleLarge,
+            textAlign: TextAlign.right,
+          ),
           const SizedBox(height: 4),
           Text(
             'أسبوع يبدأ ${_formatDate(report.weekStart)}',
@@ -270,17 +258,11 @@ class _WeeklyReportCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _MetricTile(
-                  label: 'الحضور',
-                  value: attendanceLabel,
-                ),
+                child: _MetricTile(label: 'الحضور', value: attendanceLabel),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _MetricTile(
-                  label: 'نسبة الحضور',
-                  value: percentLabel,
-                ),
+                child: _MetricTile(label: 'نسبة الحضور', value: percentLabel),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -291,9 +273,7 @@ class _WeeklyReportCard extends StatelessWidget {
               ),
             ],
           ),
-          if (report.teacherNotes
-              .trim()
-              .isNotEmpty) ...[
+          if (report.teacherNotes.trim().isNotEmpty) ...[
             const SizedBox(height: AppSizes.paddingM),
             const Text(
               'ملاحظات المعلم',
@@ -312,11 +292,7 @@ class _WeeklyReportCard extends StatelessWidget {
     );
   }
 
-  static String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d/$m/${date.year}';
-  }
+  static String _formatDate(DateTime date) => formatDateDmy(date);
 }
 
 class _MetricTile extends StatelessWidget {

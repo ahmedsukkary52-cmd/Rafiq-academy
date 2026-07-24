@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -231,7 +232,10 @@ class _MessageBubble extends StatelessWidget {
         children: [
           if (isMine) ...[
             // وقت الإرسال يمين
-            Text(_formatTime(message.sentAt), style: AppTextStyles.labelSmall),
+            Text(
+              formatTimeHm12Ar(message.sentAt),
+              style: AppTextStyles.labelSmall,
+            ),
             const SizedBox(width: 6),
             // نقاط القراءة
             const Text(
@@ -283,18 +287,14 @@ class _MessageBubble extends StatelessWidget {
 
           if (!isMine) ...[
             const SizedBox(width: 6),
-            Text(_formatTime(message.sentAt), style: AppTextStyles.labelSmall),
+            Text(
+              formatTimeHm12Ar(message.sentAt),
+              style: AppTextStyles.labelSmall,
+            ),
           ],
         ],
       ),
     );
-  }
-
-  String _formatTime(DateTime dt) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour < 12 ? 'ص' : 'م';
-    return '$h:$m $period';
   }
 }
 

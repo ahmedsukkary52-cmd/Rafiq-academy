@@ -85,6 +85,10 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TeacherBloc, TeacherState>(
+      buildWhen: (previous, current) =>
+          previous.halaqatStatus != current.halaqatStatus ||
+          previous.halaqat != current.halaqat ||
+          previous.halaqatError != current.halaqatError,
       builder: (context, state) {
         final halaqa = _findHalaqa(state);
 

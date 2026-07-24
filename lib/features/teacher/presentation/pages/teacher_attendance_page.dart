@@ -145,6 +145,15 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           ],
         ),
         body: BlocBuilder<TeacherBloc, TeacherState>(
+          buildWhen: (previous, current) =>
+              previous.studentsStatus != current.studentsStatus ||
+              previous.students != current.students ||
+              previous.studentsError != current.studentsError ||
+              previous.dayAttendanceStatus != current.dayAttendanceStatus ||
+              previous.dayAttendance != current.dayAttendance ||
+              previous.dayAttendanceError != current.dayAttendanceError ||
+              previous.attendanceSubmissionStatus !=
+                  current.attendanceSubmissionStatus,
           builder: (context, state) {
             final studentsLoading =
                 state.studentsStatus == SectionStatus.loading ||

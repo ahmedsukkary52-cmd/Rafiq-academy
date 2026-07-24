@@ -98,6 +98,13 @@ class _AwardsPageState extends State<AwardsPage> {
             ],
           ),
           body: BlocBuilder<AwardsBloc, AwardsState>(
+            buildWhen: (previous, current) =>
+                previous.statsStatus != current.statsStatus ||
+                previous.stats != current.stats ||
+                previous.statsError != current.statsError ||
+                previous.awardsStatus != current.awardsStatus ||
+                previous.grantedAwards != current.grantedAwards ||
+                previous.awardsError != current.awardsError,
             builder: (context, state) {
               return CustomScrollView(
                 slivers: [
@@ -591,6 +598,8 @@ class _CertificateSheetState extends State<_CertificateSheet> {
           const SizedBox(height: 20),
 
           BlocBuilder<AwardsBloc, AwardsState>(
+            buildWhen: (previous, current) =>
+                previous.certificateStatus != current.certificateStatus,
             builder: (context, state) => AppButton(
               label: 'إنشاء وتنزيل الشهادة',
               isLoading: state.certificateStatus == SubmissionStatus.submitting,

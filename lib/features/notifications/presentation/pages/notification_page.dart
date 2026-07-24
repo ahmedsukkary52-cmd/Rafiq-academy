@@ -78,9 +78,9 @@ class NotificationsPage extends StatelessWidget {
                       ],
                     ),
                     // Mark All as Read
-                    BlocBuilder<NotificationsBloc, NotificationsState>(
-                      builder: (context, state) {
-                        final hasUnread = state.unreadCount > 0;
+                    BlocSelector<NotificationsBloc, NotificationsState, bool>(
+                      selector: (state) => state.unreadCount > 0,
+                      builder: (context, hasUnread) {
                         return TextButton(
                           onPressed: hasUnread
                               ? () => context.read<NotificationsBloc>().add(
@@ -109,6 +109,10 @@ class NotificationsPage extends StatelessWidget {
               // Body
               Expanded(
                 child: BlocBuilder<NotificationsBloc, NotificationsState>(
+                  buildWhen: (previous, current) =>
+                      previous.status != current.status ||
+                      previous.notifications != current.notifications ||
+                      previous.error != current.error,
                   builder: (context, state) {
                     if (state.status == SectionStatus.loading) {
                       return const AppLoadingWidget();

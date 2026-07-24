@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rafiq_academy/shared/theme/app_theme.dart';
+import 'package:rafiq_academy/shared/utils/time_format.dart';
 import '../bloc/audio_bloc.dart';
 import '../bloc/audio_event.dart';
 import '../bloc/audio_state.dart';
 
 class AudioPlayerWidget extends StatelessWidget {
   const AudioPlayerWidget({super.key});
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    final twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$twoDigitMinutes:$twoDigitSeconds';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +174,7 @@ class AudioPlayerWidget extends StatelessWidget {
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        _formatDuration(
+                                        formatDurationMmSs(
                                           state.duration ?? Duration.zero,
                                         ),
                                         style: const TextStyle(
@@ -189,7 +183,7 @@ class AudioPlayerWidget extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        _formatDuration(position),
+                                        formatDurationMmSs(position),
                                         style: const TextStyle(
                                           color: Colors.white70,
                                           fontSize: 10,

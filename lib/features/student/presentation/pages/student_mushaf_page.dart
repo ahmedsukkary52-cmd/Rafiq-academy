@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import 'student_recitation_page.dart';
 
@@ -1521,7 +1522,10 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.favorite_border, color: AppColors.textHint),
+              leading: const Icon(
+                Icons.favorite_border,
+                color: AppColors.textHint,
+              ),
               title: const Text(
                 'إضافة للمفضلة',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
@@ -1534,7 +1538,10 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.bookmark_border, color: AppColors.textHint),
+              leading: const Icon(
+                Icons.bookmark_border,
+                color: AppColors.textHint,
+              ),
               title: const Text(
                 'حفظ إشارة مرجعية',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
@@ -1547,7 +1554,10 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.share_outlined, color: AppColors.textHint),
+              leading: const Icon(
+                Icons.share_outlined,
+                color: AppColors.textHint,
+              ),
               title: const Text(
                 'مشاركة السورة',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
@@ -1787,17 +1797,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         ],
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
-  }
-
-  String _formatRecordTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   String _toArabicDigits(int n) {
@@ -2184,7 +2183,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 return Row(
                   children: [
                     Text(
-                      _formatDuration(position),
+                      formatDurationMmSs(position),
                       style: TextStyle(fontSize: 11, color: iconColor),
                     ),
                     Expanded(
@@ -2212,7 +2211,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                       ),
                     ),
                     Text(
-                      _formatDuration(duration),
+                      formatDurationMmSs(duration),
                       style: TextStyle(fontSize: 11, color: iconColor),
                     ),
                   ],
@@ -2388,7 +2387,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                _formatRecordTime(_recordDurationSeconds),
+                formatSecondsMmSs(_recordDurationSeconds),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -2461,7 +2460,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                     valueListenable: _recordDuration,
                     builder: (context, duration, _) {
                       return Text(
-                        _formatDuration(duration),
+                        formatDurationMmSs(duration),
                         style: const TextStyle(fontSize: 11),
                       );
                     },

@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../homework/domain/repositories/homework_repository.dart';
 import '../../../homework/domain/usecases/homework_usecases.dart';
@@ -154,17 +155,6 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   String _toArabicDigits(int n) {
     const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return n.toString().split('').map((c) => digits[int.parse(c)]).join();
-  }
-
-  String _formatRecordTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
   }
 
   Future<void> _startRecording() async {
@@ -550,7 +540,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
                     // Timer
                     Text(
-                      _formatRecordTime(_recordDurationSeconds),
+                      formatSecondsMmSs(_recordDurationSeconds),
                       style: GoogleFonts.amiri(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -715,7 +705,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    '${_formatDuration(Duration(seconds: rec.durationSeconds))} • ${rec.dateTime.day}/${rec.dateTime.month}',
+                                                    '${formatDurationMmSs(Duration(seconds: rec.durationSeconds))} • ${rec.dateTime.day}/${rec.dateTime.month}',
                                                     style: GoogleFonts.amiri(
                                                       fontSize: 12,
                                                       color: Colors.black

@@ -47,6 +47,10 @@ class _ChatConversationsPageState extends State<ChatConversationsPage> {
         backgroundColor: AppColors.background,
         appBar: AppBar(title: const Text('المحادثات')),
         body: BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
+          buildWhen: (previous, current) =>
+              previous.conversationsStatus != current.conversationsStatus ||
+              previous.conversations != current.conversations ||
+              previous.conversationsError != current.conversationsError,
           builder: (context, state) {
             if (state.conversationsStatus == SectionStatus.loading) {
               return const AppLoadingWidget();

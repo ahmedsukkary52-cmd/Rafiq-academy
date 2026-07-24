@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../audio_library/domain/entities/audio_entities.dart';
 import '../../../audio_library/presentation/bloc/audio_bloc.dart';
 import '../../../audio_library/presentation/bloc/audio_event.dart';
@@ -743,9 +744,7 @@ class _SurahTile extends StatelessWidget {
 
   String _formatDuration(Duration d) {
     if (d <= Duration.zero) return '--:--';
-    final m = d.inMinutes;
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    return formatDurationMmSs(d);
   }
 
   @override

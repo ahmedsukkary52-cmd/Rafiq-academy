@@ -36,9 +36,7 @@ class _ProgressReportView extends StatelessWidget {
   const _ProgressReportView({required this.studentId});
 
   void _retry(BuildContext context) {
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     final id = auth is AuthAuthenticated ? auth.user.uid : studentId;
     context.read<ProgressReportBloc>().add(LoadProgressReportEvent(id));
   }
@@ -48,6 +46,10 @@ class _ProgressReportView extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: BlocBuilder<ProgressReportBloc, ProgressReportState>(
+        buildWhen: (previous, current) =>
+            previous.status != current.status ||
+            previous.report != current.report ||
+            previous.errorMessage != current.errorMessage,
         builder: (context, state) {
           return CustomScrollView(
             slivers: [
@@ -120,12 +122,11 @@ class _ProgressReportView extends StatelessWidget {
               if (state.status == SectionStatus.loading ||
                   state.status == SectionStatus.initial)
                 const SliverFillRemaining(child: AppLoadingWidget())
-              else
-                if (state.status == SectionStatus.error)
-                  SliverFillRemaining(
-                    child: AppErrorWidget(
-                      message: state.errorMessage ?? 'تعذر تحميل تقرير التقدم',
-                      onRetry: () => _retry(context),
+              else if (state.status == SectionStatus.error)
+                SliverFillRemaining(
+                  child: AppErrorWidget(
+                    message: state.errorMessage ?? 'تعذر تحميل تقرير التقدم',
+                    onRetry: () => _retry(context),
                   ),
                 )
               else if (state.report == null)
@@ -136,7 +137,7 @@ class _ProgressReportView extends StatelessWidget {
                   ),
                 )
               else
-                  _buildLoadedSliver(context, state.report!),
+                _buildLoadedSliver(context, state.report!),
             ],
           );
         },
@@ -147,8 +148,7 @@ class _ProgressReportView extends StatelessWidget {
   Widget _buildLoadedSliver(BuildContext context, ProgressReportEntity report) {
     final hasAttendanceActivity =
         report.attendanceDays > 0 || report.absenceDays > 0;
-    final hasWeeklyActivity =
-    report.weeklyVersesPerDay.any((v) => v > 0);
+    final hasWeeklyActivity = report.weeklyVersesPerDay.any((v) => v > 0);
     final notes = report.teacherNotes.trim();
 
     return SliverPadding(
@@ -193,9 +193,7 @@ class _ProgressReportView extends StatelessWidget {
             _WeeklyChartCard(values: report.weeklyVersesPerDay),
           const SizedBox(height: 12),
           _TeacherNotesCard(
-            notes: notes.isEmpty
-                ? 'لا توجد ملاحظات من المعلم حالياً'
-                : notes,
+            notes: notes.isEmpty ? 'لا توجد ملاحظات من المعلم حالياً' : notes,
             isPlaceholder: notes.isEmpty,
           ),
           const SizedBox(height: 24),
@@ -456,10 +454,7 @@ class _TeacherNotesCard extends StatelessWidget {
   final String notes;
   final bool isPlaceholder;
 
-  const _TeacherNotesCard({
-    required this.notes,
-    this.isPlaceholder = false,
-  });
+  const _TeacherNotesCard({required this.notes, this.isPlaceholder = false});
 
   @override
   Widget build(BuildContext context) {

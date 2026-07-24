@@ -31,13 +31,11 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final state = context
-          .read<TeacherBloc>()
-          .state;
+      final state = context.read<TeacherBloc>().state;
       if (state.halaqatStatus == SectionStatus.initial) {
         _retryHalaqat();
       }
@@ -58,9 +56,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   }
 
   void _retryHalaqat() {
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
     context.read<TeacherBloc>().add(LoadTeacherHalaqatEvent(auth.user.uid));
   }
@@ -79,7 +75,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     }
     final launched =
         await canLaunchUrl(uri) &&
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       AppSnackBar.showError(context, 'تعذر فتح رابط الحصة');
     }
@@ -169,8 +165,6 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                       Tab(text: 'الطلاب'),
                       Tab(text: 'الحضور'),
                       Tab(text: 'التقييمات'),
-                      Tab(text: 'المهام'),
-                      Tab(text: 'المنشورات'),
                     ],
                   ),
                 ),
@@ -188,9 +182,8 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                 Center(
                   child: AppButton(
                     label: 'فتح سجل الحضور',
-                    onPressed: () => context.push(
-                      '/teacher/attendance/${widget.halaqaId}',
-                    ),
+                    onPressed: () =>
+                        context.push('/teacher/attendance/${widget.halaqaId}'),
                     width: 200,
                   ),
                 ),
@@ -203,22 +196,6 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                     width: 200,
                   ),
                 ),
-                Center(
-                  child: AppButton(
-                    label: 'المهام',
-                    onPressed: () =>
-                        AppSnackBar.showInfo(context, 'قريبًا'),
-                    width: 200,
-                  ),
-                ),
-                Center(
-                  child: AppButton(
-                    label: 'المنشورات',
-                    onPressed: () =>
-                        AppSnackBar.showInfo(context, 'قريبًا'),
-                    width: 200,
-                  ),
-                ),
               ],
             ),
           ),
@@ -228,15 +205,31 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   }
 
   String? _scheduleLabel(HalaqaEntity halaqa) {
-    if (halaqa.schedule.isEmpty) return null;
-    final slot = halaqa.schedule.first;
-    final day = slot.day.trim();
-    final start = slot.startTime.trim();
-    final end = slot.endTime.trim();
-    if (day.isEmpty && start.isEmpty) return null;
-    if (start.isEmpty) return day.isEmpty ? null : day;
-    if (end.isEmpty) return day.isEmpty ? start : '$day — $start';
-    return day.isEmpty ? '$start–$end' : '$day — $start–$end';
+    final schedule = halaqa.schedule;
+    if (schedule.isEmpty) return null;
+
+    final days = schedule
+        .map((s) => s.day.trim())
+        .where((d) => d.isNotEmpty)
+        .toList();
+    final daysLabel = days.join('، ');
+
+    final timeKeys = <String>{};
+    for (final slot in schedule) {
+      final start = slot.startTime.trim();
+      final end = slot.endTime.trim();
+      if (start.isEmpty && end.isEmpty) continue;
+      timeKeys.add(end.isEmpty ? start : '$start–$end');
+    }
+
+    if (daysLabel.isEmpty && timeKeys.isEmpty) return null;
+    if (timeKeys.isEmpty) return daysLabel.isEmpty ? null : daysLabel;
+    if (timeKeys.length == 1) {
+      final timeLabel = timeKeys.first;
+      if (daysLabel.isEmpty) return timeLabel;
+      return '$daysLabel · $timeLabel';
+    }
+    return daysLabel.isEmpty ? null : daysLabel;
   }
 }
 
@@ -352,8 +345,13 @@ class _StudentsTab extends StatelessWidget {
   });
 
   Future<void> _onRefresh(BuildContext context) async {
-    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(halaqaId));
-    await Future.delayed(const Duration(milliseconds: 800));
+    final bloc = context.read<TeacherBloc>();
+    bloc.add(LoadHalaqaStudentsEvent(halaqaId));
+    await bloc.stream.firstWhere(
+      (s) =>
+          s.studentsStatus == SectionStatus.loaded ||
+          s.studentsStatus == SectionStatus.error,
+    );
   }
 
   @override
@@ -366,9 +364,8 @@ class _StudentsTab extends StatelessWidget {
     if (state.studentsStatus == SectionStatus.error) {
       return AppErrorWidget(
         message: state.studentsError ?? 'حدث خطأ',
-        onRetry: () => context.read<TeacherBloc>().add(
-          LoadHalaqaStudentsEvent(halaqaId),
-        ),
+        onRetry: () =>
+            context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(halaqaId)),
       );
     }
 
@@ -377,21 +374,23 @@ class _StudentsTab extends StatelessWidget {
         : state.students.where((s) => s.name.contains(searchQuery)).toList();
 
     if (state.students.isEmpty) {
-      return Column(
-        children: [
-          const Expanded(
-            child: Center(
-              child: Text(
-                'لا يوجد طلاب في هذه الحلقة',
-                style: AppTextStyles.bodyMedium,
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => _onRefresh(context),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.4,
+              child: const Center(
+                child: Text(
+                  'لا يوجد طلاب في هذه الحلقة',
+                  style: AppTextStyles.bodyMedium,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSizes.paddingM),
-            child: _AddStudentButton(halaqaId: halaqaId),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
@@ -414,34 +413,31 @@ class _StudentsTab extends StatelessWidget {
           Expanded(
             child: students.isEmpty
                 ? ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: const [
-                SizedBox(height: 80),
-                Center(
-                  child: Text(
-                    'لا نتائج للبحث',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                ),
-              ],
-            )
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 80),
+                      Center(
+                        child: Text(
+                          'لا نتائج للبحث',
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  )
                 : ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.paddingM,
-              ),
-              itemCount: students.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                if (i == students.length) {
-                  return _AddStudentButton(halaqaId: halaqaId);
-                }
-                return _StudentCard(
-                  student: students[i],
-                  halaqaId: halaqaId,
-                );
-              },
-            ),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.paddingM,
+                    ),
+                    itemCount: students.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) {
+                      return _StudentCard(
+                        student: students[i],
+                        halaqaId: halaqaId,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -464,24 +460,20 @@ class _StudentCard extends StatelessWidget {
             children: [
               _OutlinedChip(
                 label: 'منح شارة',
-                onTap: () =>
-                    context.push('/teacher/halaqa/$halaqaId/awards'),
+                onTap: () => context.push('/teacher/halaqa/$halaqaId/awards'),
                 color: AppColors.secondary,
               ),
               const SizedBox(width: 8),
               _OutlinedChip(
                 label: 'تقييم',
                 onTap: () =>
-                    context.push(
-                      '/teacher/halaqa/$halaqaId/evaluations',
-                    ),
+                    context.push('/teacher/halaqa/$halaqaId/evaluations'),
                 color: AppColors.primary,
               ),
               const SizedBox(width: 8),
               _OutlinedChip(
                 label: 'الملف الشخصي',
-                onTap: () =>
-                    context.push('/teacher/student/${student.uid}'),
+                onTap: () => context.push('/teacher/student/${student.uid}'),
                 color: AppColors.textSecondary,
               ),
             ],
@@ -569,41 +561,6 @@ class _OutlinedChip extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: color,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AddStudentButton extends StatelessWidget {
-  final String halaqaId;
-
-  const _AddStudentButton({required this.halaqaId});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => AppSnackBar.showInfo(context, 'قريبًا'),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.4),
-          ),
-          borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_rounded, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              'إضافة طالب',
-              style: AppTextStyles.labelLarge.copyWith(
-                color: AppColors.primary,
-              ),
-            ),
-          ],
         ),
       ),
     );

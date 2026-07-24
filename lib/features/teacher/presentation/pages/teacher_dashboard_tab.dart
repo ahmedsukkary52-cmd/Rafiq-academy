@@ -43,8 +43,8 @@ class TeacherDashboardTab extends StatelessWidget {
             final bloc = context.read<TeacherBloc>();
             bloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
             await bloc.stream.firstWhere(
-                  (s) =>
-              s.halaqatStatus == SectionStatus.loaded ||
+              (s) =>
+                  s.halaqatStatus == SectionStatus.loaded ||
                   s.halaqatStatus == SectionStatus.error,
             );
           },
@@ -124,8 +124,7 @@ class TeacherDashboardTab extends StatelessWidget {
             child: _EmptyHalaqatCard(),
           ),
         )
-      else
-        if (nextHalaqa != null) ...[
+      else if (nextHalaqa != null) ...[
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -138,42 +137,51 @@ class TeacherDashboardTab extends StatelessWidget {
               halaqaName: nextHalaqa.name,
               studentsCount: nextHalaqa.studentIds.length,
               scheduleLabel: _scheduleLabel(nextHalaqa),
-              onOpenTap: () =>
-                  context.push('/teacher/halaqa/${nextHalaqa.id}'),
+              onOpenTap: () => context.push('/teacher/halaqa/${nextHalaqa.id}'),
             ),
           ),
         ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSizes.paddingM),
-              child: _HalaqaQuickLinksCard(
-                onEvaluationsTap: () =>
-                    context.push(
-                      '/teacher/halaqa/${nextHalaqa.id}/evaluations',
-                    ),
-                onAnalyticsTap: () =>
-                    context.push(
-                      '/teacher/halaqa/${nextHalaqa.id}/analytics',
-                    ),
-              ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSizes.paddingM),
+            child: _HalaqaQuickLinksCard(
+              onEvaluationsTap: () =>
+                  context.push('/teacher/halaqa/${nextHalaqa.id}/evaluations'),
+              onAnalyticsTap: () =>
+                  context.push('/teacher/halaqa/${nextHalaqa.id}/analytics'),
             ),
           ),
-        ],
+        ),
+      ],
     ];
   }
 
   String? _scheduleLabel(HalaqaEntity halaqa) {
-    if (halaqa.schedule.isEmpty) return null;
-    final slot = halaqa.schedule.first;
-    final day = slot.day.trim();
-    final start = slot.startTime.trim();
-    final end = slot.endTime.trim();
-    if (day.isEmpty && start.isEmpty) return null;
-    if (start.isEmpty) return day.isEmpty ? null : day;
-    if (end.isEmpty) {
-      return day.isEmpty ? start : '$day — $start';
+    final schedule = halaqa.schedule;
+    if (schedule.isEmpty) return null;
+
+    final days = schedule
+        .map((s) => s.day.trim())
+        .where((d) => d.isNotEmpty)
+        .toList();
+    final daysLabel = days.join('، ');
+
+    final timeKeys = <String>{};
+    for (final slot in schedule) {
+      final start = slot.startTime.trim();
+      final end = slot.endTime.trim();
+      if (start.isEmpty && end.isEmpty) continue;
+      timeKeys.add(end.isEmpty ? start : '$start–$end');
     }
-    return day.isEmpty ? '$start–$end' : '$day — $start–$end';
+
+    if (daysLabel.isEmpty && timeKeys.isEmpty) return null;
+    if (timeKeys.isEmpty) return daysLabel.isEmpty ? null : daysLabel;
+    if (timeKeys.length == 1) {
+      final timeLabel = timeKeys.first;
+      if (daysLabel.isEmpty) return timeLabel;
+      return '$daysLabel · $timeLabel';
+    }
+    return daysLabel.isEmpty ? null : daysLabel;
   }
 }
 
@@ -216,15 +224,9 @@ class _TeacherHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.search_rounded, color: Colors.white),
-                onPressed: () =>
-                    AppSnackBar.showInfo(context, 'البحث قريبًا'),
-              ),
-
+              const SizedBox(width: 48),
               Row(
                 children: [
-                  // اسم + حلقة
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -249,7 +251,6 @@ class _TeacherHeader extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(width: 12),
-                  // avatar
                   Container(
                     width: 40,
                     height: 40,
@@ -613,14 +614,8 @@ class _HalaqaQuickLinksCard extends StatelessWidget {
             runSpacing: 8,
             alignment: WrapAlignment.end,
             children: [
-              _QuickLinkChip(
-                label: 'تحليلات الحلقة',
-                onTap: onAnalyticsTap,
-              ),
-              _QuickLinkChip(
-                label: 'التقييمات',
-                onTap: onEvaluationsTap,
-              ),
+              _QuickLinkChip(label: 'تحليلات الحلقة', onTap: onAnalyticsTap),
+              _QuickLinkChip(label: 'التقييمات', onTap: onEvaluationsTap),
             ],
           ),
         ],

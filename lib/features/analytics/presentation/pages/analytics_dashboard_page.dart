@@ -51,6 +51,13 @@ class _AnalyticsDashboardPageState extends State<AnalyticsDashboardPage> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: BlocBuilder<AnalyticsBloc, AnalyticsState>(
+          buildWhen: (previous, current) =>
+              previous.analytics != current.analytics ||
+              previous.analyticsStatus != current.analyticsStatus ||
+              previous.atRiskStudents != current.atRiskStudents ||
+              previous.atRiskStatus != current.atRiskStatus ||
+              previous.topStudents != current.topStudents ||
+              previous.topStudentsStatus != current.topStudentsStatus,
           builder: (context, state) {
             return CustomScrollView(
               slivers: [

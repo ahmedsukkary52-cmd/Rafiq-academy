@@ -113,6 +113,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             // ── قائمة الرسائل ──────────────────────────────────
             Expanded(
               child: BlocBuilder<ChatRoomBloc, ChatRoomState>(
+                buildWhen: (previous, current) =>
+                    previous.messages != current.messages ||
+                    previous.messagesStatus != current.messagesStatus ||
+                    previous.messagesError != current.messagesError,
                 builder: (context, state) {
                   if (state.messagesStatus == SectionStatus.loading) {
                     return const AppLoadingWidget();
@@ -140,7 +144,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
                   // نمرر عناصر بتاريخ لتجميع الرسائل بالأيام
                   final messages = state.messages;
-                  _scrollToBottom();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToBottom();
+                  });
 
                   return ListView.builder(
                     controller: _scrollCtrl,

@@ -33,6 +33,10 @@ class TeacherDashboardTab extends StatelessWidget {
     final teacherName = auth?.user.name ?? '';
 
     return BlocBuilder<TeacherBloc, TeacherState>(
+      buildWhen: (previous, current) =>
+          previous.halaqat != current.halaqat ||
+          previous.halaqatStatus != current.halaqatStatus ||
+          previous.halaqatError != current.halaqatError,
       builder: (context, state) {
         final halaqat = state.halaqat;
         final nextHalaqa = halaqat.isNotEmpty ? halaqat.first : null;
@@ -245,11 +249,12 @@ class _TeacherHeader extends StatelessWidget {
                   ),
                 ],
               ),
-              BlocBuilder<NotificationsBloc, NotificationsState>(
+              BlocSelector<NotificationsBloc, NotificationsState, int>(
                 bloc: sl<NotificationsBloc>(),
-                builder: (context, notifState) {
+                selector: (state) => state.unreadCount,
+                builder: (context, unreadCount) {
                   return NotificationBadge(
-                    count: notifState.unreadCount,
+                    count: unreadCount,
                     child: IconButton(
                       icon: const Icon(
                         Icons.notifications_outlined,

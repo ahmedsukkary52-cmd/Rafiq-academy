@@ -41,6 +41,10 @@ class _StudentEvaluationsPageState extends State<StudentEvaluationsPage> {
         backgroundColor: AppColors.background,
         body: SafeArea(
           child: BlocBuilder<StudentBloc, StudentState>(
+            buildWhen: (previous, current) =>
+                previous.recitationRecords != current.recitationRecords ||
+                previous.recitationStatus != current.recitationStatus ||
+                previous.recitationError != current.recitationError,
             builder: (context, state) {
               if (state.recitationStatus == SectionStatus.loading &&
                   state.recitationRecords.isEmpty) {

@@ -18,6 +18,9 @@ class StudentMushafDashboard extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: BlocBuilder<StudentBloc, StudentState>(
+          buildWhen: (previous, current) =>
+              previous.profile != current.profile ||
+              previous.profileStatus != current.profileStatus,
           builder: (context, state) {
             final profile = state.profile;
             // قيم حقيقية من البروفايل فقط — بدون نسب افتراضية وهمية

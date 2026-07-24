@@ -38,6 +38,10 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: BlocBuilder<StudentBloc, StudentState>(
+          buildWhen: (previous, current) =>
+              previous.profile != current.profile ||
+              previous.profileStatus != current.profileStatus ||
+              previous.profileError != current.profileError,
           builder: (context, state) {
             final waitingForProfile =
                 state.profile == null &&

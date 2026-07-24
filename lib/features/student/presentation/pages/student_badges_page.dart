@@ -45,6 +45,13 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: BlocBuilder<StudentBloc, StudentState>(
+          buildWhen: (previous, current) =>
+              previous.profile != current.profile ||
+              previous.profileStatus != current.profileStatus ||
+              previous.profileError != current.profileError ||
+              previous.achievements != current.achievements ||
+              previous.achievementsStatus != current.achievementsStatus ||
+              previous.achievementsError != current.achievementsError,
           builder: (context, state) {
             final profileBusy =
                 state.profile == null &&

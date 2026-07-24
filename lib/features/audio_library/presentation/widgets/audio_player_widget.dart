@@ -4,7 +4,6 @@ import 'package:rafiq_academy/shared/theme/app_theme.dart';
 import '../bloc/audio_bloc.dart';
 import '../bloc/audio_event.dart';
 import '../bloc/audio_state.dart';
-import '../../domain/entities/audio_entities.dart';
 
 class AudioPlayerWidget extends StatelessWidget {
   const AudioPlayerWidget({super.key});
@@ -40,18 +39,18 @@ class AudioPlayerWidget extends StatelessWidget {
           );
       },
       child: BlocBuilder<AudioLibraryBloc, AudioLibraryState>(
+        buildWhen: (previous, current) =>
+            previous.selectedSurah != current.selectedSurah ||
+            previous.isPlaying != current.isPlaying ||
+            previous.isLoading != current.isLoading ||
+            previous.duration != current.duration,
         builder: (context, state) {
           if (state.selectedSurah == null) {
             return const SizedBox.shrink();
           }
 
           final surah = state.selectedSurah!;
-
           final durationMs = state.duration?.inMilliseconds.toDouble() ?? 0.0;
-          final positionMs = state.position.inMilliseconds.toDouble().clamp(
-            0.0,
-            durationMs == 0 ? 0.0 : durationMs,
-          );
 
           return Container(
             color: AppColors.darkCard,
@@ -97,7 +96,6 @@ class AudioPlayerWidget extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // مؤشر صغير إن الصوت شغال دلوقتي
                               if (state.isPlaying) ...[
                                 const SizedBox(
                                   width: 8,
@@ -128,54 +126,80 @@ class AudioPlayerWidget extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 3,
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6,
-                              ),
-                              overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 14,
-                              ),
-                              activeTrackColor: Colors.white,
-                              inactiveTrackColor: Colors.white54,
-                              thumbColor: Colors.white,
-                              overlayColor: Colors.white24,
-                            ),
-                            child: Slider(
-                              value: positionMs,
-                              max: durationMs,
-                              onChanged: durationMs == 0
-                                  ? null
-                                  : (value) {
-                                      context.read<AudioLibraryBloc>().add(
-                                        SeekToPositionEvent(
-                                          Duration(milliseconds: value.toInt()),
+                          BlocSelector<
+                            AudioLibraryBloc,
+                            AudioLibraryState,
+                            Duration
+                          >(
+                            selector: (s) => s.position,
+                            builder: (context, position) {
+                              final positionMs = position.inMilliseconds
+                                  .toDouble()
+                                  .clamp(
+                                    0.0,
+                                    durationMs == 0 ? 0.0 : durationMs,
+                                  );
+                              return Column(
+                                children: [
+                                  SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 3,
+                                      thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 6,
+                                      ),
+                                      overlayShape:
+                                          const RoundSliderOverlayShape(
+                                            overlayRadius: 14,
+                                          ),
+                                      activeTrackColor: Colors.white,
+                                      inactiveTrackColor: Colors.white54,
+                                      thumbColor: Colors.white,
+                                      overlayColor: Colors.white24,
+                                    ),
+                                    child: Slider(
+                                      value: positionMs,
+                                      max: durationMs,
+                                      onChanged: durationMs == 0
+                                          ? null
+                                          : (value) {
+                                              context
+                                                  .read<AudioLibraryBloc>()
+                                                  .add(
+                                                    SeekToPositionEvent(
+                                                      Duration(
+                                                        milliseconds: value
+                                                            .toInt(),
+                                                      ),
+                                                    ),
+                                                  );
+                                            },
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        _formatDuration(
+                                          state.duration ?? Duration.zero,
                                         ),
-                                      );
-                                    },
-                            ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _formatDuration(
-                                  state.duration ?? Duration.zero,
-                                ),
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 10,
-                                ),
-                              ),
-                              Text(
-                                _formatDuration(state.position),
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatDuration(position),
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),

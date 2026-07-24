@@ -151,6 +151,16 @@ class _StudentHomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<StudentBloc, StudentState>(
+      buildWhen: (previous, current) =>
+          previous.profile != current.profile ||
+          previous.profileStatus != current.profileStatus ||
+          previous.profileError != current.profileError ||
+          previous.halaqa != current.halaqa ||
+          previous.halaqaStatus != current.halaqaStatus ||
+          previous.halaqaError != current.halaqaError ||
+          previous.latestAssignment != current.latestAssignment ||
+          previous.recitationRecords != current.recitationRecords ||
+          previous.recitationStatus != current.recitationStatus,
       builder: (context, state) {
         final waitingForProfile =
             state.profile == null &&
@@ -185,16 +195,17 @@ class _StudentHomeTab extends StatelessWidget {
               // TODO: منطق حساب النقاط والاستريك (gamification) يُصمَّم لاحقاً —
               // هنا نقرأ القيم فقط من studentProfiles بدون حساب محلي.
               SliverToBoxAdapter(
-                child: BlocBuilder<NotificationsBloc, NotificationsState>(
+                child: BlocSelector<NotificationsBloc, NotificationsState, int>(
                   bloc: sl<NotificationsBloc>(),
-                  builder: (context, notifState) {
+                  selector: (state) => state.unreadCount,
+                  builder: (context, unreadCount) {
                     return StudentHeaderWidget(
                       name: profile?.name ?? '...',
                       avatarEmoji: avatarEmoji,
                       coins: profile?.coins ?? 0,
                       totalStars: profile?.totalStars ?? 0,
                       streakDays: profile?.streakDays ?? 0,
-                      unreadNotificationsCount: notifState.unreadCount,
+                      unreadNotificationsCount: unreadCount,
                       onNotificationsTap: () =>
                           context.push('/student/notifications'),
                       onAvatarTap: () => context.push('/student/avatar'),
@@ -488,6 +499,9 @@ class _StudentProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<StudentBloc, StudentState>(
+      buildWhen: (previous, current) =>
+          previous.profile != current.profile ||
+          previous.profileStatus != current.profileStatus,
       builder: (context, state) {
         final profile = state.profile;
         final avatarEmoji = AvatarCatalog.byId(
@@ -874,9 +888,10 @@ class _StudentBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<NotificationsBloc, NotificationsState>(
+    return BlocSelector<NotificationsBloc, NotificationsState, int>(
       bloc: sl<NotificationsBloc>(),
-      builder: (context, notifState) {
+      selector: (state) => state.unreadCount,
+      builder: (context, unreadCount) {
         return Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -941,7 +956,7 @@ class _StudentBottomNav extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           NotificationBadge(
-                            count: i == 0 ? notifState.unreadCount : 0,
+                            count: i == 0 ? unreadCount : 0,
                             child: Icon(
                               tab.icon,
                               color: isSelected

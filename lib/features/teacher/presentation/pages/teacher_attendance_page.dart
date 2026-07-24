@@ -42,10 +42,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
   void _loadAttendance() {
     context.read<TeacherBloc>().add(
-      LoadHalaqaAttendanceEvent(
-        halaqaId: widget.halaqaId,
-        date: _selectedDate,
-      ),
+      LoadHalaqaAttendanceEvent(halaqaId: widget.halaqaId, date: _selectedDate),
     );
   }
 
@@ -54,9 +51,21 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     _loadAttendance();
   }
 
+  static DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  static DateTime get _minDate => _today.subtract(const Duration(days: 30));
+
+  DateTime _normalize(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
   void _changeDate(DateTime date) {
+    final next = _normalize(date);
+    if (next.isBefore(_minDate) || next.isAfter(_today)) return;
     setState(() {
-      _selectedDate = date;
+      _selectedDate = next;
       _attendanceMap.clear();
     });
     _loadAttendance();
@@ -80,7 +89,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       listeners: [
         BlocListener<TeacherBloc, TeacherState>(
           listenWhen: (prev, curr) =>
-          prev.attendanceSubmissionStatus !=
+              prev.attendanceSubmissionStatus !=
               curr.attendanceSubmissionStatus,
           listener: (context, state) {
             if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
@@ -102,7 +111,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
         ),
         BlocListener<TeacherBloc, TeacherState>(
           listenWhen: (prev, curr) =>
-          curr.dayAttendanceStatus == SectionStatus.loaded &&
+              curr.dayAttendanceStatus == SectionStatus.loaded &&
               (prev.dayAttendanceStatus != SectionStatus.loaded ||
                   prev.dayAttendance != curr.dayAttendance),
           listener: (context, state) {
@@ -116,7 +125,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
         ),
         BlocListener<TeacherBloc, TeacherState>(
           listenWhen: (prev, curr) =>
-          curr.studentsStatus == SectionStatus.loaded &&
+              curr.studentsStatus == SectionStatus.loaded &&
               curr.dayAttendanceStatus == SectionStatus.loaded &&
               prev.studentsStatus != SectionStatus.loaded,
           listener: (context, state) {
@@ -139,10 +148,10 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           builder: (context, state) {
             final studentsLoading =
                 state.studentsStatus == SectionStatus.loading ||
-                    state.studentsStatus == SectionStatus.initial;
+                state.studentsStatus == SectionStatus.initial;
             final attendanceLoading =
                 state.dayAttendanceStatus == SectionStatus.loading ||
-                    state.dayAttendanceStatus == SectionStatus.initial;
+                state.dayAttendanceStatus == SectionStatus.initial;
 
             if (!_shellReady && (studentsLoading || attendanceLoading)) {
               return const AppLoadingWidget();
@@ -163,26 +172,20 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             }
 
             final students = state.students;
-            final isRefreshingAttendance =
-                _shellReady && attendanceLoading;
+            final isRefreshingAttendance = _shellReady && attendanceLoading;
             final isSaving =
-                state.attendanceSubmissionStatus ==
-                SubmissionStatus.submitting;
+                state.attendanceSubmissionStatus == SubmissionStatus.submitting;
             final canSave =
                 students.isNotEmpty &&
-                    _allStudentsSelected(students) &&
-                    !isSaving &&
-                    !isRefreshingAttendance;
+                _allStudentsSelected(students) &&
+                !isSaving &&
+                !isRefreshingAttendance;
 
             final presentCount = students
-                .where(
-                  (s) => _attendanceMap[s.uid] == AttendanceStatus.present,
-            )
+                .where((s) => _attendanceMap[s.uid] == AttendanceStatus.present)
                 .length;
             final absentCount = students
-                .where(
-                  (s) => _attendanceMap[s.uid] == AttendanceStatus.absent,
-            )
+                .where((s) => _attendanceMap[s.uid] == AttendanceStatus.absent)
                 .length;
             final lateCount = students
                 .where((s) => _attendanceMap[s.uid] == AttendanceStatus.late)
@@ -192,11 +195,16 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               children: [
                 _DateNavigator(
                   date: _selectedDate,
-                  onPrev: () => _changeDate(
-                    _selectedDate.subtract(const Duration(days: 1)),
-                  ),
-                  onNext: () =>
-                      _changeDate(_selectedDate.add(const Duration(days: 1))),
+                  onPrev: _normalize(_selectedDate).isAfter(_minDate)
+                      ? () => _changeDate(
+                          _selectedDate.subtract(const Duration(days: 1)),
+                        )
+                      : null,
+                  onNext: _normalize(_selectedDate).isBefore(_today)
+                      ? () => _changeDate(
+                          _selectedDate.add(const Duration(days: 1)),
+                        )
+                      : null,
                 ),
                 if (isRefreshingAttendance)
                   const LinearProgressIndicator(
@@ -211,34 +219,30 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                 Expanded(
                   child: students.isEmpty
                       ? const Center(
-                    child: Text(
-                      'لا يوجد طلاب في هذه الحلقة',
-                      style: AppTextStyles.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                  )
+                          child: Text(
+                            'لا يوجد طلاب في هذه الحلقة',
+                            style: AppTextStyles.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                        )
                       : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.paddingM,
-                    ),
-                    itemCount: students.length,
-                    separatorBuilder: (_, __) =>
-                    const Divider(
-                      height: 1,
-                      color: AppColors.border,
-                    ),
-                    itemBuilder: (context, i) {
-                      final student = students[i];
-                      return _StudentAttendanceRow(
-                        student: student,
-                        status: _attendanceMap[student.uid],
-                        onChanged: (status) =>
-                            setState(
-                                  () => _attendanceMap[student.uid] = status,
-                            ),
-                      );
-                    },
-                  ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSizes.paddingM,
+                          ),
+                          itemCount: students.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 1, color: AppColors.border),
+                          itemBuilder: (context, i) {
+                            final student = students[i];
+                            return _StudentAttendanceRow(
+                              student: student,
+                              status: _attendanceMap[student.uid],
+                              onChanged: (status) => setState(
+                                () => _attendanceMap[student.uid] = status,
+                              ),
+                            );
+                          },
+                        ),
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
@@ -287,8 +291,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
     final records = students
         .map(
-          (s) =>
-          AttendanceRecordEntity(
+          (s) => AttendanceRecordEntity(
             id: '',
             studentId: s.uid,
             studentName: s.name,
@@ -297,7 +300,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             status: _attendanceMap[s.uid]!,
             recordedBy: authState.user.uid,
           ),
-    )
+        )
         .toList();
 
     bloc.add(SaveDayAttendanceEvent(records));
@@ -306,9 +309,9 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now(),
+      initialDate: _normalize(_selectedDate),
+      firstDate: _minDate,
+      lastDate: _today,
     );
     if (picked != null) _changeDate(picked);
   }
@@ -316,8 +319,8 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
 class _DateNavigator extends StatelessWidget {
   final DateTime date;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
 
   const _DateNavigator({
     required this.date,

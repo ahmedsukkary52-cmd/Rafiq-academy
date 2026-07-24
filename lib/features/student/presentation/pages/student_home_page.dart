@@ -81,8 +81,8 @@ class _StudentHomePageState extends State<StudentHomePage> {
         final idChanged = previous.profile?.halaqaId != currentHalaqaId;
         final profileJustLoaded =
             previous.profileStatus != SectionStatus.loaded &&
-                current.profileStatus == SectionStatus.loaded &&
-                current.halaqaStatus == SectionStatus.initial;
+            current.profileStatus == SectionStatus.loaded &&
+            current.halaqaStatus == SectionStatus.initial;
 
         return idChanged || profileJustLoaded;
       },
@@ -134,9 +134,7 @@ class _StudentHomeTab extends StatelessWidget {
   }
 
   Future<void> _onRefresh(BuildContext context) async {
-    final authState = context
-        .read<AuthBloc>()
-        .state;
+    final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
 
     final bloc = context.read<StudentBloc>();
@@ -154,7 +152,8 @@ class _StudentHomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<StudentBloc, StudentState>(
       builder: (context, state) {
-        final waitingForProfile = state.profile == null &&
+        final waitingForProfile =
+            state.profile == null &&
             (state.profileStatus == SectionStatus.initial ||
                 state.profileStatus == SectionStatus.loading);
 
@@ -304,9 +303,11 @@ class _StudentHomeTab extends StatelessWidget {
     );
   }
 
-  List<Widget> _halaqaSectionSlivers(BuildContext context,
-      StudentState state,
-      String? halaqaId,) {
+  List<Widget> _halaqaSectionSlivers(
+    BuildContext context,
+    StudentState state,
+    String? halaqaId,
+  ) {
     final hasHalaqaId = halaqaId != null && halaqaId.isNotEmpty;
 
     if (state.halaqaStatus == SectionStatus.loaded && state.halaqa != null) {
@@ -378,10 +379,7 @@ class _StudentHomeTab extends StatelessWidget {
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      'حصة الحفظ اليومية',
-                      style: AppTextStyles.titleMedium,
-                    ),
+                    Text('حصة الحفظ اليومية', style: AppTextStyles.titleMedium),
                     Text(
                       'اضغط لعرض جدول الحصص',
                       style: AppTextStyles.labelSmall,
@@ -438,8 +436,7 @@ class _StudentHomeTab extends StatelessWidget {
   }
 }
 
-// ── Placeholder Tabs (هتتبنى بالكامل في مرحلة لاحقة) ────────────────────────
-
+/// Adventure map is not backed by real progress data yet — keep the tab slot.
 class _StudentMapTab extends StatelessWidget {
   const _StudentMapTab();
 
@@ -447,375 +444,41 @@ class _StudentMapTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Lv. 3',
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Column(
-                        children: [
-                          const Text(
-                            'خريطة المغامرة',
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'سورة الفاتحة - جزء عم',
-                            style: AppTextStyles.displayMedium.copyWith(
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.search, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // XP Progress
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '١٩٥٠ / ٢٠٠٠ XP',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'التحصيل',
-                              style: AppTextStyles.displayMedium.copyWith(
-                                color: Colors.white.withOpacity(0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Stack(
-                          children: [
-                            Container(
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            FractionallySizedBox(
-                              widthFactor: 0.975,
-                              child: Container(
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondary,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Map Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: ListView(
-                  children: const [
-                    // Level 3 - Completed
-                    _MapLevel(
-                      level: 'سورة الفلق',
-                      isCompleted: true,
-                      isCurrent: false,
-                      isLocked: false,
-                    ),
-                    SizedBox(height: 8),
-                    // Divider
-                    Center(
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        color: AppColors.primary,
-                        size: 32,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-
-                    // Level 2 - Completed
-                    _MapLevel(
-                      level: 'سورة الناس',
-                      isCompleted: true,
-                      isCurrent: false,
-                      isLocked: false,
-                    ),
-                    SizedBox(height: 8),
-                    // Divider
-                    Center(
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        color: AppColors.primary,
-                        size: 32,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-
-                    // Level 1 - Current
-                    _MapLevel(
-                      level: 'سورة الملك',
-                      isCompleted: false,
-                      isCurrent: true,
-                      isLocked: false,
-                    ),
-                    SizedBox(height: 8),
-                    // Divider
-                    Center(
-                      child: Icon(
-                        Icons.lock,
-                        color: AppColors.textHint,
-                        size: 28,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-
-                    // Locked Level
-                    _MapLevel(
-                      level: 'سورة القلم',
-                      isCompleted: false,
-                      isCurrent: false,
-                      isLocked: true,
-                    ),
-                    SizedBox(height: 8),
-                    Center(
-                      child: Icon(
-                        Icons.lock,
-                        color: AppColors.textHint,
-                        size: 28,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-
-                    // Locked Level
-                    _MapLevel(
-                      level: 'سورة الحاقة',
-                      isCompleted: false,
-                      isCurrent: false,
-                      isLocked: true,
-                    ),
-                    SizedBox(height: 30),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MapLevel extends StatelessWidget {
-  final String level;
-  final bool isCompleted;
-  final bool isCurrent;
-  final bool isLocked;
-
-  const _MapLevel({
-    required this.level,
-    required this.isCompleted,
-    required this.isCurrent,
-    required this.isLocked,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Color bgColor;
-    Color borderColor;
-    Color textColor;
-
-    if (isCurrent) {
-      bgColor = AppColors.primary.withOpacity(0.1);
-      borderColor = AppColors.primary;
-      textColor = AppColors.primary;
-    } else if (isCompleted) {
-      bgColor = AppColors.secondary.withOpacity(0.15);
-      borderColor = AppColors.secondary;
-      textColor = AppColors.secondary;
-    } else {
-      bgColor = AppColors.surface;
-      borderColor = AppColors.border;
-      textColor = AppColors.textSecondary;
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: isCurrent ? 2 : 1),
-        boxShadow: isCurrent
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.2),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ]
-            : [],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (isCompleted)
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check, color: Colors.white, size: 20),
-            )
-          else if (isLocked)
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.textHint.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.lock,
-                color: AppColors.textHint,
-                size: 20,
-              ),
-            )
-          else
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+      appBar: AppBar(title: const Text('خريطتي')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSizes.paddingL),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                level,
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
+              const Icon(
+                Icons.map_outlined,
+                size: 48,
+                color: AppColors.textHint,
               ),
-              if (isCurrent)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'المرحلة الحالية',
-                      style: TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                )
-              else if (isCompleted)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'تم الانتهاء ✨',
-                    style: AppTextStyles.displayMedium.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              const SizedBox(height: 16),
+              const Text(
+                'خريطة المغامرة',
+                style: AppTextStyles.headlineMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Coming Soon',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'ستظهر خريطة التقدم عند تفعيل خطة الحفظ',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
-          // Decorative Circle (like in design)
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-          ),
-        ],
+        ),
       ),
     );
   }

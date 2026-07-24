@@ -82,6 +82,28 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     }
   }
 
+  void _openSendAssignmentSheet(
+    BuildContext context, {
+    required int studentCount,
+  }) {
+    if (studentCount <= 0) {
+      AppSnackBar.showError(
+        context,
+        'لا يوجد طلاب في هذه الحلقة لإرسال التكليف',
+      );
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: context.read<TeacherBloc>(),
+        child: _SendAssignmentSheet(halaqaId: widget.halaqaId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TeacherBloc, TeacherState>(
@@ -140,6 +162,24 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 title: Text(halaqa?.name ?? 'الحلقة'),
+                actions: [
+                  TextButton(
+                    onPressed: halaqa == null
+                        ? null
+                        : () => _openSendAssignmentSheet(
+                            context,
+                            studentCount: halaqa.studentIds.length,
+                          ),
+                    child: const Text(
+                      'تكليف',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'NotoNaskhArabic',
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: _HalaqaStatsHeader(
                     studentCount: state.studentsStatus == SectionStatus.loaded
@@ -564,4 +604,228 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_TabBarDelegate old) => false;
+}
+
+/// إرسال تكليف يومي لكل طلاب الحلقة (Slice 1 — W1).
+/// dueDate = نهاية اليوم المختار حتى يصبح «التكليف الحالي» الأحدث بحسب D7.
+class _SendAssignmentSheet extends StatefulWidget {
+  final String halaqaId;
+
+  const _SendAssignmentSheet({required this.halaqaId});
+
+  @override
+  State<_SendAssignmentSheet> createState() => _SendAssignmentSheetState();
+}
+
+class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
+  final _memorizationCtrl = TextEditingController();
+  final _reviewCtrl = TextEditingController();
+  late DateTime _dueDay;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _dueDay = DateTime(now.year, now.month, now.day);
+  }
+
+  @override
+  void dispose() {
+    _memorizationCtrl.dispose();
+    _reviewCtrl.dispose();
+    super.dispose();
+  }
+
+  DateTime get _dueDateEndOfDay =>
+      DateTime(_dueDay.year, _dueDay.month, _dueDay.day, 23, 59, 59);
+
+  String get _dueDayLabel {
+    final d = _dueDay;
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    if (d == todayOnly) return 'اليوم';
+    final tomorrow = todayOnly.add(const Duration(days: 1));
+    if (d == tomorrow) return 'غداً';
+    return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _pickDueDay() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDay,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 60)),
+      helpText: 'موعد التسليم',
+      cancelText: 'إلغاء',
+      confirmText: 'اختيار',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _dueDay = DateTime(picked.year, picked.month, picked.day);
+    });
+  }
+
+  void _submit() {
+    final memorization = _memorizationCtrl.text.trim();
+    final review = _reviewCtrl.text.trim();
+    if (memorization.isEmpty && review.isEmpty) {
+      AppSnackBar.showError(context, 'أدخل نطاق الحفظ أو المراجعة على الأقل');
+      return;
+    }
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) {
+      AppSnackBar.showError(context, 'يجب تسجيل الدخول لإرسال التكليف');
+      return;
+    }
+
+    context.read<TeacherBloc>().add(
+      SendAssignmentEvent(
+        halaqaId: widget.halaqaId,
+        newMemorizationRange: memorization,
+        reviewRange: review,
+        dueDate: _dueDateEndOfDay,
+        teacherId: authState.user.uid,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+          prev.assignmentSubmissionStatus != curr.assignmentSubmissionStatus,
+      listener: (context, state) {
+        if (state.assignmentSubmissionStatus == SubmissionStatus.success) {
+          Navigator.pop(context);
+          AppSnackBar.showSuccess(context, 'تم إرسال التكليف للطلاب');
+          context.read<TeacherBloc>().add(
+            const ResetAssignmentSubmissionEvent(),
+          );
+        } else if (state.assignmentSubmissionStatus == SubmissionStatus.error) {
+          AppSnackBar.showError(
+            context,
+            state.assignmentSubmissionError ?? 'فشل إرسال التكليف',
+          );
+          context.read<TeacherBloc>().add(
+            const ResetAssignmentSubmissionEvent(),
+          );
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusXL),
+          ),
+        ),
+        padding: EdgeInsets.only(
+          top: AppSizes.paddingL,
+          left: AppSizes.paddingM,
+          right: AppSizes.paddingM,
+          bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('تكليف جديد', style: AppTextStyles.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                'يُنشأ تكليف مستقل لكل طالب. يظهر للطالب الأحدث حسب موعد التسليم.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 20),
+              const _SheetLabel('نطاق الحفظ الجديد'),
+              AppTextField(
+                hint: 'مثال: سورة الملك ١-١٠',
+                controller: _memorizationCtrl,
+              ),
+              const SizedBox(height: 16),
+              const _SheetLabel('نطاق المراجعة'),
+              AppTextField(hint: 'مثال: سورة يس ١-٢٠', controller: _reviewCtrl),
+              const SizedBox(height: 16),
+              const _SheetLabel('موعد التسليم'),
+              GestureDetector(
+                onTap: _pickDueDay,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceGrey,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                      const Spacer(),
+                      Text(
+                        _dueDayLabel,
+                        style: AppTextStyles.bodyLarge,
+                        textDirection: TextDirection.rtl,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.assignmentSubmissionStatus !=
+                    current.assignmentSubmissionStatus,
+                builder: (context, state) {
+                  final isLoading =
+                      state.assignmentSubmissionStatus ==
+                      SubmissionStatus.submitting;
+                  return AppButton(
+                    label: 'إرسال التكليف',
+                    isLoading: isLoading,
+                    onPressed: isLoading ? null : _submit,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetLabel extends StatelessWidget {
+  final String text;
+
+  const _SheetLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: AppTextStyles.labelLarge,
+      textAlign: TextAlign.right,
+    ),
+  );
 }

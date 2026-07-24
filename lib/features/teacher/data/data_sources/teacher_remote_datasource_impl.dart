@@ -170,8 +170,17 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           .doc(halaqaId)
           .get();
 
+      if (!halaqaDoc.exists) {
+        throw const ServerException('الحلقة غير موجودة');
+      }
+
       final data = halaqaDoc.data() as Map<String, dynamic>;
       final studentIds = List<String>.from(data['studentIds'] ?? []);
+      if (studentIds.isEmpty) {
+        throw const ServerException(
+          'لا يوجد طلاب في هذه الحلقة لإرسال التكليف',
+        );
+      }
 
       final batch = firestore.batch();
       for (final studentId in studentIds) {
@@ -193,6 +202,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         });
       }
       await batch.commit();
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }

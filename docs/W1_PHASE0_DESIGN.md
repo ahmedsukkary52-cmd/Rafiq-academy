@@ -394,5 +394,5 @@ Current implementation already defines behavior. **Do not invent a new model.**
 
 ## Approval gate
 
-Design + D1–D7 reflected. **Pre-Slice starts next.**  
+Design + D1–D7 reflected. **Pre-Slice complete.** Slice 1 (teacher assign UI) in progress.  
 If implementation discovers a flawed assumption: stop, update this doc, then continue.

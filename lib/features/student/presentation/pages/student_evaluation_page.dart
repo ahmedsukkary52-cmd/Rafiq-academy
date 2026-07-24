@@ -213,41 +213,27 @@ class _EvaluationMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final memorization = _averageFor(RecitationType.memorization);
-    final review = _averageFor(RecitationType.review);
-    final behavior = records.isEmpty
-        ? 0
-        : () {
-            final scored = records
-                .map((record) => record.behaviorGrade)
-                .whereType<RecitationGrade>()
-                .map(_gradePercent)
-                .toList();
-            if (scored.isEmpty) return 0;
-            return scored.reduce((a, b) => a + b) ~/ scored.length;
-          }();
-
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Row(
         children: [
           _MetricTile(
-            value: '$memorization%',
+            value: _averageLabelFor(RecitationType.memorization),
             label: 'الحفظ',
             color: const Color(0xFFCFF4DF),
             textColor: const Color(0xFF20AF68),
           ),
           const SizedBox(width: 10),
           _MetricTile(
-            value: '$review%',
+            value: _averageLabelFor(RecitationType.review),
             label: 'المراجعة',
             color: const Color(0xFFCFF4F6),
             textColor: const Color(0xFF14AEB8),
           ),
           const SizedBox(width: 10),
           _MetricTile(
-            value: '$behavior%',
+            value: _behaviorLabel(),
             label: 'السلوك',
             color: const Color(0xFFFFF2BF),
             textColor: const Color(0xFFD9A409),
@@ -264,22 +250,37 @@ class _EvaluationMetrics extends StatelessWidget {
     );
   }
 
-  int _averageFor(RecitationType type) {
-    final typed = records
+  String _averageLabelFor(RecitationType type) {
+    final grades = records
         .where((record) => record.type == type && record.grade != null)
+        .map((record) => record.grade!)
         .toList();
-    if (typed.isEmpty) return 0;
-    final total = typed
-        .map((record) => _gradePercent(record.grade!))
-        .reduce((a, b) => a + b);
-    return total ~/ typed.length;
+    return _nearestGradeLabel(grades);
   }
 
-  int _gradePercent(RecitationGrade grade) => switch (grade) {
-    RecitationGrade.excellent => 96,
-    RecitationGrade.veryGood => 88,
-    RecitationGrade.good => 75,
-    RecitationGrade.needsRetry => 60,
+  String _behaviorLabel() {
+    final grades = records
+        .map((record) => record.behaviorGrade)
+        .whereType<RecitationGrade>()
+        .toList();
+    return _nearestGradeLabel(grades);
+  }
+
+  String _nearestGradeLabel(List<RecitationGrade> grades) {
+    if (grades.isEmpty) return '—';
+    final total = grades.map(_gradeRank).reduce((a, b) => a + b);
+    final avg = total / grades.length;
+    if (avg >= 3.5) return RecitationGrade.excellent.label;
+    if (avg >= 2.5) return RecitationGrade.veryGood.label;
+    if (avg >= 1.5) return RecitationGrade.good.label;
+    return RecitationGrade.needsRetry.label;
+  }
+
+  int _gradeRank(RecitationGrade grade) => switch (grade) {
+    RecitationGrade.excellent => 4,
+    RecitationGrade.veryGood => 3,
+    RecitationGrade.good => 2,
+    RecitationGrade.needsRetry => 1,
   };
 }
 
@@ -312,10 +313,13 @@ class _MetricTile extends StatelessWidget {
               value,
               style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 24,
+                fontSize: value.length > 3 ? 14 : 24,
                 fontWeight: FontWeight.w900,
                 color: textColor,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,

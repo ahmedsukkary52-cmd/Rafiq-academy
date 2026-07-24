@@ -39,12 +39,14 @@ class TeacherDashboardTab extends StatelessWidget {
         return RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () async {
-            if (auth != null) {
-              context.read<TeacherBloc>().add(
-                LoadTeacherHalaqatEvent(auth.user.uid),
-              );
-              await Future.delayed(const Duration(milliseconds: 800));
-            }
+            if (auth == null) return;
+            final bloc = context.read<TeacherBloc>();
+            bloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
+            await bloc.stream.firstWhere(
+                  (s) =>
+              s.halaqatStatus == SectionStatus.loaded ||
+                  s.halaqatStatus == SectionStatus.error,
+            );
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -122,7 +124,8 @@ class TeacherDashboardTab extends StatelessWidget {
             child: _EmptyHalaqatCard(),
           ),
         )
-      else if (nextHalaqa != null)
+      else
+        if (nextHalaqa != null) ...[
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -131,68 +134,31 @@ class TeacherDashboardTab extends StatelessWidget {
               AppSizes.paddingM,
               0,
             ),
-            child: _CurrentSessionCard(
+            child: _HalaqaShortcutCard(
               halaqaName: nextHalaqa.name,
               studentsCount: nextHalaqa.studentIds.length,
               scheduleLabel: _scheduleLabel(nextHalaqa),
-              onStartTap: () =>
+              onOpenTap: () =>
                   context.push('/teacher/halaqa/${nextHalaqa.id}'),
             ),
           ),
         ),
-      const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSizes.paddingM,
-            16,
-            AppSizes.paddingM,
-            0,
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              child: _HalaqaQuickLinksCard(
+                onEvaluationsTap: () =>
+                    context.push(
+                      '/teacher/halaqa/${nextHalaqa.id}/evaluations',
+                    ),
+                onAnalyticsTap: () =>
+                    context.push(
+                      '/teacher/halaqa/${nextHalaqa.id}/analytics',
+                    ),
+              ),
+            ),
           ),
-          child: _ComingSoonCard(title: 'إعلان إداري'),
-        ),
-      ),
-      const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSizes.paddingM,
-            16,
-            AppSizes.paddingM,
-            0,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SectionHeader(title: 'النشاطات الأخيرة'),
-              SizedBox(height: 8),
-              _ComingSoonCard(title: 'النشاطات'),
-            ],
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingM),
-          child: _SmartAssistantCard(
-            onRaiseTap: () {
-              final id = nextHalaqa?.id;
-              if (id == null) {
-                AppSnackBar.showInfo(context, 'لا توجد حلقة مسندة إليك');
-                return;
-              }
-              context.push('/teacher/halaqa/$id/evaluations');
-            },
-            onAssignTap: () => AppSnackBar.showInfo(context, 'قريبًا'),
-            onAtRiskTap: () {
-              final id = nextHalaqa?.id;
-              if (id == null) {
-                AppSnackBar.showInfo(context, 'لا توجد حلقة مسندة إليك');
-                return;
-              }
-              context.push('/teacher/halaqa/$id/analytics');
-            },
-          ),
-        ),
-      ),
+        ],
     ];
   }
 
@@ -477,20 +443,20 @@ class _StatCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _CurrentSessionCard - كارت الجلسة الحالية الداكن
+// _HalaqaShortcutCard — فتح حلقة محمّلة مسبقاً (بدون ادّعاء جلسة مباشرة)
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _CurrentSessionCard extends StatelessWidget {
+class _HalaqaShortcutCard extends StatelessWidget {
   final String halaqaName;
   final int studentsCount;
   final String? scheduleLabel;
-  final VoidCallback onStartTap;
+  final VoidCallback onOpenTap;
 
-  const _CurrentSessionCard({
+  const _HalaqaShortcutCard({
     required this.halaqaName,
     required this.studentsCount,
     required this.scheduleLabel,
-    required this.onStartTap,
+    required this.onOpenTap,
   });
 
   @override
@@ -507,7 +473,7 @@ class _CurrentSessionCard extends StatelessWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: onStartTap,
+            onTap: onOpenTap,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
@@ -518,13 +484,13 @@ class _CurrentSessionCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.play_circle_outline_rounded,
+                    Icons.open_in_new_rounded,
                     color: Colors.white,
                     size: 18,
                   ),
                   SizedBox(width: 6),
                   Text(
-                    'ابدأ الجلسة',
+                    'فتح الحلقة',
                     style: TextStyle(
                       fontFamily: 'NotoNaskhArabic',
                       fontSize: 14,
@@ -600,56 +566,16 @@ class _CurrentSessionCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _ComingSoonCard — placeholder محايد بدون بيانات مفبركة
+// _HalaqaQuickLinksCard — اختصارات تنقّل فقط (بدون ادّعاء ذكاء اصطناعي)
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _ComingSoonCard extends StatelessWidget {
-  final String title;
+class _HalaqaQuickLinksCard extends StatelessWidget {
+  final VoidCallback onEvaluationsTap;
+  final VoidCallback onAnalyticsTap;
 
-  const _ComingSoonCard({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.border),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.paddingM,
-        vertical: 16,
-      ),
-      child: Column(
-        children: [
-          Text(title, style: AppTextStyles.labelMedium),
-          const SizedBox(height: 4),
-          Text(
-            'قريبًا',
-            style: AppTextStyles.titleMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _SmartAssistantCard - المساعد الذكي (Image 4)
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _SmartAssistantCard extends StatelessWidget {
-  final VoidCallback onRaiseTap;
-  final VoidCallback onAssignTap;
-  final VoidCallback onAtRiskTap;
-
-  const _SmartAssistantCard({
-    required this.onRaiseTap,
-    required this.onAssignTap,
-    required this.onAtRiskTap,
+  const _HalaqaQuickLinksCard({
+    required this.onEvaluationsTap,
+    required this.onAnalyticsTap,
   });
 
   @override
@@ -663,35 +589,8 @@ class _SmartAssistantCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              const Text(
-                'مساعد ذكي',
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 12,
-                  color: Colors.white60,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                ),
-                child: const Icon(
-                  Icons.check_circle_outline,
-                  color: AppColors.primary,
-                  size: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
           const Text(
-            'ما الذي تريد إنجازه اليوم؟',
+            'اختصارات الحلقة',
             style: TextStyle(
               fontFamily: 'NotoNaskhArabic',
               fontSize: 18,
@@ -699,8 +598,9 @@ class _SmartAssistantCard extends StatelessWidget {
               color: Colors.white,
             ),
           ),
+          const SizedBox(height: 4),
           const Text(
-            'اقتراحات مخصصة بناءً على جدولك',
+            'انتقال سريع إلى صفحات الحلقة',
             style: TextStyle(
               fontFamily: 'NotoNaskhArabic',
               fontSize: 12,
@@ -713,9 +613,14 @@ class _SmartAssistantCard extends StatelessWidget {
             runSpacing: 8,
             alignment: WrapAlignment.end,
             children: [
-              _AssistantChip(label: 'طلابي في خطر', onTap: onAtRiskTap),
-              _AssistantChip(label: 'إرسال مهمة', onTap: onAssignTap),
-              _AssistantChip(label: 'رفع التقييمات', onTap: onRaiseTap),
+              _QuickLinkChip(
+                label: 'تحليلات الحلقة',
+                onTap: onAnalyticsTap,
+              ),
+              _QuickLinkChip(
+                label: 'التقييمات',
+                onTap: onEvaluationsTap,
+              ),
             ],
           ),
         ],
@@ -724,11 +629,11 @@ class _SmartAssistantCard extends StatelessWidget {
   }
 }
 
-class _AssistantChip extends StatelessWidget {
+class _QuickLinkChip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _AssistantChip({required this.label, required this.onTap});
+  const _QuickLinkChip({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -9,12 +9,10 @@ import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_profil
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
-import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 
@@ -81,7 +79,7 @@ class _TeacherBottomNav extends StatelessWidget {
 
   static const _tabs = [
     (icon: Icons.home_rounded, label: 'الرئيسية'),
-    (icon: Icons.groups_rounded, label: 'الطلاب'),
+    (icon: Icons.groups_rounded, label: 'الحلقات'),
     (icon: Icons.article_outlined, label: 'المنشورات'),
     (icon: Icons.chat_bubble_outline, label: 'الرسائل'),
     (icon: Icons.person_outline, label: 'حسابي'),
@@ -89,71 +87,61 @@ class _TeacherBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<NotificationsBloc, NotificationsState>(
-      bloc: sl<NotificationsBloc>(),
-      builder: (context, notifState) {
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
           ),
-          child: SafeArea(
-            child: SizedBox(
-              height: AppSizes.bottomNavHeight,
-              child: Row(
-                children: List.generate(_tabs.length, (i) {
-                  final tab = _tabs[i];
-                  final isSelected = i == selected;
-                  // الإشعارات على تاب الرسائل
-                  final badge = i == 3 ? notifState.unreadCount : 0;
+        ],
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          height: AppSizes.bottomNavHeight,
+          child: Row(
+            children: List.generate(_tabs.length, (i) {
+              final tab = _tabs[i];
+              final isSelected = i == selected;
 
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onChanged(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          NotificationBadge(
-                            count: badge,
-                            child: Icon(
-                              tab.icon,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              size: AppSizes.iconL,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            tab.label,
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 10,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        tab.icon,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: AppSizes.iconL,
                       ),
-                    ),
-                  );
-                }),
-              ),
-            ),
+                      const SizedBox(height: 3),
+                      Text(
+                        tab.label,
+                        style: TextStyle(
+                          fontFamily: 'NotoNaskhArabic',
+                          fontSize: 10,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

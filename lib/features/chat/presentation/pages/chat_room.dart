@@ -177,6 +177,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
             // ── Error ──────────────────────────────────────────
             BlocBuilder<ChatRoomBloc, ChatRoomState>(
+              buildWhen: (previous, current) =>
+                  previous.sendError != current.sendError,
               builder: (context, state) {
                 if (state.sendError != null) {
                   return Container(

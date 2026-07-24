@@ -641,6 +641,10 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     const SectionHeader(title: 'التعليقات'),
                     const SizedBox(height: 12),
                     BlocBuilder<PostsBloc, PostsState>(
+                      buildWhen: (previous, current) =>
+                          previous.commentsStatus != current.commentsStatus ||
+                          previous.comments != current.comments ||
+                          previous.commentsError != current.commentsError,
                       builder: (context, state) {
                         if (state.commentsStatus == SectionStatus.loading) {
                           return const Center(

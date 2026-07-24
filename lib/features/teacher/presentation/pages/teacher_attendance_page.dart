@@ -24,8 +24,13 @@ class TeacherAttendancePage extends StatefulWidget {
 
 class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   DateTime _selectedDate = DateTime.now();
+
+  /// Explicit selections only. Missing key / null = not selected (never default present).
   final Map<String, AttendanceStatus> _attendanceMap = {};
-  bool _mapSyncedForLoad = false;
+
+  /// After first successful students + day-attendance load, keep the shell visible
+  /// during save/reload instead of flashing a full-page loader.
+  bool _shellReady = false;
 
   @override
   void initState() {
@@ -36,7 +41,6 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   }
 
   void _loadAttendance() {
-    _mapSyncedForLoad = false;
     context.read<TeacherBloc>().add(
       LoadHalaqaAttendanceEvent(
         halaqaId: widget.halaqaId,
@@ -45,53 +49,81 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     );
   }
 
+  void _retryAll() {
+    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    _loadAttendance();
+  }
+
   void _changeDate(DateTime date) {
     setState(() {
       _selectedDate = date;
       _attendanceMap.clear();
-      _mapSyncedForLoad = false;
     });
     _loadAttendance();
   }
 
+  void _syncMapFromRecords(List<AttendanceRecordEntity> records) {
+    _attendanceMap.clear();
+    for (final record in records) {
+      _attendanceMap[record.studentId] = record.status;
+    }
+  }
+
+  bool _allStudentsSelected(List<HalaqaStudentSummaryEntity> students) {
+    if (students.isEmpty) return false;
+    return students.every((s) => _attendanceMap.containsKey(s.uid));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocListener<TeacherBloc, TeacherState>(
-      listenWhen: (prev, curr) =>
-          prev.attendanceSubmissionStatus != curr.attendanceSubmissionStatus ||
-          prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
-          prev.dayAttendance != curr.dayAttendance,
-      listener: (context, state) {
-        if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
-          AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
-          context.read<TeacherBloc>().add(
-            const ResetAttendanceSubmissionEvent(),
-          );
-        } else if (state.attendanceSubmissionStatus ==
-            SubmissionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.attendanceSubmissionError ?? 'فشل حفظ الحضور',
-          );
-          context.read<TeacherBloc>().add(
-            const ResetAttendanceSubmissionEvent(),
-          );
-        }
-
-        if (state.dayAttendanceStatus == SectionStatus.loaded &&
-            !_mapSyncedForLoad) {
-          setState(() {
-            _mapSyncedForLoad = true;
-            _attendanceMap.clear();
-            for (final s in state.students) {
-              _attendanceMap[s.uid] = AttendanceStatus.present;
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<TeacherBloc, TeacherState>(
+          listenWhen: (prev, curr) =>
+          prev.attendanceSubmissionStatus !=
+              curr.attendanceSubmissionStatus,
+          listener: (context, state) {
+            if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
+              AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
+              context.read<TeacherBloc>().add(
+                const ResetAttendanceSubmissionEvent(),
+              );
+            } else if (state.attendanceSubmissionStatus ==
+                SubmissionStatus.error) {
+              AppSnackBar.showError(
+                context,
+                state.attendanceSubmissionError ?? 'فشل حفظ الحضور',
+              );
+              context.read<TeacherBloc>().add(
+                const ResetAttendanceSubmissionEvent(),
+              );
             }
-            for (final record in state.dayAttendance) {
-              _attendanceMap[record.studentId] = record.status;
-            }
-          });
-        }
-      },
+          },
+        ),
+        BlocListener<TeacherBloc, TeacherState>(
+          listenWhen: (prev, curr) =>
+          curr.dayAttendanceStatus == SectionStatus.loaded &&
+              (prev.dayAttendanceStatus != SectionStatus.loaded ||
+                  prev.dayAttendance != curr.dayAttendance),
+          listener: (context, state) {
+            setState(() {
+              _syncMapFromRecords(state.dayAttendance);
+              if (state.studentsStatus == SectionStatus.loaded) {
+                _shellReady = true;
+              }
+            });
+          },
+        ),
+        BlocListener<TeacherBloc, TeacherState>(
+          listenWhen: (prev, curr) =>
+          curr.studentsStatus == SectionStatus.loaded &&
+              curr.dayAttendanceStatus == SectionStatus.loaded &&
+              prev.studentsStatus != SectionStatus.loaded,
+          listener: (context, state) {
+            setState(() => _shellReady = true);
+          },
+        ),
+      ],
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -105,22 +137,24 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
         ),
         body: BlocBuilder<TeacherBloc, TeacherState>(
           builder: (context, state) {
-            if (state.studentsStatus == SectionStatus.loading ||
+            final studentsLoading =
+                state.studentsStatus == SectionStatus.loading ||
+                    state.studentsStatus == SectionStatus.initial;
+            final attendanceLoading =
                 state.dayAttendanceStatus == SectionStatus.loading ||
-                state.dayAttendanceStatus == SectionStatus.initial) {
+                    state.dayAttendanceStatus == SectionStatus.initial;
+
+            if (!_shellReady && (studentsLoading || attendanceLoading)) {
               return const AppLoadingWidget();
             }
+
             if (state.studentsStatus == SectionStatus.error) {
               return AppErrorWidget(
                 message: state.studentsError ?? 'حدث خطأ',
-                onRetry: () {
-                  context.read<TeacherBloc>().add(
-                    LoadHalaqaStudentsEvent(widget.halaqaId),
-                  );
-                  _loadAttendance();
-                },
+                onRetry: _retryAll,
               );
             }
+
             if (state.dayAttendanceStatus == SectionStatus.error) {
               return AppErrorWidget(
                 message: state.dayAttendanceError ?? 'حدث خطأ',
@@ -129,27 +163,30 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             }
 
             final students = state.students;
-            for (final s in students) {
-              _attendanceMap.putIfAbsent(
-                s.uid,
-                () => AttendanceStatus.present,
-              );
-            }
-
-            final presentCount = _attendanceMap.values
-                .where((v) => v == AttendanceStatus.present)
-                .length;
-            final absentCount = _attendanceMap.values
-                .where((v) => v == AttendanceStatus.absent)
-                .length;
-            final lateCount = _attendanceMap.values
-                .where((v) => v == AttendanceStatus.late)
-                .length;
-            const excusedCount = 0;
-
+            final isRefreshingAttendance =
+                _shellReady && attendanceLoading;
             final isSaving =
                 state.attendanceSubmissionStatus ==
                 SubmissionStatus.submitting;
+            final canSave =
+                students.isNotEmpty &&
+                    _allStudentsSelected(students) &&
+                    !isSaving &&
+                    !isRefreshingAttendance;
+
+            final presentCount = students
+                .where(
+                  (s) => _attendanceMap[s.uid] == AttendanceStatus.present,
+            )
+                .length;
+            final absentCount = students
+                .where(
+                  (s) => _attendanceMap[s.uid] == AttendanceStatus.absent,
+            )
+                .length;
+            final lateCount = students
+                .where((s) => _attendanceMap[s.uid] == AttendanceStatus.late)
+                .length;
 
             return Column(
               children: [
@@ -161,30 +198,44 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                   onNext: () =>
                       _changeDate(_selectedDate.add(const Duration(days: 1))),
                 ),
+                if (isRefreshingAttendance)
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppColors.primary,
+                  ),
                 _AttendanceSummaryRow(
                   present: presentCount,
                   absent: absentCount,
                   late: lateCount,
-                  excused: excusedCount,
                 ),
                 Expanded(
-                  child: ListView.separated(
+                  child: students.isEmpty
+                      ? const Center(
+                    child: Text(
+                      'لا يوجد طلاب في هذه الحلقة',
+                      style: AppTextStyles.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                      : ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSizes.paddingM,
                     ),
                     itemCount: students.length,
                     separatorBuilder: (_, __) =>
-                        const Divider(height: 1, color: AppColors.border),
+                    const Divider(
+                      height: 1,
+                      color: AppColors.border,
+                    ),
                     itemBuilder: (context, i) {
                       final student = students[i];
                       return _StudentAttendanceRow(
                         student: student,
-                        status:
-                            _attendanceMap[student.uid] ??
-                            AttendanceStatus.present,
-                        onChanged: (status) => setState(
-                          () => _attendanceMap[student.uid] = status,
-                        ),
+                        status: _attendanceMap[student.uid],
+                        onChanged: (status) =>
+                            setState(
+                                  () => _attendanceMap[student.uid] = status,
+                            ),
                       );
                     },
                   ),
@@ -200,7 +251,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                     label: 'حفظ الحضور',
                     leading: const Icon(Icons.check_rounded, size: 20),
                     isLoading: isSaving,
-                    onPressed: isSaving ? null : _saveAttendance,
+                    onPressed: canSave ? _saveAttendance : null,
                   ),
                 ),
               ],
@@ -213,26 +264,41 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
   void _saveAttendance() {
     final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) return;
+    if (authState is! AuthAuthenticated) {
+      AppSnackBar.showError(context, 'يجب تسجيل الدخول لحفظ الحضور');
+      return;
+    }
 
     final bloc = context.read<TeacherBloc>();
-    final records = _attendanceMap.entries.map((entry) {
-      return AttendanceRecordEntity(
-        id: '',
-        studentId: entry.key,
-        studentName: bloc.state.students
-            .firstWhere(
-              (s) => s.uid == entry.key,
-              orElse: () =>
-                  const HalaqaStudentSummaryEntity(uid: '', name: ''),
-            )
-            .name,
-        halaqaId: widget.halaqaId,
-        date: _selectedDate,
-        status: entry.value,
-        recordedBy: authState.user.uid,
+    final students = bloc.state.students;
+
+    if (students.isEmpty) {
+      AppSnackBar.showInfo(context, 'لا يوجد طلاب لحفظ الحضور');
+      return;
+    }
+
+    if (!_allStudentsSelected(students)) {
+      AppSnackBar.showInfo(
+        context,
+        'يرجى تحديد حالة الحضور لجميع الطلاب قبل الحفظ',
       );
-    }).toList();
+      return;
+    }
+
+    final records = students
+        .map(
+          (s) =>
+          AttendanceRecordEntity(
+            id: '',
+            studentId: s.uid,
+            studentName: s.name,
+            halaqaId: widget.halaqaId,
+            date: _selectedDate,
+            status: _attendanceMap[s.uid]!,
+            recordedBy: authState.user.uid,
+          ),
+    )
+        .toList();
 
     bloc.add(SaveDayAttendanceEvent(records));
   }
@@ -317,13 +383,11 @@ class _AttendanceSummaryRow extends StatelessWidget {
   final int present;
   final int absent;
   final int late;
-  final int excused;
 
   const _AttendanceSummaryRow({
     required this.present,
     required this.absent,
     required this.late,
-    required this.excused,
   });
 
   @override
@@ -335,13 +399,6 @@ class _AttendanceSummaryRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _CounterBadge(
-            value: excused,
-            label: 'معذور',
-            color: AppColors.primaryLight,
-            textColor: AppColors.primary,
-          ),
-          const SizedBox(width: 8),
           _CounterBadge(
             value: late,
             label: 'متأخر',
@@ -406,7 +463,7 @@ class _CounterBadge extends StatelessWidget {
 
 class _StudentAttendanceRow extends StatelessWidget {
   final HalaqaStudentSummaryEntity student;
-  final AttendanceStatus status;
+  final AttendanceStatus? status;
   final void Function(AttendanceStatus) onChanged;
 
   const _StudentAttendanceRow({

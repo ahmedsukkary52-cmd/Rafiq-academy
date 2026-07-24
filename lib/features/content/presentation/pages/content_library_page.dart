@@ -97,39 +97,43 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
     // Show title input dialog
     if (!mounted) return;
     final titleController = TextEditingController(text: fileName);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إرفاق ملف'),
-        content: TextField(
-          controller: titleController,
-          decoration: const InputDecoration(labelText: 'اسم الملف'),
-          textAlign: TextAlign.right,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('إرفاق ملف'),
+          content: TextField(
+            controller: titleController,
+            decoration: const InputDecoration(labelText: 'اسم الملف'),
+            textAlign: TextAlign.right,
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('رفع'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      _bloc.add(
-        UploadFileEvent(
-          file: file,
-          title: titleController.text,
-          type: type,
-          uploadedBy: _currentUid,
-          uploaderName: _currentUserName,
-          halaqaId: widget.halaqaId,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('رفع'),
+            ),
+          ],
         ),
       );
+
+      if (confirmed == true && mounted) {
+        _bloc.add(
+          UploadFileEvent(
+            file: file,
+            title: titleController.text,
+            type: type,
+            uploadedBy: _currentUid,
+            uploaderName: _currentUserName,
+            halaqaId: widget.halaqaId,
+          ),
+        );
+      }
+    } finally {
+      titleController.dispose();
     }
   }
 

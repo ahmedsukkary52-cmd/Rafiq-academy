@@ -106,8 +106,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   // Playback
   final AudioPlayer _recordingPlayer = AudioPlayer();
   bool _isPlayingRecording = false;
-  Duration _recordPosition = Duration.zero;
-  Duration _recordDuration = Duration.zero;
+  StreamSubscription<PlayerState>? _playerStateSub;
 
   // Saved recordings
   List<Recording> _savedRecordings = [];
@@ -147,13 +146,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   }
 
   void _setupAudioListeners() {
-    _recordingPlayer.positionStream.listen((pos) {
-      if (mounted) setState(() => _recordPosition = pos);
-    });
-    _recordingPlayer.durationStream.listen((dur) {
-      if (mounted) setState(() => _recordDuration = dur ?? Duration.zero);
-    });
-    _recordingPlayer.playerStateStream.listen((state) {
+    _playerStateSub = _recordingPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlayingRecording = state.playing);
     });
   }
@@ -388,6 +381,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
   @override
   void dispose() {
+    _playerStateSub?.cancel();
     _recordingPlayer.dispose();
     _recorder.dispose();
     _recordTimer?.cancel();

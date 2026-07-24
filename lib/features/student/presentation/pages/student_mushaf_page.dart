@@ -1094,12 +1094,15 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   bool _audioPrepared = false;
 
   late AudioPlayer _audioPlayer;
-  bool _isPlayingAudio = false;
-  Duration _audioPosition = Duration.zero;
-  Duration _audioDuration = Duration.zero;
+  final ValueNotifier<bool> _isPlayingAudio = ValueNotifier(false);
+  final ValueNotifier<Duration> _audioPosition = ValueNotifier(Duration.zero);
+  final ValueNotifier<Duration> _audioDuration = ValueNotifier(Duration.zero);
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<PlayerState>? _playerStateSub;
+  StreamSubscription<Duration>? _recordPositionSub;
+  StreamSubscription<Duration?>? _recordDurationSub;
+  StreamSubscription<PlayerState>? _recordPlayerStateSub;
 
   late AudioRecorder _audioRecorder;
   bool _isRecording = false;
@@ -1107,10 +1110,10 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   int _recordDurationSeconds = 0;
   Timer? _recordTimer;
   bool _hasRecorded = false;
-  bool _isPlayingRecording = false;
+  final ValueNotifier<bool> _isPlayingRecording = ValueNotifier(false);
   late AudioPlayer _recordingPlayer;
-  Duration _recordPosition = Duration.zero;
-  Duration _recordDuration = Duration.zero;
+  final ValueNotifier<Duration> _recordPosition = ValueNotifier(Duration.zero);
+  final ValueNotifier<Duration> _recordDuration = ValueNotifier(Duration.zero);
 
   ReciterInfo _selectedReciter = _reciters.first;
 
@@ -1156,27 +1159,27 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   void _setupAudioListeners() {
     _positionSub = _audioPlayer.positionStream.listen((pos) {
-      if (mounted) setState(() => _audioPosition = pos);
+      _audioPosition.value = pos;
     });
     _durationSub = _audioPlayer.durationStream.listen((dur) {
-      if (mounted) setState(() => _audioDuration = dur ?? Duration.zero);
+      _audioDuration.value = dur ?? Duration.zero;
     });
     _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
       if (!mounted) return;
-      setState(() => _isPlayingAudio = state.playing);
+      _isPlayingAudio.value = state.playing;
       if (state.processingState == ProcessingState.completed) {
         _onAyahCompleted();
       }
     });
 
-    _recordingPlayer.positionStream.listen((pos) {
-      if (mounted) setState(() => _recordPosition = pos);
+    _recordPositionSub = _recordingPlayer.positionStream.listen((pos) {
+      _recordPosition.value = pos;
     });
-    _recordingPlayer.durationStream.listen((dur) {
-      if (mounted) setState(() => _recordDuration = dur ?? Duration.zero);
+    _recordDurationSub = _recordingPlayer.durationStream.listen((dur) {
+      _recordDuration.value = dur ?? Duration.zero;
     });
-    _recordingPlayer.playerStateStream.listen((state) {
-      if (mounted) setState(() => _isPlayingRecording = state.playing);
+    _recordPlayerStateSub = _recordingPlayer.playerStateStream.listen((state) {
+      _isPlayingRecording.value = state.playing;
     });
   }
 
@@ -1631,7 +1634,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       });
       _playCurrentAyah();
     } else {
-      setState(() => _isPlayingAudio = false);
+      _isPlayingAudio.value = false;
     }
   }
 
@@ -1645,7 +1648,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   }
 
   void _togglePlayPause() async {
-    if (_isPlayingAudio) {
+    if (_isPlayingAudio.value) {
       await _audioPlayer.pause();
       return;
     }
@@ -1695,7 +1698,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       _selectedReciter = reciter;
       _audioPrepared = false;
     });
-    if (_isPlayingAudio) {
+    if (_isPlayingAudio.value) {
       _playCurrentAyah();
     } else {
       _prepareAudioForCurrentAyah();
@@ -1750,7 +1753,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   }
 
   void _togglePlayRecording() {
-    if (_isPlayingRecording) {
+    if (_isPlayingRecording.value) {
       _recordingPlayer.pause();
     } else {
       _recordingPlayer.play();
@@ -1805,10 +1808,19 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playerStateSub?.cancel();
+    _recordPositionSub?.cancel();
+    _recordDurationSub?.cancel();
+    _recordPlayerStateSub?.cancel();
     _audioPlayer.dispose();
     _recordingPlayer.dispose();
     _audioRecorder.dispose();
     _recordTimer?.cancel();
+    _isPlayingAudio.dispose();
+    _audioPosition.dispose();
+    _audioDuration.dispose();
+    _isPlayingRecording.dispose();
+    _recordPosition.dispose();
+    _recordDuration.dispose();
     super.dispose();
   }
 
@@ -2156,39 +2168,48 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  _formatDuration(_audioPosition),
-                  style: TextStyle(fontSize: 11, color: iconColor),
-                ),
-                Expanded(
-                  child: Slider(
-                    activeColor: AppColors.primary,
-                    inactiveColor: _isDarkMode
-                        ? Colors.white10
-                        : Colors.black.withOpacity(0.06),
-                    value: _audioPosition.inMilliseconds
-                        .clamp(
-                          0,
-                          _audioDuration.inMilliseconds > 0
-                              ? _audioDuration.inMilliseconds
-                              : 1,
-                        )
-                        .toDouble(),
-                    max: _audioDuration.inMilliseconds > 0
-                        ? _audioDuration.inMilliseconds.toDouble()
-                        : 1,
-                    onChanged: (val) {
-                      _audioPlayer.seek(Duration(milliseconds: val.toInt()));
-                    },
-                  ),
-                ),
-                Text(
-                  _formatDuration(_audioDuration),
-                  style: TextStyle(fontSize: 11, color: iconColor),
-                ),
-              ],
+            AnimatedBuilder(
+              animation: Listenable.merge([_audioPosition, _audioDuration]),
+              builder: (context, _) {
+                final position = _audioPosition.value;
+                final duration = _audioDuration.value;
+                return Row(
+                  children: [
+                    Text(
+                      _formatDuration(position),
+                      style: TextStyle(fontSize: 11, color: iconColor),
+                    ),
+                    Expanded(
+                      child: Slider(
+                        activeColor: AppColors.primary,
+                        inactiveColor: _isDarkMode
+                            ? Colors.white10
+                            : Colors.black.withOpacity(0.06),
+                        value: position.inMilliseconds
+                            .clamp(
+                              0,
+                              duration.inMilliseconds > 0
+                                  ? duration.inMilliseconds
+                                  : 1,
+                            )
+                            .toDouble(),
+                        max: duration.inMilliseconds > 0
+                            ? duration.inMilliseconds.toDouble()
+                            : 1,
+                        onChanged: (val) {
+                          _audioPlayer.seek(
+                            Duration(milliseconds: val.toInt()),
+                          );
+                        },
+                      ),
+                    ),
+                    Text(
+                      _formatDuration(duration),
+                      style: TextStyle(fontSize: 11, color: iconColor),
+                    ),
+                  ],
+                );
+              },
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -2213,13 +2234,18 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isPlayingAudio ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                    iconSize: 32,
-                    onPressed: _togglePlayPause,
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _isPlayingAudio,
+                    builder: (context, playing, _) {
+                      return IconButton(
+                        icon: Icon(
+                          playing ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        iconSize: 32,
+                        onPressed: _togglePlayPause,
+                      );
+                    },
                   ),
                 ),
                 IconButton(
@@ -2383,36 +2409,54 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      _isPlayingRecording ? Icons.pause : Icons.play_arrow,
-                    ),
-                    onPressed: _togglePlayRecording,
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _isPlayingRecording,
+                    builder: (context, playing, _) {
+                      return IconButton(
+                        icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                        onPressed: _togglePlayRecording,
+                      );
+                    },
                   ),
                   Expanded(
-                    child: Slider(
-                      activeColor: AppColors.primary,
-                      value: _recordPosition.inMilliseconds
-                          .clamp(
-                            0,
-                            _recordDuration.inMilliseconds > 0
-                                ? _recordDuration.inMilliseconds
-                                : 1,
-                          )
-                          .toDouble(),
-                      max: _recordDuration.inMilliseconds > 0
-                          ? _recordDuration.inMilliseconds.toDouble()
-                          : 1,
-                      onChanged: (val) {
-                        _recordingPlayer.seek(
-                          Duration(milliseconds: val.toInt()),
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _recordPosition,
+                        _recordDuration,
+                      ]),
+                      builder: (context, _) {
+                        final position = _recordPosition.value;
+                        final duration = _recordDuration.value;
+                        return Slider(
+                          activeColor: AppColors.primary,
+                          value: position.inMilliseconds
+                              .clamp(
+                                0,
+                                duration.inMilliseconds > 0
+                                    ? duration.inMilliseconds
+                                    : 1,
+                              )
+                              .toDouble(),
+                          max: duration.inMilliseconds > 0
+                              ? duration.inMilliseconds.toDouble()
+                              : 1,
+                          onChanged: (val) {
+                            _recordingPlayer.seek(
+                              Duration(milliseconds: val.toInt()),
+                            );
+                          },
                         );
                       },
                     ),
                   ),
-                  Text(
-                    _formatDuration(_recordDuration),
-                    style: const TextStyle(fontSize: 11),
+                  ValueListenableBuilder<Duration>(
+                    valueListenable: _recordDuration,
+                    builder: (context, duration, _) {
+                      return Text(
+                        _formatDuration(duration),
+                        style: const TextStyle(fontSize: 11),
+                      );
+                    },
                   ),
                 ],
               ),

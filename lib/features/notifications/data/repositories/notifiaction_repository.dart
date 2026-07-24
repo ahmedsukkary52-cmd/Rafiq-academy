@@ -22,11 +22,17 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   Stream<Either<Failure, List<NotificationEntity>>> watchNotifications({
     required String uid,
     required String role,
-  }) {
-    return remoteDatasource
-        .watchNotifications(uid: uid, role: role)
-        .map<Either<Failure, List<NotificationEntity>>>((list) => Right(list))
-        .handleError((e) => Left(ServerFailure(e.toString())));
+  }) async* {
+    try {
+      await for (final list in remoteDatasource.watchNotifications(
+        uid: uid,
+        role: role,
+      )) {
+        yield Right(list);
+      }
+    } catch (e) {
+      yield Left(ServerFailure(e.toString()));
+    }
   }
 
   @override

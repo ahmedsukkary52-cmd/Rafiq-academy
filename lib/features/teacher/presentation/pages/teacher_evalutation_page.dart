@@ -195,24 +195,48 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
     final items = _filtered(source);
 
     if (items.isEmpty) {
-      return const Center(
-        child: Text('لا توجد تقييمات بعد', style: AppTextStyles.bodyMedium),
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async {
+          _retry();
+          await Future<void>.delayed(const Duration(milliseconds: 600));
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(
+              child: Text(
+                'لا توجد تقييمات بعد',
+                style: AppTextStyles.bodyMedium,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final record = items[i];
-        return _EvaluationCard(
-          record: record,
-          onReviewPending: record.isPendingReview
-              ? () => _showReviewPendingSheet(context, record)
-              : null,
-        );
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () async {
+        _retry();
+        await Future<void>.delayed(const Duration(milliseconds: 600));
       },
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final record = items[i];
+          return _EvaluationCard(
+            record: record,
+            onReviewPending: record.isPendingReview
+                ? () => _showReviewPendingSheet(context, record)
+                : null,
+          );
+        },
+      ),
     );
   }
 

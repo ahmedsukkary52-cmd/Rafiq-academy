@@ -1,7 +1,7 @@
 # W1 — Daily Lesson & Homework Loop  
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** **Slice 6 shipped**. Next: Slice 7 (workflow consistency audit).  
+**Status:** **W1 complete** (Pre-Slice + Slices 1–7).  
 **File key / Figma:** Basma (Copy) — teacher class/evals + student homework/evaluations as UX reference only  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT (`assignments`)
 
@@ -16,7 +16,7 @@ If a previous slice or design assumption is found incorrect: **stop**, explain, 
 ### 1.1 End-to-end map (current)
 
 ```text
-Teacher UI (missing assign) ──X──► TeacherBloc.SendAssignmentEvent
+TeacherClassDetail «تكليف» ──► TeacherBloc.SendAssignmentEvent
                                           │
                                           ▼
                                SendAssignmentUseCase
@@ -27,9 +27,9 @@ Teacher UI (missing assign) ──X──► TeacherBloc.SendAssignmentEvent
                                           ▼
                     TeacherRemoteDatasource.sendAssignment
                                           │
-                    batch write N docs → Firestore `assignments`
+                    batch: assignments + notifications (per student)
                                           │
-                    (seeds homework fields via AssignmentModel.defaultHomeworkFields)
+                    (seeds via AssignmentModel.defaultHomeworkFields — no fake media)
                                           │
           ┌───────────────────────────────┴───────────────────────────────┐
           ▼                                                               ▼
@@ -38,33 +38,23 @@ Teacher UI (missing assign) ──X──► TeacherBloc.SendAssignmentEvent
           │                                                               │
           └────────────── reads same assignment doc ──────────────────────┘
                                           │
-                    ToggleTask / CompleteHomework / SubmitRecitation
+                    ToggleTask / CompleteHomework (required: reading+listening)
+                    Recitation deferred until AppCapabilities.audioUploadsEnabled
                                           │
-                    HomeworkRemoteDatasource
+                    (optional) SubmitRecitation → Storage + pending record
                                           │
-          ┌───────────────────────────────┼───────────────────────────────┐
-          ▼                               ▼                               ▼
-   update `tasks` on              complete → points on            Storage putFile
-   `assignments`                  `studentProfiles`               + `recitationRecords`
-                                                                  reviewStatus: pending
-                                          │
-                                          ▼
-                    TeacherEvaluationsPage ← LoadHalaqaEvaluationsEvent
-                    (shows pending badge; NO grade action)
-                                          │
-                    AddRecitationRecordEvent → NEW doc only (live grade)
-                                          │
-                                          ▼
-                    StudentEvaluationsPage ← filters OUT pending
-                    (sees result only after review — but review path missing)
-                                          │
-                                          ▼
-                    ParentHomePage weekly report ← counts week recitations
-                    (no dedicated eval UI; last notes field)
-                                          │
-                                          ▼
-                    NotificationsPage ← watch only
-                    (no writers on assign/review; Admin broadcast exists)
+          ┌───────────────────────────────┴───────────────────────────────┐
+          ▼                                                               ▼
+ TeacherEvaluationsPage ← review pending (update same doc)     Live «تقييم جديد»
+          │
+          ▼
+ StudentEvaluationsPage ← reviewed only (+ Home last eval)
+          │
+          ▼
+ ParentHomePage weekly report ← reviewed-only counts/notes
+          │
+          ▼
+ NotificationsPage ← assign + review writers (audience=studentId)
 ```
 
 ### 1.2 Inventory by layer
@@ -414,5 +404,23 @@ Current implementation already defines behavior. **Do not invent a new model.**
 
 ## Approval gate
 
-D8 approved. **Slice 2** implements honest non-audio complete + Home/Homework hardening.  
-If implementation discovers a flawed assumption: stop, update this doc, then continue.
+**W1 implementation complete** through Slice 7.  
+If a later change discovers a flawed assumption: stop, update this doc, then continue.
+
+---
+
+## Slice 7 — Consistency audit (2026-07-25)
+
+| Check | Teacher assign | Student homework | Teacher review | Student evals | Parent week | Notifications |
+|-------|----------------|------------------|----------------|---------------|-------------|---------------|
+| Loading | Sheet button + submission status | Page spinner | List + refresh bar | Page spinner | Report section | Inbox stream |
+| Empty | Guard: no students | Empty + pull refresh | Empty + pull refresh | Honest empty (pending excluded) | Empty copy honesty | Existing inbox |
+| Error + retry | Snackbar + reset | AppErrorWidget retry | AppErrorWidget retry | AppErrorWidget retry | Section retry | Stream errors surfaced |
+| Refresh | N/A (one-shot) | Pull-to-refresh | Pull-to-refresh | Pull-to-refresh | Existing reload | Watch stream |
+| Permissions | Auth uid as assignedBy | Auth uid queries | Teacher Auth for live add; review by doc id | Auth uid | Parent childrenIds | audience=uid |
+| Nav | Class detail → تكليف | Home → homework / evals | Pending card → review sheet | Home last eval → evals | Home report only | Role inboxes |
+| Honesty | No fake seeds | Recitation deferred (D8) | Same-doc review | Reviewed only | Reviewed only | Real events only |
+
+**Known platform gaps (not invented in W1):** no `firestore.rules` in repo; Storage/Blaze off (`AppCapabilities.audioUploadsEnabled`); FCM push not in scope; parent notify deferred (D3).
+
+**Ship commits:** Pre-Slice `8081b27` → S1 `a95dba8` → S2 `b5a2fc3` → S3 `aefbfef` → S4 `e06c73c` → S5 `7a6dc63` → S6 `90522ff` → S7 (this).

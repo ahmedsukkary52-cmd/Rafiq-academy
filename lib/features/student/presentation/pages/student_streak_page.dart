@@ -61,40 +61,13 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _StreakHero(streak: streak)),
-                if (streak == 0)
-                  const SliverPadding(
-                    padding: EdgeInsets.fromLTRB(24, 28, 24, 0),
-                    sliver: SliverToBoxAdapter(child: _EmptyStreakCard()),
-                  ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 30, 24, 18),
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
                   sliver: SliverToBoxAdapter(
-                    child: Text(
-                      'محطات الإنجاز 🎯',
-                      style: AppTextStyles.headlineMedium.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                    child: streak == 0
+                        ? const _EmptyStreakCard()
+                        : _CurrentStreakCard(streak: streak),
                   ),
-                ),
-                SliverList.separated(
-                  itemCount: _milestones.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 18),
-                  itemBuilder: (context, index) {
-                    final milestone = _milestones[index];
-                    return Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        24,
-                        0,
-                        24,
-                        index == _milestones.length - 1 ? 36 : 0,
-                      ),
-                      child: _MilestoneCard(
-                        milestone: milestone,
-                        streak: streak,
-                      ),
-                    );
-                  },
                 ),
               ],
             );
@@ -103,13 +76,6 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
       ),
     );
   }
-
-  static const _milestones = [
-    _StreakMilestone(days: 7, title: 'أسبوع كامل', icon: '🏅'),
-    _StreakMilestone(days: 14, title: 'أسبوعان متواصلان', icon: '🥇'),
-    _StreakMilestone(days: 30, title: 'شهر كامل', icon: '🏆'),
-    _StreakMilestone(days: 100, title: 'البطولة الذهبية', icon: '💎'),
-  ];
 }
 
 class _EmptyStreakCard extends StatelessWidget {
@@ -214,89 +180,34 @@ class _StreakHero extends StatelessWidget {
   }
 }
 
-class _MilestoneCard extends StatelessWidget {
-  final _StreakMilestone milestone;
+class _CurrentStreakCard extends StatelessWidget {
   final int streak;
 
-  const _MilestoneCard({required this.milestone, required this.streak});
+  const _CurrentStreakCard({required this.streak});
 
   @override
   Widget build(BuildContext context) {
-    final completed = streak >= milestone.days;
-    final isCurrent = !completed && streak < milestone.days;
-    final remaining = (milestone.days - streak).clamp(0, milestone.days);
-
     return Container(
-      height: 108,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: completed || isCurrent
-            ? Border.all(color: const Color(0xFFFFE5A6))
-            : null,
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Opacity(
-        opacity: completed || isCurrent ? 1 : 0.48,
-        child: Row(
-          children: [
-            Text(milestone.icon, style: const TextStyle(fontSize: 38)),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${milestone.days} يوم',
-                    style: AppTextStyles.displayMedium.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(milestone.title, style: AppTextStyles.bodyMedium),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: completed
-                    ? const Color(0xFFFFF0B6)
-                    : const Color(0xFFF5F7FA),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                completed ? 'مكتمل ✅' : 'باقي $remaining',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: completed
-                      ? const Color(0xFFD6A200)
-                      : AppColors.textSecondary,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
+      child: Text(
+        'سلسلتك الحالية $streak يوم متواصل من ملفك.',
+        textAlign: TextAlign.center,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textSecondary,
         ),
       ),
     );
   }
-}
-
-class _StreakMilestone {
-  final int days;
-  final String title;
-  final String icon;
-
-  const _StreakMilestone({
-    required this.days,
-    required this.title,
-    required this.icon,
-  });
 }

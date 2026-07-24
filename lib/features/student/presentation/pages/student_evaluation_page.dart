@@ -386,13 +386,13 @@ class _EvaluationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            '${_formatWeekday(record.date)} ${record.date.day} ذو القعدة 1446 📅',
+            '${_formatWeekday(record.date)} ${record.date.day}/${record.date.month}/${record.date.year}',
             textAlign: TextAlign.right,
             style: AppTextStyles.bodyMedium,
           ),
           const SizedBox(height: 12),
           Text(
-            'سورة الملك - الآيات ${record.versesRange}',
+            _titleFor(record),
             textAlign: TextAlign.right,
             style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.w900,
@@ -403,24 +403,15 @@ class _EvaluationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _GradeBox(
-                  label: 'الحفظ',
-                  grade: record.type == RecitationType.memorization
-                      ? record.grade
-                      : record.behaviorGrade,
+                  label: record.type == RecitationType.memorization
+                      ? 'الحفظ'
+                      : 'المراجعة',
+                  grade: record.grade,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _GradeBox(label: 'التجويد', grade: record.grade),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _GradeBox(
-                  label: 'المراجعة',
-                  grade: record.type == RecitationType.review
-                      ? record.grade
-                      : record.behaviorGrade,
-                ),
+                child: _GradeBox(label: 'السلوك', grade: record.behaviorGrade),
               ),
             ],
           ),
@@ -444,6 +435,15 @@ class _EvaluationCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _titleFor(RecitationRecordEntity record) {
+    final range = record.versesRange.trim();
+    final typeLabel = record.type == RecitationType.memorization
+        ? 'حفظ'
+        : 'مراجعة';
+    if (range.isEmpty) return typeLabel;
+    return '$typeLabel — الآيات $range';
   }
 
   String _formatWeekday(DateTime date) {

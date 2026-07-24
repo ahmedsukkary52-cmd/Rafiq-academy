@@ -253,8 +253,8 @@ class _StudentHomeTab extends StatelessWidget {
                     horizontal: AppSizes.paddingM,
                   ),
                   child: StudentProgressWidget(
-                    currentSurahPercent: profile?.overallProgressPercent ?? 0,
-                    currentSurahName: profile?.currentPlanName ?? '',
+                    progressPercent: profile?.overallProgressPercent ?? 0,
+                    planName: profile?.currentPlanName ?? '',
                     totalVerses: profile?.totalVersesMemorized ?? 0,
                     completedSurahs: profile?.completedSurahs ?? 0,
                     onTap: () => context.push(AppRoutes.studentProgressReport),

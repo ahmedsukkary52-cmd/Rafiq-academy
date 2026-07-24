@@ -5,21 +5,22 @@ import 'package:rafiq_academy/shared/widgets/shared_widgets.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 
-/// كارت تقدم الحفظ — يعرض فقط بيانات الملف الحقيقية.
+/// كارت تقدم الحفظ — يعرض نسبة التقدم الإجمالية من الملف.
 ///
-/// [currentSurahPercent] = نسبة آيات السورة الحالية فقط (مستقلة عن [completedSurahs]).
-/// [completedSurahs] = عدد السور المكتملة 100% (عداد منفصل).
+/// [progressPercent] = overallProgressPercent من ملف الطالب.
+/// [planName] = اسم الخطة الحالية إن وُجد.
+/// [completedSurahs] = عدد السور المكتملة 100%.
 class StudentProgressWidget extends StatelessWidget {
-  final double currentSurahPercent;
-  final String currentSurahName;
+  final double progressPercent;
+  final String planName;
   final int totalVerses;
   final int completedSurahs;
   final VoidCallback? onTap;
 
   const StudentProgressWidget({
     super.key,
-    required this.currentSurahPercent,
-    this.currentSurahName = '',
+    required this.progressPercent,
+    this.planName = '',
     required this.totalVerses,
     required this.completedSurahs,
     this.onTap,
@@ -32,14 +33,14 @@ class StudentProgressWidget extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            currentSurahName.isNotEmpty ? currentSurahName : 'تقدم الحفظ',
+            planName.isNotEmpty ? planName : 'تقدم الحفظ',
             style: AppTextStyles.labelMedium,
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 12),
-          _DonutChart(percent: (currentSurahPercent / 100).clamp(0.0, 1.0)),
+          _DonutChart(percent: (progressPercent / 100).clamp(0.0, 1.0)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

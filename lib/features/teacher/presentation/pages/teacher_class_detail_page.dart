@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/halaqa_schedule_label.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -118,7 +119,9 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
           );
         }
 
-        final scheduleLabel = halaqa == null ? null : _scheduleLabel(halaqa);
+        final scheduleLabel = halaqa == null
+            ? null
+            : halaqaScheduleLabel(halaqa.schedule);
         final meetingLink = halaqa?.meetingLink.trim() ?? '';
 
         return Scaffold(
@@ -202,34 +205,6 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
         );
       },
     );
-  }
-
-  String? _scheduleLabel(HalaqaEntity halaqa) {
-    final schedule = halaqa.schedule;
-    if (schedule.isEmpty) return null;
-
-    final days = schedule
-        .map((s) => s.day.trim())
-        .where((d) => d.isNotEmpty)
-        .toList();
-    final daysLabel = days.join('، ');
-
-    final timeKeys = <String>{};
-    for (final slot in schedule) {
-      final start = slot.startTime.trim();
-      final end = slot.endTime.trim();
-      if (start.isEmpty && end.isEmpty) continue;
-      timeKeys.add(end.isEmpty ? start : '$start–$end');
-    }
-
-    if (daysLabel.isEmpty && timeKeys.isEmpty) return null;
-    if (timeKeys.isEmpty) return daysLabel.isEmpty ? null : daysLabel;
-    if (timeKeys.length == 1) {
-      final timeLabel = timeKeys.first;
-      if (daysLabel.isEmpty) return timeLabel;
-      return '$daysLabel · $timeLabel';
-    }
-    return daysLabel.isEmpty ? null : daysLabel;
   }
 }
 

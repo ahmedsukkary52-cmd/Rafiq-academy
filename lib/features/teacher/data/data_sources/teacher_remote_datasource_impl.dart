@@ -168,6 +168,22 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
               ? trimmed
               : FieldValue.delete(),
         });
+
+        final studentId = data['studentId'] as String? ?? '';
+        if (studentId.isNotEmpty) {
+          final notifRef = firestore
+              .collection(FirestoreCollections.notifications)
+              .doc();
+          txn.set(notifRef, {
+            'audience': studentId,
+            'title': 'تم تقييم تسميعك',
+            'body': 'راجع صفحة التقييمات لمعرفة الدرجة والملاحظات',
+            'type': NotificationTypes.assignment,
+            'readBy': <String>[],
+            'hasAudioAlert': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
       });
     } on ServerException {
       rethrow;
@@ -240,6 +256,24 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
             newMemorizationRange: newMemorizationRange,
             reviewRange: reviewRange,
           ),
+        });
+
+        final notifRef = firestore
+            .collection(FirestoreCollections.notifications)
+            .doc();
+        final rangeHint = newMemorizationRange.trim().isNotEmpty
+            ? newMemorizationRange.trim()
+            : reviewRange.trim();
+        batch.set(notifRef, {
+          'audience': studentId,
+          'title': 'تكليف جديد',
+          'body': rangeHint.isEmpty
+              ? 'لديك تكليف جديد — افتح واجباتي'
+              : 'تكليف جديد: $rangeHint — افتح واجباتي',
+          'type': NotificationTypes.assignment,
+          'readBy': <String>[],
+          'hasAudioAlert': false,
+          'createdAt': FieldValue.serverTimestamp(),
         });
       }
       await batch.commit();

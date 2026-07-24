@@ -255,7 +255,9 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         value: bloc,
         child: _AddEvaluationSheet(halaqaId: widget.halaqaId),
       ),
-    );
+    ).whenComplete(() {
+      bloc.add(const ResetRecitationSubmissionEvent());
+    });
   }
 
   void _showReviewPendingSheet(
@@ -271,7 +273,9 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         value: bloc,
         child: _ReviewPendingSheet(record: record),
       ),
-    );
+    ).whenComplete(() {
+      bloc.add(const ResetRecitationSubmissionEvent());
+    });
   }
 }
 
@@ -614,6 +618,12 @@ class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
   }
 
   void _submit() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) {
+      AppSnackBar.showError(context, 'يجب تسجيل الدخول لحفظ المراجعة');
+      return;
+    }
+
     context.read<TeacherBloc>().add(
       UpdateRecitationReviewEvent(
         recordId: widget.record.id,

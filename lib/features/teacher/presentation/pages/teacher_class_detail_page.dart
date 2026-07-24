@@ -93,15 +93,18 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       );
       return;
     }
+    final teacherBloc = context.read<TeacherBloc>();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
-        value: context.read<TeacherBloc>(),
+        value: teacherBloc,
         child: _SendAssignmentSheet(halaqaId: widget.halaqaId),
       ),
-    );
+    ).whenComplete(() {
+      teacherBloc.add(const ResetAssignmentSubmissionEvent());
+    });
   }
 
   @override
@@ -110,7 +113,10 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       buildWhen: (previous, current) =>
           previous.halaqatStatus != current.halaqatStatus ||
           previous.halaqat != current.halaqat ||
-          previous.halaqatError != current.halaqatError,
+          previous.halaqatError != current.halaqatError ||
+          previous.studentsStatus != current.studentsStatus ||
+          previous.students != current.students ||
+          previous.studentsError != current.studentsError,
       builder: (context, state) {
         final halaqa = _findHalaqa(state);
 

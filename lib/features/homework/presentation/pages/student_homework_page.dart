@@ -544,9 +544,12 @@ class _HomeworkHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final remaining = homework.dueAt.difference(DateTime.now());
+    final isOverdue = !homework.isSubmitted && remaining.isNegative;
     final hours = remaining.inHours.clamp(0, 99);
     final dueLabel = homework.isSubmitted
         ? '✅ تم إنهاء الواجب'
+        : isOverdue
+        ? '⏰ متأخر — كان موعد التسليم ${formatTimeHm12Ar(homework.dueAt)}'
         : '🕒 ينتهي الساعة ${formatTimeHm12Ar(homework.dueAt)} — متبقي $hours ساعات';
 
     return Container(

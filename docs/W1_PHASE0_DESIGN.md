@@ -1,7 +1,7 @@
 # W1 — Daily Lesson & Homework Loop  
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** **W1 complete** (Pre-Slice + Slices 1–7).  
+**Status:** **W1 Done** — implementation + production validation complete (`docs/W1_PRODUCTION_VALIDATION.md`).  
 **File key / Figma:** Basma (Copy) — teacher class/evals + student homework/evaluations as UX reference only  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT (`assignments`)
 

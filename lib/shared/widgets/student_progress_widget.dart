@@ -5,11 +5,10 @@ import 'package:rafiq_academy/shared/widgets/shared_widgets.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 
-/// كارت تقدم الحفظ.
+/// كارت تقدم الحفظ — يعرض فقط بيانات الملف الحقيقية.
 ///
 /// [currentSurahPercent] = نسبة آيات السورة الحالية فقط (مستقلة عن [completedSurahs]).
 /// [completedSurahs] = عدد السور المكتملة 100% (عداد منفصل).
-/// هدف الأسبوع مؤجل لخطة الحفظ — يُعرض «قريباً» بدون أرقام مفبركة.
 class StudentProgressWidget extends StatelessWidget {
   final double currentSurahPercent;
   final String currentSurahName;
@@ -30,68 +29,25 @@ class StudentProgressWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       onTap: onTap,
-      child: Row(
+      child: Column(
         children: [
-          // ── تقدم السورة الحالية (Donut) ──────────────────────────
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  currentSurahName.isNotEmpty ? currentSurahName : 'تقدم الحفظ',
-                  style: AppTextStyles.labelMedium,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                _DonutChart(
-                  percent: (currentSurahPercent / 100).clamp(0.0, 1.0),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _MiniStat(value: '$completedSurahs', label: 'سور مكتملة'),
-                    const SizedBox(width: 16),
-                    _MiniStat(value: '$totalVerses', label: 'آية'),
-                  ],
-                ),
-              ],
-            ),
+          Text(
+            currentSurahName.isNotEmpty ? currentSurahName : 'تقدم الحفظ',
+            style: AppTextStyles.labelMedium,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-
-          Container(width: 1, height: 100, color: AppColors.border),
-
-          // ── هدف الأسبوع — قريباً (خطة الحفظ) ───────────────────
-          const Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('هدف الأسبوع', style: AppTextStyles.labelMedium),
-                SizedBox(height: 12),
-                Icon(
-                  Icons.flag_outlined,
-                  color: AppColors.textHint,
-                  size: 28,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'قريباً',
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'بعد تعيين خطة الحفظ',
-                  style: AppTextStyles.labelSmall,
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          _DonutChart(percent: (currentSurahPercent / 100).clamp(0.0, 1.0)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _MiniStat(value: '$completedSurahs', label: 'سور مكتملة'),
+              const SizedBox(width: 24),
+              _MiniStat(value: '$totalVerses', label: 'آية'),
+            ],
           ),
         ],
       ),

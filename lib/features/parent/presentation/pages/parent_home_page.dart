@@ -267,7 +267,7 @@ class _WeeklyReportCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _MetricTile(
-                  label: 'تسميعات',
+                  label: 'تقييمات',
                   value: '${report.totalVersesMemorized}',
                 ),
               ),
@@ -345,7 +345,7 @@ class _EmptyWeeklyReport extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'سيظهر الحضور والتسميعات هنا عند تسجيلها من المعلم.',
+            'سيظهر الحضور والتقييمات المعتمدة هنا.\nالتسميعات بانتظار مراجعة المعلم لا تُحتسب.',
             style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
             textAlign: TextAlign.center,
           ),

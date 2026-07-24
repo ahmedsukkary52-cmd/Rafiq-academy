@@ -70,16 +70,34 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
           .where((d) => (d.data())['status'] == 'present')
           .length;
 
-      final lastNote = recitationSnap.docs.isNotEmpty
-          ? (recitationSnap.docs.last.data())['notes'] as String? ?? ''
+      // D6 / Slice 5: count and surface only reviewed recitations — pending
+      // homework submits are not final parent-facing activity.
+      final reviewedDocs =
+          recitationSnap.docs.where((d) {
+            final status = d.data()['reviewStatus'] as String? ?? 'reviewed';
+            return status != 'pending';
+          }).toList()..sort((a, b) {
+            final ad =
+                (a.data()['date'] as Timestamp?)?.toDate() ?? DateTime(0);
+            final bd =
+                (b.data()['date'] as Timestamp?)?.toDate() ?? DateTime(0);
+            return ad.compareTo(bd);
+          });
+
+      var lastNote = reviewedDocs.isNotEmpty
+          ? (reviewedDocs.last.data())['notes'] as String? ?? ''
           : '';
+      // Student-submit placeholder is not a teacher note.
+      if (lastNote.contains('بانتظار المراجعة')) {
+        lastNote = '';
+      }
 
       return WeeklyReportModel.fromMap(
         studentId: studentId,
         studentName: studentName,
         weekStart: weekStart,
         data: {
-          'totalVersesMemorized': recitationSnap.docs.length,
+          'totalVersesMemorized': reviewedDocs.length,
           'attendedSessions': attended,
           'totalSessions': attendanceSnap.docs.length,
           'teacherNotes': lastNote,

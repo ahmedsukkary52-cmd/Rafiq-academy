@@ -1088,6 +1088,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   bool _isLoadingData = true;
   String _errorLoading = '';
   final List<AyahModel> _ayahs = [];
+  final Map<int, int> _ayahIndexByNumber = {};
   List<List<AyahModel>> _groupedByPage =
       []; // Each element is ayahs for one Quran page
   int _selectedAyahIndex = 0;
@@ -1261,6 +1262,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
     // Clear previous data
     _ayahs.clear();
+    _ayahIndexByNumber.clear();
     _surahStartPage.clear();
 
     // Iterate all surahs
@@ -1295,6 +1297,12 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     // Convert to ordered list of pages (1-604)
     final sortedPages = pageMap.keys.toList()..sort();
     _groupedByPage = sortedPages.map((page) => pageMap[page]!).toList();
+
+    _ayahIndexByNumber
+      ..clear()
+      ..addEntries([
+        for (var i = 0; i < _ayahs.length; i++) MapEntry(_ayahs[i].number, i),
+      ]);
 
     _rebuildAyahRecognizers();
   }
@@ -2051,7 +2059,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       }
 
       // Build the ayah text
-      final originalIndex = _ayahs.indexWhere((a) => a.number == ayah.number);
+      final originalIndex = _ayahIndexByNumber[ayah.number] ?? -1;
       final isSelected = originalIndex == _selectedAyahIndex;
       final displayText = _getAyahDisplayText(ayah);
 

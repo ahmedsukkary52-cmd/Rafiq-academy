@@ -83,6 +83,13 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
           body: BlocBuilder<CalendarBloc, CalendarState>(
             builder: (context, state) {
+              final eventsByDay = <DateTime, List<CalendarEventEntity>>{};
+              for (final event in state.monthEvents) {
+                eventsByDay
+                    .putIfAbsent(event.dateOnly, () => <CalendarEventEntity>[])
+                    .add(event);
+              }
+
               return Column(
                 children: [
                   // ── التقويم ────────────────────────────────────
@@ -107,9 +114,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
                       eventLoader: (day) {
                         final key = DateTime(day.year, day.month, day.day);
-                        return state.monthEvents
-                            .where((e) => e.dateOnly == key)
-                            .toList();
+                        return eventsByDay[key] ?? const [];
                       },
 
                       calendarBuilders: CalendarBuilders(

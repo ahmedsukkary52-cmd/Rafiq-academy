@@ -32,10 +32,6 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
     });
   }
 
-  void _comingSoon(BuildContext context) {
-    AppSnackBar.showInfo(context, 'قريبًا');
-  }
-
   void _loadHalaqat() {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
@@ -45,8 +41,13 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
   }
 
   Future<void> _onRefresh() async {
+    final bloc = context.read<TeacherBloc>();
     _loadHalaqat();
-    await Future.delayed(const Duration(milliseconds: 800));
+    await bloc.stream.firstWhere(
+          (s) =>
+      s.halaqatStatus == SectionStatus.loaded ||
+          s.halaqatStatus == SectionStatus.error,
+    );
   }
 
   @override
@@ -55,21 +56,6 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('حلقاتي'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            onPressed: () => _comingSoon(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list_rounded),
-            onPressed: () => _comingSoon(context),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _comingSoon(context),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
       body: BlocBuilder<TeacherBloc, TeacherState>(
         builder: (context, state) {
@@ -84,7 +70,22 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
             );
           }
           if (state.halaqat.isEmpty) {
-            return const _EmptyHalaqat();
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: _onRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery
+                        .of(context)
+                        .size
+                        .height * 0.5,
+                    child: const _EmptyHalaqat(),
+                  ),
+                ],
+              ),
+            );
           }
 
           return RefreshIndicator(
@@ -119,49 +120,29 @@ class _HalaqaCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Row(
-                children: [
-                  _ActionChip(
-                    label: 'تقييم',
-                    color: AppColors.secondaryBg,
-                    textColor: AppColors.secondary,
-                    onTap: () => context.push(
+              _ActionChip(
+                label: 'تقييم',
+                color: AppColors.secondaryBg,
+                textColor: AppColors.secondary,
+                onTap: () =>
+                    context.push(
                       '/teacher/halaqa/${halaqa.id}/evaluations',
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _ActionChip(
-                    label: 'عرض الحلقة',
-                    color: AppColors.primary,
-                    textColor: Colors.white,
-                    onTap: () {
-                      context.read<TeacherBloc>().add(
-                        SelectHalaqaEvent(halaqa.id),
-                      );
-                      context.push('/teacher/halaqa/${halaqa.id}');
-                    },
-                  ),
-                ],
               ),
-              if (halaqa.isActive)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                  ),
-                  child: Text(
-                    'فعّالة',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _ActionChip(
+                label: 'عرض الحلقة',
+                color: AppColors.primary,
+                textColor: Colors.white,
+                onTap: () {
+                  context.read<TeacherBloc>().add(
+                    SelectHalaqaEvent(halaqa.id),
+                  );
+                  context.push('/teacher/halaqa/${halaqa.id}');
+                },
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -195,6 +176,8 @@ class _HalaqaCard extends StatelessWidget {
     );
   }
 
+  /// Accurate compact schedule from already-loaded slots only.
+  /// If times differ across entries, show days only (no false shared time).
   String? _scheduleLabel(HalaqaEntity halaqa) {
     final schedule = halaqa.schedule;
     if (schedule.isEmpty) return null;
@@ -205,19 +188,23 @@ class _HalaqaCard extends StatelessWidget {
         .toList();
     final daysLabel = days.join('، ');
 
-    final first = schedule.first;
-    final start = first.startTime.trim();
-    final end = first.endTime.trim();
-    final timeLabel = start.isEmpty
-        ? ''
-        : end.isEmpty
-        ? start
-        : '$start–$end';
+    final timeKeys = <String>{};
+    for (final slot in schedule) {
+      final start = slot.startTime.trim();
+      final end = slot.endTime.trim();
+      if (start.isEmpty && end.isEmpty) continue;
+      timeKeys.add(end.isEmpty ? start : '$start–$end');
+    }
 
-    if (daysLabel.isEmpty && timeLabel.isEmpty) return null;
-    if (daysLabel.isEmpty) return timeLabel;
-    if (timeLabel.isEmpty) return daysLabel;
-    return '$daysLabel · $timeLabel';
+    if (daysLabel.isEmpty && timeKeys.isEmpty) return null;
+    if (timeKeys.isEmpty) return daysLabel.isEmpty ? null : daysLabel;
+    if (timeKeys.length == 1) {
+      final timeLabel = timeKeys.first;
+      if (daysLabel.isEmpty) return timeLabel;
+      return '$daysLabel · $timeLabel';
+    }
+    // Multiple different times — do not attach first slot's time to all days.
+    return daysLabel.isEmpty ? null : daysLabel;
   }
 
   String _dayShort(String day) => switch (day.trim()) {

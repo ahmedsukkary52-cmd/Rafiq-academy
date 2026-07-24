@@ -44,18 +44,39 @@ class _AwardsPageState extends State<AwardsPage> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _bloc,
-      child: BlocListener<AwardsBloc, AwardsState>(
-        listener: (context, state) async {
-          // لما الشهادة جاهزة، نفتح شاشة المشاركة/الطباعة تلقائياً
-          if (state.certificateStatus == SubmissionStatus.success &&
-              state.certificateBytes != null) {
-            await Printing.sharePdf(
-              bytes: Uint8List.fromList(state.certificateBytes!),
-              filename: 'شهادة_تقدير.pdf',
-            );
-            _bloc.add(const ResetCertificateEvent());
-          }
-        },
+      child: MultiBlocListener(
+        listeners: [
+          BlocListener<AwardsBloc, AwardsState>(
+            listenWhen: (previous, current) =>
+                previous.certificateStatus != current.certificateStatus,
+            listener: (context, state) async {
+              if (state.certificateStatus == SubmissionStatus.success &&
+                  state.certificateBytes != null) {
+                await Printing.sharePdf(
+                  bytes: Uint8List.fromList(state.certificateBytes!),
+                  filename: 'شهادة_تقدير.pdf',
+                );
+                _bloc.add(const ResetCertificateEvent());
+              }
+            },
+          ),
+          BlocListener<AwardsBloc, AwardsState>(
+            listenWhen: (previous, current) =>
+                previous.grantStatus != current.grantStatus,
+            listener: (context, state) {
+              if (state.grantStatus == SubmissionStatus.success) {
+                AppSnackBar.showSuccess(context, 'تم منح الجائزة بنجاح');
+                _bloc.add(const ResetGrantAwardEvent());
+              } else if (state.grantStatus == SubmissionStatus.error) {
+                AppSnackBar.showError(
+                  context,
+                  state.grantError ?? 'تعذر منح الجائزة',
+                );
+                _bloc.add(const ResetGrantAwardEvent());
+              }
+            },
+          ),
+        ],
         child: Scaffold(
           backgroundColor: AppColors.dark,
           appBar: AppBar(
@@ -454,7 +475,8 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _studentId != null &&
+                  value:
+                      _studentId != null &&
                           students.any((s) => s.uid == _studentId)
                       ? _studentId
                       : null,
@@ -509,7 +531,6 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
                       ),
                     );
                     Navigator.pop(context);
-                    AppSnackBar.showSuccess(context, 'تم منح الجائزة بنجاح 🌟');
                   },
           ),
         ],

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../domain/entities/calendar_event_entity.dart';
@@ -43,167 +44,185 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _bloc,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('التقويم الأكاديمي'),
-          actions: [
-            TextButton.icon(
-              onPressed: () => _showAddEventSheet(context),
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: const Text(
-                '+ حدث',
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: BlocBuilder<CalendarBloc, CalendarState>(
-          builder: (context, state) {
-            return Column(
-              children: [
-                // ── التقويم ────────────────────────────────────
-                Container(
-                  color: AppColors.surface,
-                  child: TableCalendar<CalendarEventEntity>(
-                    firstDay: DateTime(2020),
-                    lastDay: DateTime(2030),
-                    focusedDay: state.focusedMonth,
-                    locale: 'ar',
-
-                    selectedDayPredicate: (day) =>
-                        isSameDay(day, state.selectedDay ?? DateTime.now()),
-
-                    onDaySelected: (selected, focused) {
-                      _bloc.add(SelectDayEvent(selected));
-                    },
-
-                    onPageChanged: (focused) {
-                      _loadMonth(focused);
-                    },
-
-                    eventLoader: (day) {
-                      final key = DateTime(day.year, day.month, day.day);
-                      return state.monthEvents
-                          .where((e) => e.dateOnly == key)
-                          .toList();
-                    },
-
-                    calendarBuilders: CalendarBuilders(
-                      // نقاط الأحداث تحت الأيام
-                      markerBuilder: (context, day, events) {
-                        if (events.isEmpty) return null;
-                        final types = events.map((e) => (e).type).toSet();
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: types.take(3).map((t) {
-                            return Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.symmetric(horizontal: 1),
-                              decoration: BoxDecoration(
-                                color: _colorForType(t),
-                                shape: BoxShape.circle,
-                              ),
-                            );
-                          }).toList(),
-                        );
-                      },
-                    ),
-
-                    calendarStyle: CalendarStyle(
-                      todayDecoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      selectedDecoration: BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      defaultTextStyle: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                      weekendTextStyle: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.primary,
-                      ),
-                      outsideDaysVisible: false,
-                    ),
-
-                    headerStyle: const HeaderStyle(
-                      formatButtonVisible: false,
-                      titleCentered: true,
-                      titleTextStyle: AppTextStyles.titleLarge,
-                      leftChevronPadding: EdgeInsets.all(4),
-                      rightChevronPadding: EdgeInsets.all(4),
-                      rightChevronIcon: Icon(Icons.chevron_right_rounded),
-                      leftChevronIcon: Icon(Icons.chevron_left_rounded),
-                    ),
-                  ),
-                ),
-
-                // ── Legend ─────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.paddingM,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: CalendarEventType.values.map((t) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          children: [
-                            Text(t.label, style: AppTextStyles.labelSmall),
-                            const SizedBox(width: 4),
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: _colorForType(t),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-
-                // ── أحداث اليوم المختار ─────────────────────────
-                Expanded(
-                  child: state.selectedDayEvents.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'لا توجد أحداث في هذا اليوم',
-                            style: AppTextStyles.bodyMedium,
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSizes.paddingM,
-                            vertical: 8,
-                          ),
-                          itemCount: state.selectedDayEvents.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (context, i) {
-                            final event = state.selectedDayEvents[i];
-                            return _EventCard(event: event);
-                          },
-                        ),
-                ),
-              ],
+      child: BlocListener<CalendarBloc, CalendarState>(
+        listenWhen: (previous, current) =>
+            previous.addEventStatus != current.addEventStatus,
+        listener: (context, state) {
+          if (state.addEventStatus == SubmissionStatus.success) {
+            AppSnackBar.showSuccess(context, 'تم إضافة الحدث');
+            context.read<CalendarBloc>().add(const ResetAddEventEvent());
+          } else if (state.addEventStatus == SubmissionStatus.error) {
+            AppSnackBar.showError(
+              context,
+              state.addEventError ?? 'تعذر إضافة الحدث',
             );
-          },
+            context.read<CalendarBloc>().add(const ResetAddEventEvent());
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: const Text('التقويم الأكاديمي'),
+            actions: [
+              TextButton.icon(
+                onPressed: () => _showAddEventSheet(context),
+                icon: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                label: const Text(
+                  '+ حدث',
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          body: BlocBuilder<CalendarBloc, CalendarState>(
+            builder: (context, state) {
+              return Column(
+                children: [
+                  // ── التقويم ────────────────────────────────────
+                  Container(
+                    color: AppColors.surface,
+                    child: TableCalendar<CalendarEventEntity>(
+                      firstDay: DateTime(2020),
+                      lastDay: DateTime(2030),
+                      focusedDay: state.focusedMonth,
+                      locale: 'ar',
+
+                      selectedDayPredicate: (day) =>
+                          isSameDay(day, state.selectedDay ?? DateTime.now()),
+
+                      onDaySelected: (selected, focused) {
+                        _bloc.add(SelectDayEvent(selected));
+                      },
+
+                      onPageChanged: (focused) {
+                        _loadMonth(focused);
+                      },
+
+                      eventLoader: (day) {
+                        final key = DateTime(day.year, day.month, day.day);
+                        return state.monthEvents
+                            .where((e) => e.dateOnly == key)
+                            .toList();
+                      },
+
+                      calendarBuilders: CalendarBuilders(
+                        // نقاط الأحداث تحت الأيام
+                        markerBuilder: (context, day, events) {
+                          if (events.isEmpty) return null;
+                          final types = events.map((e) => (e).type).toSet();
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: types.take(3).map((t) {
+                              return Container(
+                                width: 6,
+                                height: 6,
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _colorForType(t),
+                                  shape: BoxShape.circle,
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+
+                      calendarStyle: CalendarStyle(
+                        todayDecoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        selectedDecoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        defaultTextStyle: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                        weekendTextStyle: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.primary,
+                        ),
+                        outsideDaysVisible: false,
+                      ),
+
+                      headerStyle: const HeaderStyle(
+                        formatButtonVisible: false,
+                        titleCentered: true,
+                        titleTextStyle: AppTextStyles.titleLarge,
+                        leftChevronPadding: EdgeInsets.all(4),
+                        rightChevronPadding: EdgeInsets.all(4),
+                        rightChevronIcon: Icon(Icons.chevron_right_rounded),
+                        leftChevronIcon: Icon(Icons.chevron_left_rounded),
+                      ),
+                    ),
+                  ),
+
+                  // ── Legend ─────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.paddingM,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: CalendarEventType.values.map((t) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            children: [
+                              Text(t.label, style: AppTextStyles.labelSmall),
+                              const SizedBox(width: 4),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _colorForType(t),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  // ── أحداث اليوم المختار ─────────────────────────
+                  Expanded(
+                    child: state.selectedDayEvents.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'لا توجد أحداث في هذا اليوم',
+                              style: AppTextStyles.bodyMedium,
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSizes.paddingM,
+                              vertical: 8,
+                            ),
+                            itemCount: state.selectedDayEvents.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, i) {
+                              final event = state.selectedDayEvents[i];
+                              return _EventCard(event: event);
+                            },
+                          ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -511,7 +530,6 @@ class _AddEventSheetState extends State<_AddEventSheet> {
                   ),
                 );
                 Navigator.pop(context);
-                AppSnackBar.showSuccess(context, 'تم إضافة الحدث');
               },
             ),
           ],

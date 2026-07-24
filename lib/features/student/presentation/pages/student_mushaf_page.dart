@@ -1807,7 +1807,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   String _formatRecordTime(int seconds) {
     final m = seconds ~/ 60;
     final s = seconds % 60;
-    return '${s.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   String _toArabicDigits(int n) {

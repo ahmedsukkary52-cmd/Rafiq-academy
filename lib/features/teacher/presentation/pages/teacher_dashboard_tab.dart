@@ -223,13 +223,16 @@ class _TodayAgendaSection extends StatelessWidget {
           ),
         );
       case SectionStatus.loaded:
+        final closeout = agenda.closeout;
         if (!agenda.hasActionableItems) {
-          return _AgendaEmptyState(
-            sessionsTodayCount: agenda.sessionsTodayCount,
-          );
+          // NoSession or Complete — honest idle/done card (D-C1/D-C5).
+          return _CloseoutCard(closeout: closeout);
         }
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _CloseoutSummary(closeout: closeout),
+            const SizedBox(height: 12),
             for (final item in agenda.items) ...[
               _AgendaItemCard(item: item),
               const SizedBox(height: 12),
@@ -364,25 +367,84 @@ class _AgendaActionRow extends StatelessWidget {
   };
 }
 
-class _AgendaEmptyState extends StatelessWidget {
-  final int sessionsTodayCount;
+// ── Day closeout (W3 Slice 4) ────────────────────────────────────────────────
+// Pure presentation of TeacherDayAgenda.closeout. No computation, no I/O.
+// Neutral, assistive wording only (D9): never blames the teacher.
 
-  const _AgendaEmptyState({required this.sessionsTodayCount});
+/// Idle / done state when there are no actionable items.
+class _CloseoutCard extends StatelessWidget {
+  final TeacherDayCloseout closeout;
+
+  const _CloseoutCard({required this.closeout});
 
   @override
   Widget build(BuildContext context) {
-    final message = sessionsTodayCount == 0
-        ? 'لا توجد حصص مجدوَلة اليوم'
-        : 'لا يوجد عمل متبقٍّ اليوم';
+    final isComplete = closeout.status == DayCloseoutStatus.complete;
+    final message = switch (closeout.status) {
+      DayCloseoutStatus.noSession => 'لا توجد حصص مجدوَلة اليوم',
+      DayCloseoutStatus.complete => 'اكتمل عمل اليوم',
+      // Defensive: incomplete never reaches this card.
+      DayCloseoutStatus.incomplete => 'لا يوجد عمل متبقٍّ اليوم',
+    };
 
     return _AgendaCard(
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textSecondary,
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          if (isComplete) ...[
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.check_circle_outline_rounded,
+              size: 18,
+              color: AppColors.success,
+            ),
+          ],
+        ],
       ),
+    );
+  }
+}
+
+/// Calm day-level "incomplete" line shown above the remaining agenda cards.
+class _CloseoutSummary extends StatelessWidget {
+  final TeacherDayCloseout closeout;
+
+  const _CloseoutSummary({required this.closeout});
+
+  @override
+  Widget build(BuildContext context) {
+    // Fraction only adds signal for multi-halaqa days (D-C2-A).
+    final showFraction = closeout.totalHalaqat > 1;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (showFraction) ...[
+          Text(
+            'مكتمل ${closeout.completedHalaqat} من ${closeout.totalHalaqat} حلقات',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          'لم يكتمل عمل اليوم',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }

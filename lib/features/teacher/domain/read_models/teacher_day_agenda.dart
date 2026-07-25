@@ -27,6 +27,46 @@ class TeacherAgendaItem extends Equatable {
   List<Object?> get props => [halaqaId, halaqaName, startAt, pendingActions];
 }
 
+/// Honest end-of-day status (W3 Slice 4).
+///
+/// A **pure presentation** of the agenda — never a new completion rule.
+enum DayCloseoutStatus {
+  /// No halaqa meets today — nothing to close out (idle day).
+  noSession,
+
+  /// At least one halaqa meets today and none has remaining work.
+  complete,
+
+  /// At least one of today's halaqat still has remaining work.
+  incomplete,
+}
+
+/// Day-level closeout, derived **only** from [TeacherDayAgenda].
+///
+/// Not persisted, not a domain aggregate, and it performs **no** I/O and **no**
+/// readiness math of its own — it just names what the agenda already says
+/// (W3 Slice 4: closeout is presentation of existing facts).
+class TeacherDayCloseout extends Equatable {
+  final DayCloseoutStatus status;
+
+  /// Halaqat meeting today (denominator). Mirrors `sessionsTodayCount`.
+  final int totalHalaqat;
+
+  /// Halaqat with no remaining work (`total - remaining`).
+  final int completedHalaqat;
+
+  const TeacherDayCloseout({
+    required this.status,
+    required this.totalHalaqat,
+    required this.completedHalaqat,
+  });
+
+  int get remainingHalaqat => totalHalaqat - completedHalaqat;
+
+  @override
+  List<Object?> get props => [status, totalHalaqat, completedHalaqat];
+}
+
 /// Presentation-facing **read projection** of "what should I do today?".
 ///
 /// Not a domain entity and not persisted. Derived at read time from the
@@ -48,6 +88,31 @@ class TeacherDayAgenda extends Equatable {
   static const empty = TeacherDayAgenda(items: [], sessionsTodayCount: 0);
 
   bool get hasActionableItems => items.isNotEmpty;
+
+  /// Day closeout — a pure function of [items] and [sessionsTodayCount].
+  ///
+  /// Single source of truth: readiness stays in [items] (from W1/W2), this
+  /// only aggregates counts. No new reads, no duplicated readiness logic.
+  TeacherDayCloseout get closeout {
+    final total = sessionsTodayCount;
+    final remaining = items.length;
+    final completed = (total - remaining).clamp(0, total);
+
+    final DayCloseoutStatus status;
+    if (total == 0) {
+      status = DayCloseoutStatus.noSession;
+    } else if (remaining == 0) {
+      status = DayCloseoutStatus.complete;
+    } else {
+      status = DayCloseoutStatus.incomplete;
+    }
+
+    return TeacherDayCloseout(
+      status: status,
+      totalHalaqat: total,
+      completedHalaqat: completed,
+    );
+  }
 
   @override
   List<Object?> get props => [items, sessionsTodayCount];

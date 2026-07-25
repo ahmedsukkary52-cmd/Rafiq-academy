@@ -1,7 +1,7 @@
 # W3 — Daily Halaqa Session Operations
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 + Slice 3 production-validated (Pass)**. Awaiting approval for Slice 4.  
+**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 + Slice 3 + Slice 4 production-validated (Pass) — W3 COMPLETE.** (`docs/W3_SLICE4_PRODUCTION_VALIDATION.md`)  
 **Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
 **Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.

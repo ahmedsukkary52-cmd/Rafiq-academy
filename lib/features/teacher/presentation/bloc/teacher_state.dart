@@ -34,7 +34,10 @@ class TeacherState extends Equatable {
   final List<AttendanceRecordEntity> dayAttendance;
   final String? dayAttendanceError;
 
-  // ── تسجيل الحضور (Optimistic، عشان كده مفيهاش loading عام) ────────────
+  /// Calendar day currently requested/loaded (guards stale load responses).
+  final DateTime? dayAttendanceDate;
+
+  // ── خطأ حضور قديم (غير مستخدم في مسار الحفظ الحالي) ───────────────────
   final String? attendanceError;
 
   // ── حفظ حضور اليوم ────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ class TeacherState extends Equatable {
     this.dayAttendanceStatus = SectionStatus.initial,
     this.dayAttendance = const [],
     this.dayAttendanceError,
+    this.dayAttendanceDate,
     this.attendanceError,
     this.attendanceSubmissionStatus = SubmissionStatus.idle,
     this.attendanceSubmissionError,
@@ -88,6 +92,7 @@ class TeacherState extends Equatable {
     SectionStatus? dayAttendanceStatus,
     List<AttendanceRecordEntity>? dayAttendance,
     Object? dayAttendanceError = _unset,
+    Object? dayAttendanceDate = _unset,
     Object? attendanceError = _unset,
     SubmissionStatus? attendanceSubmissionStatus,
     Object? attendanceSubmissionError = _unset,
@@ -120,6 +125,9 @@ class TeacherState extends Equatable {
       dayAttendanceError: identical(dayAttendanceError, _unset)
           ? this.dayAttendanceError
           : dayAttendanceError as String?,
+      dayAttendanceDate: identical(dayAttendanceDate, _unset)
+          ? this.dayAttendanceDate
+          : dayAttendanceDate as DateTime?,
       attendanceError: identical(attendanceError, _unset)
           ? this.attendanceError
           : attendanceError as String?,
@@ -156,6 +164,7 @@ class TeacherState extends Equatable {
     dayAttendanceStatus,
     dayAttendance,
     dayAttendanceError,
+    dayAttendanceDate,
     attendanceError,
     attendanceSubmissionStatus,
     attendanceSubmissionError,

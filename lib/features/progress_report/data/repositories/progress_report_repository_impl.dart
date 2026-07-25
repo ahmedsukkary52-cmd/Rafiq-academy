@@ -30,7 +30,7 @@ class ProgressReportRepositoryImpl implements ProgressReportRepository {
       now.year,
       now.month,
       now.day,
-    ).subtract(const Duration(days: _lookbackDays));
+    ).subtract(const Duration(days: _lookbackDays - 1));
 
     if (id.isEmpty) {
       return _mapper.map(

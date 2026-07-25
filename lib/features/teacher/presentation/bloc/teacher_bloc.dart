@@ -161,28 +161,45 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     LoadHalaqaAttendanceEvent event,
     Emitter<TeacherState> emit,
   ) async {
+    final requestedDay = DateTime(
+      event.date.year,
+      event.date.month,
+      event.date.day,
+    );
     emit(
       state.copyWith(
         dayAttendanceStatus: SectionStatus.loading,
         dayAttendanceError: null,
+        dayAttendanceDate: requestedDay,
       ),
     );
 
     final result = await getHalaqaAttendanceForDate(
-      HalaqaAttendanceDateParams(halaqaId: event.halaqaId, date: event.date),
+      HalaqaAttendanceDateParams(halaqaId: event.halaqaId, date: requestedDay),
     );
+
+    // Ignore stale responses after a newer day was requested.
+    final currentDay = state.dayAttendanceDate;
+    if (currentDay == null ||
+        currentDay.year != requestedDay.year ||
+        currentDay.month != requestedDay.month ||
+        currentDay.day != requestedDay.day) {
+      return;
+    }
 
     result.fold(
       (failure) => emit(
         state.copyWith(
           dayAttendanceStatus: SectionStatus.error,
           dayAttendanceError: failure.message,
+          dayAttendanceDate: requestedDay,
         ),
       ),
       (records) => emit(
         state.copyWith(
           dayAttendanceStatus: SectionStatus.loaded,
           dayAttendance: records,
+          dayAttendanceDate: requestedDay,
         ),
       ),
     );

@@ -111,7 +111,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
         statuses,
       );
 
-      // حساب الحضور الأسبوعي (آخر 7 أيام)
+      // حساب الحضور الأسبوعي (آخر 7 أيام تقويمية فقط)
       final weeklyAttendance = _calculateWeeklyAttendance(
         attendanceDocs,
         halaqaId: halaqaId,
@@ -137,11 +137,10 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       final twoWeeks = now.subtract(const Duration(days: 14));
 
       final results = await Future.wait([
-        // طلاب غابوا أكتر من مرتين في آخر أسبوعين
+        // كل علامات الحضور لآخر أسبوعين (ثم نفلتر الغياب بعد إزالة التكرار)
         firestore
             .collection(FirestoreCollections.attendanceRecords)
             .where('halaqaId', isEqualTo: halaqaId)
-            .where('status', isEqualTo: 'absent')
             .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(twoWeeks))
             .get(),
         // طلاب مش اتقيّموا من أسبوعين
@@ -152,21 +151,36 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
             .get(),
       ]);
 
-      final absenceDocs = results[0].docs;
+      final attendanceDocs = results[0].docs;
       final recitationDocs = results[1].docs;
 
       final atRiskMap = <String, AtRiskStudentEntity>{};
 
-      // طلاب الغياب المتكرر
-      final absenceCountPerStudent = <String, int>{};
-      for (final doc in absenceDocs) {
-        final studentId = (doc.data())['studentId'] as String? ?? '';
-        absenceCountPerStudent[studentId] =
-            (absenceCountPerStudent[studentId] ?? 0) + 1;
+      final marksByStudent = <String, List<AttendanceMarkRef>>{};
+      for (final doc in attendanceDocs) {
+        final data = doc.data();
+        final studentId = (data['studentId'] as String?) ?? '';
+        if (studentId.isEmpty) continue;
+        final rawDate = data['date'];
+        final date = rawDate is Timestamp ? rawDate.toDate() : DateTime.now();
+        marksByStudent
+            .putIfAbsent(studentId, () => [])
+            .add(
+              AttendanceMarkRef(
+                id: doc.id,
+                halaqaId: halaqaId,
+                studentId: studentId,
+                date: date,
+                status: data['status'] as String?,
+              ),
+            );
       }
 
-      for (final entry in absenceCountPerStudent.entries) {
-        if (entry.value >= 2) {
+      for (final entry in marksByStudent.entries) {
+        final absences = AttendancePolicy.countAbsent(
+          AttendancePolicy.uniqueDayStatuses(entry.value),
+        );
+        if (absences >= 2) {
           final userDoc = await firestore
               .collection(FirestoreCollections.users)
               .doc(entry.key)
@@ -177,7 +191,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
             studentName: userData['name'] as String? ?? '',
             profileImageUrl: userData['profileImageUrl'] as String?,
             reason: RiskReason.repeatedAbsence,
-            detail: '${entry.value} غيابات متتالية',
+            detail: '$absences غيابات خلال آخر أسبوعين',
           );
         }
       }
@@ -282,12 +296,14 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
     }
   }
 
-  /// حساب نسبة الحضور لكل يوم في الأسبوع الماضي من سجلات الحضور
+  /// حساب نسبة الحضور لكل يوم في آخر 7 أيام تقويمية
   Map<String, double> _calculateWeeklyAttendance(
     List<QueryDocumentSnapshot> docs, {
     required String halaqaId,
   }) {
     final dayNames = ['أح', 'إث', 'ثل', 'أر', 'خم', 'جم', 'سب'];
+    final today = AttendancePolicy.dayStart(DateTime.now());
+    final weekStart = today.subtract(const Duration(days: 6));
 
     final marksByWeekday = <int, List<AttendanceMarkRef>>{};
 
@@ -295,7 +311,10 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       final data = doc.data() as Map<String, dynamic>;
       final timestamp = data['date'] as Timestamp;
       final date = timestamp.toDate();
-      final weekday = date.weekday % 7; // 0=أحد
+      final day = AttendancePolicy.dayStart(date);
+      if (day.isBefore(weekStart) || day.isAfter(today)) continue;
+
+      final weekday = day.weekday % 7; // 0=أحد
       marksByWeekday
           .putIfAbsent(weekday, () => [])
           .add(
@@ -303,7 +322,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
               id: doc.id,
               halaqaId: halaqaId,
               studentId: (data['studentId'] as String?) ?? '',
-              date: date,
+              date: day,
               status: data['status'] as String?,
             ),
           );

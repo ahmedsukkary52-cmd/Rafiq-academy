@@ -1,7 +1,7 @@
 # W2 — Attendance Loop  
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D8). Implementation in progress.  
+**Status:** Done — see `docs/W2_PRODUCTION_VALIDATION.md`.  
 **File key / Figma:** Basma (Copy) — teacher/parent frames as **UI reference only** (not business logic).  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT (`attendanceRecords`)  
 **Predecessor:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`)

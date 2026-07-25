@@ -360,7 +360,7 @@ class _WeeklyAttendanceCard extends StatelessWidget {
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 400),
                       width: 20,
-                      height: barHeight.clamp(4, 90),
+                      height: value <= 0 ? 0 : barHeight.clamp(4, 90),
                       decoration: BoxDecoration(
                         color: isHigh ? AppColors.primary : AppColors.secondary,
                         borderRadius: BorderRadius.circular(6),

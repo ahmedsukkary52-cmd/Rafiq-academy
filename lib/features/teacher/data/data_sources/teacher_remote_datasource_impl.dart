@@ -85,6 +85,14 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           .where('date', isLessThan: Timestamp.fromDate(dayEnd))
           .get();
 
+      // Firestore batch max is 500 ops; keep day save atomic (no split commits).
+      final estimatedOps = records.length + existingSnap.docs.length;
+      if (estimatedOps > 500) {
+        throw const ServerException(
+          'عدد سجلات الحضور كبير جداً للحفظ دفعة واحدة. قلّل حجم الحلقة أو أعد المحاولة لاحقاً.',
+        );
+      }
+
       final batch = firestore.batch();
       final savedStudentIds = <String>{};
 

@@ -62,6 +62,10 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       DateTime(date.year, date.month, date.day);
 
   void _changeDate(DateTime date) {
+    final bloc = context.read<TeacherBloc>();
+    if (bloc.state.attendanceSubmissionStatus == SubmissionStatus.submitting) {
+      return;
+    }
     final next = _normalize(date);
     if (next.isBefore(_minDate) || next.isAfter(_today)) return;
     setState(() {
@@ -81,6 +85,11 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   bool _allStudentsSelected(List<HalaqaStudentSummaryEntity> students) {
     if (students.isEmpty) return false;
     return students.every((s) => _attendanceMap.containsKey(s.uid));
+  }
+
+  bool _isSameDay(DateTime? a, DateTime b) {
+    if (a == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   @override
@@ -113,8 +122,16 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           listenWhen: (prev, curr) =>
               curr.dayAttendanceStatus == SectionStatus.loaded &&
               (prev.dayAttendanceStatus != SectionStatus.loaded ||
-                  prev.dayAttendance != curr.dayAttendance),
+                  prev.dayAttendance != curr.dayAttendance ||
+                  prev.dayAttendanceDate != curr.dayAttendanceDate),
           listener: (context, state) {
+            final loadedDay = state.dayAttendanceDate;
+            if (loadedDay == null ||
+                loadedDay.year != _selectedDate.year ||
+                loadedDay.month != _selectedDate.month ||
+                loadedDay.day != _selectedDate.day) {
+              return;
+            }
             setState(() {
               _syncMapFromRecords(state.dayAttendance);
               if (state.studentsStatus == SectionStatus.loaded) {
@@ -140,7 +157,14 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.calendar_today_outlined),
-              onPressed: _pickDate,
+              onPressed:
+                  context
+                          .watch<TeacherBloc>()
+                          .state
+                          .attendanceSubmissionStatus ==
+                      SubmissionStatus.submitting
+                  ? null
+                  : _pickDate,
             ),
           ],
         ),
@@ -151,6 +175,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               previous.studentsError != current.studentsError ||
               previous.dayAttendanceStatus != current.dayAttendanceStatus ||
               previous.dayAttendance != current.dayAttendance ||
+              previous.dayAttendanceDate != current.dayAttendanceDate ||
               previous.dayAttendanceError != current.dayAttendanceError ||
               previous.attendanceSubmissionStatus !=
                   current.attendanceSubmissionStatus,
@@ -184,11 +209,17 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             final isRefreshingAttendance = _shellReady && attendanceLoading;
             final isSaving =
                 state.attendanceSubmissionStatus == SubmissionStatus.submitting;
+            final dayMatchesSelection = _isSameDay(
+              state.dayAttendanceDate,
+              _selectedDate,
+            );
             final canSave =
                 students.isNotEmpty &&
                 _allStudentsSelected(students) &&
                 !isSaving &&
-                !isRefreshingAttendance;
+                !isRefreshingAttendance &&
+                dayMatchesSelection &&
+                state.dayAttendanceStatus == SectionStatus.loaded;
 
             final presentCount = students
                 .where((s) => _attendanceMap[s.uid] == AttendanceStatus.present)
@@ -204,12 +235,14 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               children: [
                 _DateNavigator(
                   date: _selectedDate,
-                  onPrev: _normalize(_selectedDate).isAfter(_minDate)
+                  onPrev:
+                      !isSaving && _normalize(_selectedDate).isAfter(_minDate)
                       ? () => _changeDate(
                           _selectedDate.subtract(const Duration(days: 1)),
                         )
                       : null,
-                  onNext: _normalize(_selectedDate).isBefore(_today)
+                  onNext:
+                      !isSaving && _normalize(_selectedDate).isBefore(_today)
                       ? () => _changeDate(
                           _selectedDate.add(const Duration(days: 1)),
                         )
@@ -316,6 +349,10 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   }
 
   Future<void> _pickDate() async {
+    if (context.read<TeacherBloc>().state.attendanceSubmissionStatus ==
+        SubmissionStatus.submitting) {
+      return;
+    }
     final picked = await showDatePicker(
       context: context,
       initialDate: _normalize(_selectedDate),

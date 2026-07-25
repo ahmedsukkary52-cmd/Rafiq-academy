@@ -10,12 +10,22 @@ class ProgressReportMapper {
   ProgressReportEntity map(ProgressReportSourceModel source, {DateTime? now}) {
     final clock = now ?? DateTime.now();
 
-    final statuses = source.attendance.map((a) => a.status);
+    final statuses = AttendancePolicy.uniqueDayStatuses(
+      source.attendance.map(
+        (a) => AttendanceMarkRef(
+          id: a.id,
+          halaqaId: a.halaqaId,
+          studentId: source.studentId,
+          date: a.date,
+          status: a.status,
+        ),
+      ),
+    );
     final attended = AttendancePolicy.countAttended(statuses);
     final absences = AttendancePolicy.countAbsent(statuses);
     final attendancePercent = AttendancePolicy.attendancePercent(
       attended: attended,
-      total: source.attendance.length,
+      total: statuses.length,
     );
 
     return ProgressReportEntity(

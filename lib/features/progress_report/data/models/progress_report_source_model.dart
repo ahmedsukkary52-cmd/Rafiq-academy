@@ -3,11 +3,13 @@ import '../../../../shared/utils/attendance_policy.dart';
 /// Raw attendance row from `attendanceRecords` (read-only).
 class ProgressAttendanceDocModel {
   final String id;
+  final String halaqaId;
   final DateTime date;
   final String status;
 
   const ProgressAttendanceDocModel({
     required this.id,
+    required this.halaqaId,
     required this.date,
     required this.status,
   });

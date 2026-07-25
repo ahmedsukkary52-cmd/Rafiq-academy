@@ -64,6 +64,7 @@ class ProgressReportRemoteDatasourceImpl
         : (rawDate as DateTime? ?? DateTime.now());
     return ProgressAttendanceDocModel(
       id: doc.id,
+      halaqaId: (data['halaqaId'] as String?)?.trim() ?? '',
       date: date,
       status: (data['status'] as String?)?.trim() ?? '',
     );

@@ -302,6 +302,12 @@ class _AttendanceCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            'الحضور يشمل التأخر',
+            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

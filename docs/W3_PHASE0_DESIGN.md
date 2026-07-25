@@ -1,7 +1,7 @@
 # W3 — Daily Halaqa Session Operations
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D10). **Pre-Slice production-validated** — Slice 1 not started (awaiting approval).  
+**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 production-validated** — awaiting approval for Slice 2.  
 **Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
 **Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.
@@ -230,9 +230,9 @@ Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analy
 | Step | Name | What it adds | Immediately usable? |
 |------|------|--------------|---------------------|
 | **Pre-Slice** | Today-session derivation helper | **Done + validated** — `mapTodayOperationalDays`; unit tests; day SSOT = `AttendancePolicy.dayStart`; sole consumer of `map()` still `ScheduleRepositoryImpl` | Foundation |
-| **Slice 1** | **Day Agenda (read-only)** | In `TeacherDashboardTab` (D1): list today's halaqat/sessions or honest "no session today"; sorted by time; reuse `GetTeacherHalaqatUseCase` | Yes — teacher sees today at a glance |
-| **Slice 2** | **Readiness signals** | Per session: register complete? (reuse W2 day query + roster + `AttendancePolicy`), homework assigned? (exact W1 definition — D3), pending reviews (reuse W1 `reviewStatus`) | Yes — teacher sees what's missing |
-| **Slice 3** | **Deep-link actions** | Each agenda item → existing attendance page / evaluations / assign sheet / class detail | Yes — one hub to run the day |
+| **Slice 1** | **Day Agenda + zero-new-query readiness + deep-links** | **Done + validated** — `TeacherDashboardTab` (D1) consumes a derived `TeacherDayAgenda` (`GetTodayAgendaUseCase` in the bloc, never the widget tree). Lists today's halaqat with **remaining** work only; each row deep-links to the existing attendance page / evaluations. Readiness reuses existing reads with **no new query/index**: register-incomplete (W2 `attendanceRecords(halaqaId,date)` + roster) and pending reviews (W1 `reviewStatus`). Completed work is removed; calm honest empty states. Replaced the old shortcut + quick-links cards → dashboard is simpler. | Yes — teacher sees today's work and navigates |
+| **Slice 2** | **Homework-assigned readiness** | Add the one remaining readiness signal deferred from Slice 1: homework assigned for today (exact W1 definition — D3). This is the signal that needs a new halaqa-scoped assignment query/index — confirm/add here. | Yes — completes "what's missing" |
+| **Slice 3** | **Deep-link actions (remaining)** | Extend deep-links beyond attendance/evaluations if needed (assign sheet / class detail) once Slice 2 lands | Yes — one hub to run the day |
 | **Slice 4** | **Day closeout signal** | Aggregate Slice 2 into honest "اليوم مكتمل / ناقص" with neutral D9 wording | Yes — end-of-day honesty |
 | **Slice 5** | Consistency audit + production validation | W1/W2-style report; refresh/empty/error/permissions parity | DoD |
 
@@ -255,6 +255,25 @@ Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analy
 | Fix applied | D7 sort uses map-key `halaqaId` instead of parsing operational-day ids |
 
 **Accepted pre-existing behavior (not a Pre-Slice regression):** if slot `endTime` ≤ `startTime` (e.g. overnight `22:00–01:00`), `map()` clamps end to `startAt + 1h` on the same calendar day. W3 D6 remains calendar-day operational (no overnight session model).
+
+### Slice 1 production validation (2026-07-26)
+
+**Verdict: Pass.** Slice 2 may begin after explicit approval.
+
+**Scope reconciliation (honest note):** the approved plan put readiness in Slice 2. The approved Slice 1 constraints asked the agenda to also answer "what still needs attention?" and to remove completed work. To honor both while keeping Slice 1 small, Slice 1 ships only the two readiness signals that reuse existing reads with **no new Firestore query or index** (register-incomplete, pending reviews). The **homework-assigned** signal — the one that needs a new halaqa-scoped assignment query/index — is deferred to Slice 2, exactly where the design already flagged that index question.
+
+| Area | Result |
+|------|--------|
+| Composition | Dashboard consumes `state.todayAgenda`; all derivation in `GetTodayAgendaUseCase` via the bloc — no computation in the widget tree |
+| Orchestration only | Reuses `mapTodayOperationalDays` (D6/D7 + `AttendancePolicy` day SSOT), W2 attendance read, W1 recitation read + `isPendingReview`; no business rule or policy re-implemented |
+| Persistence | Read-time only — no new collection/field, no cached flag, no orchestration state (D8/D10) |
+| Remaining-work focus | Completed actions removed from the agenda; empty roster never actionable; honest empty states ("لا توجد حصص مجدوَلة اليوم" vs "لا يوجد عمل متبقٍّ اليوم") |
+| Deep-links | Every row opens an existing route (`/teacher/attendance/:id`, `/teacher/halaqa/:id/evaluations`); no duplicated UI |
+| Tone (D9) | Neutral wording: "لم يتم تسجيل الحضور بعد", "توجد تسميعات بانتظار المراجعة" |
+| Simplicity | Removed `_HalaqaShortcutCard` + `_HalaqaQuickLinksCard`; one focused "عمل اليوم" section replaces two decorative cards |
+| Correctness | 10 unit tests (empty / not-today / attendance-incomplete / pending-review / both-in-order / completed-removed / empty-roster / D7 ordering / two failure paths) |
+| Analyze / format / tests | New code clean (remaining infos are pre-existing `withOpacity`); `dart format` applied; full suite green |
+| Performance | O(today-halaqat) reads — 2 per today-halaqa (attendance + recitations). Recitation read is unbounded (same as evaluations page); acceptable for Slice 1, revisit if it grows |
 
 ---
 
@@ -324,6 +343,6 @@ W3 is **Done** only if all are true:
 ## Approval gate
 
 **Phase 0 approved (D1–D10).**  
-**Pre-Slice production-validated (Pass).**  
-Execution remaining: Slice 1 (agenda) → 2 (readiness) → 3 (deep-links) → 4 (closeout) → 5 (audit + production validation).  
-**Do not start Slice 1 until explicitly approved.**
+**Pre-Slice + Slice 1 production-validated (Pass).**  
+Execution remaining: Slice 2 (homework-assigned readiness) → 3 (remaining deep-links) → 4 (closeout) → 5 (audit + production validation).  
+**Do not start Slice 2 until explicitly approved.**

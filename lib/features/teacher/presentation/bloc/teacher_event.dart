@@ -20,6 +20,11 @@ class LoadTeacherHalaqatEvent extends TeacherEvent {
   List<Object?> get props => [teacherId];
 }
 
+/// إعادة اشتقاق أجندة اليوم من الحلقات المحمّلة حالياً (W3 — بدون تحميل جديد)
+class LoadTodayAgendaEvent extends TeacherEvent {
+  const LoadTodayAgendaEvent();
+}
+
 /// اختيار حلقة معيّنة من القائمة - بيحمّل طلابها تلقائياً
 class SelectHalaqaEvent extends TeacherEvent {
   final String halaqaId;

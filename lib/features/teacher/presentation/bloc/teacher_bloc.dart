@@ -9,6 +9,7 @@ import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
 import '../../domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
+import '../../domain/usecases/get_today_agenda_usecase.dart';
 import '../../domain/usecases/save_day_attendance_usecase.dart';
 import '../../domain/usecases/send_assignment_usecase.dart';
 import '../../domain/usecases/update_recitation_review_usecase.dart';
@@ -26,6 +27,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final AddRecitationRecordUseCase addRecitationRecord;
   final UpdateRecitationReviewUseCase updateRecitationReview;
   final SendAssignmentUseCase sendAssignment;
+  final GetTodayAgendaUseCase getTodayAgenda;
 
   TeacherBloc({
     required this.getTeacherHalaqat,
@@ -36,8 +38,10 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     required this.addRecitationRecord,
     required this.updateRecitationReview,
     required this.sendAssignment,
+    required this.getTodayAgenda,
   }) : super(TeacherState.initial()) {
     on<LoadTeacherHalaqatEvent>(_onLoadHalaqat);
+    on<LoadTodayAgendaEvent>(_onLoadTodayAgenda);
     on<SelectHalaqaEvent>(_onSelectHalaqa);
     on<LoadHalaqaStudentsEvent>(_onLoadHalaqaStudents);
     on<LoadHalaqaEvaluationsEvent>(_onLoadEvaluations);
@@ -65,15 +69,54 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
 
     final result = await getTeacherHalaqat(TeacherIdParams(event.teacherId));
 
+    final failure = result.fold<String?>((f) => f.message, (_) => null);
+    if (failure != null) {
+      emit(
+        state.copyWith(
+          halaqatStatus: SectionStatus.error,
+          halaqatError: failure,
+        ),
+      );
+      return;
+    }
+
+    final halaqat = result.getOrElse((_) => const []);
+    emit(state.copyWith(halaqatStatus: SectionStatus.loaded, halaqat: halaqat));
+
+    // W3: derive today's agenda from the just-loaded halaqat (no extra read).
+    await _deriveTodayAgenda(emit);
+  }
+
+  /// Recomputes today's agenda from the halaqat already in state (retry path).
+  Future<void> _onLoadTodayAgenda(
+    LoadTodayAgendaEvent event,
+    Emitter<TeacherState> emit,
+  ) => _deriveTodayAgenda(emit);
+
+  Future<void> _deriveTodayAgenda(Emitter<TeacherState> emit) async {
+    emit(
+      state.copyWith(
+        todayAgendaStatus: SectionStatus.loading,
+        todayAgendaError: null,
+      ),
+    );
+
+    final result = await getTodayAgenda(
+      TodayAgendaParams(halaqat: state.halaqat),
+    );
+
     result.fold(
       (failure) => emit(
         state.copyWith(
-          halaqatStatus: SectionStatus.error,
-          halaqatError: failure.message,
+          todayAgendaStatus: SectionStatus.error,
+          todayAgendaError: failure.message,
         ),
       ),
-      (halaqat) => emit(
-        state.copyWith(halaqatStatus: SectionStatus.loaded, halaqat: halaqat),
+      (agenda) => emit(
+        state.copyWith(
+          todayAgendaStatus: SectionStatus.loaded,
+          todayAgenda: agenda,
+        ),
       ),
     );
   }

@@ -303,6 +303,8 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_studen
     as _i440;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
     as _i626;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_today_agenda_usecase.dart'
+    as _i271;
 import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance_usecase.dart'
     as _i642;
 import 'package:rafiq_academy/features/teacher/domain/usecases/save_day_attendance_usecase.dart'
@@ -599,6 +601,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i626.GetTeacherHalaqatUseCase>(
       () => _i626.GetTeacherHalaqatUseCase(gh<_i1050.TeacherRepository>()),
     );
+    gh.lazySingleton<_i271.GetTodayAgendaUseCase>(
+      () => _i271.GetTodayAgendaUseCase(gh<_i1050.TeacherRepository>()),
+    );
     gh.lazySingleton<_i642.RecordAttendanceUseCase>(
       () => _i642.RecordAttendanceUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -740,20 +745,6 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
-    gh.singleton<_i933.TeacherBloc>(
-      () => _i933.TeacherBloc(
-        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
-        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
-        getHalaqaRecitationRecords:
-            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
-        getHalaqaAttendanceForDate:
-            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
-        saveDayAttendance: gh<_i343.SaveDayAttendanceUseCase>(),
-        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
-        updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
-        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
-      ),
-    );
     gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
       () => _i1010.GetHalaqaAnalyticsUseCase(gh<_i656.AnalyticsRepository>()),
     );
@@ -885,6 +876,21 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i152.MarkAllNotificationsAsReadUseCase>(
       () => _i152.MarkAllNotificationsAsReadUseCase(
         gh<_i587.NotificationsRepository>(),
+      ),
+    );
+    gh.singleton<_i933.TeacherBloc>(
+      () => _i933.TeacherBloc(
+        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
+        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
+        getHalaqaRecitationRecords:
+            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
+        getHalaqaAttendanceForDate:
+            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
+        saveDayAttendance: gh<_i343.SaveDayAttendanceUseCase>(),
+        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
+        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
+        getTodayAgenda: gh<_i271.GetTodayAgendaUseCase>(),
       ),
     );
     gh.lazySingleton<_i186.GetAwardsStatsUseCase>(

@@ -1,8 +1,13 @@
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../models/class_session_model.dart';
 import '../models/halaqa_schedule_source_model.dart';
 
 /// Maps raw `halaqat.schedule` slots into weekly [ClassSessionEntity] rows.
+///
+/// Also derives **today's operational days** for W3 orchestration (D6/D7):
+/// one row per halaqa that has a schedule slot today, stably ordered.
+/// Does **not** encode attendance/homework/review rules — those stay in W1/W2.
 class HalaqaWeeklySessionsMapper {
   const HalaqaWeeklySessionsMapper();
 
@@ -56,6 +61,103 @@ class HalaqaWeeklySessionsMapper {
     return sessions;
   }
 
+  /// Today's operational teaching days across [sources] (W3 Pre-Slice).
+  ///
+  /// - Filters to the calendar day of [now] via [AttendancePolicy.dayStart].
+  /// - Collapses multiple same-day slots for one halaqa into **one** row (D6).
+  /// - Orders by earliest start time, then `halaqaId` (D7 — never random).
+  /// - Pure derivation; no persistence (D8/D10).
+  List<ClassSessionEntity> mapTodayOperationalDays(
+    Iterable<HalaqaScheduleSourceModel> sources, {
+    DateTime? now,
+  }) {
+    final clock = now ?? DateTime.now();
+    final today = AttendancePolicy.dayStart(clock);
+    final byHalaqa = <String, ClassSessionEntity>{};
+
+    for (final source in sources) {
+      final halaqaId = source.halaqaId.trim();
+      if (halaqaId.isEmpty) continue;
+
+      for (final session in map(source, now: clock)) {
+        final sessionDay = AttendancePolicy.dayStart(session.startAt);
+        if (sessionDay != today) continue;
+
+        final existing = byHalaqa[halaqaId];
+        if (existing == null) {
+          byHalaqa[halaqaId] = _asOperationalDay(
+            halaqaId: halaqaId,
+            day: today,
+            session: session,
+            clock: clock,
+          );
+          continue;
+        }
+
+        // D6: one operational day — earliest start, latest end.
+        final startAt = session.startAt.isBefore(existing.startAt)
+            ? session.startAt
+            : existing.startAt;
+        final endAt = session.endAt.isAfter(existing.endAt)
+            ? session.endAt
+            : existing.endAt;
+        byHalaqa[halaqaId] = ClassSessionModel(
+          id: existing.id,
+          title: existing.title,
+          type: existing.type,
+          startAt: startAt,
+          endAt: endAt,
+          teacherName: existing.teacherName,
+          status: _statusFor(clock, startAt, endAt),
+          meetingLink: existing.meetingLink.isNotEmpty
+              ? existing.meetingLink
+              : session.meetingLink,
+          topic: existing.topic,
+        );
+      }
+    }
+
+    final days = byHalaqa.values.toList()
+      ..sort((a, b) {
+        final byTime = a.startAt.compareTo(b.startAt);
+        if (byTime != 0) return byTime;
+        // Stable fallback already present in the app: Firestore document id.
+        return _halaqaIdOf(a).compareTo(_halaqaIdOf(b));
+      });
+    return days;
+  }
+
+  ClassSessionEntity _asOperationalDay({
+    required String halaqaId,
+    required DateTime day,
+    required ClassSessionEntity session,
+    required DateTime clock,
+  }) {
+    final y = day.year.toString().padLeft(4, '0');
+    final m = day.month.toString().padLeft(2, '0');
+    final d = day.day.toString().padLeft(2, '0');
+    return ClassSessionModel(
+      id: '${halaqaId}_$y$m$d',
+      title: session.title,
+      type: session.type,
+      startAt: session.startAt,
+      endAt: session.endAt,
+      teacherName: session.teacherName,
+      status: _statusFor(clock, session.startAt, session.endAt),
+      meetingLink: session.meetingLink,
+      topic: session.topic,
+    );
+  }
+
+  /// Operational-day ids are `{halaqaId}_yyyyMMdd`; weekly slot ids are
+  /// `{halaqaId}_{index}`. Prefer the longest stable prefix when sorting.
+  String _halaqaIdOf(ClassSessionEntity session) {
+    final id = session.id;
+    final underscore = id.lastIndexOf('_');
+    if (underscore <= 0) return id;
+    return id.substring(0, underscore);
+  }
+
   ClassSessionStatus _statusFor(
     DateTime now,
     DateTime startAt,
@@ -106,7 +208,7 @@ class HalaqaWeeklySessionsMapper {
   }
 
   DateTime _dateForWeekdayInCurrentWeek(int weekday, DateTime now) {
-    final today = DateTime(now.year, now.month, now.day);
+    final today = AttendancePolicy.dayStart(now);
     return today.add(Duration(days: weekday - today.weekday));
   }
 

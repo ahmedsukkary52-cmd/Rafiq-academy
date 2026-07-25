@@ -1,0 +1,313 @@
+# W3 — Daily Halaqa Session Operations
+## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
+
+**Status:** Approved (D1–D10). **Pre-Slice complete** — awaiting validation before Slice 1.  
+**Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
+**Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
+**Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.
+
+### Core mandate for W3
+
+**Do NOT invent a new "Session" module.** W3 is an **orchestration layer** that turns the teacher's day into one operational experience by **reusing** Homework (W1), Attendance (W2), Evaluations, and Schedule. Reuse before building. No new collections. No new status fields unless a product decision explicitly approves one.
+
+---
+
+## 0. Goal (operations, not screens)
+
+Answer the teacher's real question every day:
+
+> "It is today. I arrived. **What must I do for my halaqa(t) right now, and what did I forget?**"
+
+W3 makes the app say — from existing data:
+
+**Before the session:** which of my halaqat meet today, roster ready, is today's homework assigned, any leftover pending reviews.  
+**During the session:** mark attendance, evaluate recitation, (re)assign homework — all reachable from one place.  
+**After the session:** is today's register complete, is homework assigned, are yesterday's reviews cleared — an honest "day done / day incomplete" signal.
+
+---
+
+## 1. Real academy operations research
+
+A teacher at a Qur'an halaqa/maktab, from arrival to departure, performs a repeatable ritual. Below, each step is classified against the **current codebase**.
+
+Legend: **Verified** (implemented) · **Partial** (exists but not orchestrated/complete) · **Missing** · **Product decision**.
+
+### 1.1 Arrival / "what is today?"
+
+| # | Real operation | Classification | Evidence |
+|---|----------------|----------------|----------|
+| O1 | Teacher knows which halaqa(t) they own | **Verified** | `GetTeacherHalaqatUseCase` → `TeacherBloc.halaqat`; dashboard lists them |
+| O2 | Teacher knows **which halaqat meet today** | **Partial** | `halaqat.schedule` slots exist; `HalaqaWeeklySessionsMapper` derives weekly sessions **but only for one halaqa and only on the student schedule page**. No teacher "today across my halaqat" view |
+| O3 | Teacher handles **multiple halaqat** today | **Partial** | Dashboard shows `halaqat.first` as "next"; no per-day multi-halaqa agenda |
+| O4 | Teacher handles **multiple sessions in one day** | **Partial** | Mapper emits one `ClassSessionEntity` per slot; not surfaced for teacher, not deduped to "today" |
+| O5 | **No session today** | **Missing** | Nothing computes "today has 0 sessions"; dashboard always shows a halaqa shortcut |
+| O6 | Today is a **holiday / off day** | **Product decision** | No holiday concept; only weekly slots exist |
+
+### 1.2 Before the session (readiness)
+
+| # | Real operation | Classification | Evidence |
+|---|----------------|----------------|----------|
+| O7 | Roster is loaded and correct | **Verified** | `GetHalaqaStudentsUseCase` (needs `whereIn` chunking — audit P1-2) |
+| O8 | Is **today's homework already assigned?** | **Missing (derivable)** | `assignments` has `halaqaId`, `assignedBy`, `dueDate`; no query "did this halaqa get an assignment for today?" |
+| O9 | Are there **leftover pending reviews** from yesterday? | **Partial** | `recitationRecords.reviewStatus == 'pending'` exists; `getHalaqaRecitationRecords` loads all then UI filters; not summarized as "N pending" pre-session |
+| O10 | Meeting link ready (online halaqa) | **Verified** | `halaqat.meetingLink`; class detail "join" button |
+
+### 1.3 During the session (execution)
+
+| # | Real operation | Classification | Evidence |
+|---|----------------|----------------|----------|
+| O11 | **Take attendance** (P/A/L) | **Verified** | W2: `TeacherAttendancePage` → `SaveDayAttendanceEvent`, deterministic IDs |
+| O12 | **Evaluate recitation** (live) | **Verified** | `AddRecitationRecordEvent`; evaluations page "+ تقييم جديد" |
+| O13 | **Review pending** homework submissions | **Verified** | `UpdateRecitationReviewEvent` (transaction, same doc) |
+| O14 | **Assign / adjust homework** for next time | **Verified** | W1: `SendAssignmentEvent` from class detail |
+| O15 | Everything reachable from **one place** during class | **Partial** | All exist, but split across class-detail tabs + separate routes; no single "run today's session" surface |
+
+### 1.4 After the session (closeout / honesty)
+
+| # | Real operation | Classification | Evidence |
+|---|----------------|----------------|----------|
+| O16 | Was **attendance actually taken today?** | **Missing (derivable)** | `attendanceRecords` by `halaqaId` + today range already queried in W2 datasource; not surfaced as "register complete? N/total" on the day agenda |
+| O17 | Was **homework assigned** for the day? | **Missing (derivable)** | See O8 |
+| O18 | Are **yesterday's reviews cleared?** | **Partial** | Pending count derivable from `recitationRecords`; not summarized |
+| O19 | Honest **"today's work: done / incomplete"** signal | **Missing** | No aggregation of O16–O18 |
+| O20 | Parents/students perceive the day | **Verified (indirect)** | Parent weekly + student progress already reflect attendance + reviewed recitations |
+
+### 1.5 Definition — "Today's work" (approved)
+
+**Derived at read time (D8/D10)** from Verified data — "Today's work" for a halaqa that has a session today =
+
+1. **Attendance register complete** — reuse W2 `attendanceRecords` + `AttendancePolicy` (roster covered for calendar day).  
+2. **Homework assigned** — reuse **exact W1 definition** (D3): current assignment = latest `dueDate` (W1 D7). No second interpretation.  
+3. **Pending reviews** — reuse W1 `reviewStatus == pending` on `recitationRecords` (D4 — never reimplement).  
+
+W3 does **not** invent new persisted state; it **derives** signals and deep-links into existing workflows (D5).
+
+---
+
+## 2. Workflow diagram (orchestration of existing pieces)
+
+```text
+                         ┌──────────────────────────────────────────┐
+                         │  Teacher opens app (arrival)               │
+                         └───────────────────┬──────────────────────┘
+                                             │  reuse: GetTeacherHalaqatUseCase
+                                             ▼
+                    ┌────────────────────────────────────────────────┐
+                    │  DAY AGENDA (new orchestration, no new module)   │
+                    │  for each halaqa: derive today's session(s)      │
+                    │  reuse: HalaqaWeeklySessionsMapper (per halaqa)  │
+                    └───────┬───────────────┬───────────────┬─────────┘
+              today has     │               │ no session    │ multiple
+              session(s)    ▼               ▼ today         ▼ halaqat/sessions
+        ┌───────────────────────────┐  ┌──────────────┐  ┌──────────────────┐
+        │ Readiness per session:     │  │ honest empty │  │ list, sorted by   │
+        │  • roster (GetHalaqaStud.) │  │ "لا حصص اليوم"│  │ startAt           │
+        │  • homework assigned? (der)│  └──────────────┘  └──────────────────┘
+        │  • attendance complete?(der)│
+        │  • pending reviews? (der)  │
+        └───────────┬────────────────┘
+                    │ tap a session → REUSE existing surfaces (no new screens)
+        ┌───────────┼───────────────────────────────┬───────────────────────┐
+        ▼           ▼                                ▼                       ▼
+  Attendance   Evaluations                     Assign homework         Class detail
+  (W2 page)    (add + review pending)          (W1 sheet)              (roster/tabs)
+  SaveDay...   Add/UpdateRecitation...         SendAssignment...       existing route
+        │           │                                │                       │
+        └───────────┴────────────────────────────────┴───────────────────────┘
+                    │ after actions → same derived signals refresh
+                    ▼
+        ┌────────────────────────────────────────────┐
+        │  DAY CLOSEOUT signal (derived, honest):      │
+        │  register complete? homework assigned?       │
+        │  reviews cleared? → "اليوم مكتمل / ناقص"      │
+        └────────────────────────────────────────────┘
+                    │ downstream (already Verified)
+                    ▼
+     Parent weekly report + Student progress reflect the day (no W3 change)
+```
+
+---
+
+## 3. Existing implementation map
+
+### 3.1 By layer (what already exists)
+
+| Layer | Component | Today's role | W3 use |
+|-------|-----------|--------------|--------|
+| **Schedule** | `halaqat.schedule` (Firestore field) | Weekly slots (day + start/end) | Source of "does this halaqa meet today?" |
+| | `ScheduleRemoteDatasource.getHalaqaScheduleSource` | Reads one halaqa's schedule | Reuse per halaqa (or extend to teacher's set) |
+| | `HalaqaWeeklySessionsMapper` | Slots → `ClassSessionEntity` weekly, with live/upcoming/ended | Reuse to compute **today's** sessions |
+| | `GetWeeklySessionsUseCase` / `ScheduleBloc` | Per-halaqa weekly sessions (student page) | Reuse logic; **not** the teacher-day aggregator yet |
+| | `ClassSessionEntity` (live/upcoming/ended, canJoin) | Session VO | Reuse as agenda row |
+| **Teacher** | `GetTeacherHalaqatUseCase` → `TeacherBloc.halaqat` | Teacher's halaqat + `schedule` + `studentIds` | Iterate halaqat for today's agenda |
+| | `TeacherDashboardTab` | Header + stats + `halaqat.first` shortcut | Candidate host for Day Agenda (reuse, enhance) |
+| | `GetHalaqaStudentsUseCase` | Roster | Readiness: roster size / names |
+| | `GetHalaqaAttendanceForDateUseCase` | Day attendance (deduped) | Readiness: register complete? |
+| | `SaveDayAttendanceUseCase` (W2) | Atomic day save | During session |
+| | `GetHalaqaRecitationRecordsUseCase` | All halaqa recitations | Readiness: pending count; During: review |
+| | `AddRecitationRecordUseCase` / `UpdateRecitationReviewUseCase` | Live eval / review | During session |
+| | `SendAssignmentUseCase` (W1) | Assign homework to roster | During session; readiness: assigned? |
+| **Homework** | `assignments` (`halaqaId`, `assignedBy`, `dueDate`, tasks) | SSOT | Derive "assigned for today?" |
+| **Attendance** | `attendanceRecords` (deterministic day IDs) | SSOT | Derive "register complete?" |
+| **Evaluations** | `recitationRecords` (`reviewStatus`) | SSOT | Derive "pending reviews?" |
+| **Shared** | `AttendancePolicy` | Day/percent/dedupe | Reuse dayStart + dedupe for completeness |
+| | `halaqaScheduleLabel` | Schedule display | Reuse labels |
+| | `time_format.dart` | Date/time formatting | Reuse |
+| | `SectionStatus` / `AppErrorWidget` / snackbars | State + UX | Reuse |
+| **Routing** | `/teacher`, `/teacher/halaqa/:id`, `/teacher/attendance/:id`, `/teacher/halaqa/:id/evaluations` | Existing destinations | Agenda deep-links into these |
+
+### 3.2 Entry points already wired
+
+- Teacher home → dashboard tab (default surface on arrival).  
+- Dashboard → class detail (`/teacher/halaqa/:id`).  
+- Class detail tabs → attendance (link), evaluations (link), assign (sheet), roster.  
+- All the "do the work" actions exist and are Verified from W1/W2.
+
+---
+
+## 4. Reuse map (W3 = wiring, not building)
+
+| W3 need | Reuse (existing) | New (thin) required? |
+|---------|------------------|----------------------|
+| Teacher's halaqat | `GetTeacherHalaqatUseCase` | No |
+| Does halaqa meet today? | `HalaqaWeeklySessionsMapper` + `halaqat.schedule` | Thin: filter mapper output to **today** (in-memory) |
+| Aggregate **all** teacher halaqat sessions today | `GetWeeklySessionsUseCase` (per halaqa) | Thin: orchestrating use case that maps over `TeacherBloc.halaqat` (no new datasource, no new collection) |
+| Register complete? | `GetHalaqaAttendanceForDateUseCase` + `AttendancePolicy` | Thin: compare deduped count vs roster size |
+| Homework assigned for today? | `assignments` query | Thin: **one** query use case `hasAssignmentForDay(halaqaId, day)` (reuse collection + likely reuse existing index) |
+| Pending reviews count | `GetHalaqaRecitationRecordsUseCase` | Thin: count `reviewStatus == pending` (client) |
+| Take attendance / evaluate / review / assign | W2 page, evaluations page, W1 sheet | No — deep-link |
+| State/UX | `SectionStatus`, `AppErrorWidget`, `RefreshIndicator` | No |
+| Day/date | `AttendancePolicy.dayStart`, `time_format` | No |
+
+**Net new code footprint (proposed):** one orchestration use case + one bloc (or extend `TeacherBloc`) + one agenda UI surface (host inside existing teacher dashboard). **No new Firestore collection. No new persisted field** (unless a decision below approves one).
+
+---
+
+## 5. Product gaps (what's genuinely absent)
+
+| ID | Gap | Nature | Notes |
+|----|-----|--------|-------|
+| G1 | No **teacher "today across my halaqat"** aggregation | Missing orchestration | Core of W3 |
+| G2 | No **"is today a session day?"** for teacher | Missing (derivable) | Mapper exists; not filtered to today for teacher |
+| G3 | No **"homework assigned today?"** signal | Missing (derivable) | Needs "for today" definition (D3) |
+| G4 | No **"register complete?"** signal | Missing (derivable) | Reuse W2 day query + roster |
+| G5 | No **pending-review backlog** summary | Missing (derivable) | Count from recitationRecords |
+| G6 | No **day closeout / honest "day incomplete"** | Missing | Aggregate G3–G5 |
+| G7 | No **holiday / no-session** concept | Product decision | Weekly slots only |
+| G8 | Attendance **not bound** to a specific session slot | Carried from W2 D7 | Keep calendar-day; do not bind unless D5 |
+| G9 | Multiple sessions same day for same halaqa | Product decision | Two slots same weekday → one register or two? (D6) |
+| G10 | No absence/late **notification** to parents at session close | Deferred (W2 D2) | Out of W3 unless reopened |
+
+---
+
+## 6. Product decisions (approved)
+
+| # | Decision | Resolution |
+|---|----------|------------|
+| **D1** | Agenda host | **Approved** — enhance existing `TeacherDashboardTab`. No new page/route |
+| **D2** | Product objective | **Approved** — dashboard answers one question: **What should I do today?** Everything in W3 supports that |
+| **D3** | Homework "for today" | **Approved** — reuse **exact W1 definition** (latest `dueDate` / W1 D7). No second interpretation. Homework SSOT stays in W1 |
+| **D4** | Policies | **Approved** — reuse every existing W1/W2 policy (attendance, homework, evaluation, reporting). **Never reimplement** inside W3 |
+| **D5** | Execution | **Approved** — agenda orchestrates only; execution deep-links into existing screens. No duplicated UI |
+| **D6** | Multiple slots same day | **Approved** — same halaqa + same calendar day = **one** operational teaching day. Do not split attendance/homework by slot |
+| **D7** | Multi-halaqa order | **Approved** — stable execution order: **schedule time first**; if equal/missing, fall back to **stable app ordering** (`halaqaId` lexicographic). Never random across launches |
+| **D8** | Readiness derivation | **Approved** — all readiness indicators derived at **read time**. Never cache operational state |
+| **D9** | Tone | **Approved** — assist, never blame. Neutral copy only (e.g. «لم يتم تسجيل الحضور بعد»، «لم يتم إرسال واجب اليوم»، «توجد تسميعات بانتظار المراجعة») |
+| **D10** | Persistence | **Approved** — no new collections, fields, orchestration persistence, `sessionCompleted`, or `teacherOpenedSession`. Compute from existing data |
+
+### Engineering rules (approved)
+
+- Before every slice: search for existing helpers/policies/mappers/formatters; prefer reuse; extend safely rather than create parallels.
+- Orchestration layer owns only: determine today's work → determine readiness → navigate to existing workflows.
+- Business logic remains owned by W1 and W2.
+
+---
+
+## 7. Proposed slices (small, releasable, reuse-first)
+
+Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analyze → format → commit → push → usable.
+
+| Step | Name | What it adds | Immediately usable? |
+|------|------|--------------|---------------------|
+| **Pre-Slice** | Today-session derivation helper | **Done** — extended `HalaqaWeeklySessionsMapper.mapTodayOperationalDays` (D6/D7); unit tests; reuses `AttendancePolicy.dayStart`; no UI | Foundation |
+| **Slice 1** | **Day Agenda (read-only)** | In `TeacherDashboardTab` (D1-A): list today's halaqat/sessions or honest "no session today"; sorted by time; reuse `GetTeacherHalaqatUseCase` | Yes — teacher sees today at a glance |
+| **Slice 2** | **Readiness signals** | Per session: register complete? (reuse W2 day query + roster + `AttendancePolicy`), homework assigned? (thin `assignments` query per D3), pending reviews count (reuse recitations) | Yes — teacher sees what's missing |
+| **Slice 3** | **Deep-link actions** | Each agenda item → existing attendance page / evaluations / assign sheet / class detail | Yes — one hub to run the day |
+| **Slice 4** | **Day closeout signal** | Aggregate Slice 2 into honest "اليوم مكتمل / ناقص: الحضور • الواجب • المراجعات" | Yes — end-of-day honesty |
+| **Slice 5** | Consistency audit + production validation | W1/W2-style report; refresh/empty/error/permissions parity | DoD |
+
+**Optional later (not W3 unless approved):** in-agenda quick actions (D2-B), notifications (D8), supervisor register view (D9).
+
+### Index/query note (Verified/Inference)
+- Register-complete + homework-assigned reuse existing `attendanceRecords(halaqaId,date)` and `assignments(studentId,dueDate)` shapes. A **halaqa-scoped** assignment "for today" check may need an `assignments(halaqaId, dueDate)` composite — **confirm during Slice 2**; do not assume a new index until the query is written.
+
+---
+
+## 8. Actors affected
+
+| Actor | W3 impact |
+|-------|-----------|
+| **Teacher** | Primary — gains a daily operating surface orchestrating existing tools |
+| **Student** | None new — already reflected via progress/homework (Verified) |
+| **Parent** | None new — weekly report already reflects the day (Verified) |
+| **Supervisor** | **Out of W3** (D9) |
+| **Admin** | **Out of W3** |
+
+---
+
+## 9. Explicitly OUT of W3
+
+- ❌ New **"Session" module / collection** (mandate: orchestrate, don't build).  
+- ❌ New Firestore **collections**.  
+- ❌ New persisted **fields** (`sessionId`, `sessionOperated`, holiday flags) — D10.  
+- ❌ **Slot-bound attendance** (keep W2 D7 calendar-day; D6 = one day).  
+- ❌ **Absence/late notifications** (W2 D2 deferred).  
+- ❌ **استئذان / absenceRequests** UI (W2 D3).  
+- ❌ **Supervisor** unmarked-register dashboard (W2 D4).  
+- ❌ **Holiday/term calendar** engine.  
+- ❌ **Payments, learning-plan engine, audio recitation infra** (separate workflows).  
+- ❌ **Admin dashboards / gamification.**  
+- ❌ Rebuilding attendance/homework/evaluation UIs — **deep-link into existing ones only** (D5).  
+- ❌ Figma-driven parallel screens — Figma is **UI reference only**.  
+- ❌ Reimplementing W1/W2 business rules inside W3 (D4).
+
+---
+
+## 10. Risks
+
+| Type | Risk | Mitigation |
+|------|------|------------|
+| **Architecture** | W3 becomes a parallel "session" stack | Hard rule: orchestration + deep-links; reuse existing use cases/pages |
+| **Product** | "Today's work" definition ambiguous | Lock D3 (assigned), D4 (pending), D6 (multi-slot) before Slice 2 |
+| **Technical** | Per-halaqa schedule reads = N reads for N halaqat | Halaqat already loaded in `TeacherBloc` with `schedule` inline → derive today's sessions **in memory**, avoid extra reads |
+| **Technical** | Homework-for-today query needs new index | Confirm in Slice 2; reuse existing shape if possible |
+| **Product** | Empty/holiday confusion | Honest "لا حصص اليوم"; holidays deferred (D7) |
+| **Scale** | Roster `whereIn` (audit P1-2) | Address as shared fix; not a new W3 debt |
+| **Security** | No Firestore rules in repo (audit P0-1) | Platform gap; W3 reads teacher-owned data only, no widened writes |
+
+---
+
+## 11. Definition of Done (W3)
+
+W3 is **Done** only if all are true:
+
+1. Teacher immediately understands today's operational state (**What should I do today?** — D2).  
+2. Every agenda item opens an **existing** workflow (D5).  
+3. No business logic duplicated (D3, D4).  
+4. No UI duplicated (D5).  
+5. No Firestore schema changes (D10).  
+6. No workflow-specific persistence (D10).  
+7. Dashboard complexity is **reduced**, not increased (D1).  
+8. Neutral assistive wording only (D9).  
+9. `flutter analyze` clean; code formatted; committed and pushed per slice.  
+10. Docs reflect the final architecture.  
+11. Production validation (W1/W2 style) before marking Done.  
+12. If a slice assumption is wrong: **stop**, update this doc, continue.
+
+---
+
+## Approval gate
+
+**Phase 0 approved (D1–D10).**  
+Execution: Pre-Slice (today-session derivation) → Slice 1 (agenda) → 2 (readiness) → 3 (deep-links) → 4 (closeout) → 5 (audit + production validation).  
+**Do not start the next slice until the current slice is validated.**

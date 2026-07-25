@@ -1,7 +1,7 @@
 # W3 — Daily Halaqa Session Operations
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D10). **Pre-Slice complete** — awaiting validation before Slice 1.  
+**Status:** Approved (D1–D10). **Pre-Slice production-validated** — Slice 1 not started (awaiting approval).  
 **Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
 **Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.
@@ -229,17 +229,32 @@ Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analy
 
 | Step | Name | What it adds | Immediately usable? |
 |------|------|--------------|---------------------|
-| **Pre-Slice** | Today-session derivation helper | **Done** — extended `HalaqaWeeklySessionsMapper.mapTodayOperationalDays` (D6/D7); unit tests; reuses `AttendancePolicy.dayStart`; no UI | Foundation |
-| **Slice 1** | **Day Agenda (read-only)** | In `TeacherDashboardTab` (D1-A): list today's halaqat/sessions or honest "no session today"; sorted by time; reuse `GetTeacherHalaqatUseCase` | Yes — teacher sees today at a glance |
-| **Slice 2** | **Readiness signals** | Per session: register complete? (reuse W2 day query + roster + `AttendancePolicy`), homework assigned? (thin `assignments` query per D3), pending reviews count (reuse recitations) | Yes — teacher sees what's missing |
+| **Pre-Slice** | Today-session derivation helper | **Done + validated** — `mapTodayOperationalDays`; unit tests; day SSOT = `AttendancePolicy.dayStart`; sole consumer of `map()` still `ScheduleRepositoryImpl` | Foundation |
+| **Slice 1** | **Day Agenda (read-only)** | In `TeacherDashboardTab` (D1): list today's halaqat/sessions or honest "no session today"; sorted by time; reuse `GetTeacherHalaqatUseCase` | Yes — teacher sees today at a glance |
+| **Slice 2** | **Readiness signals** | Per session: register complete? (reuse W2 day query + roster + `AttendancePolicy`), homework assigned? (exact W1 definition — D3), pending reviews (reuse W1 `reviewStatus`) | Yes — teacher sees what's missing |
 | **Slice 3** | **Deep-link actions** | Each agenda item → existing attendance page / evaluations / assign sheet / class detail | Yes — one hub to run the day |
-| **Slice 4** | **Day closeout signal** | Aggregate Slice 2 into honest "اليوم مكتمل / ناقص: الحضور • الواجب • المراجعات" | Yes — end-of-day honesty |
+| **Slice 4** | **Day closeout signal** | Aggregate Slice 2 into honest "اليوم مكتمل / ناقص" with neutral D9 wording | Yes — end-of-day honesty |
 | **Slice 5** | Consistency audit + production validation | W1/W2-style report; refresh/empty/error/permissions parity | DoD |
 
-**Optional later (not W3 unless approved):** in-agenda quick actions (D2-B), notifications (D8), supervisor register view (D9).
+**Optional later (not W3 unless approved):** absence notifications, supervisor register view, holiday calendar.
 
 ### Index/query note (Verified/Inference)
-- Register-complete + homework-assigned reuse existing `attendanceRecords(halaqaId,date)` and `assignments(studentId,dueDate)` shapes. A **halaqa-scoped** assignment "for today" check may need an `assignments(halaqaId, dueDate)` composite — **confirm during Slice 2**; do not assume a new index until the query is written.
+- Register-complete + homework-assigned reuse existing `attendanceRecords(halaqaId,date)` and W1 assignment semantics. Confirm any new composite only if a real Slice 2 query requires it.
+
+### Pre-Slice production validation (2026-07-25)
+
+**Verdict: Pass.** Slice 1 may begin after explicit approval.
+
+| Area | Result |
+|------|--------|
+| Architecture | Extended existing mapper; no new business-rule layer; no W1/W2 logic copied; `AttendancePolicy.dayStart` is day-boundary SSOT |
+| Correctness | 16 unit tests covering empty / one / multi-halaqa / multi-slot / out-of-order / equal-time / day-boundary / overnight clamp / duplicates / deterministic |
+| Maintainability | Pure, deterministic, no Firestore/Bloc/UI/nav/cache |
+| Performance | O(H×S) over already-loaded schedules — acceptable (H and S small); not optimized further |
+| Regression | Only `ScheduleRepositoryImpl` calls `map()`; weekly `map()` regression tests pass |
+| Fix applied | D7 sort uses map-key `halaqaId` instead of parsing operational-day ids |
+
+**Accepted pre-existing behavior (not a Pre-Slice regression):** if slot `endTime` ≤ `startTime` (e.g. overnight `22:00–01:00`), `map()` clamps end to `startAt + 1h` on the same calendar day. W3 D6 remains calendar-day operational (no overnight session model).
 
 ---
 
@@ -309,5 +324,6 @@ W3 is **Done** only if all are true:
 ## Approval gate
 
 **Phase 0 approved (D1–D10).**  
-Execution: Pre-Slice (today-session derivation) → Slice 1 (agenda) → 2 (readiness) → 3 (deep-links) → 4 (closeout) → 5 (audit + production validation).  
-**Do not start the next slice until the current slice is validated.**
+**Pre-Slice production-validated (Pass).**  
+Execution remaining: Slice 1 (agenda) → 2 (readiness) → 3 (deep-links) → 4 (closeout) → 5 (audit + production validation).  
+**Do not start Slice 1 until explicitly approved.**

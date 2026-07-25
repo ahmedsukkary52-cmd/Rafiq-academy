@@ -117,14 +117,14 @@ class HalaqaWeeklySessionsMapper {
       }
     }
 
-    final days = byHalaqa.values.toList()
+    final days = byHalaqa.entries.toList()
       ..sort((a, b) {
-        final byTime = a.startAt.compareTo(b.startAt);
+        final byTime = a.value.startAt.compareTo(b.value.startAt);
         if (byTime != 0) return byTime;
-        // Stable fallback already present in the app: Firestore document id.
-        return _halaqaIdOf(a).compareTo(_halaqaIdOf(b));
+        // D7 stable fallback: Firestore halaqa document id (map key).
+        return a.key.compareTo(b.key);
       });
-    return days;
+    return days.map((e) => e.value).toList();
   }
 
   ClassSessionEntity _asOperationalDay({
@@ -147,15 +147,6 @@ class HalaqaWeeklySessionsMapper {
       meetingLink: session.meetingLink,
       topic: session.topic,
     );
-  }
-
-  /// Operational-day ids are `{halaqaId}_yyyyMMdd`; weekly slot ids are
-  /// `{halaqaId}_{index}`. Prefer the longest stable prefix when sorting.
-  String _halaqaIdOf(ClassSessionEntity session) {
-    final id = session.id;
-    final underscore = id.lastIndexOf('_');
-    if (underscore <= 0) return id;
-    return id.substring(0, underscore);
   }
 
   ClassSessionStatus _statusFor(

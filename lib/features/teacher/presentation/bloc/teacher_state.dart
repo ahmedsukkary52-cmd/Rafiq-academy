@@ -30,6 +30,9 @@ class TeacherState extends Equatable {
   final List<HalaqaStudentSummaryEntity> students;
   final String? studentsError;
 
+  /// Halaqa id for the in-flight / loaded students roster (guards stale opens).
+  final String? studentsHalaqaId;
+
   // ── تقييمات الحلقة ────────────────────────────────────────────────────
   final SectionStatus evaluationsStatus;
   final List<RecitationRecordEntity> evaluations;
@@ -69,6 +72,7 @@ class TeacherState extends Equatable {
     this.studentsStatus = SectionStatus.initial,
     this.students = const [],
     this.studentsError,
+    this.studentsHalaqaId,
     this.evaluationsStatus = SectionStatus.initial,
     this.evaluations = const [],
     this.evaluationsError,
@@ -98,6 +102,7 @@ class TeacherState extends Equatable {
     SectionStatus? studentsStatus,
     List<HalaqaStudentSummaryEntity>? students,
     Object? studentsError = _unset,
+    Object? studentsHalaqaId = _unset,
     SectionStatus? evaluationsStatus,
     List<RecitationRecordEntity>? evaluations,
     Object? evaluationsError = _unset,
@@ -132,6 +137,9 @@ class TeacherState extends Equatable {
       studentsError: identical(studentsError, _unset)
           ? this.studentsError
           : studentsError as String?,
+      studentsHalaqaId: identical(studentsHalaqaId, _unset)
+          ? this.studentsHalaqaId
+          : studentsHalaqaId as String?,
       evaluationsStatus: evaluationsStatus ?? this.evaluationsStatus,
       evaluations: evaluations ?? this.evaluations,
       evaluationsError: identical(evaluationsError, _unset)
@@ -178,6 +186,7 @@ class TeacherState extends Equatable {
     studentsStatus,
     students,
     studentsError,
+    studentsHalaqaId,
     evaluationsStatus,
     evaluations,
     evaluationsError,

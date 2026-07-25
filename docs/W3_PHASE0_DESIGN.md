@@ -1,7 +1,7 @@
 # W3 — Daily Halaqa Session Operations
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 Pass + Slice 3 shipped** — awaiting approval for Slice 4.  
+**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 + Slice 3 production-validated (Pass)**. Awaiting approval for Slice 4.  
 **Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
 **Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.
@@ -232,7 +232,7 @@ Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analy
 | **Pre-Slice** | Today-session derivation helper | **Done + validated** — `mapTodayOperationalDays`; unit tests; day SSOT = `AttendancePolicy.dayStart`; sole consumer of `map()` still `ScheduleRepositoryImpl` | Foundation |
 | **Slice 1** | **Day Agenda + zero-new-query readiness + deep-links** | **Done + validated** — `TeacherDashboardTab` (D1) consumes a derived `TeacherDayAgenda` (`GetTodayAgendaUseCase` in the bloc, never the widget tree). Lists today's halaqat with **remaining** work only; each row deep-links to the existing attendance page / evaluations. Readiness reuses existing reads with **no new query/index**: register-incomplete (W2 `attendanceRecords(halaqaId,date)` + roster) and pending reviews (W1 `reviewStatus`). Completed work is removed; calm honest empty states. Replaced the old shortcut + quick-links cards → dashboard is simpler. | Yes — teacher sees today's work and navigates |
 | **Slice 2** | **Homework-assigned readiness** | **Done + validated** — `TeacherAgendaAction.sendHomework` via W1 D7 at halaqa scope (`getLatestAssignmentDueDate`: `where halaqaId` + `orderBy dueDate desc` + `limit 1`). "Today" = latest dueDate's calendar day via `AttendancePolicy.dayStart`. Deep-link → existing class detail (assign sheet host). New composite index documented below. | Yes — completes "what's missing" |
-| **Slice 3** | **Deep-link actions (remaining)** | **Done** — `sendHomework` → `/teacher/halaqa/:id?assign=1`; class detail opens existing assign sheet once students load. No new route/UI. | Yes — one hub to run the day |
+| **Slice 3** | **Deep-link actions (remaining)** | **Done + validated** — `sendHomework` → `/teacher/halaqa/:id?assign=1`; opens existing assign sheet once when `studentsHalaqaId` matches. See `docs/W3_SLICE3_PRODUCTION_VALIDATION.md`. | Yes — one hub to run the day |
 | **Slice 4** | **Day closeout signal** | Aggregate Slice 2 into honest "اليوم مكتمل / ناقص" with neutral D9 wording | Yes — end-of-day honesty |
 | **Slice 5** | Consistency audit + production validation | W1/W2-style report; refresh/empty/error/permissions parity | DoD |
 
@@ -392,8 +392,8 @@ W3 is **Done** only if all are true:
 ## Approval gate
 
 **Phase 0 approved (D1–D10).**  
-**Pre-Slice + Slice 1 + Slice 2 production-validated (Pass)** — `docs/W3_SLICE2_PRODUCTION_VALIDATION.md`.  
-**Slice 3 shipped** (assign-sheet deep-link via `?assign=1`).  
+**Pre-Slice + Slice 1 + Slice 2 + Slice 3 production-validated (Pass)** —  
+`docs/W3_SLICE2_PRODUCTION_VALIDATION.md`, `docs/W3_SLICE3_PRODUCTION_VALIDATION.md`.  
 Execution remaining: Slice 4 (closeout) → 5 (audit + production validation).  
 **Do not start Slice 4 until explicitly approved.**  
-**Ops note:** deploy the new `assignments(halaqaId, dueDate)` composite index from `firestore.indexes.json` before relying on Slice 2 homework readiness in production.
+**Ops note:** deploy the `assignments(halaqaId, dueDate)` composite index before relying on homework readiness in production.

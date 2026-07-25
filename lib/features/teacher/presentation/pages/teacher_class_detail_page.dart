@@ -14,6 +14,7 @@ import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../utils/assign_sheet_deep_link_gate.dart';
 
 class TeacherClassDetailPage extends StatefulWidget {
   final String halaqaId;
@@ -35,13 +36,20 @@ class TeacherClassDetailPage extends StatefulWidget {
 class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final AssignSheetDeepLinkGate _assignGate;
   String _searchQuery = '';
-  bool _openedAssignSheet = false;
+
+  /// Prevents stacking multiple assign sheets (deep-link + button / double-tap).
+  bool _assignSheetVisible = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _assignGate = AssignSheetDeepLinkGate(
+      expectedHalaqaId: widget.halaqaId,
+      armed: widget.openAssignSheet,
+    );
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -49,7 +57,9 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       if (state.halaqatStatus == SectionStatus.initial) {
         _retryHalaqat();
       }
-      _tryOpenAssignSheet(state);
+      // Observe current status only — never open against a stale pre-load
+      // `loaded` roster (gate requires a fresh loading → loaded cycle).
+      _onStudentsStatus(state);
     });
   }
 
@@ -96,6 +106,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     BuildContext context, {
     required int studentCount,
   }) {
+    if (_assignSheetVisible) return;
     if (studentCount <= 0) {
       AppSnackBar.showError(
         context,
@@ -104,6 +115,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       return;
     }
     final teacherBloc = context.read<TeacherBloc>();
+    _assignSheetVisible = true;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -113,15 +125,17 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
         child: _SendAssignmentSheet(halaqaId: widget.halaqaId),
       ),
     ).whenComplete(() {
+      _assignSheetVisible = false;
       teacherBloc.add(const ResetAssignmentSubmissionEvent());
     });
   }
 
-  /// W3 Slice 3: one-shot open of the existing assign sheet from deep-link.
-  void _tryOpenAssignSheet(TeacherState state) {
-    if (!widget.openAssignSheet || _openedAssignSheet || !mounted) return;
-    if (state.studentsStatus != SectionStatus.loaded) return;
-    _openedAssignSheet = true;
+  void _onStudentsStatus(TeacherState state) {
+    final shouldOpen = _assignGate.onStudentsStatus(
+      isLoaded: state.studentsStatus == SectionStatus.loaded,
+      studentsHalaqaId: state.studentsHalaqaId,
+    );
+    if (!shouldOpen || !mounted) return;
     _openSendAssignmentSheet(context, studentCount: state.students.length);
   }
 
@@ -130,10 +144,10 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     return BlocConsumer<TeacherBloc, TeacherState>(
       listenWhen: (previous, current) =>
           widget.openAssignSheet &&
-          !_openedAssignSheet &&
-          previous.studentsStatus != current.studentsStatus &&
-          current.studentsStatus == SectionStatus.loaded,
-      listener: (context, state) => _tryOpenAssignSheet(state),
+          !_assignGate.hasOpened &&
+          (previous.studentsStatus != current.studentsStatus ||
+              previous.studentsHalaqaId != current.studentsHalaqaId),
+      listener: (context, state) => _onStudentsStatus(state),
       buildWhen: (previous, current) =>
           previous.halaqatStatus != current.halaqatStatus ||
           previous.halaqat != current.halaqat ||
@@ -696,6 +710,12 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
   }
 
   void _submit() {
+    final bloc = context.read<TeacherBloc>();
+    // Guard rapid double-tap before the button rebuilds as loading.
+    if (bloc.state.assignmentSubmissionStatus == SubmissionStatus.submitting) {
+      return;
+    }
+
     final memorization = _memorizationCtrl.text.trim();
     final review = _reviewCtrl.text.trim();
     if (memorization.isEmpty && review.isEmpty) {
@@ -709,7 +729,7 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
       return;
     }
 
-    context.read<TeacherBloc>().add(
+    bloc.add(
       SendAssignmentEvent(
         halaqaId: widget.halaqaId,
         newMemorizationRange: memorization,

@@ -138,6 +138,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         studentsStatus: SectionStatus.loading,
         studentsError: null,
+        studentsHalaqaId: event.halaqaId,
       ),
     );
 
@@ -145,17 +146,22 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       HalaqaStudentsParams(event.halaqaId),
     );
 
+    // Ignore stale responses after a newer halaqa was requested.
+    if (state.studentsHalaqaId != event.halaqaId) return;
+
     result.fold(
       (failure) => emit(
         state.copyWith(
           studentsStatus: SectionStatus.error,
           studentsError: failure.message,
+          studentsHalaqaId: event.halaqaId,
         ),
       ),
       (students) => emit(
         state.copyWith(
           studentsStatus: SectionStatus.loaded,
           students: students,
+          studentsHalaqaId: event.halaqaId,
         ),
       ),
     );

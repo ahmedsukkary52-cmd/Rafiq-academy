@@ -50,18 +50,6 @@ class LoadHalaqaEvaluationsEvent extends TeacherEvent {
   List<Object?> get props => [halaqaId];
 }
 
-/// تسجيل حضور/غياب/تأخير لطالب بنقرة واحدة.
-/// بيتعمل لها Optimistic Update فوراً في الـ UI قبل ما الكتابة في
-/// Firestore تخلص، عشان الاستجابة تكون فورية للمعلم.
-class RecordAttendanceEvent extends TeacherEvent {
-  final AttendanceRecordEntity record;
-
-  const RecordAttendanceEvent(this.record);
-
-  @override
-  List<Object?> get props => [record];
-}
-
 /// تحميل سجلات الحضور لحلقة في يوم معيّن
 class LoadHalaqaAttendanceEvent extends TeacherEvent {
   final String halaqaId;

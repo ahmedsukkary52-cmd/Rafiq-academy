@@ -3,14 +3,13 @@ import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_state.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../../domain/usecases/add_recitation_record_usecase.dart';
 import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
 import '../../domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
-import '../../domain/usecases/record_attendance_usecase.dart';
+import '../../domain/usecases/save_day_attendance_usecase.dart';
 import '../../domain/usecases/send_assignment_usecase.dart';
 import '../../domain/usecases/update_recitation_review_usecase.dart';
 import 'teacher_event.dart';
@@ -23,7 +22,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final GetHalaqaStudentsUseCase getHalaqaStudents;
   final GetHalaqaRecitationRecordsUseCase getHalaqaRecitationRecords;
   final GetHalaqaAttendanceForDateUseCase getHalaqaAttendanceForDate;
-  final RecordAttendanceUseCase recordAttendance;
+  final SaveDayAttendanceUseCase saveDayAttendance;
   final AddRecitationRecordUseCase addRecitationRecord;
   final UpdateRecitationReviewUseCase updateRecitationReview;
   final SendAssignmentUseCase sendAssignment;
@@ -33,7 +32,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     required this.getHalaqaStudents,
     required this.getHalaqaRecitationRecords,
     required this.getHalaqaAttendanceForDate,
-    required this.recordAttendance,
+    required this.saveDayAttendance,
     required this.addRecitationRecord,
     required this.updateRecitationReview,
     required this.sendAssignment,
@@ -43,7 +42,6 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     on<LoadHalaqaStudentsEvent>(_onLoadHalaqaStudents);
     on<LoadHalaqaEvaluationsEvent>(_onLoadEvaluations);
     on<LoadHalaqaAttendanceEvent>(_onLoadDayAttendance);
-    on<RecordAttendanceEvent>(_onRecordAttendance);
     on<SaveDayAttendanceEvent>(_onSaveDayAttendance);
     on<ResetAttendanceSubmissionEvent>(_onResetAttendanceSubmission);
     on<AddRecitationRecordEvent>(_onAddRecitationRecord);
@@ -201,30 +199,29 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       ),
     );
 
-    for (final record in event.records) {
-      final result = await recordAttendance(record);
-      final failed = result.fold((f) => f.message, (_) => null);
-      if (failed != null) {
-        emit(
-          state.copyWith(
-            attendanceSubmissionStatus: SubmissionStatus.error,
-            attendanceSubmissionError: failed,
-          ),
-        );
-        return;
-      }
-    }
+    final result = await saveDayAttendance(event.records);
 
-    emit(state.copyWith(attendanceSubmissionStatus: SubmissionStatus.success));
-
-    if (event.records.isNotEmpty) {
-      add(
-        LoadHalaqaAttendanceEvent(
-          halaqaId: event.records.first.halaqaId,
-          date: event.records.first.date,
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          attendanceSubmissionStatus: SubmissionStatus.error,
+          attendanceSubmissionError: failure.message,
         ),
-      );
-    }
+      ),
+      (_) {
+        emit(
+          state.copyWith(attendanceSubmissionStatus: SubmissionStatus.success),
+        );
+        if (event.records.isNotEmpty) {
+          add(
+            LoadHalaqaAttendanceEvent(
+              halaqaId: event.records.first.halaqaId,
+              date: event.records.first.date,
+            ),
+          );
+        }
+      },
+    );
   }
 
   void _onResetAttendanceSubmission(
@@ -236,63 +233,6 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
         attendanceSubmissionStatus: SubmissionStatus.idle,
         attendanceSubmissionError: null,
       ),
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // تسجيل الحضور - بنقرة واحدة مع Optimistic Update
-  // ══════════════════════════════════════════════════════════════════════
-
-  /// منطق العملية:
-  /// 1. نحدّث الـ UI فوراً (قبل ما ننتظر Firestore) عشان الاستجابة تبقى
-  ///    لحظية للمعلم وهو بيسجّل حضور حلقة كاملة بسرعة.
-  /// 2. نبعت الكتابة الفعلية لـ Firestore في الخلفية.
-  /// 3. لو فشلت الكتابة، نرجّع حالة الطالب لقيمتها القديمة (Rollback)
-  ///    ونوضح error بسيط، بدل ما نسيب الـ UI يكذب على المعلم.
-  Future<void> _onRecordAttendance(
-    RecordAttendanceEvent event,
-    Emitter<TeacherState> emit,
-  ) async {
-    final studentIndex = state.students.indexWhere(
-      (s) => s.uid == event.record.studentId,
-    );
-
-    // الطالب مش موجود في القائمة الحالية أصلاً - متوقعش، بس بنحمي نفسنا
-    if (studentIndex == -1) return;
-
-    final previousStudent = state.students[studentIndex];
-
-    final optimisticStudent = HalaqaStudentSummaryEntity(
-      uid: previousStudent.uid,
-      name: previousStudent.name,
-      profileImageUrl: previousStudent.profileImageUrl,
-      todayAttendance: event.record.status,
-    );
-
-    final optimisticList = List<HalaqaStudentSummaryEntity>.from(state.students)
-      ..[studentIndex] = optimisticStudent;
-
-    emit(state.copyWith(students: optimisticList, attendanceError: null));
-
-    final result = await recordAttendance(event.record);
-
-    result.fold(
-      (failure) {
-        // Rollback: نرجّع الطالب لحالته القديمة قبل المحاولة
-        final rolledBackList = List<HalaqaStudentSummaryEntity>.from(
-          state.students,
-        )..[studentIndex] = previousStudent;
-
-        emit(
-          state.copyWith(
-            students: rolledBackList,
-            attendanceError: failure.message,
-          ),
-        );
-      },
-      (_) {
-        // نجحت الكتابة - الـ UI أصلاً محدّث من الخطوة الأولى، مفيش حاجة زيادة
-      },
     );
   }
 

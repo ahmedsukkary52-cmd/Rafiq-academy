@@ -51,18 +51,29 @@ class TeacherRepositoryImpl implements TeacherRepository {
   Future<Either<Failure, Unit>> recordAttendance(
     AttendanceRecordEntity record,
   ) async {
+    return saveDayAttendance([record]);
+  }
+
+  @override
+  Future<Either<Failure, Unit>> saveDayAttendance(
+    List<AttendanceRecordEntity> records,
+  ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      await remoteDatasource.recordAttendance(
-        AttendanceRecordModel(
-          id: record.id,
-          studentId: record.studentId,
-          studentName: record.studentName,
-          halaqaId: record.halaqaId,
-          date: record.date,
-          status: record.status,
-          recordedBy: record.recordedBy,
-        ),
+      await remoteDatasource.saveDayAttendance(
+        records
+            .map(
+              (record) => AttendanceRecordModel(
+                id: record.id,
+                studentId: record.studentId,
+                studentName: record.studentName,
+                halaqaId: record.halaqaId,
+                date: record.date,
+                status: record.status,
+                recordedBy: record.recordedBy,
+              ),
+            )
+            .toList(),
       );
       return const Right(unit);
     } on ServerException catch (e) {

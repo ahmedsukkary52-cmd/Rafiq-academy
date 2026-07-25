@@ -4,6 +4,7 @@ import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
@@ -65,39 +66,69 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
 
   @override
   Future<void> recordAttendance(AttendanceRecordModel record) async {
-    try {
-      final dayStart = DateTime(
-        record.date.year,
-        record.date.month,
-        record.date.day,
-      );
-      final dayEnd = dayStart.add(const Duration(days: 1));
-      final normalized = AttendanceRecordModel(
-        id: record.id,
-        studentId: record.studentId,
-        studentName: record.studentName,
-        halaqaId: record.halaqaId,
-        date: dayStart,
-        status: record.status,
-        recordedBy: record.recordedBy,
-      );
+    await saveDayAttendance([record]);
+  }
 
-      final existing = await firestore
+  @override
+  Future<void> saveDayAttendance(List<AttendanceRecordModel> records) async {
+    try {
+      if (records.isEmpty) return;
+
+      final halaqaId = records.first.halaqaId;
+      final dayStart = AttendancePolicy.dayStart(records.first.date);
+      final dayEnd = AttendancePolicy.dayEndExclusive(records.first.date);
+
+      final existingSnap = await firestore
           .collection(FirestoreCollections.attendanceRecords)
-          .where('halaqaId', isEqualTo: record.halaqaId)
-          .where('studentId', isEqualTo: record.studentId)
+          .where('halaqaId', isEqualTo: halaqaId)
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart))
           .where('date', isLessThan: Timestamp.fromDate(dayEnd))
-          .limit(1)
           .get();
 
-      if (existing.docs.isNotEmpty) {
-        await existing.docs.first.reference.update(normalized.toFirestore());
-      } else {
-        await firestore
+      final batch = firestore.batch();
+      final savedStudentIds = <String>{};
+
+      for (final record in records) {
+        final normalizedDay = AttendancePolicy.dayStart(record.date);
+        final docId = AttendancePolicy.documentId(
+          halaqaId: record.halaqaId,
+          studentId: record.studentId,
+          date: normalizedDay,
+        );
+        final normalized = AttendanceRecordModel(
+          id: docId,
+          studentId: record.studentId,
+          studentName: record.studentName,
+          halaqaId: record.halaqaId,
+          date: normalizedDay,
+          status: record.status,
+          recordedBy: record.recordedBy,
+        );
+        final ref = firestore
             .collection(FirestoreCollections.attendanceRecords)
-            .add(normalized.toFirestore());
+            .doc(docId);
+        batch.set(ref, normalized.toFirestore(), SetOptions(merge: true));
+        savedStudentIds.add(record.studentId);
       }
+
+      // Remove legacy auto-id duplicates for the same students/day.
+      for (final doc in existingSnap.docs) {
+        final data = doc.data();
+        final studentId = data['studentId'] as String? ?? '';
+        if (!savedStudentIds.contains(studentId)) continue;
+        final expectedId = AttendancePolicy.documentId(
+          halaqaId: halaqaId,
+          studentId: studentId,
+          date: dayStart,
+        );
+        if (doc.id != expectedId) {
+          batch.delete(doc.reference);
+        }
+      }
+
+      await batch.commit();
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -109,8 +140,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     required DateTime date,
   }) async {
     try {
-      final dayStart = DateTime(date.year, date.month, date.day);
-      final dayEnd = dayStart.add(const Duration(days: 1));
+      final dayStart = AttendancePolicy.dayStart(date);
+      final dayEnd = AttendancePolicy.dayEndExclusive(date);
 
       final snapshot = await firestore
           .collection(FirestoreCollections.attendanceRecords)
@@ -119,7 +150,21 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           .where('date', isLessThan: Timestamp.fromDate(dayEnd))
           .get();
 
-      return snapshot.docs.map(AttendanceRecordModel.fromFirestore).toList();
+      // One record per student — prefer deterministic doc id when duplicates exist.
+      final byStudent = <String, AttendanceRecordModel>{};
+      for (final doc in snapshot.docs) {
+        final model = AttendanceRecordModel.fromFirestore(doc);
+        final preferredId = AttendancePolicy.documentId(
+          halaqaId: halaqaId,
+          studentId: model.studentId,
+          date: dayStart,
+        );
+        final existing = byStudent[model.studentId];
+        if (existing == null || model.id == preferredId) {
+          byStudent[model.studentId] = model;
+        }
+      }
+      return byStudent.values.toList();
     } catch (e) {
       throw ServerException(e.toString());
     }

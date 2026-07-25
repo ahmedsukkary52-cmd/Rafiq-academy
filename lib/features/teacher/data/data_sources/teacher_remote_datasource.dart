@@ -8,6 +8,9 @@ abstract class TeacherRemoteDatasource {
   Future<List<HalaqaModel>> getTeacherHalaqat(String teacherId);
   Future<List<HalaqaStudentSummaryModel>> getHalaqaStudents(String halaqaId);
   Future<void> recordAttendance(AttendanceRecordModel record);
+
+  /// Atomic save for a full day register (deterministic doc ids — W2 D8).
+  Future<void> saveDayAttendance(List<AttendanceRecordModel> records);
   Future<List<AttendanceRecordModel>> getHalaqaAttendanceForDate({
     required String halaqaId,
     required DateTime date,

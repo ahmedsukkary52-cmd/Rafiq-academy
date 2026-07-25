@@ -23,6 +23,11 @@ abstract class TeacherRepository {
   /// تسجيل الحضور لطالب معيّن (upsert لنفس الحلقة/الطالب/اليوم)
   Future<Either<Failure, Unit>> recordAttendance(AttendanceRecordEntity record);
 
+  /// حفظ سجل يوم كامل دفعة واحدة (atomic batch)
+  Future<Either<Failure, Unit>> saveDayAttendance(
+    List<AttendanceRecordEntity> records,
+  );
+
   /// سجلات الحضور لحلقة في يوم معيّن
   Future<Either<Failure, List<AttendanceRecordEntity>>>
   getHalaqaAttendanceForDate({

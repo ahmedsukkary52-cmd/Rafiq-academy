@@ -305,6 +305,8 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaq
     as _i626;
 import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance_usecase.dart'
     as _i642;
+import 'package:rafiq_academy/features/teacher/domain/usecases/save_day_attendance_usecase.dart'
+    as _i343;
 import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart'
     as _i192;
 import 'package:rafiq_academy/features/teacher/domain/usecases/update_recitation_review_usecase.dart'
@@ -600,6 +602,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i642.RecordAttendanceUseCase>(
       () => _i642.RecordAttendanceUseCase(gh<_i1050.TeacherRepository>()),
     );
+    gh.lazySingleton<_i343.SaveDayAttendanceUseCase>(
+      () => _i343.SaveDayAttendanceUseCase(gh<_i1050.TeacherRepository>()),
+    );
     gh.lazySingleton<_i192.SendAssignmentUseCase>(
       () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -733,6 +738,20 @@ extension GetItInjectableX on _i174.GetIt {
         remoteDatasource: gh<_i444.AwardsRemoteDatasource>(),
         pdfGenerator: gh<_i649.CertificatePdfGenerator>(),
         networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.singleton<_i933.TeacherBloc>(
+      () => _i933.TeacherBloc(
+        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
+        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
+        getHalaqaRecitationRecords:
+            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
+        getHalaqaAttendanceForDate:
+            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
+        saveDayAttendance: gh<_i343.SaveDayAttendanceUseCase>(),
+        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
+        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
       ),
     );
     gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
@@ -905,20 +924,6 @@ extension GetItInjectableX on _i174.GetIt {
         getMonthEvents: gh<_i429.GetMonthEventsUseCase>(),
         addCalendarEvent: gh<_i429.AddCalendarEventUseCase>(),
         deleteCalendarEvent: gh<_i429.DeleteCalendarEventUseCase>(),
-      ),
-    );
-    gh.singleton<_i933.TeacherBloc>(
-      () => _i933.TeacherBloc(
-        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
-        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
-        getHalaqaRecitationRecords:
-            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
-        getHalaqaAttendanceForDate:
-            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
-        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
-        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
-        updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
-        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
       ),
     );
     gh.singleton<_i303.StudentBloc>(

@@ -92,16 +92,30 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
 
       final avgPerformance = totalGrades > 0 ? totalScore / totalGrades : 0.0;
 
-      // حساب نسبة الحضور (D1: late counts as attended)
-      final statuses = attendanceDocs
-          .map((d) => (d.data())['status'] as String?)
-          .toList();
+      // حساب نسبة الحضور (D1: late counts as attended; one mark per student/day)
+      final statuses = AttendancePolicy.uniqueDayStatuses(
+        attendanceDocs.map((d) {
+          final data = d.data();
+          final rawDate = data['date'];
+          final date = rawDate is Timestamp ? rawDate.toDate() : DateTime.now();
+          return AttendanceMarkRef(
+            id: d.id,
+            halaqaId: halaqaId,
+            studentId: (data['studentId'] as String?) ?? '',
+            date: date,
+            status: data['status'] as String?,
+          );
+        }),
+      );
       final attendancePercent = AttendancePolicy.attendancePercentFromStatuses(
         statuses,
       );
 
       // حساب الحضور الأسبوعي (آخر 7 أيام)
-      final weeklyAttendance = _calculateWeeklyAttendance(attendanceDocs);
+      final weeklyAttendance = _calculateWeeklyAttendance(
+        attendanceDocs,
+        halaqaId: halaqaId,
+      );
 
       return HalaqaAnalyticsEntity(
         halaqaId: halaqaId,
@@ -270,29 +284,36 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
 
   /// حساب نسبة الحضور لكل يوم في الأسبوع الماضي من سجلات الحضور
   Map<String, double> _calculateWeeklyAttendance(
-    List<QueryDocumentSnapshot> docs,
-  ) {
+    List<QueryDocumentSnapshot> docs, {
+    required String halaqaId,
+  }) {
     final dayNames = ['أح', 'إث', 'ثل', 'أر', 'خم', 'جم', 'سب'];
 
-    final totalPerDay = <int, int>{};
-    final presentPerDay = <int, int>{};
+    final marksByWeekday = <int, List<AttendanceMarkRef>>{};
 
     for (final doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
       final timestamp = data['date'] as Timestamp;
-      final weekday = timestamp.toDate().weekday % 7; // 0=أحد
-
-      totalPerDay[weekday] = (totalPerDay[weekday] ?? 0) + 1;
-      if (AttendancePolicy.isAttendedStatus(data['status'] as String?)) {
-        presentPerDay[weekday] = (presentPerDay[weekday] ?? 0) + 1;
-      }
+      final date = timestamp.toDate();
+      final weekday = date.weekday % 7; // 0=أحد
+      marksByWeekday
+          .putIfAbsent(weekday, () => [])
+          .add(
+            AttendanceMarkRef(
+              id: doc.id,
+              halaqaId: halaqaId,
+              studentId: (data['studentId'] as String?) ?? '',
+              date: date,
+              status: data['status'] as String?,
+            ),
+          );
     }
 
     return {
       for (int i = 0; i < 7; i++)
-        dayNames[i]: totalPerDay[i] != null && totalPerDay[i]! > 0
-            ? ((presentPerDay[i] ?? 0) / totalPerDay[i]!) * 100
-            : 0.0,
+        dayNames[i]: AttendancePolicy.attendancePercentFromStatuses(
+          AttendancePolicy.uniqueDayStatuses(marksByWeekday[i] ?? const []),
+        ),
     };
   }
 }

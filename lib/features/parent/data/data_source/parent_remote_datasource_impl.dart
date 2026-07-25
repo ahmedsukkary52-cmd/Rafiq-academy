@@ -67,9 +67,22 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
       final studentName = (userDoc.data())?['name'] ?? '';
 
-      final statuses = attendanceSnap.docs
-          .map((d) => (d.data())['status'] as String?)
-          .toList();
+      final statuses = AttendancePolicy.uniqueDayStatuses(
+        attendanceSnap.docs.map((d) {
+          final data = d.data();
+          final rawDate = data['date'];
+          final date = rawDate is Timestamp
+              ? rawDate.toDate()
+              : (rawDate as DateTime? ?? weekStart);
+          return AttendanceMarkRef(
+            id: d.id,
+            halaqaId: (data['halaqaId'] as String?) ?? '',
+            studentId: studentId,
+            date: date,
+            status: data['status'] as String?,
+          );
+        }),
+      );
       final attended = AttendancePolicy.countAttended(statuses);
 
       // D6 / Slice 5: count and surface only reviewed recitations — pending
@@ -101,7 +114,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         data: {
           'totalVersesMemorized': reviewedDocs.length,
           'attendedSessions': attended,
-          'totalSessions': attendanceSnap.docs.length,
+          'totalSessions': statuses.length,
           'teacherNotes': lastNote,
         },
       );

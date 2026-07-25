@@ -54,4 +54,41 @@ class AttendancePolicy {
     final day = d.day.toString().padLeft(2, '0');
     return '${halaqaId}_${studentId}_$y$m$day';
   }
+
+  /// One status per (halaqa, student, calendar day).
+  /// Deterministic document ids win over legacy auto-id duplicates.
+  static List<String?> uniqueDayStatuses(Iterable<AttendanceMarkRef> marks) {
+    final byKey = <String, String?>{};
+    for (final mark in marks) {
+      final day = dayStart(mark.date);
+      final preferredId = documentId(
+        halaqaId: mark.halaqaId,
+        studentId: mark.studentId,
+        date: day,
+      );
+      final key = preferredId;
+      final existing = byKey.containsKey(key);
+      if (!existing || mark.id == preferredId) {
+        byKey[key] = mark.status;
+      }
+    }
+    return byKey.values.toList();
+  }
+}
+
+/// Minimal attendance mark identity for [AttendancePolicy.uniqueDayStatuses].
+class AttendanceMarkRef {
+  final String id;
+  final String halaqaId;
+  final String studentId;
+  final DateTime date;
+  final String? status;
+
+  const AttendanceMarkRef({
+    required this.id,
+    required this.halaqaId,
+    required this.studentId,
+    required this.date,
+    required this.status,
+  });
 }

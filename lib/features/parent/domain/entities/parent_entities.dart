@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../shared/utils/attendance_policy.dart';
+
 // ══════════════════════════════════════════════════════════════════════════════
 // AbsenceRequestEntity - طلب استئذان من ولي الأمر
 // ══════════════════════════════════════════════════════════════════════════════
@@ -26,8 +28,15 @@ class AbsenceRequestEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props =>
-      [id, studentId, requestedBy, date, reason, status, reviewedBy];
+  List<Object?> get props => [
+    id,
+    studentId,
+    requestedBy,
+    date,
+    reason,
+    status,
+    reviewedBy,
+  ];
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -58,8 +67,16 @@ class PaymentEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props =>
-      [id, studentId, parentId, amount, dueDate, paidAt, status, method];
+  List<Object?> get props => [
+    id,
+    studentId,
+    parentId,
+    amount,
+    dueDate,
+    paidAt,
+    status,
+    method,
+  ];
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -85,8 +102,10 @@ class WeeklyReportEntity extends Equatable {
     required this.teacherNotes,
   });
 
-  double get attendancePercent =>
-      totalSessions == 0 ? 0 : (attendedSessions / totalSessions) * 100;
+  double get attendancePercent => AttendancePolicy.attendancePercent(
+    attended: attendedSessions,
+    total: totalSessions,
+  );
 
   @override
   List<Object?> get props => [

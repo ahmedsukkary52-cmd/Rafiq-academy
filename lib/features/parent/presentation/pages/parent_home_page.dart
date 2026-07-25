@@ -273,6 +273,16 @@ class _WeeklyReportCard extends StatelessWidget {
               ),
             ],
           ),
+          if (report.totalSessions > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'يشمل الحضور والتأخر — الغياب فقط لا يُحسب',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textHint,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ],
           if (report.teacherNotes.trim().isNotEmpty) ...[
             const SizedBox(height: AppSizes.paddingM),
             const Text(

@@ -12,7 +12,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
-import '../../domain/entities/teacher_day_agenda.dart';
+import '../../domain/read_models/teacher_day_agenda.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
@@ -343,16 +343,20 @@ class _AgendaActionRow extends StatelessWidget {
 
   String _labelFor(TeacherAgendaAction action) => switch (action) {
     TeacherAgendaAction.takeAttendance => 'لم يتم تسجيل الحضور بعد',
+    TeacherAgendaAction.sendHomework => 'لم يتم إرسال واجب اليوم',
     TeacherAgendaAction.reviewRecitations => 'توجد تسميعات بانتظار المراجعة',
   };
 
   IconData _iconFor(TeacherAgendaAction action) => switch (action) {
     TeacherAgendaAction.takeAttendance => Icons.how_to_reg_outlined,
+    TeacherAgendaAction.sendHomework => Icons.assignment_outlined,
     TeacherAgendaAction.reviewRecitations => Icons.rate_review_outlined,
   };
 
   String _routeFor(TeacherAgendaAction action) => switch (action) {
     TeacherAgendaAction.takeAttendance => '/teacher/attendance/$halaqaId',
+    // Assign sheet lives on class detail — no dedicated assign route (D5).
+    TeacherAgendaAction.sendHomework => '/teacher/halaqa/$halaqaId',
     TeacherAgendaAction.reviewRecitations =>
       '/teacher/halaqa/$halaqaId/evaluations',
   };

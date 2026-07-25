@@ -32,4 +32,7 @@ abstract class TeacherRemoteDatasource {
     required DateTime dueDate,
     required String teacherId,
   });
+
+  /// Latest assignment `dueDate` for [halaqaId], or `null` if none exist.
+  Future<DateTime?> getLatestAssignmentDueDate(String halaqaId);
 }

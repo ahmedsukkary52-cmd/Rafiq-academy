@@ -1,7 +1,7 @@
 # W3 — Daily Halaqa Session Operations
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 production-validated** — awaiting approval for Slice 2.  
+**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 production-validated** — awaiting approval for Slice 3.  
 **Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
 **Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.
@@ -231,15 +231,27 @@ Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analy
 |------|------|--------------|---------------------|
 | **Pre-Slice** | Today-session derivation helper | **Done + validated** — `mapTodayOperationalDays`; unit tests; day SSOT = `AttendancePolicy.dayStart`; sole consumer of `map()` still `ScheduleRepositoryImpl` | Foundation |
 | **Slice 1** | **Day Agenda + zero-new-query readiness + deep-links** | **Done + validated** — `TeacherDashboardTab` (D1) consumes a derived `TeacherDayAgenda` (`GetTodayAgendaUseCase` in the bloc, never the widget tree). Lists today's halaqat with **remaining** work only; each row deep-links to the existing attendance page / evaluations. Readiness reuses existing reads with **no new query/index**: register-incomplete (W2 `attendanceRecords(halaqaId,date)` + roster) and pending reviews (W1 `reviewStatus`). Completed work is removed; calm honest empty states. Replaced the old shortcut + quick-links cards → dashboard is simpler. | Yes — teacher sees today's work and navigates |
-| **Slice 2** | **Homework-assigned readiness** | Add the one remaining readiness signal deferred from Slice 1: homework assigned for today (exact W1 definition — D3). This is the signal that needs a new halaqa-scoped assignment query/index — confirm/add here. | Yes — completes "what's missing" |
+| **Slice 2** | **Homework-assigned readiness** | **Done + validated** — `TeacherAgendaAction.sendHomework` via W1 D7 at halaqa scope (`getLatestAssignmentDueDate`: `where halaqaId` + `orderBy dueDate desc` + `limit 1`). "Today" = latest dueDate's calendar day via `AttendancePolicy.dayStart`. Deep-link → existing class detail (assign sheet host). New composite index documented below. | Yes — completes "what's missing" |
 | **Slice 3** | **Deep-link actions (remaining)** | Extend deep-links beyond attendance/evaluations if needed (assign sheet / class detail) once Slice 2 lands | Yes — one hub to run the day |
 | **Slice 4** | **Day closeout signal** | Aggregate Slice 2 into honest "اليوم مكتمل / ناقص" with neutral D9 wording | Yes — end-of-day honesty |
 | **Slice 5** | Consistency audit + production validation | W1/W2-style report; refresh/empty/error/permissions parity | DoD |
 
 **Optional later (not W3 unless approved):** absence notifications, supervisor register view, holiday calendar.
 
-### Index/query note (Verified/Inference)
-- Register-complete + homework-assigned reuse existing `attendanceRecords(halaqaId,date)` and W1 assignment semantics. Confirm any new composite only if a real Slice 2 query requires it.
+### Index/query note (Verified)
+
+**Slice 2 requires one new composite index** on `assignments`:
+
+| Fields | Why required |
+|--------|----------------|
+| `halaqaId` ASC + `dueDate` DESC | Teacher readiness must answer "what is this halaqa's current assignment?" using the **same W1 D7 rule** (latest `dueDate`) but scoped to the halaqa. |
+
+**Why an existing query cannot satisfy this:**
+- The only existing assignments read is student-scoped: `where studentId` + `orderBy dueDate desc` + `limit 1` (Home / Homework).
+- That cannot answer per-halaqa readiness without N student queries (roster size) and still would not be a single halaqa-level "current" under D7.
+- `sendAssignment` already writes `halaqaId`; no new field. Extending `TeacherRemoteDatasource` with `getLatestAssignmentDueDate` reuses the collection and W1 ordering — only the equality field changes from `studentId` → `halaqaId`.
+
+Register-complete continues to reuse the existing `attendanceRecords(halaqaId, date)` query + `AttendancePolicy.isRegisterComplete` (no new index).
 
 ### Pre-Slice production validation (2026-07-25)
 
@@ -274,6 +286,34 @@ Order mirrors W1/W2: derive/read first, then optional actions. Each slice: analy
 | Correctness | 10 unit tests (empty / not-today / attendance-incomplete / pending-review / both-in-order / completed-removed / empty-roster / D7 ordering / two failure paths) |
 | Analyze / format / tests | New code clean (remaining infos are pre-existing `withOpacity`); `dart format` applied; full suite green |
 | Performance | O(today-halaqat) reads — 2 per today-halaqa (attendance + recitations). Recitation read is unbounded (same as evaluations page); acceptable for Slice 1, revisit if it grows |
+
+### Architecture verification (pre-Slice 2, 2026-07-26)
+
+Audited `GetTodayAgendaUseCase` against the orchestration rules. **Two violations found and fixed before Slice 2:**
+
+| Rule | Slice 1 status | Fix |
+|------|----------------|-----|
+| Reuse W1/W2 policies | **Fail** — `_attendanceIncomplete` invented register-complete comparison inside the use case | Moved to `AttendancePolicy.isRegisterComplete` / `isRegisterIncomplete` (W2 policy SSOT) |
+| Must not duplicate attendance logic | **Fail** (same) | Use case now only calls the policy |
+| Must not duplicate recitation visibility | **Pass** — uses `RecitationRecordEntity.isPendingReview` only | — |
+| Must not encode dashboard-specific business rules elsewhere | **Fail** — D7 sort re-encoded in the use case after per-halaqa mapper calls | Use case now calls `mapTodayOperationalDays` **once** over all sources and trusts mapper order |
+| `TeacherDayAgenda` is a projection, not a domain model | **Warn** — lived under `domain/entities` | Moved to `domain/read_models/` with explicit projection docs |
+
+After fixes: use case is a thin application orchestrator only.
+
+### Slice 2 production validation (2026-07-26)
+
+**Verdict: Pass.** Slice 3 may begin after explicit approval.
+
+| Area | Result |
+|------|--------|
+| Homework readiness | W1 D7 at halaqa scope: latest `dueDate`; "today" via `AttendancePolicy.dayStart` — no second homework rule |
+| Infrastructure | Extended `TeacherRepository` / remote DS with `getLatestAssignmentDueDate`; reuses `assignments` collection written by `sendAssignment` |
+| Index | Added `assignments(halaqaId ASC, dueDate DESC)` — documented why student-scoped query cannot answer this |
+| Deep-link | `sendHomework` → `/teacher/halaqa/:id` (existing assign-sheet host); no new route/UI |
+| Tone (D9) | «لم يتم إرسال واجب اليوم» |
+| Correctness | Agenda tests cover missing/stale/present homework + failure path; `AttendancePolicy.isRegisterComplete` unit tests added |
+| Analyze / format / tests | Touched code clean; `dart format` applied; suite green |
 
 ---
 
@@ -343,6 +383,8 @@ W3 is **Done** only if all are true:
 ## Approval gate
 
 **Phase 0 approved (D1–D10).**  
-**Pre-Slice + Slice 1 production-validated (Pass).**  
-Execution remaining: Slice 2 (homework-assigned readiness) → 3 (remaining deep-links) → 4 (closeout) → 5 (audit + production validation).  
-**Do not start Slice 2 until explicitly approved.**
+**Pre-Slice + Slice 1 + Slice 2 production-validated (Pass).**  
+Execution remaining: Slice 3 (remaining deep-links) → 4 (closeout) → 5 (audit + production validation).  
+**Do not start Slice 3 until explicitly approved.**
+
+**Ops note:** deploy the new `assignments(halaqaId, dueDate)` composite index from `firestore.indexes.json` before relying on Slice 2 homework readiness in production.

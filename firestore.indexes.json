@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "assignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "halaqaId", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "recitationRecords",
       "queryScope": "COLLECTION",
       "fields": [

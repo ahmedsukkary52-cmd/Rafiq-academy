@@ -57,6 +57,14 @@ abstract class TeacherRepository {
     required DateTime dueDate,
     required String teacherId,
   });
+
+  /// Latest assignment `dueDate` for a halaqa (W1 D7 at halaqa scope).
+  ///
+  /// Returns `null` when the halaqa has no assignments. Used by W3 to derive
+  /// "homework assigned for today?" without inventing a second homework rule.
+  Future<Either<Failure, DateTime?>> getLatestAssignmentDueDate(
+    String halaqaId,
+  );
 }
 
 class TeacherIdParams extends Equatable {

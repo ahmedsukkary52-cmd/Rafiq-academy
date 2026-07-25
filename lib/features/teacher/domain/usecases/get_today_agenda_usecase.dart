@@ -4,11 +4,12 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../schedule/data/mappers/halaqa_weekly_sessions_mapper.dart';
 import '../../../schedule/data/models/halaqa_schedule_source_model.dart';
+import '../../../schedule/domain/entities/class_session_entity.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
-import '../entities/attendance_record_entity.dart';
-import '../entities/teacher_day_agenda.dart';
+import '../read_models/teacher_day_agenda.dart';
 import '../repositories/teacher_repository.dart';
 
 class TodayAgendaParams extends Equatable {
@@ -24,18 +25,17 @@ class TodayAgendaParams extends Equatable {
   List<Object?> get props => [halaqat, now];
 }
 
-/// W3 orchestration use case: **determine today's work → determine readiness**.
+/// W3 application orchestrator: determine today's work → determine readiness.
 ///
-/// Navigation itself happens in the widget. This layer never re-implements a
-/// business rule — it reuses:
-/// - [HalaqaWeeklySessionsMapper.mapTodayOperationalDays] for D6/D7 day derivation
-///   (day boundaries via `AttendancePolicy`, so W2 stays the single source),
-/// - existing W2 attendance reads for register readiness,
-/// - existing W1 recitation reads + [RecitationRecordEntity.isPendingReview]
-///   for pending-review readiness.
+/// Owns **no** business rules. It only:
+/// - asks [HalaqaWeeklySessionsMapper.mapTodayOperationalDays] for today's
+///   halaqat in D6/D7 order (day boundaries via [AttendancePolicy]),
+/// - asks [AttendancePolicy.isRegisterIncomplete] for register readiness,
+/// - asks [RecitationRecordEntity.isPendingReview] for review readiness,
+/// - asks the repository for the halaqa's latest assignment `dueDate` (W1 D7)
+///   and compares its calendar day via [AttendancePolicy.dayStart].
 ///
-/// Homework-assigned readiness is intentionally out of Slice 1 (it needs a new
-/// halaqa-scoped assignment query/index — handled in Slice 2).
+/// Navigation stays in the widget. [TeacherDayAgenda] is a read projection.
 @lazySingleton
 class GetTodayAgendaUseCase
     extends UseCase<TeacherDayAgenda, TodayAgendaParams> {
@@ -50,25 +50,21 @@ class GetTodayAgendaUseCase
     TodayAgendaParams params,
   ) async {
     final now = params.now ?? DateTime.now();
+    final byId = {for (final h in params.halaqat) h.id: h};
 
-    // 1. Which halaqat meet today, in stable execution order (D6/D7).
-    final operational = <(HalaqaEntity, DateTime)>[];
-    for (final halaqa in params.halaqat) {
-      final days = _sessionsMapper.mapTodayOperationalDays([
-        _sourceOf(halaqa),
-      ], now: now);
-      if (days.isEmpty) continue;
-      operational.add((halaqa, days.first.startAt));
-    }
-    operational.sort((a, b) {
-      final byTime = a.$2.compareTo(b.$2);
-      if (byTime != 0) return byTime;
-      return a.$1.id.compareTo(b.$1.id); // D7 stable fallback: halaqa id.
-    });
+    // 1. Today's operational days — D6/D7 owned by the Pre-Slice mapper.
+    final days = _sessionsMapper.mapTodayOperationalDays(
+      params.halaqat.map(_sourceOf),
+      now: now,
+    );
 
     // 2. Readiness per halaqa; keep only halaqat with remaining work.
     final items = <TeacherAgendaItem>[];
-    for (final (halaqa, startAt) in operational) {
+    for (final day in days) {
+      final halaqaId = _halaqaIdOf(day);
+      final halaqa = byId[halaqaId];
+      if (halaqa == null) continue;
+
       final actionsEither = await _pendingActionsFor(halaqa, now);
       final failure = actionsEither.fold<Failure?>((l) => l, (_) => null);
       if (failure != null) return Left(failure);
@@ -80,14 +76,14 @@ class GetTodayAgendaUseCase
         TeacherAgendaItem(
           halaqaId: halaqa.id,
           halaqaName: halaqa.name,
-          startAt: startAt,
+          startAt: day.startAt,
           pendingActions: actions,
         ),
       );
     }
 
     return Right(
-      TeacherDayAgenda(items: items, sessionsTodayCount: operational.length),
+      TeacherDayAgenda(items: items, sessionsTodayCount: days.length),
     );
   }
 
@@ -97,7 +93,7 @@ class GetTodayAgendaUseCase
   ) async {
     final actions = <TeacherAgendaAction>[];
 
-    // Attendance register readiness (reuse W2 read — dedupe already applied).
+    // Register readiness — comparison owned by AttendancePolicy (W2).
     final attendanceEither = await repository.getHalaqaAttendanceForDate(
       halaqaId: halaqa.id,
       date: now,
@@ -108,11 +104,23 @@ class GetTodayAgendaUseCase
     );
     if (attendanceFailure != null) return Left(attendanceFailure);
     final records = attendanceEither.getOrElse((_) => const []);
-    if (_attendanceIncomplete(halaqa, records)) {
+    if (AttendancePolicy.isRegisterIncomplete(
+      rosterStudentIds: halaqa.studentIds,
+      markedStudentIds: records.map((r) => r.studentId),
+    )) {
       actions.add(TeacherAgendaAction.takeAttendance);
     }
 
-    // Pending-review readiness (reuse W1 read + isPendingReview).
+    // Homework-assigned readiness — W1 D7 at halaqa scope (latest dueDate).
+    final dueEither = await repository.getLatestAssignmentDueDate(halaqa.id);
+    final dueFailure = dueEither.fold<Failure?>((l) => l, (_) => null);
+    if (dueFailure != null) return Left(dueFailure);
+    final latestDue = dueEither.getOrElse((_) => null);
+    if (!_isLatestDueToday(latestDue, now)) {
+      actions.add(TeacherAgendaAction.sendHomework);
+    }
+
+    // Pending-review readiness — visibility owned by RecitationRecordEntity.
     final reviewsEither = await repository.getHalaqaRecitationRecords(
       halaqa.id,
     );
@@ -126,18 +134,19 @@ class GetTodayAgendaUseCase
     return Right(actions);
   }
 
-  /// Register is "incomplete" when at least one roster student has no record
-  /// today. An empty roster has nothing to mark, so it is never actionable.
-  bool _attendanceIncomplete(
-    HalaqaEntity halaqa,
-    List<AttendanceRecordEntity> records,
-  ) {
-    final roster = halaqa.studentIds
-        .where((id) => id.trim().isNotEmpty)
-        .toSet();
-    if (roster.isEmpty) return false;
-    final marked = records.map((r) => r.studentId).toSet();
-    return !marked.containsAll(roster);
+  /// W1 D7 "current" assignment is the latest `dueDate`. It counts as
+  /// "today's" when that dueDate's calendar day matches [now] (W2 day SSOT).
+  bool _isLatestDueToday(DateTime? latestDue, DateTime now) {
+    if (latestDue == null) return false;
+    return AttendancePolicy.dayStart(latestDue) ==
+        AttendancePolicy.dayStart(now);
+  }
+
+  /// Operational-day ids are `${halaqaId}_yyyyMMdd` (Pre-Slice).
+  String _halaqaIdOf(ClassSessionEntity day) {
+    final i = day.id.lastIndexOf('_');
+    if (i <= 0) return day.id;
+    return day.id.substring(0, i);
   }
 
   HalaqaScheduleSourceModel _sourceOf(HalaqaEntity h) {

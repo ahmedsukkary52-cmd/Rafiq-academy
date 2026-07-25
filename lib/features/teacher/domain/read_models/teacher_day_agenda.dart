@@ -2,10 +2,9 @@ import 'package:equatable/equatable.dart';
 
 /// One neutral, assistive action a teacher can still take today (W3 D9).
 ///
-/// The agenda only carries the *type* of remaining work; the presentation
-/// layer owns the Arabic wording and the deep-link route, so no business rule
-/// or copy leaks into the orchestration layer.
-enum TeacherAgendaAction { takeAttendance, reviewRecitations }
+/// This is orchestration vocabulary only — not a Firestore-backed domain
+/// concept. The presentation layer owns Arabic wording and deep-link routes.
+enum TeacherAgendaAction { takeAttendance, sendHomework, reviewRecitations }
 
 /// A single halaqa's remaining work for today.
 ///
@@ -28,10 +27,11 @@ class TeacherAgendaItem extends Equatable {
   List<Object?> get props => [halaqaId, halaqaName, startAt, pendingActions];
 }
 
-/// Read-time view model of "what should I do today?".
+/// Presentation-facing **read projection** of "what should I do today?".
 ///
-/// Derived entirely from the schedule + existing W1/W2 state on every read.
-/// No persistence, no cached flags, no orchestration collections (W3 D8/D10).
+/// Not a domain entity and not persisted. Derived at read time from the
+/// schedule + existing W1/W2 state (W3 D8/D10). Lives under `read_models`
+/// so it is never mistaken for a business aggregate.
 class TeacherDayAgenda extends Equatable {
   /// Halaqat with remaining work today, in stable execution order (D7).
   final List<TeacherAgendaItem> items;

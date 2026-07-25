@@ -55,6 +55,35 @@ class AttendancePolicy {
     return '${halaqaId}_${studentId}_$y$m$day';
   }
 
+  /// Whether every roster student has a day mark (W2 register-complete).
+  ///
+  /// Empty roster is vacuously complete — nothing to mark. Used by W3
+  /// orchestration; do not re-encode this comparison elsewhere.
+  static bool isRegisterComplete({
+    required Iterable<String> rosterStudentIds,
+    required Iterable<String> markedStudentIds,
+  }) {
+    final roster = rosterStudentIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (roster.isEmpty) return true;
+    final marked = markedStudentIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    return marked.containsAll(roster);
+  }
+
+  /// Inverse of [isRegisterComplete].
+  static bool isRegisterIncomplete({
+    required Iterable<String> rosterStudentIds,
+    required Iterable<String> markedStudentIds,
+  }) => !isRegisterComplete(
+    rosterStudentIds: rosterStudentIds,
+    markedStudentIds: markedStudentIds,
+  );
+
   /// One status per (halaqa, student, calendar day).
   /// Deterministic document ids win over legacy auto-id duplicates.
   static List<String?> uniqueDayStatuses(Iterable<AttendanceMarkRef> marks) {

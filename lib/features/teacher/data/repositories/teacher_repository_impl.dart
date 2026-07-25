@@ -178,4 +178,16 @@ class TeacherRepositoryImpl implements TeacherRepository {
       return Left(ServerFailure(e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, DateTime?>> getLatestAssignmentDueDate(
+    String halaqaId,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getLatestAssignmentDueDate(halaqaId));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
 }

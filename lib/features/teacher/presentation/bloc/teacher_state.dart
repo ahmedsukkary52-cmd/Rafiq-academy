@@ -5,7 +5,7 @@ import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
-import '../../domain/entities/teacher_day_agenda.dart';
+import '../../domain/read_models/teacher_day_agenda.dart';
 
 class _Unset {
   const _Unset();

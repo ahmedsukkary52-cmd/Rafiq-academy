@@ -336,4 +336,25 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
       throw ServerException(e.toString());
     }
   }
+
+  @override
+  Future<DateTime?> getLatestAssignmentDueDate(String halaqaId) async {
+    try {
+      // Same ordering as W1 student "current homework" (latest dueDate),
+      // scoped to the halaqa so the teacher agenda reuses D7, not a second rule.
+      final snapshot = await firestore
+          .collection(FirestoreCollections.assignments)
+          .where('halaqaId', isEqualTo: halaqaId)
+          .orderBy('dueDate', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return null;
+      final raw = snapshot.docs.first.data()['dueDate'];
+      if (raw is Timestamp) return raw.toDate();
+      return null;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
 }

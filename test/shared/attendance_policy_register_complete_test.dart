@@ -53,4 +53,26 @@ void main() {
       );
     });
   });
+
+  group('AttendancePolicy.isSameCalendarDay', () {
+    test('same local day ignores clock time', () {
+      expect(
+        AttendancePolicy.isSameCalendarDay(
+          DateTime(2024, 6, 3, 0, 0),
+          DateTime(2024, 6, 3, 23, 59, 59),
+        ),
+        isTrue,
+      );
+    });
+
+    test('different calendar days are not the same', () {
+      expect(
+        AttendancePolicy.isSameCalendarDay(
+          DateTime(2024, 6, 3, 23, 59),
+          DateTime(2024, 6, 4, 0, 0),
+        ),
+        isFalse,
+      );
+    });
+  });
 }

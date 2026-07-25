@@ -71,12 +71,13 @@ void main() {
       ], now: now);
 
       expect(days, hasLength(1));
-      expect(days.single.id, 'h1_20260722');
-      expect(days.single.title, 'حلقة أ');
-      expect(days.single.startAt, DateTime(2026, 7, 22, 16, 0));
-      expect(days.single.endAt, DateTime(2026, 7, 22, 17, 0));
-      expect(days.single.meetingLink, 'https://meet.example/a');
-      expect(days.single.status, ClassSessionStatus.upcoming);
+      expect(days.single.halaqaId, 'h1');
+      expect(days.single.session.id, 'h1_20260722');
+      expect(days.single.session.title, 'حلقة أ');
+      expect(days.single.session.startAt, DateTime(2026, 7, 22, 16, 0));
+      expect(days.single.session.endAt, DateTime(2026, 7, 22, 17, 0));
+      expect(days.single.session.meetingLink, 'https://meet.example/a');
+      expect(days.single.session.status, ClassSessionStatus.upcoming);
     });
 
     test('multiple halaqat today ordered by start time', () {
@@ -93,7 +94,7 @@ void main() {
         ),
       ], now: now);
 
-      expect(days.map((d) => d.title).toList(), ['مبكرة', 'متأخرة']);
+      expect(days.map((d) => d.session.title).toList(), ['مبكرة', 'متأخرة']);
     });
 
     test('multiple slots same halaqa collapse to one day (D6)', () {
@@ -109,9 +110,9 @@ void main() {
       ], now: now);
 
       expect(days, hasLength(1));
-      expect(days.single.startAt, DateTime(2026, 7, 22, 9, 0));
-      expect(days.single.endAt, DateTime(2026, 7, 22, 17, 0));
-      expect(days.single.status, ClassSessionStatus.live);
+      expect(days.single.session.startAt, DateTime(2026, 7, 22, 9, 0));
+      expect(days.single.session.endAt, DateTime(2026, 7, 22, 17, 0));
+      expect(days.single.session.status, ClassSessionStatus.live);
     });
 
     test('slots listed out of chronological order still order correctly', () {
@@ -133,7 +134,11 @@ void main() {
         ),
       ], now: now);
 
-      expect(days.map((d) => d.title).toList(), ['أولاً', 'منتصف', 'لاحقاً']);
+      expect(days.map((d) => d.session.title).toList(), [
+        'أولاً',
+        'منتصف',
+        'لاحقاً',
+      ]);
     });
 
     test('same start time → stable halaqaId order (D7)', () {
@@ -150,7 +155,11 @@ void main() {
         ),
       ], now: now);
 
-      expect(days.map((d) => d.id).toList(), ['h_a_20260722', 'h_b_20260722']);
+      expect(days.map((d) => d.halaqaId).toList(), ['h_a', 'h_b']);
+      expect(days.map((d) => d.session.id).toList(), [
+        'h_a_20260722',
+        'h_b_20260722',
+      ]);
     });
 
     test('duplicate identical schedule entries collapse to one day', () {
@@ -166,8 +175,8 @@ void main() {
       ], now: now);
 
       expect(days, hasLength(1));
-      expect(days.single.startAt, DateTime(2026, 7, 22, 16, 0));
-      expect(days.single.endAt, DateTime(2026, 7, 22, 17, 0));
+      expect(days.single.session.startAt, DateTime(2026, 7, 22, 16, 0));
+      expect(days.single.session.endAt, DateTime(2026, 7, 22, 17, 0));
     });
 
     test('day boundary: late Wednesday still includes Wednesday slots', () {
@@ -182,10 +191,10 @@ void main() {
 
       expect(days, hasLength(1));
       expect(
-        AttendancePolicy.dayStart(days.single.startAt),
+        AttendancePolicy.dayStart(days.single.session.startAt),
         AttendancePolicy.dayStart(late),
       );
-      expect(days.single.status, ClassSessionStatus.ended);
+      expect(days.single.session.status, ClassSessionStatus.ended);
     });
 
     test('day boundary: just after midnight excludes previous weekday', () {
@@ -202,8 +211,8 @@ void main() {
       ], now: thursday);
 
       expect(days, hasLength(1));
-      expect(days.single.startAt, DateTime(2026, 7, 23, 9, 0));
-      expect(days.single.id, 'h1_20260723');
+      expect(days.single.session.startAt, DateTime(2026, 7, 23, 9, 0));
+      expect(days.single.session.id, 'h1_20260723');
     });
 
     test(
@@ -219,8 +228,8 @@ void main() {
         ], now: now);
 
         expect(days, hasLength(1));
-        expect(days.single.startAt, DateTime(2026, 7, 22, 22, 0));
-        expect(days.single.endAt, DateTime(2026, 7, 22, 23, 0));
+        expect(days.single.session.startAt, DateTime(2026, 7, 22, 22, 0));
+        expect(days.single.session.endAt, DateTime(2026, 7, 22, 23, 0));
       },
     );
 
@@ -242,7 +251,10 @@ void main() {
       final b = mapper.mapTodayOperationalDays(sources, now: now);
 
       expect(a, b);
-      expect(a.map((e) => e.id).toList(), b.map((e) => e.id).toList());
+      expect(
+        a.map((e) => e.session.id).toList(),
+        b.map((e) => e.session.id).toList(),
+      );
     });
 
     test('skips empty halaqaId and unparseable start times', () {
@@ -265,7 +277,7 @@ void main() {
       ], now: now);
 
       expect(days, hasLength(1));
-      expect(days.single.id, 'h2_20260722');
+      expect(days.single.session.id, 'h2_20260722');
     });
   });
 

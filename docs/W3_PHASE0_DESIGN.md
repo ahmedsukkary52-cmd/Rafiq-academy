@@ -1,7 +1,7 @@
 # W3 — Daily Halaqa Session Operations
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 production-validated** — awaiting approval for Slice 3.  
+**Status:** Approved (D1–D10). **Pre-Slice + Slice 1 + Slice 2 production-validated (Pass)** — see `docs/W3_SLICE2_PRODUCTION_VALIDATION.md`. Awaiting Slice 3 completion.  
 **Predecessors:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`), W2 Done (`docs/W2_PRODUCTION_VALIDATION.md`), audit (`docs/POST_W2_PRODUCT_AUDIT.md`)  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT  
 **Standing rule:** If a slice/assumption is found wrong: **stop**, explain, update this doc, then continue.
@@ -303,17 +303,26 @@ After fixes: use case is a thin application orchestrator only.
 
 ### Slice 2 production validation (2026-07-26)
 
-**Verdict: Pass.** Slice 3 may begin after explicit approval.
+**Verdict: Pass** — full report: `docs/W3_SLICE2_PRODUCTION_VALIDATION.md`.
+
+Validation found and fixed before Pass:
+
+| Finding | Fix |
+|---------|-----|
+| Fragile parse of `${halaqaId}_yyyyMMdd` in orchestrator | Mapper returns `TodayOperationalDay(halaqaId, session)` |
+| Private `_isLatestDueToday` in use case | `AttendancePolicy.isSameCalendarDay` |
+| Empty roster showed sendHomework while assign is blocked | Skip homework action when roster empty |
+| Pull-to-refresh dismissed before agenda finished | Wait for `todayAgendaStatus` loaded/error |
+| Agenda stale after attendance / assign / review writes | `LoadTodayAgendaEvent` on those successes |
 
 | Area | Result |
 |------|--------|
-| Homework readiness | W1 D7 at halaqa scope: latest `dueDate`; "today" via `AttendancePolicy.dayStart` — no second homework rule |
-| Infrastructure | Extended `TeacherRepository` / remote DS with `getLatestAssignmentDueDate`; reuses `assignments` collection written by `sendAssignment` |
-| Index | Added `assignments(halaqaId ASC, dueDate DESC)` — documented why student-scoped query cannot answer this |
-| Deep-link | `sendHomework` → `/teacher/halaqa/:id` (existing assign-sheet host); no new route/UI |
+| Homework readiness | W1 D7 at halaqa scope: latest `dueDate`; "today" via `AttendancePolicy.isSameCalendarDay` |
+| Infrastructure | Extended `TeacherRepository` / remote DS with `getLatestAssignmentDueDate`; reuses `assignments` |
+| Index | `assignments(halaqaId ASC, dueDate DESC)` — documented why student-scoped query cannot answer this |
+| Deep-link | `sendHomework` → `/teacher/halaqa/:id` (existing host); sheet auto-open = Slice 3 |
 | Tone (D9) | «لم يتم إرسال واجب اليوم» |
-| Correctness | Agenda tests cover missing/stale/present homework + failure path; `AttendancePolicy.isRegisterComplete` unit tests added |
-| Analyze / format / tests | Touched code clean; `dart format` applied; suite green |
+| Analyze / format / tests | Touched code clean; suite green |
 
 ---
 
@@ -383,8 +392,6 @@ W3 is **Done** only if all are true:
 ## Approval gate
 
 **Phase 0 approved (D1–D10).**  
-**Pre-Slice + Slice 1 + Slice 2 production-validated (Pass).**  
-Execution remaining: Slice 3 (remaining deep-links) → 4 (closeout) → 5 (audit + production validation).  
-**Do not start Slice 3 until explicitly approved.**
-
+**Pre-Slice + Slice 1 + Slice 2 production-validated (Pass)** — `docs/W3_SLICE2_PRODUCTION_VALIDATION.md`.  
+Execution remaining: Slice 3 (assign-sheet deep-link) → 4 (closeout) → 5 (audit + production validation).  
 **Ops note:** deploy the new `assignments(halaqaId, dueDate)` composite index from `firestore.indexes.json` before relying on Slice 2 homework readiness in production.

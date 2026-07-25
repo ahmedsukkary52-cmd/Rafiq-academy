@@ -3,6 +3,26 @@ import '../../domain/entities/class_session_entity.dart';
 import '../models/class_session_model.dart';
 import '../models/halaqa_schedule_source_model.dart';
 
+/// One halaqa's operational teaching day (W3 Pre-Slice).
+///
+/// Carries [halaqaId] explicitly so consumers never parse session ids.
+class TodayOperationalDay {
+  final String halaqaId;
+  final ClassSessionEntity session;
+
+  const TodayOperationalDay({required this.halaqaId, required this.session});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TodayOperationalDay &&
+          halaqaId == other.halaqaId &&
+          session == other.session;
+
+  @override
+  int get hashCode => Object.hash(halaqaId, session);
+}
+
 /// Maps raw `halaqat.schedule` slots into weekly [ClassSessionEntity] rows.
 ///
 /// Also derives **today's operational days** for W3 orchestration (D6/D7):
@@ -67,7 +87,8 @@ class HalaqaWeeklySessionsMapper {
   /// - Collapses multiple same-day slots for one halaqa into **one** row (D6).
   /// - Orders by earliest start time, then `halaqaId` (D7 — never random).
   /// - Pure derivation; no persistence (D8/D10).
-  List<ClassSessionEntity> mapTodayOperationalDays(
+  /// - Returns [halaqaId] explicitly (no id-string parsing by consumers).
+  List<TodayOperationalDay> mapTodayOperationalDays(
     Iterable<HalaqaScheduleSourceModel> sources, {
     DateTime? now,
   }) {
@@ -124,7 +145,9 @@ class HalaqaWeeklySessionsMapper {
         // D7 stable fallback: Firestore halaqa document id (map key).
         return a.key.compareTo(b.key);
       });
-    return days.map((e) => e.value).toList();
+    return days
+        .map((e) => TodayOperationalDay(halaqaId: e.key, session: e.value))
+        .toList();
   }
 
   ClassSessionEntity _asOperationalDay({

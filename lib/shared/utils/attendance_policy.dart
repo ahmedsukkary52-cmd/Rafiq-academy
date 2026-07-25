@@ -41,6 +41,10 @@ class AttendancePolicy {
   static DateTime dayEndExclusive(DateTime date) =>
       dayStart(date).add(const Duration(days: 1));
 
+  /// True when [a] and [b] fall on the same local calendar day.
+  static bool isSameCalendarDay(DateTime a, DateTime b) =>
+      dayStart(a) == dayStart(b);
+
   /// Deterministic doc id — no new fields (W2 D8).
   /// Format: `{halaqaId}_{studentId}_{yyyyMMdd}`
   static String documentId({

@@ -280,6 +280,8 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
             ),
           );
         }
+        // W3: remaining-work agenda must refresh after register write.
+        add(const LoadTodayAgendaEvent());
       },
     );
   }
@@ -325,6 +327,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
         );
         add(LoadHalaqaEvaluationsEvent(event.record.halaqaId));
+        add(const LoadTodayAgendaEvent());
       },
     );
   }
@@ -362,6 +365,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
         );
         add(LoadHalaqaEvaluationsEvent(event.halaqaId));
+        add(const LoadTodayAgendaEvent());
       },
     );
   }
@@ -410,9 +414,13 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           assignmentSubmissionError: failure.message,
         ),
       ),
-      (_) => emit(
-        state.copyWith(assignmentSubmissionStatus: SubmissionStatus.success),
-      ),
+      (_) {
+        emit(
+          state.copyWith(assignmentSubmissionStatus: SubmissionStatus.success),
+        );
+        // W3: remaining-work agenda must refresh after homework write.
+        add(const LoadTodayAgendaEvent());
+      },
     );
   }
 

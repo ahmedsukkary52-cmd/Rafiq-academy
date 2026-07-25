@@ -7,7 +7,6 @@ import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../schedule/data/mappers/halaqa_weekly_sessions_mapper.dart';
 import '../../../schedule/data/models/halaqa_schedule_source_model.dart';
-import '../../../schedule/domain/entities/class_session_entity.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../read_models/teacher_day_agenda.dart';
 import '../repositories/teacher_repository.dart';
@@ -33,7 +32,7 @@ class TodayAgendaParams extends Equatable {
 /// - asks [AttendancePolicy.isRegisterIncomplete] for register readiness,
 /// - asks [RecitationRecordEntity.isPendingReview] for review readiness,
 /// - asks the repository for the halaqa's latest assignment `dueDate` (W1 D7)
-///   and compares its calendar day via [AttendancePolicy.dayStart].
+///   and compares its calendar day via [AttendancePolicy.isSameCalendarDay].
 ///
 /// Navigation stays in the widget. [TeacherDayAgenda] is a read projection.
 @lazySingleton
@@ -61,8 +60,7 @@ class GetTodayAgendaUseCase
     // 2. Readiness per halaqa; keep only halaqat with remaining work.
     final items = <TeacherAgendaItem>[];
     for (final day in days) {
-      final halaqaId = _halaqaIdOf(day);
-      final halaqa = byId[halaqaId];
+      final halaqa = byId[day.halaqaId];
       if (halaqa == null) continue;
 
       final actionsEither = await _pendingActionsFor(halaqa, now);
@@ -76,7 +74,7 @@ class GetTodayAgendaUseCase
         TeacherAgendaItem(
           halaqaId: halaqa.id,
           halaqaName: halaqa.name,
-          startAt: day.startAt,
+          startAt: day.session.startAt,
           pendingActions: actions,
         ),
       );
@@ -112,12 +110,19 @@ class GetTodayAgendaUseCase
     }
 
     // Homework-assigned readiness — W1 D7 at halaqa scope (latest dueDate).
-    final dueEither = await repository.getLatestAssignmentDueDate(halaqa.id);
-    final dueFailure = dueEither.fold<Failure?>((l) => l, (_) => null);
-    if (dueFailure != null) return Left(dueFailure);
-    final latestDue = dueEither.getOrElse((_) => null);
-    if (!_isLatestDueToday(latestDue, now)) {
-      actions.add(TeacherAgendaAction.sendHomework);
+    // Empty roster: align with existing sendAssignment guard (nothing to assign).
+    final hasRoster = halaqa.studentIds.any((id) => id.trim().isNotEmpty);
+    if (hasRoster) {
+      final dueEither = await repository.getLatestAssignmentDueDate(halaqa.id);
+      final dueFailure = dueEither.fold<Failure?>((l) => l, (_) => null);
+      if (dueFailure != null) return Left(dueFailure);
+      final latestDue = dueEither.getOrElse((_) => null);
+      final assignedToday =
+          latestDue != null &&
+          AttendancePolicy.isSameCalendarDay(latestDue, now);
+      if (!assignedToday) {
+        actions.add(TeacherAgendaAction.sendHomework);
+      }
     }
 
     // Pending-review readiness — visibility owned by RecitationRecordEntity.
@@ -132,21 +137,6 @@ class GetTodayAgendaUseCase
     }
 
     return Right(actions);
-  }
-
-  /// W1 D7 "current" assignment is the latest `dueDate`. It counts as
-  /// "today's" when that dueDate's calendar day matches [now] (W2 day SSOT).
-  bool _isLatestDueToday(DateTime? latestDue, DateTime now) {
-    if (latestDue == null) return false;
-    return AttendancePolicy.dayStart(latestDue) ==
-        AttendancePolicy.dayStart(now);
-  }
-
-  /// Operational-day ids are `${halaqaId}_yyyyMMdd` (Pre-Slice).
-  String _halaqaIdOf(ClassSessionEntity day) {
-    final i = day.id.lastIndexOf('_');
-    if (i <= 0) return day.id;
-    return day.id.substring(0, i);
   }
 
   HalaqaScheduleSourceModel _sourceOf(HalaqaEntity h) {

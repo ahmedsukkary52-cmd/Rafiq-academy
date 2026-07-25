@@ -316,10 +316,9 @@ void main() {
       expect(agenda.items, isEmpty, reason: 'nothing left to do → removed');
     });
 
-    test('empty roster is never an attendance action', () async {
-      final useCase = GetTodayAgendaUseCase(
-        _FakeTeacherRepository(latestDueByHalaqa: {'h1': _mondayDue}),
-      );
+    test('empty roster is never an attendance or homework action', () async {
+      // Aligns with sendAssignment empty-roster guard and register-complete.
+      final useCase = GetTodayAgendaUseCase(_FakeTeacherRepository());
 
       final agenda = _unwrap(
         await useCase(

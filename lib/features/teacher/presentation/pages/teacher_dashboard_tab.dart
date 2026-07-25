@@ -50,11 +50,13 @@ class TeacherDashboardTab extends StatelessWidget {
             if (auth == null) return;
             final bloc = context.read<TeacherBloc>();
             bloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
-            await bloc.stream.firstWhere(
-              (s) =>
-                  s.halaqatStatus == SectionStatus.loaded ||
-                  s.halaqatStatus == SectionStatus.error,
-            );
+            // Wait for halaqat AND agenda — agenda derives after halaqat load.
+            await bloc.stream.firstWhere((s) {
+              if (s.halaqatStatus == SectionStatus.error) return true;
+              if (s.halaqatStatus != SectionStatus.loaded) return false;
+              return s.todayAgendaStatus == SectionStatus.loaded ||
+                  s.todayAgendaStatus == SectionStatus.error;
+            });
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),

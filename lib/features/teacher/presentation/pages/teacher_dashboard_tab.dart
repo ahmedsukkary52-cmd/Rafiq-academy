@@ -357,8 +357,8 @@ class _AgendaActionRow extends StatelessWidget {
 
   String _routeFor(TeacherAgendaAction action) => switch (action) {
     TeacherAgendaAction.takeAttendance => '/teacher/attendance/$halaqaId',
-    // Assign sheet lives on class detail — no dedicated assign route (D5).
-    TeacherAgendaAction.sendHomework => '/teacher/halaqa/$halaqaId',
+    // Assign sheet lives on class detail — open via existing query deep-link.
+    TeacherAgendaAction.sendHomework => '/teacher/halaqa/$halaqaId?assign=1',
     TeacherAgendaAction.reviewRecitations =>
       '/teacher/halaqa/$halaqaId/evaluations',
   };

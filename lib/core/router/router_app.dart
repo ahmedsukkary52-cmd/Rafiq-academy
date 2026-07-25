@@ -47,7 +47,6 @@ import '../../features/awards/presentation/pages/awards_page.dart';
 // Calendar
 import '../../features/calendar/presentation/pages/calendar_page.dart';
 
-
 class AppRoutes {
   AppRoutes._();
 
@@ -105,8 +104,10 @@ class AppRouter {
   late final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
-    refreshListenable: Listenable.merge(
-        [_BlocListenable(authBloc), onboardingSeen]),
+    refreshListenable: Listenable.merge([
+      _BlocListenable(authBloc),
+      onboardingSeen,
+    ]),
 
     redirect: (BuildContext context, GoRouterState state) {
       final authState = authBloc.state;
@@ -114,8 +115,9 @@ class AppRouter {
 
       // أول تشغيل للتطبيق → الأونبوردنج قبل أي حاجة تانية
       if (!onboardingSeen.value) {
-        return currentPath == AppRoutes.onboarding ? null : AppRoutes
-            .onboarding;
+        return currentPath == AppRoutes.onboarding
+            ? null
+            : AppRoutes.onboarding;
       }
       if (currentPath == AppRoutes.onboarding) {
         return AppRoutes.splash;
@@ -161,14 +163,8 @@ class AppRouter {
         path: AppRoutes.onboarding,
         builder: (_, __) => OnboardingPage(onboardingSeen: onboardingSeen),
       ),
-      GoRoute(
-        path: AppRoutes.splash,
-        builder: (_, __) => const SplashPage(),
-      ),
-      GoRoute(
-        path: AppRoutes.login,
-        builder: (_, __) => const LoginPage(),
-      ),
+      GoRoute(path: AppRoutes.splash, builder: (_, __) => const SplashPage()),
+      GoRoute(path: AppRoutes.login, builder: (_, __) => const LoginPage()),
       GoRoute(
         path: AppRoutes.register,
         builder: (_, __) => const RegisterPage(),
@@ -247,10 +243,7 @@ class AppRouter {
             path: 'avatar',
             builder: (_, __) => const AvatarSelectionPage(),
           ),
-          GoRoute(
-            path: 'settings',
-            builder: (_, __) => const SettingsPage(),
-          ),
+          GoRoute(path: 'settings', builder: (_, __) => const SettingsPage()),
           GoRoute(
             path: 'content',
             builder: (_, __) => const ContentLibraryPage(),
@@ -260,10 +253,7 @@ class AppRouter {
             builder: (_, __) => const StudentAudioLibraryPage(),
           ),
           // بوابة شات الطالب → تفتح محادثة المعلم تلقائياً
-          GoRoute(
-            path: 'chat',
-            builder: (_, __) => const StudentChatPage(),
-          ),
+          GoRoute(path: 'chat', builder: (_, __) => const StudentChatPage()),
           GoRoute(
             path: 'chat/:conversationId',
             builder: (_, state) {
@@ -286,55 +276,48 @@ class AppRouter {
           // تفاصيل حلقة
           GoRoute(
             path: 'halaqa/:halaqaId',
-            builder: (_, state) =>
-                TeacherClassDetailPage(
-                  halaqaId: state.pathParameters['halaqaId']!,
-                ),
+            builder: (_, state) => TeacherClassDetailPage(
+              halaqaId: state.pathParameters['halaqaId']!,
+              openAssignSheet:
+                  state.uri.queryParameters['assign'] == '1' ||
+                  state.uri.queryParameters['assign'] == 'true',
+            ),
             routes: [
               GoRoute(
                 path: 'evaluations',
-                builder: (_, state) =>
-                    TeacherEvaluationsPage(
-                      halaqaId: state.pathParameters['halaqaId']!,
-                    ),
+                builder: (_, state) => TeacherEvaluationsPage(
+                  halaqaId: state.pathParameters['halaqaId']!,
+                ),
               ),
               GoRoute(
                 path: 'analytics',
-                builder: (_, state) =>
-                    AnalyticsDashboardPage(
-                      halaqaId: state.pathParameters['halaqaId']!,
-                    ),
+                builder: (_, state) => AnalyticsDashboardPage(
+                  halaqaId: state.pathParameters['halaqaId']!,
+                ),
               ),
               GoRoute(
                 path: 'awards',
                 builder: (_, state) =>
-                    AwardsPage(
-                      halaqaId: state.pathParameters['halaqaId']!,
-                    ),
+                    AwardsPage(halaqaId: state.pathParameters['halaqaId']!),
               ),
             ],
           ),
           // الحضور
           GoRoute(
             path: 'attendance/:halaqaId',
-            builder: (_, state) =>
-                TeacherAttendancePage(
-                  halaqaId: state.pathParameters['halaqaId']!,
-                ),
+            builder: (_, state) => TeacherAttendancePage(
+              halaqaId: state.pathParameters['halaqaId']!,
+            ),
           ),
           // ملف طالب
           GoRoute(
             path: 'student/:studentId',
-            builder: (_, state) =>
-                StudentProfilePage(
-                  studentId: state.pathParameters['studentId']!,
-                ),
+            builder: (_, state) => StudentProfilePage(
+              studentId: state.pathParameters['studentId']!,
+            ),
           ),
           // التقويم
-          GoRoute(
-            path: 'calendar',
-            builder: (_, __) => const CalendarPage(),
-          ),
+          GoRoute(path: 'calendar', builder: (_, __) => const CalendarPage()),
           // مكتبة المحتوى
           GoRoute(
             path: 'content',
@@ -373,30 +356,23 @@ class AppRouter {
       ),
 
       // ── Admin ─────────────────────────────────────────────────
-      GoRoute(
-        path: AppRoutes.admin,
-        builder: (_, __) => const AdminHomePage(),
-      ),
+      GoRoute(path: AppRoutes.admin, builder: (_, __) => const AdminHomePage()),
     ],
 
-    errorBuilder: (context, state) =>
-        Scaffold(
-          appBar: AppBar(title: const Text('خطأ')),
-          body: Center(
-            child: Text('الصفحة غير موجودة: ${state.error}'),
-          ),
-        ),
+    errorBuilder: (context, state) => Scaffold(
+      appBar: AppBar(title: const Text('خطأ')),
+      body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
+    ),
   );
 
-  static String _routeForRole(String role) =>
-      switch (role) {
-        AppRoles.student => AppRoutes.student,
-        AppRoles.parent => AppRoutes.parent,
-        AppRoles.teacher => AppRoutes.teacher,
-        AppRoles.supervisor => AppRoutes.supervisor,
-        AppRoles.admin => AppRoutes.admin,
-        _ => AppRoutes.login,
-      };
+  static String _routeForRole(String role) => switch (role) {
+    AppRoles.student => AppRoutes.student,
+    AppRoles.parent => AppRoutes.parent,
+    AppRoles.teacher => AppRoutes.teacher,
+    AppRoles.supervisor => AppRoutes.supervisor,
+    AppRoles.admin => AppRoutes.admin,
+    _ => AppRoutes.login,
+  };
 
   static bool _isAllowedRoute(String path, String role) {
     final roleRoute = _routeForRole(role);

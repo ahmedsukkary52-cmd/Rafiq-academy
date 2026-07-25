@@ -18,7 +18,15 @@ import '../bloc/teacher_state.dart';
 class TeacherClassDetailPage extends StatefulWidget {
   final String halaqaId;
 
-  const TeacherClassDetailPage({super.key, required this.halaqaId});
+  /// When true (W3 Slice 3 deep-link), open the existing assign sheet once
+  /// students are loaded — no new UI, reuses `_openSendAssignmentSheet`.
+  final bool openAssignSheet;
+
+  const TeacherClassDetailPage({
+    super.key,
+    required this.halaqaId,
+    this.openAssignSheet = false,
+  });
 
   @override
   State<TeacherClassDetailPage> createState() => _TeacherClassDetailPageState();
@@ -28,6 +36,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _searchQuery = '';
+  bool _openedAssignSheet = false;
 
   @override
   void initState() {
@@ -40,6 +49,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       if (state.halaqatStatus == SectionStatus.initial) {
         _retryHalaqat();
       }
+      _tryOpenAssignSheet(state);
     });
   }
 
@@ -107,9 +117,23 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     });
   }
 
+  /// W3 Slice 3: one-shot open of the existing assign sheet from deep-link.
+  void _tryOpenAssignSheet(TeacherState state) {
+    if (!widget.openAssignSheet || _openedAssignSheet || !mounted) return;
+    if (state.studentsStatus != SectionStatus.loaded) return;
+    _openedAssignSheet = true;
+    _openSendAssignmentSheet(context, studentCount: state.students.length);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TeacherBloc, TeacherState>(
+    return BlocConsumer<TeacherBloc, TeacherState>(
+      listenWhen: (previous, current) =>
+          widget.openAssignSheet &&
+          !_openedAssignSheet &&
+          previous.studentsStatus != current.studentsStatus &&
+          current.studentsStatus == SectionStatus.loaded,
+      listener: (context, state) => _tryOpenAssignSheet(state),
       buildWhen: (previous, current) =>
           previous.halaqatStatus != current.halaqatStatus ||
           previous.halaqat != current.halaqat ||

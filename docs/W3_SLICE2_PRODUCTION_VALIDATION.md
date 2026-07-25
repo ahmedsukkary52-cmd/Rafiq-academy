@@ -102,7 +102,7 @@ Legend: **Pass** / **Fail→Fixed** / **Accept**
 
 | Item | Why accepted |
 |------|----------------|
-| `sendHomework` opens class detail, not the assign sheet | Existing route only (D5). Opening the sheet is Slice 3. |
+| `sendHomework` opens class detail, not the assign sheet | **Superseded by Slice 3** — `?assign=1` opens the existing sheet |
 | Latest dueDate in the future hides an older "today" assign | Exact W1 D7 semantics at halaqa scope (D3). |
 | Recitation readiness still loads full halaqa history | Same read as evaluations page; optimize later if needed. |
 | Index must be deployed to Firebase project | Same platform gap pattern as W1/W2 indexes. |

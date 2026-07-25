@@ -1,3 +1,5 @@
+import '../../../../shared/utils/attendance_policy.dart';
+
 /// Raw attendance row from `attendanceRecords` (read-only).
 class ProgressAttendanceDocModel {
   final String id;
@@ -10,9 +12,9 @@ class ProgressAttendanceDocModel {
     required this.status,
   });
 
-  bool get isPresentLike => status == 'present' || status == 'late';
+  bool get isPresentLike => AttendancePolicy.isAttendedStatus(status);
 
-  bool get isAbsent => !isPresentLike;
+  bool get isAbsent => AttendancePolicy.isAbsentStatus(status);
 }
 
 /// Raw recitation row from `recitationRecords` (read-only).

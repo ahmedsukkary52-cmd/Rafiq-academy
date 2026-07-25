@@ -1,3 +1,4 @@
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/progress_report_entity.dart';
 import '../models/progress_report_source_model.dart';
 
@@ -9,10 +10,13 @@ class ProgressReportMapper {
   ProgressReportEntity map(ProgressReportSourceModel source, {DateTime? now}) {
     final clock = now ?? DateTime.now();
 
-    final attended = source.attendance.where((a) => a.isPresentLike).length;
-    final absences = source.attendance.where((a) => a.isAbsent).length;
-    final total = source.attendance.length;
-    final attendancePercent = total == 0 ? 0.0 : (attended / total) * 100.0;
+    final statuses = source.attendance.map((a) => a.status);
+    final attended = AttendancePolicy.countAttended(statuses);
+    final absences = AttendancePolicy.countAbsent(statuses);
+    final attendancePercent = AttendancePolicy.attendancePercent(
+      attended: attended,
+      total: source.attendance.length,
+    );
 
     return ProgressReportEntity(
       memorizationAccuracyPercent: 0,

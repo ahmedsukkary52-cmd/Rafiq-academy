@@ -1,7 +1,7 @@
 # W2 — Attendance Loop  
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Awaiting approval before any implementation.  
+**Status:** Approved (D1–D8). Implementation in progress.  
 **File key / Figma:** Basma (Copy) — teacher/parent frames as **UI reference only** (not business logic).  
 **Architecture:** Feature-first Clean Architecture + BLoC + Firestore SSOT (`attendanceRecords`)  
 **Predecessor:** W1 Done (`docs/W1_PRODUCTION_VALIDATION.md`)
@@ -265,20 +265,20 @@ Order mirrors W1: prerequisites first; each slice analyze → format → commit 
 
 | # | Decision | Category | Options / recommendation |
 |---|----------|----------|---------------------------|
-| **D1** | Does **`late` count as attended** for parent weekly + shared “attended” definition? | **Product decision** | **A (recommended):** Yes — late = attended for %, still show late count separately where useful. Aligns student progress with industry “participated”. **B:** No — late excluded (keep parent as-is; change student progress). |
-| **D2** | Notify student/parent when marked **absent**? | **Product decision** | **A:** Student only (like W1 D3 pattern). **B:** Student + parent. **C (recommended for minimal W2):** Defer notifications — harden register + honesty first. |
-| **D3** | Include **استئذان / absenceRequests** UI in W2? | **Product decision** | **Recommended: No** — stack exists but incomplete; ship as W2-Excuse later. |
-| **D4** | Supervisor attendance oversight in W2? | **Product decision** | **Recommended: No** |
-| **D5** | Weekly `totalSessions` denominator | **Verified** current = count of attendance docs in week (not schedule). Change? | **Recommended: Keep** (honest to marked days). Document in UI copy. |
-| **D6** | Add **`excused`** status? | **Product decision** | **Recommended: No for W2** — requires schema + teacher UI + parent meaning. |
-| **D7** | Bind attendance to **schedule slot id**? | **Product decision** | **Recommended: No** — reuse calendar day + halaqa (Verified current). |
-| **D8** | Deterministic attendance doc IDs? | **Inference** / engineering | **Recommended: Yes** as Slice 1 hardening — no new fields. |
+| **D1** | Does **`late` count as attended** for parent weekly + shared “attended” definition? | **Product decision** | **Approved A** — late = attended for **all** actors via `AttendancePolicy` |
+| **D2** | Notify student/parent when marked **absent**? | **Product decision** | **Defer** — no notification writers in W2 |
+| **D3** | Include **استئذان / absenceRequests** UI in W2? | **Product decision** | **No** — separate workflow later |
+| **D4** | Supervisor attendance oversight in W2? | **Product decision** | **No** — Teacher → Student → Parent only |
+| **D5** | Weekly `totalSessions` denominator | **Verified** current = count of attendance docs in week (not schedule). Change? | **Keep** — document in UI if needed |
+| **D6** | Add **`excused`** status? | **Product decision** | **No** — reuse present/absent/late |
+| **D7** | Bind attendance to **schedule slot id**? | **Product decision** | **No** — calendar day only |
+| **D8** | Deterministic attendance doc IDs? | **Inference** / engineering | **Yes** — `{halaqaId}_{studentId}_{yyyyMMdd}`; no new fields |
 
 ### Decisions that are **not** product (reuse Verified code)
 
 - Teacher statuses today: present / absent / late — **Verified**.  
-- Upsert-by-day — **Verified**.  
-- Parent sees attendance via weekly report (not dedicated screen) for W2 MVP — **Inference** aligned with W1 D6 style.  
+- Upsert-by-day — **Verified** (Slice 1 upgrades to deterministic id + batch).  
+- Parent sees attendance via weekly report (not dedicated screen) for W2 MVP — **Approved**.  
 - Figma = UI reference only — standing rule.
 
 ---
@@ -287,7 +287,7 @@ Order mirrors W1: prerequisites first; each slice analyze → format → commit 
 
 Per standing rules:
 
-1. **Actors:** Teacher can complete day register reliably; Student + Parent see **the same attended definition** (per D1).  
+1. **Actors:** Teacher can complete day register reliably; Student + Parent see **the same attended definition** (D1 via `AttendancePolicy`).  
 2. **No invented Islamic/ops content**; no fake attendance stats.  
 3. **Reuse** existing pages/blocs/use cases — no parallel attendance stack.  
 4. **Firestore:** no unjustified new collections/fields.  
@@ -299,47 +299,7 @@ Per standing rules:
 
 ---
 
-## 11. Success criteria / test plan (post-approval)
-
-### Teacher
-
-1. Open class → attendance → mark all students → save.  
-2. Expect: one logical record per student for that day; reload shows same statuses.  
-3. Change a mark and save again → upsert, not duplicate.  
-4. Offline → clear error; no silent success.  
-5. Empty roster → honest empty (no crash).
-
-### Parent
-
-1. After teacher marks a week including `late` and `present`.  
-2. Expect: weekly numbers match **approved D1** rule.  
-3. No pending/fake rows.
-
-### Student
-
-1. Progress report 30-day metrics match **same D1 rule**.  
-2. Absences count only `absent` (unless D6 adds excused later).
-
-### Regression
-
-- W1 homework loop unchanged.  
-- Analytics still loads.  
-- `flutter analyze` clean.
-
----
-
 ## Approval gate
 
-**Phase 0 complete. No implementation until you approve.**
-
-Please confirm especially:
-
-1. **D1** late = attended? (A recommended)  
-2. **D2** absence notifications in W2? (C defer recommended)  
-3. **D3** استئذان in W2? (No recommended)  
-4. **D4** supervisor in W2? (No recommended)  
-5. **D6** excused status? (No recommended)  
-6. **D7** slot-linked attendance? (No recommended)  
-7. **D8** deterministic doc IDs? (Yes recommended)
-
-Once approved (with any adjustments), implementation starts with **Pre-Slice** (policy helper + indexes) then slices in order.
+**Phase 0 approved (D1–D8).** Implementation: Pre-Slice → Slice 1 → 2 → 3 → audit → production validation.  
+D2 notifications and D3 استئذان explicitly out of W2.

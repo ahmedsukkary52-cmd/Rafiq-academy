@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/analytics_entities.dart';
 import 'analytics_remote_datasource.dart';
 
@@ -91,13 +92,13 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
 
       final avgPerformance = totalGrades > 0 ? totalScore / totalGrades : 0.0;
 
-      // حساب نسبة الحضور
-      final presentCount = attendanceDocs
-          .where((d) => (d.data())['status'] == 'present')
-          .length;
-      final attendancePercent = attendanceDocs.isNotEmpty
-          ? (presentCount / attendanceDocs.length) * 100
-          : 0.0;
+      // حساب نسبة الحضور (D1: late counts as attended)
+      final statuses = attendanceDocs
+          .map((d) => (d.data())['status'] as String?)
+          .toList();
+      final attendancePercent = AttendancePolicy.attendancePercentFromStatuses(
+        statuses,
+      );
 
       // حساب الحضور الأسبوعي (آخر 7 أيام)
       final weeklyAttendance = _calculateWeeklyAttendance(attendanceDocs);
@@ -282,7 +283,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       final weekday = timestamp.toDate().weekday % 7; // 0=أحد
 
       totalPerDay[weekday] = (totalPerDay[weekday] ?? 0) + 1;
-      if (data['status'] == 'present') {
+      if (AttendancePolicy.isAttendedStatus(data['status'] as String?)) {
         presentPerDay[weekday] = (presentPerDay[weekday] ?? 0) + 1;
       }
     }

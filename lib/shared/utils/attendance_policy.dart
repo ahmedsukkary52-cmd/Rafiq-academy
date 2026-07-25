@@ -1,0 +1,57 @@
+/// Single product rule for attendance aggregates (W2 D1).
+///
+/// `late` counts as attended everywhere — Teacher analytics, Student progress,
+/// and Parent weekly report must use this helper (no local duplicates).
+class AttendancePolicy {
+  const AttendancePolicy._();
+
+  static const String statusPresent = 'present';
+  static const String statusAbsent = 'absent';
+  static const String statusLate = 'late';
+
+  /// Statuses that count toward attendance percentage / attended sessions.
+  static const Set<String> attendedStatuses = {statusPresent, statusLate};
+
+  static bool isAttendedStatus(String? status) =>
+      attendedStatuses.contains((status ?? '').trim());
+
+  static bool isAbsentStatus(String? status) => !isAttendedStatus(status);
+
+  static int countAttended(Iterable<String?> statuses) =>
+      statuses.where(isAttendedStatus).length;
+
+  static int countAbsent(Iterable<String?> statuses) =>
+      statuses.where(isAbsentStatus).length;
+
+  /// [attended] / [total] × 100. Returns 0 when [total] is 0.
+  static double attendancePercent({required int attended, required int total}) {
+    if (total <= 0) return 0;
+    return (attended / total) * 100;
+  }
+
+  static double attendancePercentFromStatuses(Iterable<String?> statuses) {
+    final list = statuses.toList();
+    return attendancePercent(attended: countAttended(list), total: list.length);
+  }
+
+  /// Calendar day at local midnight (W2 D7 — day-based, not slot-based).
+  static DateTime dayStart(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  static DateTime dayEndExclusive(DateTime date) =>
+      dayStart(date).add(const Duration(days: 1));
+
+  /// Deterministic doc id — no new fields (W2 D8).
+  /// Format: `{halaqaId}_{studentId}_{yyyyMMdd}`
+  static String documentId({
+    required String halaqaId,
+    required String studentId,
+    required DateTime date,
+  }) {
+    final d = dayStart(date);
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${halaqaId}_${studentId}_$y$m$day';
+  }
+}

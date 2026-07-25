@@ -5,6 +5,7 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../models/parent_model.dart';
 
@@ -66,9 +67,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
       final studentName = (userDoc.data())?['name'] ?? '';
 
-      final attended = attendanceSnap.docs
-          .where((d) => (d.data())['status'] == 'present')
-          .length;
+      final statuses = attendanceSnap.docs
+          .map((d) => (d.data())['status'] as String?)
+          .toList();
+      final attended = AttendancePolicy.countAttended(statuses);
 
       // D6 / Slice 5: count and surface only reviewed recitations — pending
       // homework submits are not final parent-facing activity.

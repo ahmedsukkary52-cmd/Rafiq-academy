@@ -29,7 +29,8 @@ class NotificationModel extends NotificationEntity {
       body: data['body'] ?? '',
       type: data['type'] ?? '',
       hasAudioAlert: data['hasAudioAlert'] as bool? ?? false,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      // Null while a server timestamp is still pending on the writing client.
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: readBy.contains(currentUid),
     );
   }

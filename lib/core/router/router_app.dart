@@ -91,6 +91,7 @@ class AppRoutes {
 
   // Other roles
   static const String parent = '/parent';
+  static const String parentNotifs = '/parent/notifications';
   static const String supervisor = '/supervisor';
   static const String admin = '/admin';
 }
@@ -347,6 +348,12 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.parent,
         builder: (_, __) => const ParentHomePage(),
+        routes: [
+          GoRoute(
+            path: 'notifications',
+            builder: (_, __) => const NotificationsPage(),
+          ),
+        ],
       ),
 
       // ── Supervisor ────────────────────────────────────────────

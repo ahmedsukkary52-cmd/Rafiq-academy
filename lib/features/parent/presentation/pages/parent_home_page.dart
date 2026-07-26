@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../notifications/presentation/bloc/notifications_bloc.dart';
+import '../../../notifications/presentation/bloc/notifications_event.dart';
+import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
@@ -24,13 +31,29 @@ class _ParentHomePageState extends State<ParentHomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadChildren());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  void _loadData() {
+    _loadChildren();
+    _watchNotifications();
   }
 
   void _loadChildren() {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
     context.read<ParentBloc>().add(LoadChildrenEvent(authState.user.uid));
+  }
+
+  void _watchNotifications() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+    sl<NotificationsBloc>().add(
+      StartWatchingNotificationsEvent(
+        uid: authState.user.uid,
+        role: AppRoles.parent,
+      ),
+    );
   }
 
   void _selectChild(String studentId) {
@@ -52,7 +75,28 @@ class _ParentHomePageState extends State<ParentHomePage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('نافذة ولي الأمر')),
+      appBar: AppBar(
+        title: const Text('نافذة ولي الأمر'),
+        actions: [
+          BlocSelector<NotificationsBloc, NotificationsState, int>(
+            bloc: sl<NotificationsBloc>(),
+            selector: (state) => state.unreadCount,
+            builder: (context, unreadCount) {
+              return Padding(
+                padding: const EdgeInsets.only(left: 8, right: 8),
+                child: NotificationBadge(
+                  count: unreadCount,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'الإشعارات',
+                    onPressed: () => context.push(AppRoutes.parentNotifs),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (prev, curr) =>
             prev.childrenStatus != curr.childrenStatus ||

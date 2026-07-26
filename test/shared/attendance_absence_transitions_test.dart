@@ -146,6 +146,72 @@ void main() {
     );
   });
 
+  group('AttendanceAbsenceTransitions.previousStatusByStudent', () {
+    AttendanceMarkRef ref({
+      required String id,
+      required String studentId,
+      String? status,
+    }) => AttendanceMarkRef(
+      id: id,
+      halaqaId: 'h1',
+      studentId: studentId,
+      date: day,
+      status: status,
+    );
+
+    String canonicalId(String studentId) => AttendancePolicy.documentId(
+      halaqaId: 'h1',
+      studentId: studentId,
+      date: day,
+    );
+
+    test('reads raw stored statuses without absent coercion', () {
+      final previous = AttendanceAbsenceTransitions.previousStatusByStudent([
+        ref(id: canonicalId('s1'), studentId: 's1', status: 'late'),
+        ref(id: canonicalId('s2'), studentId: 's2', status: 'weird'),
+        ref(id: canonicalId('s3'), studentId: 's3'),
+      ]);
+
+      expect(previous, {'s1': 'late', 's2': 'weird', 's3': null});
+    });
+
+    test('deterministic document wins over a legacy duplicate', () {
+      final legacyFirst = AttendanceAbsenceTransitions.previousStatusByStudent([
+        ref(id: 'legacyAutoId', studentId: 's1', status: 'present'),
+        ref(id: canonicalId('s1'), studentId: 's1', status: 'absent'),
+      ]);
+      final legacyLast = AttendanceAbsenceTransitions.previousStatusByStudent([
+        ref(id: canonicalId('s1'), studentId: 's1', status: 'absent'),
+        ref(id: 'legacyAutoId', studentId: 's1', status: 'present'),
+      ]);
+
+      expect(legacyFirst['s1'], 'absent');
+      expect(legacyLast['s1'], 'absent');
+    });
+
+    test('blank student ids are ignored', () {
+      final previous = AttendanceAbsenceTransitions.previousStatusByStudent([
+        ref(id: 'x', studentId: '  ', status: 'absent'),
+      ]);
+
+      expect(previous, isEmpty);
+    });
+
+    test('feeds the projector so a re-save of absent stays silent', () {
+      final previous = AttendanceAbsenceTransitions.previousStatusByStudent([
+        ref(id: canonicalId('s1'), studentId: 's1', status: 'absent'),
+      ]);
+
+      expect(
+        AttendanceAbsenceTransitions.project(
+          previousStatusByStudentId: previous,
+          currentMarks: [mark(id: 's1', status: 'absent')],
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   group('AcademyEventIds', () {
     test('in-app delivery id is parent-scoped', () {
       expect(

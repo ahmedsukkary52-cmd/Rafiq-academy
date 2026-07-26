@@ -60,6 +60,7 @@ class NotificationTypes {
   static const String achievement = 'achievement';
   static const String payment = 'payment';
   static const String assignment = 'assignment';
+  static const String attendance = 'attendance';
   static const String general = 'general';
 }
 

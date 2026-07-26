@@ -4,6 +4,8 @@ import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/domain/academy_event.dart';
+import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
@@ -70,9 +72,11 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   }
 
   @override
-  Future<void> saveDayAttendance(List<AttendanceRecordModel> records) async {
+  Future<List<AcademyEvent>> saveDayAttendance(
+    List<AttendanceRecordModel> records,
+  ) async {
     try {
-      if (records.isEmpty) return;
+      if (records.isEmpty) return const [];
 
       final halaqaId = records.first.halaqaId;
       final dayStart = AttendancePolicy.dayStart(records.first.date);
@@ -84,6 +88,22 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart))
           .where('date', isLessThan: Timestamp.fromDate(dayEnd))
           .get();
+
+      // Raw pre-save statuses; AttendanceRecordModel is deliberately not used
+      // here because it maps unknown → absent.
+      final previousStatuses =
+          AttendanceAbsenceTransitions.previousStatusByStudent(
+            existingSnap.docs.map((doc) {
+              final data = doc.data();
+              return AttendanceMarkRef(
+                id: doc.id,
+                halaqaId: (data['halaqaId'] as String?) ?? halaqaId,
+                studentId: (data['studentId'] as String?) ?? '',
+                date: dayStart,
+                status: data['status'] as String?,
+              );
+            }),
+          );
 
       // Firestore batch max is 500 ops; keep day save atomic (no split commits).
       final estimatedOps = records.length + existingSnap.docs.length;
@@ -135,6 +155,20 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
       }
 
       await batch.commit();
+
+      // Derived only from a committed save: no events for failed writes.
+      return AttendanceAbsenceTransitions.project(
+        previousStatusByStudentId: previousStatuses,
+        currentMarks: records.map(
+          (record) => AttendanceMarkInput(
+            studentId: record.studentId,
+            studentName: record.studentName,
+            halaqaId: record.halaqaId,
+            date: record.date,
+            status: record.wireStatus,
+          ),
+        ),
+      );
     } on ServerException {
       rethrow;
     } catch (e) {

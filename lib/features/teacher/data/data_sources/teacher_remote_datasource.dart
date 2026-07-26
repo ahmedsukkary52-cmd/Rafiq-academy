@@ -1,3 +1,4 @@
+import '../../../../shared/domain/academy_event.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
@@ -10,7 +11,12 @@ abstract class TeacherRemoteDatasource {
   Future<void> recordAttendance(AttendanceRecordModel record);
 
   /// Atomic save for a full day register (deterministic doc ids — W2 D8).
-  Future<void> saveDayAttendance(List<AttendanceRecordModel> records);
+  ///
+  /// Returns the academy events produced by the **committed** status
+  /// transitions. Delivery is not this layer's concern.
+  Future<List<AcademyEvent>> saveDayAttendance(
+    List<AttendanceRecordModel> records,
+  );
   Future<List<AttendanceRecordModel>> getHalaqaAttendanceForDate({
     required String halaqaId,
     required DateTime date,

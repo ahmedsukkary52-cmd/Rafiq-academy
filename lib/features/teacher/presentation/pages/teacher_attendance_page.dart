@@ -102,7 +102,14 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               curr.attendanceSubmissionStatus,
           listener: (context, state) {
             if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
-              AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
+              if (state.attendanceEventsUnpublished) {
+                AppSnackBar.showInfo(
+                  context,
+                  'تم حفظ الحضور، لكن تعذّر إبلاغ أولياء الأمور بالتغييرات',
+                );
+              } else {
+                AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
+              }
               context.read<TeacherBloc>().add(
                 const ResetAttendanceSubmissionEvent(),
               );

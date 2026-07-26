@@ -5,6 +5,7 @@ import '../../../../core/error/failure.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../entities/attendance_record_entity.dart';
+import '../entities/attendance_save_result.dart';
 import '../entities/halaqa_students_summary_entity.dart';
 
 enum AttendanceStatus { present, absent, late }
@@ -24,7 +25,10 @@ abstract class TeacherRepository {
   Future<Either<Failure, Unit>> recordAttendance(AttendanceRecordEntity record);
 
   /// حفظ سجل يوم كامل دفعة واحدة (atomic batch)
-  Future<Either<Failure, Unit>> saveDayAttendance(
+  ///
+  /// Attendance is the primary operation; the result reports how many academy
+  /// events the committed transitions produced and whether they were published.
+  Future<Either<Failure, AttendanceSaveResult>> saveDayAttendance(
     List<AttendanceRecordEntity> records,
   );
 

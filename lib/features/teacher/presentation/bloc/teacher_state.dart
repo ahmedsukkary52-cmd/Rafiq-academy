@@ -53,6 +53,9 @@ class TeacherState extends Equatable {
   final SubmissionStatus attendanceSubmissionStatus;
   final String? attendanceSubmissionError;
 
+  /// Register saved, but its academy events could not be published.
+  final bool attendanceEventsUnpublished;
+
   // ── تسجيل تقييم التسميع ───────────────────────────────────────────────
   final SubmissionStatus recitationSubmissionStatus;
   final String? recitationSubmissionError;
@@ -83,6 +86,7 @@ class TeacherState extends Equatable {
     this.attendanceError,
     this.attendanceSubmissionStatus = SubmissionStatus.idle,
     this.attendanceSubmissionError,
+    this.attendanceEventsUnpublished = false,
     this.recitationSubmissionStatus = SubmissionStatus.idle,
     this.recitationSubmissionError,
     this.assignmentSubmissionStatus = SubmissionStatus.idle,
@@ -113,6 +117,7 @@ class TeacherState extends Equatable {
     Object? attendanceError = _unset,
     SubmissionStatus? attendanceSubmissionStatus,
     Object? attendanceSubmissionError = _unset,
+    bool? attendanceEventsUnpublished,
     SubmissionStatus? recitationSubmissionStatus,
     Object? recitationSubmissionError = _unset,
     SubmissionStatus? assignmentSubmissionStatus,
@@ -161,6 +166,8 @@ class TeacherState extends Equatable {
       attendanceSubmissionError: identical(attendanceSubmissionError, _unset)
           ? this.attendanceSubmissionError
           : attendanceSubmissionError as String?,
+      attendanceEventsUnpublished:
+          attendanceEventsUnpublished ?? this.attendanceEventsUnpublished,
       recitationSubmissionStatus:
           recitationSubmissionStatus ?? this.recitationSubmissionStatus,
       recitationSubmissionError: identical(recitationSubmissionError, _unset)
@@ -197,6 +204,7 @@ class TeacherState extends Equatable {
     attendanceError,
     attendanceSubmissionStatus,
     attendanceSubmissionError,
+    attendanceEventsUnpublished,
     recitationSubmissionStatus,
     recitationSubmissionError,
     assignmentSubmissionStatus,

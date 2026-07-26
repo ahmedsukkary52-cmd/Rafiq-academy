@@ -31,6 +31,36 @@ class AttendanceAbsenceTransitions {
   static bool isExplicitAbsent(String? status) =>
       (status ?? '').trim() == AttendancePolicy.statusAbsent;
 
+  /// Canonical pre-save status per student from a day's stored marks.
+  ///
+  /// Mirrors [AttendancePolicy.uniqueDayStatuses]: when a legacy auto-id
+  /// duplicate and the deterministic document both exist, the deterministic
+  /// one is the truth. Statuses stay **raw** — no unknown → absent mapping.
+  static Map<String, String?> previousStatusByStudent(
+    Iterable<AttendanceMarkRef> dayMarks,
+  ) {
+    final statuses = <String, String?>{};
+    final canonical = <String>{};
+
+    for (final mark in dayMarks) {
+      final studentId = mark.studentId.trim();
+      if (studentId.isEmpty) continue;
+
+      final preferredId = AttendancePolicy.documentId(
+        halaqaId: mark.halaqaId,
+        studentId: studentId,
+        date: mark.date,
+      );
+      final isCanonical = mark.id == preferredId;
+      if (canonical.contains(studentId) && !isCanonical) continue;
+
+      statuses[studentId] = mark.status;
+      if (isCanonical) canonical.add(studentId);
+    }
+
+    return statuses;
+  }
+
   /// Derive academy events from previous day marks vs the marks being saved.
   ///
   /// [previousStatusByStudentId] must use **raw** status strings from Firestore

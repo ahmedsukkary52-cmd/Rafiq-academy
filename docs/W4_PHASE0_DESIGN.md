@@ -1,7 +1,7 @@
 # W4 — Absence Awareness & Parent Day Signal
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Phase 0 approved with workflow + multi-channel adjustments (2026-07-26). **Pre-Slice Pass** — see `docs/W4_PRESLICE_PRODUCTION_VALIDATION.md`. Awaiting Slice 1 approval.  
+**Status:** Phase 0 approved with workflow + multi-channel adjustments (2026-07-26). **Pre-Slice Pass** (`docs/W4_PRESLICE_PRODUCTION_VALIDATION.md`) · **Slice 1 Pass** (`docs/W4_SLICE1_PRODUCTION_VALIDATION.md`). Awaiting Slice 2 approval.  
 **Date:** 2026-07-26  
 **Predecessors:** W1 + W2 + W3 complete; `docs/POST_W3_PRODUCT_AUDIT.md` approved with Category A/B adjustment  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.  
@@ -385,11 +385,13 @@ Category B Release Readiness remains deferred and does not gate W4.
 
 | Option | Meaning |
 |--------|---------|
-| **A. Fail closed before any write if recipient resolution errors (recommended)** | Teacher retries; register and required signal cannot silently diverge |
-| B. Save attendance and show a partial warning | Needs a reliable retry path for the signal; none exists |
+| ~~A. Fail closed before any write if recipient resolution errors~~ | Superseded — see below |
+| **B. Save attendance and surface a partial warning (implemented in Slice 1)** | Attendance is the primary operation; a publication failure is reported, not hidden |
 | C. Best effort, silent | Unacceptable for the workflow's core promise |
 
 An empty recipient set is **not** an error: the register saves, but there is no linked parent to notify.
+
+**Superseded by the approved Slice 1 constraints (2026-07-26).** Publication must describe a *successful* attendance save, and recipient resolution must stay outside the attendance domain — so resolution cannot precede the commit. Attendance now commits first; a publication failure leaves the register valid and tells the teacher «تم حفظ الحضور، لكن تعذّر إبلاغ أولياء الأمور بالتغييرات». Because an unchanged re-save correctly emits no event, a failed publication is not repaired by retrying; a durable outbox or server-side trigger is out of W4 scope and is raised at the Slice 2 gate.
 
 ### D-W4-6 — Historical edits
 
@@ -449,14 +451,14 @@ Avoid blame, disciplinary language, and claims that an excuse was accepted.
 
 **Done.** Validation: `docs/W4_PRESLICE_PRODUCTION_VALIDATION.md`. No attendance↔notification coupling, no UI, no Category B. **Stop — await Slice 1 approval.**
 
-### Slice 1 — end-to-end parent awareness workflow
+### Slice 1 — end-to-end parent awareness workflow ✅ Pass
 
 1. After attendance SSOT save, derive academy events and publish through `AcademyEventSink`.
 2. Provide the W4 in-app notification sink (deterministic delivery ids; existing `notifications` schema).
 3. Compose `NotificationsPage` + unread badge into `ParentHomePage`; parent nested route + watcher restart.
 4. Keep weekly report unchanged as aggregate attendance truth.
 
-Immediately usable: teacher saves/corrects a register; linked parent can see the in-app projection of the attendance event.
+**Done.** Validation: `docs/W4_SLICE1_PRODUCTION_VALIDATION.md`. Teacher saves/corrects a register; every linked parent can see the in-app projection of the attendance event. **Stop — await Slice 2 approval.**
 
 ### Slice 2 — production validation and workflow closure
 

@@ -262,6 +262,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         attendanceSubmissionStatus: SubmissionStatus.submitting,
         attendanceSubmissionError: null,
+        attendanceEventsUnpublished: false,
       ),
     );
 
@@ -274,9 +275,12 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           attendanceSubmissionError: failure.message,
         ),
       ),
-      (_) {
+      (outcome) {
         emit(
-          state.copyWith(attendanceSubmissionStatus: SubmissionStatus.success),
+          state.copyWith(
+            attendanceSubmissionStatus: SubmissionStatus.success,
+            attendanceEventsUnpublished: outcome.hasUnpublishedEvents,
+          ),
         );
         if (event.records.isNotEmpty) {
           add(
@@ -300,6 +304,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         attendanceSubmissionStatus: SubmissionStatus.idle,
         attendanceSubmissionError: null,
+        attendanceEventsUnpublished: false,
       ),
     );
   }

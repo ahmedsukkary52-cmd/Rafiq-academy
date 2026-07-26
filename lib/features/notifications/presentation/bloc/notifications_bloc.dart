@@ -36,9 +36,16 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     StartWatchingNotificationsEvent event,
     Emitter<NotificationsState> emit,
   ) async {
+    // The bloc is a singleton, so a different identity must not inherit the
+    // previous account's list while the new stream is still loading.
+    final identityChanged = _currentUid != null && _currentUid != event.uid;
     _currentUid = event.uid;
 
-    emit(state.copyWith(status: SectionStatus.loading, error: null));
+    emit(
+      identityChanged
+          ? NotificationsState.initial().copyWith(status: SectionStatus.loading)
+          : state.copyWith(status: SectionStatus.loading, error: null),
+    );
 
     await emit.forEach(
       watchNotifications(

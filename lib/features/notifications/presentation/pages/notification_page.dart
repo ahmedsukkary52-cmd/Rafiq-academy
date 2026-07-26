@@ -363,6 +363,10 @@ class _NotificationTile extends StatelessWidget {
       emoji: '📝',
       bgColor: Color(0xFFE3F2FD),
     ),
+    'attendance' => const _NotifTypeInfo(
+      emoji: '📋',
+      bgColor: Color(0xFFE0F2F1),
+    ),
     'message' => const _NotifTypeInfo(emoji: '💬', bgColor: Color(0xFFF3E5F5)),
     _ => const _NotifTypeInfo(emoji: '🔔', bgColor: Color(0xFFF5F5F5)),
   };

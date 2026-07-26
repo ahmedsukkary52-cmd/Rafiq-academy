@@ -4,10 +4,13 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/academy_event.dart';
+import '../../../../shared/domain/academy_event_sink.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
+import '../../domain/entities/attendance_save_result.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../data_sources/teacher_remote_datasource.dart';
@@ -18,9 +21,13 @@ class TeacherRepositoryImpl implements TeacherRepository {
   final TeacherRemoteDatasource remoteDatasource;
   final NetworkInfo networkInfo;
 
+  /// Delivery port. The teacher feature never learns which channels exist.
+  final AcademyEventSink eventSink;
+
   const TeacherRepositoryImpl({
     required this.remoteDatasource,
     required this.networkInfo,
+    required this.eventSink,
   });
 
   @override
@@ -51,16 +58,19 @@ class TeacherRepositoryImpl implements TeacherRepository {
   Future<Either<Failure, Unit>> recordAttendance(
     AttendanceRecordEntity record,
   ) async {
-    return saveDayAttendance([record]);
+    final result = await saveDayAttendance([record]);
+    return result.map((_) => unit);
   }
 
   @override
-  Future<Either<Failure, Unit>> saveDayAttendance(
+  Future<Either<Failure, AttendanceSaveResult>> saveDayAttendance(
     List<AttendanceRecordEntity> records,
   ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+
+    final List<AcademyEvent> events;
     try {
-      await remoteDatasource.saveDayAttendance(
+      events = await remoteDatasource.saveDayAttendance(
         records
             .map(
               (record) => AttendanceRecordModel(
@@ -75,9 +85,23 @@ class TeacherRepositoryImpl implements TeacherRepository {
             )
             .toList(),
       );
-      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    }
+
+    if (events.isEmpty) return const Right(AttendanceSaveResult.noEvents());
+
+    // Attendance is already committed and stays the source of truth, so a sink
+    // failure degrades publication only — it never invalidates the register.
+    try {
+      await eventSink.publish(events);
+      return Right(
+        AttendanceSaveResult(eventCount: events.length, eventsPublished: true),
+      );
+    } catch (_) {
+      return Right(
+        AttendanceSaveResult(eventCount: events.length, eventsPublished: false),
+      );
     }
   }
 

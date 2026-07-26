@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/services/parent_recipient_resolver.dart';
 import '../models/parent_model.dart';
 
 @LazySingleton(as: ParentRemoteDatasource)
@@ -30,6 +31,42 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       if (!doc.exists) return [];
       final data = doc.data() as Map<String, dynamic>;
       return List<String>.from(data['childrenIds'] ?? []);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<Map<String, List<String>>> getParentIdsByStudentIds(
+    List<String> studentIds,
+  ) async {
+    try {
+      final requested = ParentRecipientResolver.normalizeStudentIds(studentIds);
+      if (requested.isEmpty) return {};
+
+      final requestedSet = requested.toSet();
+      final result = <String, List<String>>{};
+      final chunks = ParentRecipientResolver.chunkStudentIds(requested);
+
+      for (final chunk in chunks) {
+        final snap = await firestore
+            .collection(FirestoreCollections.parentProfiles)
+            .where('childrenIds', arrayContainsAny: chunk)
+            .get();
+
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final children = List<String>.from(data['childrenIds'] ?? []);
+          ParentRecipientResolver.mergeParentProfile(
+            into: result,
+            parentId: doc.id,
+            childrenIds: children,
+            requestedStudentIds: requestedSet,
+          );
+        }
+      }
+
+      return result;
     } catch (e) {
       throw ServerException(e.toString());
     }

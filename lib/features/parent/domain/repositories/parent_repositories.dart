@@ -12,6 +12,11 @@ abstract class ParentRepository {
   /// جلب معرّفات أبناء ولي الأمر
   Future<Either<Failure, List<String>>> getChildrenIds(String parentId);
 
+  /// Reverse lookup: student UIDs → linked parent profile IDs.
+  Future<Either<Failure, Map<String, List<String>>>> getParentIdsByStudentIds(
+    List<String> studentIds,
+  );
+
   /// التقرير الأسبوعي للطالب
   Future<Either<Failure, WeeklyReportEntity>> getWeeklyReport({
     required String studentId,

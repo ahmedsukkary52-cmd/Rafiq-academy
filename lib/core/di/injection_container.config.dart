@@ -315,6 +315,7 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/update_recitation
     as _i1070;
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
     as _i933;
+import 'package:rafiq_academy/shared/domain/academy_event_sink.dart' as _i273;
 
 extension GetItInjectableX on _i174.GetIt {
   // initializes the registration of main-scope dependencies inside of GetIt
@@ -346,6 +347,9 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
         mp3QuranCatalog: gh<_i638.Mp3QuranCatalogService>(),
       ),
+    );
+    gh.lazySingleton<_i273.AcademyEventSink>(
+      () => const _i273.NoOpAcademyEventSink(),
     );
     gh.lazySingleton<_i174.AudioLibraryRepository>(
       () => _i4.AudioLibraryRepositoryImpl(

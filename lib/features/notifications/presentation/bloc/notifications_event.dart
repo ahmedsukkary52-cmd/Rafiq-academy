@@ -34,3 +34,12 @@ class MarkNotificationAsReadEvent extends NotificationsEvent {
 class MarkAllNotificationsAsReadEvent extends NotificationsEvent {
   const MarkAllNotificationsAsReadEvent();
 }
+
+/// Clears the singleton inbox and drops the active identity.
+///
+/// Used on logout so the next account never inherits unread count / list.
+/// The next [StartWatchingNotificationsEvent] cancels the previous watch
+/// (restartable). Snapshots that arrive after stop are ignored.
+class StopWatchingNotificationsEvent extends NotificationsEvent {
+  const StopWatchingNotificationsEvent();
+}

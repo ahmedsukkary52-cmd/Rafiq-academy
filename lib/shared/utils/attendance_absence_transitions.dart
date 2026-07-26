@@ -33,9 +33,10 @@ class AttendanceAbsenceTransitions {
 
   /// Canonical pre-save status per student from a day's stored marks.
   ///
-  /// Mirrors [AttendancePolicy.uniqueDayStatuses]: when a legacy auto-id
-  /// duplicate and the deterministic document both exist, the deterministic
-  /// one is the truth. Statuses stay **raw** — no unknown → absent mapping.
+  /// Mirrors the deterministic-id-wins rule in
+  /// [AttendancePolicy.uniqueDayStatuses], but returns a per-student map of
+  /// **raw** status strings (no unknown → absent mapping). Keep those two
+  /// rules aligned when either changes.
   static Map<String, String?> previousStatusByStudent(
     Iterable<AttendanceMarkRef> dayMarks,
   ) {

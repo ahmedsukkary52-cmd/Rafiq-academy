@@ -90,6 +90,9 @@ class AttendancePolicy {
 
   /// One status per (halaqa, student, calendar day).
   /// Deterministic document ids win over legacy auto-id duplicates.
+  ///
+  /// W4 absence transitions use the same win rule via
+  /// [AttendanceAbsenceTransitions.previousStatusByStudent] — keep aligned.
   static List<String?> uniqueDayStatuses(Iterable<AttendanceMarkRef> marks) {
     final byKey = <String, String?>{};
     for (final mark in marks) {

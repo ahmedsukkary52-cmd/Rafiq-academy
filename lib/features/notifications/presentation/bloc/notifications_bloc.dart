@@ -28,8 +28,17 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       _onStartWatching,
       transformer: restartable(),
     );
+    on<StopWatchingNotificationsEvent>(_onStopWatching);
     on<MarkNotificationAsReadEvent>(_onMarkAsRead);
     on<MarkAllNotificationsAsReadEvent>(_onMarkAllAsRead);
+  }
+
+  Future<void> _onStopWatching(
+    StopWatchingNotificationsEvent event,
+    Emitter<NotificationsState> emit,
+  ) async {
+    _currentUid = null;
+    emit(NotificationsState.initial());
   }
 
   Future<void> _onStartWatching(
@@ -51,14 +60,22 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       watchNotifications(
         WatchNotificationsParams(uid: event.uid, role: event.role),
       ),
-      onData: (either) => either.fold(
-        (failure) =>
-            state.copyWith(status: SectionStatus.error, error: failure.message),
-        (notifications) => state.copyWith(
-          status: SectionStatus.loaded,
-          notifications: notifications,
-        ),
-      ),
+      onData: (either) {
+        // Logout (or a newer watch) may have cleared identity while this
+        // subscription was still delivering — ignore stale snapshots.
+        if (_currentUid != event.uid) return state;
+
+        return either.fold(
+          (failure) => state.copyWith(
+            status: SectionStatus.error,
+            error: failure.message,
+          ),
+          (notifications) => state.copyWith(
+            status: SectionStatus.loaded,
+            notifications: notifications,
+          ),
+        );
+      },
     );
   }
 

@@ -67,9 +67,9 @@ The weekly report still reads `attendanceRecords` directly. Nothing downstream r
 
 Phase 0 recommended **fail closed before any write** if recipient resolution errors. Slice 1 constraint 2 makes the attendance write the primary operation and requires events to describe a *successful* save, so resolution can no longer run before the commit without attendance depending on recipients (constraint 5).
 
-**Implemented instead:** attendance commits first and stays valid; if publication fails the register is still saved and the teacher is told plainly — «تم حفظ الحضور، لكن تعذّر إبلاغ أولياء الأمور بالتغييرات». It is surfaced, not silent.
+**Implemented instead:** attendance commits first and stays valid; if publication fails the register is still saved and the teacher is told plainly — «تم حفظ الحضور، لكن تعذّر نشر تحديثات الغياب». It is surfaced, not silent.
 
-**Known limitation (accepted for now):** because a repeat save of an unchanged absence correctly emits nothing (constraint 3), retrying does not re-attempt a failed publication. A durable retry would need an outbox or a server-side trigger — both out of W4 scope. Flagged for the Slice 2 gate.
+**Architectural limitation (formalized Slice 2):** event delivery on this client path is **at-most-once**. An identical re-save correctly emits no events, so a failed publication is not repaired by retry. Classified as **Category B – Platform Hardening (B-R8)**; eventual outbox / server trigger / event queue — **not W4**. See `docs/W4_PHASE0_DESIGN.md` and `docs/POST_W3_PRODUCT_AUDIT.md` §5.2.
 
 ---
 

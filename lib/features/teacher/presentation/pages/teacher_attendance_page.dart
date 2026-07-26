@@ -105,7 +105,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               if (state.attendanceEventsUnpublished) {
                 AppSnackBar.showInfo(
                   context,
-                  'تم حفظ الحضور، لكن تعذّر إبلاغ أولياء الأمور بالتغييرات',
+                  'تم حفظ الحضور، لكن تعذّر نشر تحديثات الغياب',
                 );
               } else {
                 AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');

@@ -13,6 +13,8 @@ import 'features/parent/presentation/bloc/parent_bloc.dart';
 import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
+import 'features/notifications/presentation/bloc/notifications_event.dart';
+import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/analytics/presentation/bloc/analytics_bloc.dart';
 import 'features/awards/presentation/bloc/awards_bloc.dart';
 import 'features/calendar/presentation/bloc/calendar_bloc.dart';
@@ -26,19 +28,16 @@ import 'shared/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initDependencies();
 
   final prefs = await SharedPreferences.getInstance();
-  final onboardingSeen =
-  ValueNotifier<bool>(prefs.getBool(onboardingSeenPrefKey) ?? false);
+  final onboardingSeen = ValueNotifier<bool>(
+    prefs.getBool(onboardingSeenPrefKey) ?? false,
+  );
   final appPreferences = await AppPreferencesController.load(prefs);
 
-  runApp(
-    MyApp(onboardingSeen: onboardingSeen, appPreferences: appPreferences),
-  );
+  runApp(MyApp(onboardingSeen: onboardingSeen, appPreferences: appPreferences));
 }
 
 class MyApp extends StatelessWidget {
@@ -53,8 +52,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authBloc = sl<AuthBloc>()
-      ..add(const CheckAuthStatusEvent());
+    final authBloc = sl<AuthBloc>()..add(const CheckAuthStatusEvent());
 
     return MultiBlocProvider(
       providers: [
@@ -72,36 +70,46 @@ class MyApp extends StatelessWidget {
         BlocProvider.value(value: sl<ChatConversationsBloc>()),
         BlocProvider.value(value: sl<PostsBloc>()),
       ],
-      child: AppPreferencesScope(
-        controller: appPreferences,
-        child: ValueListenableBuilder<ThemeMode>(
-          valueListenable: appPreferences.themeMode,
-          builder: (context, themeMode, _) {
-            return ValueListenableBuilder<AppFontSize>(
-              valueListenable: appPreferences.fontSize,
-              builder: (context, fontSize, _) {
-                return MaterialApp.router(
-                  debugShowCheckedModeBanner: false,
-                  title: 'أكاديمية رفيق',
-                  theme: AppTheme.theme,
-                  darkTheme: AppTheme.darkTheme,
-                  themeMode: themeMode,
-                  builder: (context, child) {
-                    return MediaQuery(
-                      data: MediaQuery.of(context).copyWith(
-                        textScaler: TextScaler.linear(fontSize.scale),
-                      ),
-                      child: child!,
-                    );
-                  },
-                  routerConfig: AppRouter(
-                    authBloc: authBloc,
-                    onboardingSeen: onboardingSeen,
-                  ).router,
-                );
-              },
-            );
-          },
+      child: BlocListener<AuthBloc, AuthState>(
+        listenWhen: (previous, current) =>
+            current is AuthUnauthenticated && previous is! AuthUnauthenticated,
+        listener: (context, state) {
+          // Singleton inbox must not survive logout (W4 G6 / Slice 2).
+          context.read<NotificationsBloc>().add(
+            const StopWatchingNotificationsEvent(),
+          );
+        },
+        child: AppPreferencesScope(
+          controller: appPreferences,
+          child: ValueListenableBuilder<ThemeMode>(
+            valueListenable: appPreferences.themeMode,
+            builder: (context, themeMode, _) {
+              return ValueListenableBuilder<AppFontSize>(
+                valueListenable: appPreferences.fontSize,
+                builder: (context, fontSize, _) {
+                  return MaterialApp.router(
+                    debugShowCheckedModeBanner: false,
+                    title: 'أكاديمية رفيق',
+                    theme: AppTheme.theme,
+                    darkTheme: AppTheme.darkTheme,
+                    themeMode: themeMode,
+                    builder: (context, child) {
+                      return MediaQuery(
+                        data: MediaQuery.of(context).copyWith(
+                          textScaler: TextScaler.linear(fontSize.scale),
+                        ),
+                        child: child!,
+                      );
+                    },
+                    routerConfig: AppRouter(
+                      authBloc: authBloc,
+                      onboardingSeen: onboardingSeen,
+                    ).router,
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );

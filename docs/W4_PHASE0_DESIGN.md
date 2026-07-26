@@ -1,7 +1,7 @@
 # W4 — Absence Awareness & Parent Day Signal
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Phase 0 approved with workflow + multi-channel adjustments (2026-07-26). **Pre-Slice Pass** (`docs/W4_PRESLICE_PRODUCTION_VALIDATION.md`) · **Slice 1 Pass** (`docs/W4_SLICE1_PRODUCTION_VALIDATION.md`). Awaiting Slice 2 approval.  
+**Status:** Phase 0 approved with workflow + multi-channel adjustments (2026-07-26). **Pre-Slice Pass** · **Slice 1 Pass** · **Slice 2 Pass** (`docs/W4_SLICE2_PRODUCTION_VALIDATION.md`). **W4 COMPLETE** pending product owner acknowledgement of Category B at-most-once publication (B-R8).  
 **Date:** 2026-07-26  
 **Predecessors:** W1 + W2 + W3 complete; `docs/POST_W3_PRODUCT_AUDIT.md` approved with Category A/B adjustment  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.  
@@ -391,7 +391,21 @@ Category B Release Readiness remains deferred and does not gate W4.
 
 An empty recipient set is **not** an error: the register saves, but there is no linked parent to notify.
 
-**Superseded by the approved Slice 1 constraints (2026-07-26).** Publication must describe a *successful* attendance save, and recipient resolution must stay outside the attendance domain — so resolution cannot precede the commit. Attendance now commits first; a publication failure leaves the register valid and tells the teacher «تم حفظ الحضور، لكن تعذّر إبلاغ أولياء الأمور بالتغييرات». Because an unchanged re-save correctly emits no event, a failed publication is not repaired by retrying; a durable outbox or server-side trigger is out of W4 scope and is raised at the Slice 2 gate.
+**Superseded by the approved Slice 1 constraints (2026-07-26).** Publication must describe a *successful* attendance save, and recipient resolution must stay outside the attendance domain — so resolution cannot precede the commit. Attendance now commits first; a publication failure leaves the register valid and tells the teacher «تم حفظ الحضور، لكن تعذّر نشر تحديثات الغياب».
+
+### Architectural limitation — at-most-once delivery (approved Category B)
+
+| Tag | Statement |
+|-----|-----------|
+| **Verified** | Attendance is primary; publication is a secondary projection; attendance must never roll back because delivery failed |
+| **Verified** | Transition detection is idempotent: identical re-save of an unchanged absence correctly emits **no** events |
+| **Verified** | Therefore a failed publication after a successful save is **not** repaired by replaying the same save |
+| **Product Decision** | W4 accepts **at-most-once** event delivery for this client path |
+| **Classification** | **Category B — Platform Hardening** (Release Readiness). **Do not solve inside W4.** |
+
+**Eventual solutions (platform, not client):** transactional outbox, server-side trigger on `attendanceRecords`, or an event queue. **Not** additional client-side retry / re-derive logic that would blur attendance facts with delivery.
+
+Tracked as **B-R8** in `docs/POST_W3_PRODUCT_AUDIT.md`.
 
 ### D-W4-6 — Historical edits
 
@@ -460,14 +474,17 @@ Avoid blame, disciplinary language, and claims that an excuse was accepted.
 
 **Done.** Validation: `docs/W4_SLICE1_PRODUCTION_VALIDATION.md`. Teacher saves/corrects a register; every linked parent can see the in-app projection of the attendance event. **Stop — await Slice 2 approval.**
 
-### Slice 2 — production validation and workflow closure
+### Slice 2 — production validation and workflow closure ✅ Pass
 
 - First absent save, identical re-save, absent→present, absent→late.
 - Current and historical editable dates.
 - No linked parent, one parent, multiple parents, multiple children.
 - Attendance remains SSOT even if a future channel is added.
 - Parent loading/empty/error/retry, unread/read behavior, logout/account switching.
+- Ownership audit: no duplicated transition / recipient / composition logic carried forward.
 - W1/W2/W3 regression suite, analyze, format, tests, docs, commit, push.
+
+**Done.** Validation: `docs/W4_SLICE2_PRODUCTION_VALIDATION.md`. At-most-once publication documented as Category B (B-R8). **Stop — await acknowledgement that W4 is complete for product scope.**
 
 ---
 
@@ -485,6 +502,7 @@ Avoid blame, disciplinary language, and claims that an excuse was accepted.
 - ❌ New session IDs or slot-bound attendance
 - ❌ New Firestore collection
 - ❌ Category B Platform Hardening (rules, deploy config, CI, release pipeline)
+- ❌ Durable / exactly-once event delivery (transactional outbox, server trigger, event queue) — **B-R8**
 
 ---
 
@@ -497,7 +515,8 @@ Avoid blame, disciplinary language, and claims that an excuse was accepted.
 | Unknown/null status interpreted as absent | Architecture | Explicit status transition policy; tests |
 | Parent lookup N+1 | Performance | Chunked `arrayContainsAny`, once per save |
 | Signal writes exceed 500-op batch | Scale | Include every write/delete in preflight |
-| Notification failure blocks core attendance | Product trade-off | D-W4-5 approval; no silent partial state |
+| Notification failure blocks core attendance | Product trade-off | Attendance stays committed; teacher is told publication failed (channel-neutral copy) |
+| Failed publication lost on identical re-save | **Category B (B-R8)** | Documented at-most-once; outbox / server trigger / queue later — **not W4** |
 | No linked parent | Product reality | Attendance succeeds; no fake recipient |
 | Parent sees previous account's notifications | Stale singleton state | Clear/restart watcher on identity/audience change |
 | User expects phone push | UX | Explicit in-app scope/copy; no push promise |
@@ -530,4 +549,6 @@ W4 is complete only if:
 
 D-W4-1 … D-W4-10 remain as recommended **A** unless superseded later.
 
-**Pre-Slice complete and validated.** Stop — await approval before Slice 1.
+**Pre-Slice + Slice 1 + Slice 2 production-validated (Pass).**  
+
+Product workflow W4 is closed on the client path. Category B item **B-R8** (at-most-once academy-event delivery) remains for Release Readiness and must **not** be solved with more client logic.

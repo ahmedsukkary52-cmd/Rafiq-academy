@@ -405,6 +405,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         assignmentSubmissionStatus: SubmissionStatus.submitting,
         assignmentSubmissionError: null,
+        assignmentEventsUnpublished: false,
       ),
     );
 
@@ -425,9 +426,12 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           assignmentSubmissionError: failure.message,
         ),
       ),
-      (_) {
+      (outcome) {
         emit(
-          state.copyWith(assignmentSubmissionStatus: SubmissionStatus.success),
+          state.copyWith(
+            assignmentSubmissionStatus: SubmissionStatus.success,
+            assignmentEventsUnpublished: outcome.hasUnpublishedEvents,
+          ),
         );
         // W3: remaining-work agenda must refresh after homework write.
         add(const LoadTodayAgendaEvent());
@@ -443,6 +447,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         assignmentSubmissionStatus: SubmissionStatus.idle,
         assignmentSubmissionError: null,
+        assignmentEventsUnpublished: false,
       ),
     );
   }

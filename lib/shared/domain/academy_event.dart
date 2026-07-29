@@ -5,11 +5,12 @@ import '../utils/attendance_policy.dart';
 /// Stable operational facts in the academy.
 ///
 /// An [AcademyEvent] is **what happened** — never a notification command.
-/// Delivery channels (in-app, later FCM/SMS/…) project the fact; they do not
-/// redefine it. Emitters must not change when a new observer subscribes.
+/// Payload = minimum immutable facts at occurrence time (ids, timestamps,
+/// actor, affected entity, workflow fact). No presentation copy.
 ///
-/// SSOT documents (attendance, assignments, recitation records) remain truth.
-/// Events are derived facts that observers may consume.
+/// Once an event kind is emitted on a live write path it is a **stable
+/// contract**: do not rename or change its meaning; evolve by adding a new
+/// event kind. Observers must not break because another workflow evolves.
 sealed class AcademyEvent extends Equatable {
   const AcademyEvent();
 
@@ -21,6 +22,9 @@ sealed class AcademyEvent extends Equatable {
 }
 
 /// Student transitioned to an explicit `absent` mark for a calendar day.
+///
+/// Public since W4 — stable contract. [studentName] was part of the original
+/// public payload and must not be removed silently (versioning rule).
 class StudentAbsentRecorded extends AcademyEvent {
   @override
   final String studentId;
@@ -51,6 +55,8 @@ class StudentAbsentRecorded extends AcademyEvent {
 }
 
 /// Student previously marked explicitly absent was corrected to present/late.
+///
+/// Public since W4 — stable contract.
 class StudentAbsenceCorrected extends AcademyEvent {
   @override
   final String studentId;
@@ -88,13 +94,14 @@ class StudentAbsenceCorrected extends AcademyEvent {
 
 /// Homework (assignment document) was committed for a student.
 ///
-/// Fact only — not "notify parent" / "send inbox card".
+/// Fact only — IDs, actor, due date, assigned ranges. Display names are
+/// enriched by delivery/observers when needed.
 class HomeworkAssigned extends AcademyEvent {
   final String assignmentId;
   @override
   final String studentId;
-  final String studentName;
   final String halaqaId;
+  final String assignedBy;
   final DateTime dueDate;
   final String newMemorizationRange;
   final String reviewRange;
@@ -102,8 +109,8 @@ class HomeworkAssigned extends AcademyEvent {
   const HomeworkAssigned({
     required this.assignmentId,
     required this.studentId,
-    required this.studentName,
     required this.halaqaId,
+    required this.assignedBy,
     required this.dueDate,
     required this.newMemorizationRange,
     required this.reviewRange,
@@ -116,8 +123,8 @@ class HomeworkAssigned extends AcademyEvent {
   List<Object?> get props => [
     assignmentId,
     studentId,
-    studentName,
     halaqaId,
+    assignedBy,
     dueDate,
     newMemorizationRange,
     reviewRange,
@@ -126,16 +133,15 @@ class HomeworkAssigned extends AcademyEvent {
 
 /// A recitation record became reviewed (grade available as academy fact).
 ///
-/// Fact only — observers decide who should know; channels decide how.
+/// Not yet public on a live write path (Slice 2). Payload stays fact-only.
 class HomeworkReviewed extends AcademyEvent {
   final String recitationRecordId;
   @override
   final String studentId;
-  final String studentName;
   final String halaqaId;
   final DateTime date;
 
-  /// Grade as stored on the SSOT recitation document (display/wire today).
+  /// Grade strings as stored on the SSOT recitation document.
   final String? grade;
   final String? behaviorGrade;
   final String versesRange;
@@ -143,7 +149,6 @@ class HomeworkReviewed extends AcademyEvent {
   const HomeworkReviewed({
     required this.recitationRecordId,
     required this.studentId,
-    required this.studentName,
     required this.halaqaId,
     required this.date,
     this.grade,
@@ -158,7 +163,6 @@ class HomeworkReviewed extends AcademyEvent {
   List<Object?> get props => [
     recitationRecordId,
     studentId,
-    studentName,
     halaqaId,
     date,
     grade,

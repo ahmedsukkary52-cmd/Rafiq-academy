@@ -8,14 +8,15 @@ import '../entities/notification_signal_ids.dart';
 /// Delivery-layer mapping: academy facts + resolved observers → in-app messages.
 ///
 /// Owns **how** (wording, type, deterministic card id) for the in-app channel
-/// only. Whether an event exists is academy-domain; who should know is the
-/// observer layer.
+/// only. Display names may be enriched by the handler — they are not event
+/// payload.
 class InAppAcademySignalComposer {
   const InAppAcademySignalComposer._();
 
   static List<NotificationSignal> compose({
     required Iterable<AcademyEvent> events,
     required Map<String, List<String>> observerIdsByEventId,
+    Map<String, String> studentNamesById = const {},
   }) {
     final signals = <NotificationSignal>[];
 
@@ -23,8 +24,6 @@ class InAppAcademySignalComposer {
       final observers = observerIdsByEventId[event.eventId] ?? const <String>[];
       if (observers.isEmpty) continue;
 
-      final title = _title(event);
-      final body = _body(event);
       final type = _type(event);
 
       for (final observerId in observers) {
@@ -35,8 +34,12 @@ class InAppAcademySignalComposer {
               eventId: event.eventId,
             ),
             audience: observerId,
-            title: title,
-            body: body,
+            title: _title(event),
+            body: _body(
+              event,
+              observerId: observerId,
+              studentNamesById: studentNamesById,
+            ),
             type: type,
           ),
         );
@@ -59,17 +62,26 @@ class InAppAcademySignalComposer {
     HomeworkReviewed() => 'تم تقييم التسميع',
   };
 
-  static String _body(AcademyEvent event) {
-    final name = _studentLabel(event);
+  static String _body(
+    AcademyEvent event, {
+    required String observerId,
+    required Map<String, String> studentNamesById,
+  }) {
+    final name = _studentLabel(event, studentNamesById);
 
     return switch (event) {
       StudentAbsentRecorded(:final date) =>
         'تم تسجيل غياب $name بتاريخ ${formatDateDmy(date)}',
       StudentAbsenceCorrected(:final date, :final correctedToStatus) =>
         'تم تحديث حالة $name بتاريخ ${formatDateDmy(date)} إلى ${_statusLabel(correctedToStatus)}',
-      HomeworkAssigned(:final newMemorizationRange, :final reviewRange) =>
+      HomeworkAssigned(
+        :final studentId,
+        :final newMemorizationRange,
+        :final reviewRange,
+      ) =>
         _homeworkAssignedBody(
-          name: name,
+          forSubjectStudent: observerId == studentId,
+          studentLabel: name,
           newMemorizationRange: newMemorizationRange,
           reviewRange: reviewRange,
         ),
@@ -80,18 +92,27 @@ class InAppAcademySignalComposer {
     };
   }
 
+  /// Preserve legacy student wording; parents get a child-scoped fact line.
   static String _homeworkAssignedBody({
-    required String name,
+    required bool forSubjectStudent,
+    required String studentLabel,
     required String newMemorizationRange,
     required String reviewRange,
   }) {
     final rangeHint = newMemorizationRange.trim().isNotEmpty
         ? newMemorizationRange.trim()
         : reviewRange.trim();
-    if (rangeHint.isEmpty) {
-      return 'تم تعيين تكليف جديد لـ $name';
+
+    if (forSubjectStudent) {
+      return rangeHint.isEmpty
+          ? 'لديك تكليف جديد — افتح واجباتي'
+          : 'تكليف جديد: $rangeHint — افتح واجباتي';
     }
-    return 'تم تعيين تكليف لـ $name: $rangeHint';
+
+    if (rangeHint.isEmpty) {
+      return 'تم تعيين تكليف جديد لـ $studentLabel';
+    }
+    return 'تم تعيين تكليف لـ $studentLabel: $rangeHint';
   }
 
   static String _statusLabel(String status) => switch (status) {
@@ -99,14 +120,17 @@ class InAppAcademySignalComposer {
     _ => 'حاضر',
   };
 
-  static String _studentLabel(AcademyEvent event) {
-    final name = switch (event) {
+  static String _studentLabel(
+    AcademyEvent event,
+    Map<String, String> studentNamesById,
+  ) {
+    final fromEvent = switch (event) {
       StudentAbsentRecorded(:final studentName) => studentName,
       StudentAbsenceCorrected(:final studentName) => studentName,
-      HomeworkAssigned(:final studentName) => studentName,
-      HomeworkReviewed(:final studentName) => studentName,
+      HomeworkAssigned() ||
+      HomeworkReviewed() => studentNamesById[event.studentId] ?? '',
     };
-    final trimmed = name.trim();
+    final trimmed = fromEvent.trim();
     return trimmed.isEmpty ? 'الطالب' : trimmed;
   }
 }

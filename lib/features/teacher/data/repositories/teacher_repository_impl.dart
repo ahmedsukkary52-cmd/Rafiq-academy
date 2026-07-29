@@ -5,12 +5,12 @@ import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/academy_event.dart';
+import '../../../../shared/domain/academy_event_publication.dart';
 import '../../../../shared/domain/academy_event_sink.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
-import '../../domain/entities/attendance_save_result.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../data_sources/teacher_remote_datasource.dart';
@@ -21,7 +21,7 @@ class TeacherRepositoryImpl implements TeacherRepository {
   final TeacherRemoteDatasource remoteDatasource;
   final NetworkInfo networkInfo;
 
-  /// Delivery port. The teacher feature never learns which channels exist.
+  /// Delivery port. The teacher feature never learns which handlers exist.
   final AcademyEventSink eventSink;
 
   const TeacherRepositoryImpl({
@@ -29,6 +29,25 @@ class TeacherRepositoryImpl implements TeacherRepository {
     required this.networkInfo,
     required this.eventSink,
   });
+
+  /// SSOT is already committed; sink failure never rolls it back.
+  Future<AcademyEventPublication> _publishAfterCommit(
+    List<AcademyEvent> events,
+  ) async {
+    if (events.isEmpty) return const AcademyEventPublication.none();
+    try {
+      await eventSink.publish(events);
+      return AcademyEventPublication(
+        eventCount: events.length,
+        eventsPublished: true,
+      );
+    } catch (_) {
+      return AcademyEventPublication(
+        eventCount: events.length,
+        eventsPublished: false,
+      );
+    }
+  }
 
   @override
   Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(
@@ -63,7 +82,7 @@ class TeacherRepositoryImpl implements TeacherRepository {
   }
 
   @override
-  Future<Either<Failure, AttendanceSaveResult>> saveDayAttendance(
+  Future<Either<Failure, AcademyEventPublication>> saveDayAttendance(
     List<AttendanceRecordEntity> records,
   ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
@@ -89,20 +108,7 @@ class TeacherRepositoryImpl implements TeacherRepository {
       return Left(ServerFailure(e.message));
     }
 
-    if (events.isEmpty) return const Right(AttendanceSaveResult.noEvents());
-
-    // Attendance is already committed and stays the source of truth, so a sink
-    // failure degrades publication only — it never invalidates the register.
-    try {
-      await eventSink.publish(events);
-      return Right(
-        AttendanceSaveResult(eventCount: events.length, eventsPublished: true),
-      );
-    } catch (_) {
-      return Right(
-        AttendanceSaveResult(eventCount: events.length, eventsPublished: false),
-      );
-    }
+    return Right(await _publishAfterCommit(events));
   }
 
   @override
@@ -181,7 +187,7 @@ class TeacherRepositoryImpl implements TeacherRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> sendAssignment({
+  Future<Either<Failure, AcademyEventPublication>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,
     required String reviewRange,
@@ -189,18 +195,21 @@ class TeacherRepositoryImpl implements TeacherRepository {
     required String teacherId,
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+
+    final List<AcademyEvent> events;
     try {
-      await remoteDatasource.sendAssignment(
+      events = await remoteDatasource.sendAssignment(
         halaqaId: halaqaId,
         newMemorizationRange: newMemorizationRange,
         reviewRange: reviewRange,
         dueDate: dueDate,
         teacherId: teacherId,
       );
-      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }
+
+    return Right(await _publishAfterCommit(events));
   }
 
   @override

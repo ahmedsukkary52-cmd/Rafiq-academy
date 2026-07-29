@@ -167,8 +167,8 @@ import 'package:rafiq_academy/features/notifications/data/observers/default_acad
     as _i990;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
     as _i579;
-import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_sink.dart'
-    as _i448;
+import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_handler.dart'
+    as _i815;
 import 'package:rafiq_academy/features/notifications/domain/repositories/notifications_repository.dart'
     as _i587;
 import 'package:rafiq_academy/features/notifications/domain/usecases/notification_usecase.dart'
@@ -932,14 +932,18 @@ extension GetItInjectableX on _i174.GetIt {
         getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
       ),
     );
-    gh.lazySingleton<_i273.AcademyEventSink>(
-      () => _i448.InAppAcademyEventSink(
+    gh.lazySingleton<_i815.InAppAcademyEventHandler>(
+      () => _i815.InAppAcademyEventHandler(
         observerResolver: gh<_i937.AcademyEventObserverResolver>(),
         notificationsDatasource: gh<_i676.NotificationsRemoteDatasource>(),
+        firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.factory<_i951.ScheduleBloc>(
       () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
+    );
+    gh.lazySingleton<_i273.AcademyEventSink>(
+      () => diModule.academyEventSink(gh<_i815.InAppAcademyEventHandler>()),
     );
     gh.lazySingleton<_i1050.TeacherRepository>(
       () => _i63.TeacherRepositoryImpl(

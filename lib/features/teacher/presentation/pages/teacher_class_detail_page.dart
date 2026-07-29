@@ -748,7 +748,14 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
       listener: (context, state) {
         if (state.assignmentSubmissionStatus == SubmissionStatus.success) {
           Navigator.pop(context);
-          AppSnackBar.showSuccess(context, 'تم إرسال التكليف للطلاب');
+          if (state.assignmentEventsUnpublished) {
+            AppSnackBar.showInfo(
+              context,
+              'تم حفظ التكليف، لكن تعذّر نشر التحديثات',
+            );
+          } else {
+            AppSnackBar.showSuccess(context, 'تم إرسال التكليف للطلاب');
+          }
           context.read<TeacherBloc>().add(
             const ResetAssignmentSubmissionEvent(),
           );

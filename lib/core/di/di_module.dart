@@ -6,6 +6,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
+import '../../features/notifications/data/sinks/in_app_academy_event_handler.dart';
+import '../../shared/domain/academy_event_sink.dart';
+import '../../shared/domain/fan_out_academy_event_sink.dart';
 import '../network/network_info.dart';
 
 /// DiModule مسؤول عن تسجيل:
@@ -41,4 +44,10 @@ abstract class DiModule {
   @lazySingleton
   NetworkInfo networkInfo(InternetConnection connection) =>
       NetworkInfoImpl(connection);
+
+  /// Single publish port; handlers remain independently registered.
+  /// Adding FCM/analytics later = add a handler here without touching emitters.
+  @lazySingleton
+  AcademyEventSink academyEventSink(InAppAcademyEventHandler inApp) =>
+      FanOutAcademyEventSink(handlers: [inApp]);
 }

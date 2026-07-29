@@ -4,7 +4,7 @@ import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/attendance_save_result.dart';
+import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
 import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/read_models/teacher_day_agenda.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
@@ -113,7 +113,7 @@ class _FakeTeacherRepository implements TeacherRepository {
   Future<Either<Failure, Unit>> recordAttendance(AttendanceRecordEntity r) =>
       throw UnimplementedError();
   @override
-  Future<Either<Failure, AttendanceSaveResult>> saveDayAttendance(
+  Future<Either<Failure, AcademyEventPublication>> saveDayAttendance(
     List<AttendanceRecordEntity> r,
   ) => throw UnimplementedError();
   @override
@@ -124,7 +124,7 @@ class _FakeTeacherRepository implements TeacherRepository {
     UpdateRecitationReviewParams p,
   ) => throw UnimplementedError();
   @override
-  Future<Either<Failure, Unit>> sendAssignment({
+  Future<Either<Failure, AcademyEventPublication>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,
     required String reviewRange,

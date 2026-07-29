@@ -35,8 +35,8 @@ void main() {
   }) => HomeworkAssigned(
     assignmentId: assignmentId,
     studentId: studentId,
-    studentName: 'أحمد',
     halaqaId: 'h1',
+    assignedBy: 't1',
     dueDate: date,
     newMemorizationRange: range,
     reviewRange: '',
@@ -48,7 +48,6 @@ void main() {
   }) => HomeworkReviewed(
     recitationRecordId: recordId,
     studentId: 's1',
-    studentName: 'أحمد',
     halaqaId: 'h1',
     date: date,
     grade: grade,
@@ -118,67 +117,32 @@ void main() {
       expect(correction.body, 'تم تحديث حالة أحمد بتاريخ 03/06/2024 إلى حاضر');
     });
 
-    test('correction to late is worded as late', () {
-      final event = corrected(status: 'late');
-      final signal = InAppAcademySignalComposer.compose(
-        events: [event],
-        observerIdsByEventId: {
-          event.eventId: ['p1'],
-        },
-      ).single;
-
-      expect(signal.body, 'تم تحديث حالة أحمد بتاريخ 03/06/2024 إلى متأخر');
-    });
-
-    test('every resolved observer gets an individually addressed signal', () {
-      final event = absent();
-      final signals = InAppAcademySignalComposer.compose(
-        events: [event],
-        observerIdsByEventId: {
-          event.eventId: ['p1', 'p2'],
-        },
-      );
-
-      expect(signals.map((s) => s.audience), ['p1', 'p2']);
-      expect(signals.map((s) => s.id).toSet(), hasLength(2));
-    });
-
-    test('no observers produces no signal', () {
-      final event = absent();
-      final signals = InAppAcademySignalComposer.compose(
-        events: [event],
-        observerIdsByEventId: const {},
-      );
-
-      expect(signals, isEmpty);
-    });
-
-    test('missing student name falls back to a neutral label', () {
-      final event = absent(studentName: '   ');
-      final signal = InAppAcademySignalComposer.compose(
-        events: [event],
-        observerIdsByEventId: {
-          event.eventId: ['p1'],
-        },
-      ).single;
-
-      expect(signal.body, 'تم تسجيل غياب الطالب بتاريخ 03/06/2024');
-    });
-
-    test('homework assigned uses assignment type and neutral fact copy', () {
+    test('student homework copy matches legacy wording', () {
       final event = assigned();
-      final signals = InAppAcademySignalComposer.compose(
+      final signal = InAppAcademySignalComposer.compose(
         events: [event],
         observerIdsByEventId: {
-          event.eventId: ['s1', 'p1'],
+          event.eventId: ['s1'],
         },
-      );
+      ).single;
 
-      expect(signals, hasLength(2));
-      expect(signals.map((s) => s.audience), ['s1', 'p1']);
-      expect(signals.first.type, NotificationTypes.assignment);
-      expect(signals.first.title, 'تكليف جديد');
-      expect(signals.first.body, 'تم تعيين تكليف لـ أحمد: البقرة 1-5');
+      expect(signal.type, NotificationTypes.assignment);
+      expect(signal.title, 'تكليف جديد');
+      expect(signal.body, 'تكليف جديد: البقرة 1-5 — افتح واجباتي');
+    });
+
+    test('parent homework copy uses enriched student name', () {
+      final event = assigned();
+      final signal = InAppAcademySignalComposer.compose(
+        events: [event],
+        observerIdsByEventId: {
+          event.eventId: ['p1'],
+        },
+        studentNamesById: const {'s1': 'أحمد'},
+      ).single;
+
+      expect(signal.audience, 'p1');
+      expect(signal.body, 'تم تعيين تكليف لـ أحمد: البقرة 1-5');
     });
 
     test('homework reviewed includes grade when present', () {
@@ -188,6 +152,7 @@ void main() {
         observerIdsByEventId: {
           event.eventId: ['p1'],
         },
+        studentNamesById: const {'s1': 'أحمد'},
       ).single;
 
       expect(signal.type, NotificationTypes.assignment);

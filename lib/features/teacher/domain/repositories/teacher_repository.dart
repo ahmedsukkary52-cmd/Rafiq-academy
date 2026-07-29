@@ -2,10 +2,10 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../shared/domain/academy_event_publication.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../entities/attendance_record_entity.dart';
-import '../entities/attendance_save_result.dart';
 import '../entities/halaqa_students_summary_entity.dart';
 
 enum AttendanceStatus { present, absent, late }
@@ -28,7 +28,7 @@ abstract class TeacherRepository {
   ///
   /// Attendance is the primary operation; the result reports how many academy
   /// events the committed transitions produced and whether they were published.
-  Future<Either<Failure, AttendanceSaveResult>> saveDayAttendance(
+  Future<Either<Failure, AcademyEventPublication>> saveDayAttendance(
     List<AttendanceRecordEntity> records,
   );
 
@@ -53,8 +53,8 @@ abstract class TeacherRepository {
   Future<Either<Failure, List<RecitationRecordEntity>>>
   getHalaqaRecitationRecords(String halaqaId);
 
-  /// إرسال تكليف لطالب أو حلقة كاملة
-  Future<Either<Failure, Unit>> sendAssignment({
+  /// Commits assignment docs (SSOT) then publishes [HomeworkAssigned] facts.
+  Future<Either<Failure, AcademyEventPublication>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,
     required String reviewRange,

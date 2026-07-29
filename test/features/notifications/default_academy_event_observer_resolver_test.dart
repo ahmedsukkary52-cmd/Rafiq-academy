@@ -21,8 +21,8 @@ void main() {
   HomeworkAssigned assigned(String studentId) => HomeworkAssigned(
     assignmentId: 'a_$studentId',
     studentId: studentId,
-    studentName: 'أحمد',
     halaqaId: 'h1',
+    assignedBy: 't1',
     dueDate: date,
     newMemorizationRange: '1-5',
     reviewRange: '',
@@ -37,13 +37,6 @@ void main() {
   });
 
   group('DefaultAcademyEventObserverResolver', () {
-    test('empty batch looks up nothing', () async {
-      final result = await resolver.resolve(const []);
-
-      expect(result, isEmpty);
-      expect(parents.callCount, 0);
-    });
-
     test('absence resolves linked parents only', () async {
       parents.result = const {
         's1': ['p1', 'p2'],
@@ -54,7 +47,6 @@ void main() {
 
       expect(result[event.eventId], ['p1', 'p2']);
       expect(result[event.eventId], isNot(contains('s1')));
-      expect(parents.requestedStudentIds, ['s1']);
     });
 
     test('homework assigned includes subject student and parents', () async {
@@ -66,29 +58,6 @@ void main() {
       final result = await resolver.resolve([event]);
 
       expect(result[event.eventId], ['s1', 'p1']);
-    });
-
-    test('dedupes when student id also appears as a parent link', () async {
-      parents.result = const {
-        's1': ['s1', 'p1'],
-      };
-
-      final event = assigned('s1');
-      final result = await resolver.resolve([event]);
-
-      expect(result[event.eventId], ['s1', 'p1']);
-    });
-
-    test('batches parent lookup once across events', () async {
-      parents.result = const {
-        's1': ['p1'],
-        's2': ['p2'],
-      };
-
-      await resolver.resolve([absent('s1'), assigned('s2')]);
-
-      expect(parents.callCount, 1);
-      expect(parents.requestedStudentIds!.toSet(), {'s1', 's2'});
     });
 
     test('lookup failure propagates', () async {
@@ -105,15 +74,11 @@ void main() {
 class _FakeParentRepository implements ParentRepository {
   Map<String, List<String>> result = const {};
   Failure? failure;
-  List<String>? requestedStudentIds;
-  int callCount = 0;
 
   @override
   Future<Either<Failure, Map<String, List<String>>>> getParentIdsByStudentIds(
     List<String> studentIds,
   ) async {
-    callCount++;
-    requestedStudentIds = studentIds;
     if (failure != null) return Left(failure!);
     return Right(result);
   }

@@ -300,7 +300,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   }
 
   @override
-  Future<void> sendAssignment({
+  Future<List<AcademyEvent>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,
     required String reviewRange,
@@ -308,7 +308,6 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     required String teacherId,
   }) async {
     try {
-      // نجيب طلاب الحلقة ونبعت تكليف لكل واحد
       final halaqaDoc = await firestore
           .collection(FirestoreCollections.halaqat)
           .doc(halaqaId)
@@ -326,7 +325,16 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         );
       }
 
+      // One assignment write per student (notifications are not written here).
+      if (studentIds.length > 500) {
+        throw const ServerException(
+          'عدد طلاب الحلقة كبير جداً لإرسال التكليف دفعة واحدة.',
+        );
+      }
+
       final batch = firestore.batch();
+      final events = <AcademyEvent>[];
+
       for (final studentId in studentIds) {
         final ref = firestore
             .collection(FirestoreCollections.assignments)
@@ -345,25 +353,21 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           ),
         });
 
-        final notifRef = firestore
-            .collection(FirestoreCollections.notifications)
-            .doc();
-        final rangeHint = newMemorizationRange.trim().isNotEmpty
-            ? newMemorizationRange.trim()
-            : reviewRange.trim();
-        batch.set(notifRef, {
-          'audience': studentId,
-          'title': 'تكليف جديد',
-          'body': rangeHint.isEmpty
-              ? 'لديك تكليف جديد — افتح واجباتي'
-              : 'تكليف جديد: $rangeHint — افتح واجباتي',
-          'type': NotificationTypes.assignment,
-          'readBy': <String>[],
-          'hasAudioAlert': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        events.add(
+          HomeworkAssigned(
+            assignmentId: ref.id,
+            studentId: studentId,
+            halaqaId: halaqaId,
+            assignedBy: teacherId,
+            dueDate: dueDate,
+            newMemorizationRange: newMemorizationRange,
+            reviewRange: reviewRange,
+          ),
+        );
       }
+
       await batch.commit();
+      return events;
     } on ServerException {
       rethrow;
     } catch (e) {

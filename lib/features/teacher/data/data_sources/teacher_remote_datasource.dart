@@ -31,7 +31,10 @@ abstract class TeacherRemoteDatasource {
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
     String halaqaId,
   );
-  Future<void> sendAssignment({
+
+  /// Commits one assignment doc per roster student. Returns [HomeworkAssigned]
+  /// facts for the committed docs — no notification writes.
+  Future<List<AcademyEvent>> sendAssignment({
     required String halaqaId,
     required String newMemorizationRange,
     required String reviewRange,

@@ -64,6 +64,9 @@ class TeacherState extends Equatable {
   final SubmissionStatus assignmentSubmissionStatus;
   final String? assignmentSubmissionError;
 
+  /// Assignments saved, but academy events could not be published.
+  final bool assignmentEventsUnpublished;
+
   const TeacherState({
     this.halaqatStatus = SectionStatus.initial,
     this.halaqat = const [],
@@ -91,6 +94,7 @@ class TeacherState extends Equatable {
     this.recitationSubmissionError,
     this.assignmentSubmissionStatus = SubmissionStatus.idle,
     this.assignmentSubmissionError,
+    this.assignmentEventsUnpublished = false,
   });
 
   factory TeacherState.initial() => const TeacherState();
@@ -122,6 +126,7 @@ class TeacherState extends Equatable {
     Object? recitationSubmissionError = _unset,
     SubmissionStatus? assignmentSubmissionStatus,
     Object? assignmentSubmissionError = _unset,
+    bool? assignmentEventsUnpublished,
   }) {
     return TeacherState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -178,6 +183,8 @@ class TeacherState extends Equatable {
       assignmentSubmissionError: identical(assignmentSubmissionError, _unset)
           ? this.assignmentSubmissionError
           : assignmentSubmissionError as String?,
+      assignmentEventsUnpublished:
+          assignmentEventsUnpublished ?? this.assignmentEventsUnpublished,
     );
   }
 
@@ -209,5 +216,6 @@ class TeacherState extends Equatable {
     recitationSubmissionError,
     assignmentSubmissionStatus,
     assignmentSubmissionError,
+    assignmentEventsUnpublished,
   ];
 }

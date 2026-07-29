@@ -1,7 +1,7 @@
 # W5 — Parent Academic Awareness
 ## Phase 0 Technical Design
 
-**Status:** Phase 0 **approved in principle** (2026-07-29) with event/observer/delivery ownership clarification. **Pre-Slice implemented** — await approval before Slice 1.  
+**Status:** Phase 0 approved · **Pre-Slice Pass** · **Slice 1 Pass** — await approval before Slice 2.  
 **Date:** 2026-07-29  
 **Predecessors:** W1–W4 complete; Post-W4 cross-workflow audit approved  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.
@@ -56,6 +56,39 @@ Do not let these responsibilities leak into each other.
 Design every event so **future observers** (Supervisor, Analytics, Audit Log, AI Assistant, …) can subscribe **without changing the workflow that emitted it**.
 
 W5 must **not** optimize only for parent notifications. W5 optimizes for a **reusable academy event stream**. The first concrete delivery remains in-app signals to student + linked parents (D-W5-1); that is a consumer choice, not the event’s identity.
+
+#### 5. Event versioning and stability (**approved**)
+
+Once an `AcademyEvent` becomes **public** inside the academy domain (emitted on a live write path), treat it as a **stable contract**.
+
+| Rule | Meaning |
+|------|---------|
+| No silent renames | Do not rename a public event type |
+| No silent semantic changes | Do not change what an existing event means |
+| Evolve by addition | If behavior must change, introduce a **new** event kind rather than mutating an old one |
+| Protect observers | Observers must not break because another workflow evolves |
+
+Pre-Slice types that have not yet been emitted on a live path may still be tightened for payload ownership before their first public publish (Slice 1 for `HomeworkAssigned`).
+
+#### 6. Event payload ownership (**approved**)
+
+Every `AcademyEvent` carries only the **minimum immutable facts** true at the moment it occurred.
+
+| Include | Exclude |
+|---------|---------|
+| IDs, timestamps, actor, affected entity, workflow fact | Presentation copy, display labels invented for inbox UI, channel hints |
+
+Observers / delivery may **enrich** later by reading repositories (e.g. student display name for inbox wording).
+
+#### 7. Observer independence (**approved**)
+
+| Rule | Meaning |
+|------|---------|
+| Independent execution | Each registered observer/handler runs independently |
+| Isolated failure | Failure in one must not prevent others from processing the same event |
+| Publisher ignorance | The event publisher (`AcademyEventSink.publish` caller) must not know which observers are registered |
+
+Concrete W5 shape: a fan-out sink invokes registered handlers; emitters depend only on `AcademyEventSink`.
 
 ### Debt-track boundary
 

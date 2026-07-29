@@ -136,6 +136,8 @@ void main() {
       result.fold((_) => fail('expected success'), (outcome) {
         expect(outcome.eventCount, 1);
         expect(outcome.eventsPublished, isTrue);
+        expect(outcome.succeededHandlerNames, ['fake']);
+        expect(outcome.failedHandlerNames, isEmpty);
       });
     });
 

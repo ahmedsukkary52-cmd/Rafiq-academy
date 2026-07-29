@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/exception.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/features/notifications/data/observers/default_academy_event_observer_resolver.dart';
+import 'package:rafiq_academy/features/parent/data/observers/default_academy_event_observer_resolver.dart';
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
 import 'package:rafiq_academy/shared/domain/academy_event.dart';

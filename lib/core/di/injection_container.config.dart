@@ -163,8 +163,6 @@ import 'package:rafiq_academy/features/homework/presentation/bloc/homework_bloc.
     as _i421;
 import 'package:rafiq_academy/features/notifications/data/datasources/notifications_remote_datasource.dart'
     as _i676;
-import 'package:rafiq_academy/features/notifications/data/observers/default_academy_event_observer_resolver.dart'
-    as _i990;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
     as _i579;
 import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_handler.dart'
@@ -179,6 +177,8 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
     as _i892;
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource_impl.dart'
     as _i430;
+import 'package:rafiq_academy/features/parent/data/observers/default_academy_event_observer_resolver.dart'
+    as _i890;
 import 'package:rafiq_academy/features/parent/data/repositories/parent_repository_impl.dart'
     as _i964;
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart'
@@ -776,7 +776,7 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i888.SubmitAbsenceRequestUseCase(gh<_i493.ParentRepository>()),
     );
     gh.lazySingleton<_i937.AcademyEventObserverResolver>(
-      () => _i990.DefaultAcademyEventObserverResolver(
+      () => _i890.DefaultAcademyEventObserverResolver(
         parentRepository: gh<_i493.ParentRepository>(),
       ),
     );

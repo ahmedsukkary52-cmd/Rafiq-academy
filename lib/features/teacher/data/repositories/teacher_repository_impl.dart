@@ -31,6 +31,9 @@ class TeacherRepositoryImpl implements TeacherRepository {
   });
 
   /// SSOT is already committed; sink failure never rolls it back.
+  ///
+  /// Returns channel-neutral publication observability (published? which
+  /// handlers succeeded/failed?) — never notification-specific metrics.
   Future<AcademyEventPublication> _publishAfterCommit(
     List<AcademyEvent> events,
   ) async {
@@ -40,11 +43,19 @@ class TeacherRepositoryImpl implements TeacherRepository {
       return AcademyEventPublication(
         eventCount: events.length,
         eventsPublished: report.anySucceeded,
+        handlerReports: report.handlers,
       );
-    } catch (_) {
+    } catch (e) {
       return AcademyEventPublication(
         eventCount: events.length,
         eventsPublished: false,
+        handlerReports: [
+          AcademyEventHandlerReport(
+            handlerName: 'publish',
+            succeeded: false,
+            error: e,
+          ),
+        ],
       );
     }
   }

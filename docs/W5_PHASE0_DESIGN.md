@@ -1,7 +1,7 @@
 # W5 — Parent Academic Awareness
 ## Phase 0 Technical Design
 
-**Status:** Phase 0 approved · **Pre-Slice Pass** · **Slice 1 Pass** · **Slice 2 Pass** — await approval before continuing.  
+**Status:** Phase 0 approved · Pre-Slice Pass · Slice 1 Pass · Slice 2 Pass · **W5 COMPLETE** (`docs/W5_COMPLETION_PRODUCTION_VALIDATION.md`)  
 **Date:** 2026-07-29  
 **Predecessors:** W1–W4 complete; Post-W4 cross-workflow audit approved  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.
@@ -117,6 +117,31 @@ Fan-out is **best-effort**.
 | Event ids | Deterministic `eventId`s guarantee the same domain fact is published as one operational identity |
 | Handler tolerance | Handlers must still tolerate duplicate delivery (e.g. deterministic in-app signal ids / upsert) |
 | Shared responsibility | Do not rely only on the publisher for correctness |
+
+#### 11. Event observability (**approved**)
+
+Every `AcademyEvent` must be observable **without** coupling it to any delivery channel.
+
+| Concern | Owner | Must not mix with |
+|---------|-------|-------------------|
+| Workflow / SSOT success | Academy domain | Inbox metrics, FCM receipts, copy |
+| Fact published? | Academy publish outcome (`AcademyEventPublication`) | Channel-specific payloads |
+| Which handlers processed / failed? | Channel-neutral handler reports on the publish report | Notification UI state |
+| Delivery metrics (open rates, device tokens, …) | Delivery layer only | Teacher/homework write path |
+
+The academy workflow must be able to answer:
+
+1. Was the domain fact published?
+2. Which observers/handlers processed it?
+3. Which handlers failed?
+
+…without importing notification-specific types into the homework/attendance workflow.
+
+#### 12. Future compatibility (**approved**)
+
+The current pipeline must remain capable of supporting Push, Email, SMS, Supervisor observers, Analytics, Audit log, and AI assistants **without changing the publisher**.
+
+If a future feature requires modifying the Homework (or Attendance) emit path to support a new observer, treat that as an **architectural regression**.
 
 ### Debt-track boundary
 

@@ -4,12 +4,13 @@ import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/academy_event_observation.dart';
 import '../../../../shared/domain/academy_event_observer_resolver.dart';
-import '../../../parent/domain/repositories/parent_repositories.dart';
+import '../../domain/repositories/parent_repositories.dart';
 
 /// Expands [AcademyEventObservation] specs using parent relationship data.
 ///
-/// New observer kinds (supervisor, audit, …) extend the observation policy and
-/// this resolver — emitters stay unchanged.
+/// Belongs with parent relationships (who is linked), not with any delivery
+/// channel. New observer kinds extend the observation policy + this resolver —
+/// emitters stay unchanged.
 @LazySingleton(as: AcademyEventObserverResolver)
 class DefaultAcademyEventObserverResolver
     implements AcademyEventObserverResolver {

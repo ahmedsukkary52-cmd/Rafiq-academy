@@ -8,8 +8,10 @@ import '../../domain/usecases/add_recitation_record_usecase.dart';
 import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
 import '../../domain/usecases/get_halaqa_students_usecase.dart';
+import '../../domain/usecases/get_pending_absence_requests_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
 import '../../domain/usecases/get_today_agenda_usecase.dart';
+import '../../domain/usecases/review_absence_request_usecase.dart';
 import '../../domain/usecases/save_day_attendance_usecase.dart';
 import '../../domain/usecases/send_assignment_usecase.dart';
 import '../../domain/usecases/update_recitation_review_usecase.dart';
@@ -28,6 +30,8 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final UpdateRecitationReviewUseCase updateRecitationReview;
   final SendAssignmentUseCase sendAssignment;
   final GetTodayAgendaUseCase getTodayAgenda;
+  final GetPendingAbsenceRequestsUseCase getPendingAbsenceRequests;
+  final ReviewAbsenceRequestUseCase reviewAbsenceRequest;
 
   TeacherBloc({
     required this.getTeacherHalaqat,
@@ -39,6 +43,8 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     required this.updateRecitationReview,
     required this.sendAssignment,
     required this.getTodayAgenda,
+    required this.getPendingAbsenceRequests,
+    required this.reviewAbsenceRequest,
   }) : super(TeacherState.initial()) {
     on<LoadTeacherHalaqatEvent>(_onLoadHalaqat);
     on<LoadTodayAgendaEvent>(_onLoadTodayAgenda);
@@ -53,6 +59,9 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     on<ResetRecitationSubmissionEvent>(_onResetRecitationSubmission);
     on<SendAssignmentEvent>(_onSendAssignment);
     on<ResetAssignmentSubmissionEvent>(_onResetAssignmentSubmission);
+    on<LoadPendingAbsenceRequestsEvent>(_onLoadPendingAbsenceRequests);
+    on<ReviewAbsenceRequestEvent>(_onReviewAbsenceRequest);
+    on<ResetAbsenceReviewEvent>(_onResetAbsenceReview);
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -453,6 +462,110 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
         assignmentSubmissionStatus: SubmissionStatus.idle,
         assignmentSubmissionError: null,
         assignmentEventsUnpublished: false,
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // طلبات الاستئذان (W7 Slice 2 — classify request, not attendance)
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadPendingAbsenceRequests(
+    LoadPendingAbsenceRequestsEvent event,
+    Emitter<TeacherState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        pendingAbsenceRequestsStatus: SectionStatus.loading,
+        pendingAbsenceRequestsError: null,
+        pendingAbsenceRequestsHalaqaId: event.halaqaId,
+        pendingAbsenceRequestsDate: event.date,
+      ),
+    );
+
+    final result = await getPendingAbsenceRequests(
+      PendingAbsenceRequestsParams(
+        teacherId: event.teacherId,
+        halaqaId: event.halaqaId,
+        date: event.date,
+      ),
+    );
+
+    final sameScope =
+        state.pendingAbsenceRequestsHalaqaId == event.halaqaId &&
+        state.pendingAbsenceRequestsDate != null &&
+        state.pendingAbsenceRequestsDate!.year == event.date.year &&
+        state.pendingAbsenceRequestsDate!.month == event.date.month &&
+        state.pendingAbsenceRequestsDate!.day == event.date.day;
+    if (!sameScope) return;
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          pendingAbsenceRequestsStatus: SectionStatus.error,
+          pendingAbsenceRequestsError: failure.message,
+        ),
+      ),
+      (requests) => emit(
+        state.copyWith(
+          pendingAbsenceRequestsStatus: SectionStatus.loaded,
+          pendingAbsenceRequests: requests,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onReviewAbsenceRequest(
+    ReviewAbsenceRequestEvent event,
+    Emitter<TeacherState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        absenceReviewStatus: SubmissionStatus.submitting,
+        absenceReviewError: null,
+      ),
+    );
+
+    final result = await reviewAbsenceRequest(
+      ReviewAbsenceRequestParams(
+        requestId: event.requestId,
+        halaqaId: event.halaqaId,
+        teacherId: event.teacherId,
+        decision: event.decision,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          absenceReviewStatus: SubmissionStatus.error,
+          absenceReviewError: failure.message,
+        ),
+      ),
+      (_) {
+        emit(state.copyWith(absenceReviewStatus: SubmissionStatus.success));
+        final date = state.pendingAbsenceRequestsDate;
+        if (date != null) {
+          add(
+            LoadPendingAbsenceRequestsEvent(
+              teacherId: event.teacherId,
+              halaqaId: event.halaqaId,
+              date: date,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  void _onResetAbsenceReview(
+    ResetAbsenceReviewEvent event,
+    Emitter<TeacherState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        absenceReviewStatus: SubmissionStatus.idle,
+        absenceReviewError: null,
       ),
     );
   }

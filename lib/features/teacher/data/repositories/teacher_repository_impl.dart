@@ -8,6 +8,7 @@ import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/academy_event_publication.dart';
 import '../../../../shared/domain/academy_event_sink.dart';
 import '../../../student/data/models/recitation_record_model.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
@@ -233,6 +234,46 @@ class TeacherRepositoryImpl implements TeacherRepository {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       return Right(await remoteDatasource.getLatestAssignmentDueDate(halaqaId));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getPendingAbsenceRequests({
+    required String halaqaId,
+    required DateTime date,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getPendingAbsenceRequests(
+          halaqaId: halaqaId,
+          date: date,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> reviewAbsenceRequest({
+    required String requestId,
+    required String expectedHalaqaId,
+    required String teacherId,
+    required AbsenceRequestStatus decision,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.reviewAbsenceRequest(
+        requestId: requestId,
+        expectedHalaqaId: expectedHalaqaId,
+        teacherId: teacherId,
+        decision: decision,
+      );
+      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

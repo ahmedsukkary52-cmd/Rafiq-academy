@@ -1,7 +1,7 @@
 # W7 — Parent Absence Request (استئذان) Lifecycle
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Phase 0 approved · Pre-Slice Pass · Slice 1 Pass · awaiting Slice 2 approval  
+**Status:** Phase 0 approved · Pre-Slice Pass · Slice 1 Pass · Slice 2 Pass · awaiting Slice 3 approval  
 **Date:** 2026-07-29  
 **Predecessors:** W1–W6 complete; `docs/POST_W6_PRODUCT_AUDIT.md` (W7 recommendation approved)  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.
@@ -26,6 +26,7 @@
 | Supervisor observes, does not take over teaching | W6 Rules 1–2, 6 | Supervisor may see request context; teacher owns attendance decisions |
 | Explainability from academy facts | W6 Rule 7 | Every displayed request state must cite request + attendance facts |
 | Domain ownership over feature ownership | Standing | One owner per rule; extract only for real domain concepts |
+| **Rule 1 — Teacher decisions classify the request, not attendance** | **Locked (Slice 2)** | Approve/reject changes **only** the absence request. Attendance remains the only operational presence record. The workflow **never** infers or rewrites attendance from a request decision. |
 
 ### Standing boundaries
 
@@ -287,6 +288,7 @@ See §3.5. **Recommendation: A** if parent/teacher/supervisor need inbox-quality
 | ID | Status |
 |----|--------|
 | Architectural constraints (SSOT, no request-owned attendance, reuse W2/W4/W5/W6) | **Locked** |
+| **Rule 1** — Teacher decisions classify the request, not attendance | **Locked** (Slice 2) |
 | **D-W7-2** | **Approved** — submit allowed before attendance; never auto-modifies attendance |
 | **D-W7-3** | **Approved** — approve/reject updates request status only |
 | D-W7-1, D-W7-4…D-W7-10 | Follow recommendations unless later overridden |

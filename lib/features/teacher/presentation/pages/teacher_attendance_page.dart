@@ -6,6 +6,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../domain/entities/attendance_record_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
@@ -39,6 +40,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     final bloc = context.read<TeacherBloc>();
     bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
     _loadAttendance();
+    _loadPendingRequests();
   }
 
   void _loadAttendance() {
@@ -47,9 +49,22 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     );
   }
 
+  void _loadPendingRequests() {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) return;
+    context.read<TeacherBloc>().add(
+      LoadPendingAbsenceRequestsEvent(
+        teacherId: auth.user.uid,
+        halaqaId: widget.halaqaId,
+        date: _selectedDate,
+      ),
+    );
+  }
+
   void _retryAll() {
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
     _loadAttendance();
+    _loadPendingRequests();
   }
 
   static DateTime get _today {
@@ -74,6 +89,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       _attendanceMap.clear();
     });
     _loadAttendance();
+    _loadPendingRequests();
   }
 
   void _syncMapFromRecords(List<AttendanceRecordEntity> records) {
@@ -157,6 +173,25 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             setState(() => _shellReady = true);
           },
         ),
+        BlocListener<TeacherBloc, TeacherState>(
+          listenWhen: (prev, curr) =>
+              prev.absenceReviewStatus != curr.absenceReviewStatus,
+          listener: (context, state) {
+            if (state.absenceReviewStatus == SubmissionStatus.success) {
+              AppSnackBar.showSuccess(
+                context,
+                'تم تسجيل قرار الاستئذان — الحضور يُحدَّد من سجل الحضور فقط',
+              );
+              context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
+            } else if (state.absenceReviewStatus == SubmissionStatus.error) {
+              AppSnackBar.showError(
+                context,
+                state.absenceReviewError ?? 'تعذر تسجيل القرار',
+              );
+              context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
+            }
+          },
+        ),
       ],
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -186,7 +221,14 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               previous.dayAttendanceDate != current.dayAttendanceDate ||
               previous.dayAttendanceError != current.dayAttendanceError ||
               previous.attendanceSubmissionStatus !=
-                  current.attendanceSubmissionStatus,
+                  current.attendanceSubmissionStatus ||
+              previous.pendingAbsenceRequestsStatus !=
+                  current.pendingAbsenceRequestsStatus ||
+              previous.pendingAbsenceRequests !=
+                  current.pendingAbsenceRequests ||
+              previous.pendingAbsenceRequestsError !=
+                  current.pendingAbsenceRequestsError ||
+              previous.absenceReviewStatus != current.absenceReviewStatus,
           builder: (context, state) {
             final studentsLoading =
                 state.studentsStatus == SectionStatus.loading ||
@@ -282,6 +324,33 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                   present: presentCount,
                   absent: absentCount,
                   late: lateCount,
+                ),
+                _PendingAbsenceRequestsSection(
+                  state: state,
+                  students: students,
+                  canWrite: canWrite,
+                  reviewing:
+                      state.absenceReviewStatus == SubmissionStatus.submitting,
+                  onRetry: _loadPendingRequests,
+                  onDecide: (request, decision) {
+                    final auth = context.read<AuthBloc>().state;
+                    if (auth is! AuthAuthenticated) return;
+                    if (!canWrite) {
+                      AppSnackBar.showInfo(
+                        context,
+                        'مراجعة الاستئذان ملك معلم الحلقة',
+                      );
+                      return;
+                    }
+                    context.read<TeacherBloc>().add(
+                      ReviewAbsenceRequestEvent(
+                        requestId: request.id,
+                        halaqaId: widget.halaqaId,
+                        teacherId: auth.user.uid,
+                        decision: decision,
+                      ),
+                    );
+                  },
                 ),
                 Expanded(
                   child: students.isEmpty
@@ -644,6 +713,151 @@ class _AttendanceButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Contextual استئذان queue for the selected attendance day (W7 Slice 2).
+///
+/// Decisions classify the request only — they never rewrite attendance.
+class _PendingAbsenceRequestsSection extends StatelessWidget {
+  final TeacherState state;
+  final List<HalaqaStudentSummaryEntity> students;
+  final bool canWrite;
+  final bool reviewing;
+  final VoidCallback onRetry;
+  final void Function(
+    AbsenceRequestEntity request,
+    AbsenceRequestStatus decision,
+  )
+  onDecide;
+
+  const _PendingAbsenceRequestsSection({
+    required this.state,
+    required this.students,
+    required this.canWrite,
+    required this.reviewing,
+    required this.onRetry,
+    required this.onDecide,
+  });
+
+  String _studentName(String studentId) {
+    for (final s in students) {
+      if (s.uid == studentId) return s.name.trim().isEmpty ? 'طالب' : s.name;
+    }
+    return 'طالب';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.pendingAbsenceRequestsStatus == SectionStatus.initial ||
+        state.pendingAbsenceRequestsStatus == SectionStatus.loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+        child: SizedBox(height: 40, child: AppLoadingWidget()),
+      );
+    }
+
+    if (state.pendingAbsenceRequestsStatus == SectionStatus.error) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+        child: AppErrorWidget(
+          message:
+              state.pendingAbsenceRequestsError ?? 'تعذر تحميل طلبات الاستئذان',
+          onRetry: onRetry,
+        ),
+      );
+    }
+
+    final requests = state.pendingAbsenceRequests;
+    if (requests.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.paddingM,
+        0,
+        AppSizes.paddingM,
+        AppSizes.paddingS,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'طلبات استئذان لهذا اليوم',
+            style: AppTextStyles.titleMedium,
+            textAlign: TextAlign.right,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'القبول/الرفض يصنّف الطلب فقط — سجل الحضور يُحدَّد بشكل مستقل.',
+            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.right,
+          ),
+          const SizedBox(height: 8),
+          for (final request in requests)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _studentName(request.studentId),
+                      style: AppTextStyles.titleMedium,
+                      textAlign: TextAlign.right,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      request.reason,
+                      style: AppTextStyles.bodyMedium,
+                      textAlign: TextAlign.right,
+                    ),
+                    if (canWrite) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: reviewing
+                                  ? null
+                                  : () => onDecide(
+                                      request,
+                                      AbsenceRequestStatus.rejected,
+                                    ),
+                              child: const Text('رفض'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: reviewing
+                                  ? null
+                                  : () => onDecide(
+                                      request,
+                                      AbsenceRequestStatus.approved,
+                                    ),
+                              child: reviewing
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('قبول'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
@@ -46,6 +47,13 @@ class TeacherState extends Equatable {
   /// Calendar day currently requested/loaded (guards stale load responses).
   final DateTime? dayAttendanceDate;
 
+  // ── طلبات الاستئذان المعلقة (W7 Slice 2 — contextual) ─────────────────
+  final SectionStatus pendingAbsenceRequestsStatus;
+  final List<AbsenceRequestEntity> pendingAbsenceRequests;
+  final String? pendingAbsenceRequestsError;
+  final String? pendingAbsenceRequestsHalaqaId;
+  final DateTime? pendingAbsenceRequestsDate;
+
   // ── خطأ حضور قديم (غير مستخدم في مسار الحفظ الحالي) ───────────────────
   final String? attendanceError;
 
@@ -70,6 +78,10 @@ class TeacherState extends Equatable {
   /// Assignments saved, but academy events could not be published.
   final bool assignmentEventsUnpublished;
 
+  // ── مراجعة طلب استئذان (status only) ──────────────────────────────────
+  final SubmissionStatus absenceReviewStatus;
+  final String? absenceReviewError;
+
   const TeacherState({
     this.halaqatStatus = SectionStatus.initial,
     this.halaqat = const [],
@@ -89,6 +101,11 @@ class TeacherState extends Equatable {
     this.dayAttendance = const [],
     this.dayAttendanceError,
     this.dayAttendanceDate,
+    this.pendingAbsenceRequestsStatus = SectionStatus.initial,
+    this.pendingAbsenceRequests = const [],
+    this.pendingAbsenceRequestsError,
+    this.pendingAbsenceRequestsHalaqaId,
+    this.pendingAbsenceRequestsDate,
     this.attendanceError,
     this.attendanceSubmissionStatus = SubmissionStatus.idle,
     this.attendanceSubmissionError,
@@ -99,6 +116,8 @@ class TeacherState extends Equatable {
     this.assignmentSubmissionStatus = SubmissionStatus.idle,
     this.assignmentSubmissionError,
     this.assignmentEventsUnpublished = false,
+    this.absenceReviewStatus = SubmissionStatus.idle,
+    this.absenceReviewError,
   });
 
   factory TeacherState.initial() => const TeacherState();
@@ -122,6 +141,11 @@ class TeacherState extends Equatable {
     List<AttendanceRecordEntity>? dayAttendance,
     Object? dayAttendanceError = _unset,
     Object? dayAttendanceDate = _unset,
+    SectionStatus? pendingAbsenceRequestsStatus,
+    List<AbsenceRequestEntity>? pendingAbsenceRequests,
+    Object? pendingAbsenceRequestsError = _unset,
+    Object? pendingAbsenceRequestsHalaqaId = _unset,
+    Object? pendingAbsenceRequestsDate = _unset,
     Object? attendanceError = _unset,
     SubmissionStatus? attendanceSubmissionStatus,
     Object? attendanceSubmissionError = _unset,
@@ -132,6 +156,8 @@ class TeacherState extends Equatable {
     SubmissionStatus? assignmentSubmissionStatus,
     Object? assignmentSubmissionError = _unset,
     bool? assignmentEventsUnpublished,
+    SubmissionStatus? absenceReviewStatus,
+    Object? absenceReviewError = _unset,
   }) {
     return TeacherState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -168,6 +194,21 @@ class TeacherState extends Equatable {
       dayAttendanceDate: identical(dayAttendanceDate, _unset)
           ? this.dayAttendanceDate
           : dayAttendanceDate as DateTime?,
+      pendingAbsenceRequestsStatus:
+          pendingAbsenceRequestsStatus ?? this.pendingAbsenceRequestsStatus,
+      pendingAbsenceRequests:
+          pendingAbsenceRequests ?? this.pendingAbsenceRequests,
+      pendingAbsenceRequestsError:
+          identical(pendingAbsenceRequestsError, _unset)
+          ? this.pendingAbsenceRequestsError
+          : pendingAbsenceRequestsError as String?,
+      pendingAbsenceRequestsHalaqaId:
+          identical(pendingAbsenceRequestsHalaqaId, _unset)
+          ? this.pendingAbsenceRequestsHalaqaId
+          : pendingAbsenceRequestsHalaqaId as String?,
+      pendingAbsenceRequestsDate: identical(pendingAbsenceRequestsDate, _unset)
+          ? this.pendingAbsenceRequestsDate
+          : pendingAbsenceRequestsDate as DateTime?,
       attendanceError: identical(attendanceError, _unset)
           ? this.attendanceError
           : attendanceError as String?,
@@ -192,6 +233,10 @@ class TeacherState extends Equatable {
           : assignmentSubmissionError as String?,
       assignmentEventsUnpublished:
           assignmentEventsUnpublished ?? this.assignmentEventsUnpublished,
+      absenceReviewStatus: absenceReviewStatus ?? this.absenceReviewStatus,
+      absenceReviewError: identical(absenceReviewError, _unset)
+          ? this.absenceReviewError
+          : absenceReviewError as String?,
     );
   }
 
@@ -215,6 +260,11 @@ class TeacherState extends Equatable {
     dayAttendance,
     dayAttendanceError,
     dayAttendanceDate,
+    pendingAbsenceRequestsStatus,
+    pendingAbsenceRequests,
+    pendingAbsenceRequestsError,
+    pendingAbsenceRequestsHalaqaId,
+    pendingAbsenceRequestsDate,
     attendanceError,
     attendanceSubmissionStatus,
     attendanceSubmissionError,
@@ -225,5 +275,7 @@ class TeacherState extends Equatable {
     assignmentSubmissionStatus,
     assignmentSubmissionError,
     assignmentEventsUnpublished,
+    absenceReviewStatus,
+    absenceReviewError,
   ];
 }

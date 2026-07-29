@@ -1,4 +1,6 @@
 import '../../../../shared/domain/academy_event.dart';
+import '../../../parent/data/models/parent_model.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
@@ -47,4 +49,18 @@ abstract class TeacherRemoteDatasource {
 
   /// Latest assignment `dueDate` for [halaqaId], or `null` if none exist.
   Future<DateTime?> getLatestAssignmentDueDate(String halaqaId);
+
+  /// Pending استئذان for [halaqaId] (caller filters/auth). Never touches attendance.
+  Future<List<AbsenceRequestModel>> getPendingAbsenceRequests({
+    required String halaqaId,
+    required DateTime date,
+  });
+
+  /// Status-only review. Never touches attendanceRecords.
+  Future<void> reviewAbsenceRequest({
+    required String requestId,
+    required String expectedHalaqaId,
+    required String teacherId,
+    required AbsenceRequestStatus decision,
+  });
 }

@@ -7,6 +7,8 @@ import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
+import '../../../parent/data/models/parent_model.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
@@ -398,6 +400,77 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
       if (raw is Timestamp) return raw.toDate();
       return null;
     } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AbsenceRequestModel>> getPendingAbsenceRequests({
+    required String halaqaId,
+    required DateTime date,
+  }) async {
+    try {
+      final day = AttendancePolicy.dayStart(date);
+      final snap = await firestore
+          .collection(FirestoreCollections.absenceRequests)
+          .where('halaqaId', isEqualTo: halaqaId.trim())
+          .get();
+
+      final items = <AbsenceRequestModel>[];
+      for (final doc in snap.docs) {
+        final model = AbsenceRequestModel.fromFirestore(doc);
+        if (model.status != AbsenceRequestStatus.pending) continue;
+        if (!AttendancePolicy.isSameCalendarDay(model.date, day)) continue;
+        items.add(model);
+      }
+      items.sort((a, b) => a.studentId.compareTo(b.studentId));
+      return items;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> reviewAbsenceRequest({
+    required String requestId,
+    required String expectedHalaqaId,
+    required String teacherId,
+    required AbsenceRequestStatus decision,
+  }) async {
+    try {
+      if (decision == AbsenceRequestStatus.pending) {
+        throw const ServerException('قرار المراجعة غير صالح');
+      }
+
+      final ref = firestore
+          .collection(FirestoreCollections.absenceRequests)
+          .doc(requestId.trim());
+
+      await firestore.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const ServerException('طلب الاستئذان غير موجود');
+        }
+        final data = snap.data() ?? const <String, dynamic>{};
+        final halaqaId = (data['halaqaId'] as String?)?.trim() ?? '';
+        if (halaqaId != expectedHalaqaId.trim()) {
+          throw const ServerException('طلب الاستئذان لا يخص هذه الحلقة');
+        }
+        final status = (data['status'] as String?)?.trim() ?? '';
+        if (status != 'pending') {
+          throw const ServerException('تم اتخاذ قرار لهذا الطلب مسبقاً');
+        }
+
+        // Status classification only — never writes attendanceRecords (Rule 1).
+        tx.update(ref, {
+          'status': decision == AbsenceRequestStatus.approved
+              ? 'approved'
+              : 'rejected',
+          'reviewedBy': teacherId.trim(),
+        });
+      });
+    } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
   }

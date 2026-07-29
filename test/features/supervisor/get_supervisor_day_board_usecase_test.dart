@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
+import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
@@ -119,6 +120,19 @@ class _FakeTeacherRepository implements TeacherRepository {
     required String reviewRange,
     required DateTime dueDate,
     required String teacherId,
+  }) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getPendingAbsenceRequests({
+    required String halaqaId,
+    required DateTime date,
+  }) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, Unit>> reviewAbsenceRequest({
+    required String requestId,
+    required String expectedHalaqaId,
+    required String teacherId,
+    required AbsenceRequestStatus decision,
   }) => throw UnimplementedError();
 }
 

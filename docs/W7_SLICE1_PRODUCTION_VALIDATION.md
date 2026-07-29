@@ -54,4 +54,4 @@
 
 ## Stop
 
-**Awaiting approval before Slice 2** (teacher pending queue + approve/reject updating **request status only**).
+Slice 2 approved path available — see `docs/W7_SLICE2_PRODUCTION_VALIDATION.md`.

@@ -3,6 +3,7 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../shared/domain/academy_event_publication.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../entities/attendance_record_entity.dart';
@@ -71,6 +72,18 @@ abstract class TeacherRepository {
   Future<Either<Failure, DateTime?>> getLatestAssignmentDueDate(
     String halaqaId,
   );
+
+  /// Pending استئذان for [halaqaId] on [date] (contextual only — no attendance).
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getPendingAbsenceRequests({required String halaqaId, required DateTime date});
+
+  /// Approve/reject request doc only (W7 Rule 1). Never touches attendance.
+  Future<Either<Failure, Unit>> reviewAbsenceRequest({
+    required String requestId,
+    required String expectedHalaqaId,
+    required String teacherId,
+    required AbsenceRequestStatus decision,
+  });
 }
 
 class TeacherIdParams extends Equatable {

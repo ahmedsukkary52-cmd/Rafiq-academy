@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/error/exception.dart';
 import 'package:rafiq_academy/core/network/network_info.dart';
+import 'package:rafiq_academy/features/parent/data/models/parent_model.dart';
+import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/student/data/models/halaqa_model.dart';
 import 'package:rafiq_academy/features/student/data/models/recitation_record_model.dart';
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
@@ -264,4 +266,16 @@ class _FakeTeacherDatasource implements TeacherRemoteDatasource {
   @override
   Future<DateTime?> getLatestAssignmentDueDate(String halaqaId) =>
       throw UnimplementedError();
+  @override
+  Future<List<AbsenceRequestModel>> getPendingAbsenceRequests({
+    required String halaqaId,
+    required DateTime date,
+  }) => throw UnimplementedError();
+  @override
+  Future<void> reviewAbsenceRequest({
+    required String requestId,
+    required String expectedHalaqaId,
+    required String teacherId,
+    required AbsenceRequestStatus decision,
+  }) => throw UnimplementedError();
 }

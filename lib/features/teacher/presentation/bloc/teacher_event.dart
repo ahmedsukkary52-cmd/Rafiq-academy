@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
 
@@ -145,4 +146,42 @@ class SendAssignmentEvent extends TeacherEvent {
 /// إرجاع حالة إرسال التكليف لـ idle بعد ما الـ UI يعرض النتيجة
 class ResetAssignmentSubmissionEvent extends TeacherEvent {
   const ResetAssignmentSubmissionEvent();
+}
+
+/// Pending استئذان for a halaqa calendar day (W7 Slice 2 — contextual only)
+class LoadPendingAbsenceRequestsEvent extends TeacherEvent {
+  final String teacherId;
+  final String halaqaId;
+  final DateTime date;
+
+  const LoadPendingAbsenceRequestsEvent({
+    required this.teacherId,
+    required this.halaqaId,
+    required this.date,
+  });
+
+  @override
+  List<Object?> get props => [teacherId, halaqaId, date];
+}
+
+/// Approve or reject an استئذان (request status only — Rule 1)
+class ReviewAbsenceRequestEvent extends TeacherEvent {
+  final String requestId;
+  final String halaqaId;
+  final String teacherId;
+  final AbsenceRequestStatus decision;
+
+  const ReviewAbsenceRequestEvent({
+    required this.requestId,
+    required this.halaqaId,
+    required this.teacherId,
+    required this.decision,
+  });
+
+  @override
+  List<Object?> get props => [requestId, halaqaId, teacherId, decision];
+}
+
+class ResetAbsenceReviewEvent extends TeacherEvent {
+  const ResetAbsenceReviewEvent();
 }

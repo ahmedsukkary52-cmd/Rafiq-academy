@@ -311,12 +311,16 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_recita
     as _i998;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart'
     as _i440;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_pending_absence_requests_usecase.dart'
+    as _i775;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
     as _i626;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_today_agenda_usecase.dart'
     as _i271;
 import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance_usecase.dart'
     as _i642;
+import 'package:rafiq_academy/features/teacher/domain/usecases/review_absence_request_usecase.dart'
+    as _i182;
 import 'package:rafiq_academy/features/teacher/domain/usecases/save_day_attendance_usecase.dart'
     as _i343;
 import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart'
@@ -980,6 +984,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i440.GetHalaqaStudentsUseCase>(
       () => _i440.GetHalaqaStudentsUseCase(gh<_i1050.TeacherRepository>()),
     );
+    gh.lazySingleton<_i775.GetPendingAbsenceRequestsUseCase>(
+      () => _i775.GetPendingAbsenceRequestsUseCase(
+        gh<_i1050.TeacherRepository>(),
+      ),
+    );
     gh.lazySingleton<_i626.GetTeacherHalaqatUseCase>(
       () => _i626.GetTeacherHalaqatUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -988,6 +997,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i642.RecordAttendanceUseCase>(
       () => _i642.RecordAttendanceUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i182.ReviewAbsenceRequestUseCase>(
+      () => _i182.ReviewAbsenceRequestUseCase(gh<_i1050.TeacherRepository>()),
     );
     gh.lazySingleton<_i343.SaveDayAttendanceUseCase>(
       () => _i343.SaveDayAttendanceUseCase(gh<_i1050.TeacherRepository>()),
@@ -1012,6 +1024,8 @@ extension GetItInjectableX on _i174.GetIt {
         updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
         sendAssignment: gh<_i192.SendAssignmentUseCase>(),
         getTodayAgenda: gh<_i271.GetTodayAgendaUseCase>(),
+        getPendingAbsenceRequests: gh<_i775.GetPendingAbsenceRequestsUseCase>(),
+        reviewAbsenceRequest: gh<_i182.ReviewAbsenceRequestUseCase>(),
       ),
     );
     gh.singleton<_i149.SupervisorBloc>(

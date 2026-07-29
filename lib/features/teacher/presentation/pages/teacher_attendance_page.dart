@@ -12,6 +12,7 @@ import '../../domain/repositories/teacher_repository.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../utils/teacher_workflow_ownership.dart';
 
 class TeacherAttendancePage extends StatefulWidget {
   final String halaqaId;
@@ -237,9 +238,26 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             final lateCount = students
                 .where((s) => _attendanceMap[s.uid] == AttendanceStatus.late)
                 .length;
+            final canWrite = TeacherWorkflowOwnership.canExecute(context);
 
             return Column(
               children: [
+                if (!canWrite)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSizes.paddingM,
+                      AppSizes.paddingS,
+                      AppSizes.paddingM,
+                      0,
+                    ),
+                    child: Text(
+                      'عرض إشرافي — التنفيذ ملك معلم الحلقة فقط',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
                 _DateNavigator(
                   date: _selectedDate,
                   onPrev:
@@ -286,27 +304,37 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                             return _StudentAttendanceRow(
                               student: student,
                               status: _attendanceMap[student.uid],
-                              onChanged: (status) => setState(
-                                () => _attendanceMap[student.uid] = status,
-                              ),
+                              onChanged: canWrite
+                                  ? (status) => setState(
+                                      () =>
+                                          _attendanceMap[student.uid] = status,
+                                    )
+                                  : null,
                             );
                           },
                         ),
                 ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSizes.paddingM,
-                    AppSizes.paddingM,
-                    AppSizes.paddingM,
-                    MediaQuery.of(context).padding.bottom + AppSizes.paddingM,
+                if (canWrite)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      AppSizes.paddingM,
+                      AppSizes.paddingM,
+                      AppSizes.paddingM,
+                      MediaQuery.of(context).padding.bottom + AppSizes.paddingM,
+                    ),
+                    child: AppButton(
+                      label: 'حفظ الحضور',
+                      leading: const Icon(Icons.check_rounded, size: 20),
+                      isLoading: isSaving,
+                      onPressed: canSave ? _saveAttendance : null,
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height:
+                        MediaQuery.of(context).padding.bottom +
+                        AppSizes.paddingM,
                   ),
-                  child: AppButton(
-                    label: 'حفظ الحضور',
-                    leading: const Icon(Icons.check_rounded, size: 20),
-                    isLoading: isSaving,
-                    onPressed: canSave ? _saveAttendance : null,
-                  ),
-                ),
               ],
             );
           },
@@ -316,6 +344,13 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   }
 
   void _saveAttendance() {
+    if (!TeacherWorkflowOwnership.canExecute(context)) {
+      AppSnackBar.showInfo(
+        context,
+        'حفظ الحضور ملك معلم الحلقة — الإشراف للتوجيه فقط',
+      );
+      return;
+    }
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) {
       AppSnackBar.showError(context, 'يجب تسجيل الدخول لحفظ الحضور');
@@ -520,7 +555,7 @@ class _CounterBadge extends StatelessWidget {
 class _StudentAttendanceRow extends StatelessWidget {
   final HalaqaStudentSummaryEntity student;
   final AttendanceStatus? status;
-  final void Function(AttendanceStatus) onChanged;
+  final void Function(AttendanceStatus)? onChanged;
 
   const _StudentAttendanceRow({
     required this.student,
@@ -540,21 +575,27 @@ class _StudentAttendanceRow extends StatelessWidget {
                 label: '!',
                 isActive: status == AttendanceStatus.late,
                 activeColor: AppColors.secondary,
-                onTap: () => onChanged(AttendanceStatus.late),
+                onTap: onChanged == null
+                    ? null
+                    : () => onChanged!(AttendanceStatus.late),
               ),
               const SizedBox(width: 6),
               _AttendanceButton(
                 label: '✗',
                 isActive: status == AttendanceStatus.absent,
                 activeColor: AppColors.error,
-                onTap: () => onChanged(AttendanceStatus.absent),
+                onTap: onChanged == null
+                    ? null
+                    : () => onChanged!(AttendanceStatus.absent),
               ),
               const SizedBox(width: 6),
               _AttendanceButton(
                 label: '✓',
                 isActive: status == AttendanceStatus.present,
                 activeColor: AppColors.success,
-                onTap: () => onChanged(AttendanceStatus.present),
+                onTap: onChanged == null
+                    ? null
+                    : () => onChanged!(AttendanceStatus.present),
               ),
             ],
           ),
@@ -572,7 +613,7 @@ class _AttendanceButton extends StatelessWidget {
   final String label;
   final bool isActive;
   final Color activeColor;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _AttendanceButton({
     required this.label,

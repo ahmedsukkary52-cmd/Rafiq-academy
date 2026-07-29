@@ -6,12 +6,14 @@ import '../../features/chat/presentation/pages/chat_room.dart';
 import '../../features/chat/presentation/pages/student_chat_page.dart';
 import '../../features/content/presentation/pages/content_library_page.dart';
 import '../../features/notifications/presentation/pages/notification_page.dart';
+import '../../features/parent/presentation/pages/parent_absence_requests_page.dart';
 import '../../features/parent/presentation/pages/parent_home_page.dart';
 import '../../features/student/presentation/pages/student_evaluation_page.dart';
 import '../../features/student/presentation/pages/student_profile_page.dart';
 import '../../features/supervisor/presentation/pages/supervisor_home_page.dart';
 import '../../features/teacher/presentation/pages/teacher_evalutation_page.dart';
 import '../constants/app_constants.dart';
+import 'supervisor_escalation_paths.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
@@ -91,6 +93,7 @@ class AppRoutes {
 
   // Other roles
   static const String parent = '/parent';
+  static const String parentAbsence = '/parent/absence-requests';
   static const String parentNotifs = '/parent/notifications';
   static const String supervisor = '/supervisor';
   static const String admin = '/admin';
@@ -350,6 +353,10 @@ class AppRouter {
         builder: (_, __) => const ParentHomePage(),
         routes: [
           GoRoute(
+            path: 'absence-requests',
+            builder: (_, __) => const ParentAbsenceRequestsPage(),
+          ),
+          GoRoute(
             path: 'notifications',
             builder: (_, __) => const NotificationsPage(),
           ),
@@ -384,9 +391,17 @@ class AppRouter {
   static bool _isAllowedRoute(String path, String role) {
     final roleRoute = _routeForRole(role);
     // كل route بيبدأ بـ roleRoute مسموح، + Auth routes
-    return path.startsWith(roleRoute) ||
+    if (path.startsWith(roleRoute) ||
         path == AppRoutes.splash ||
-        path == AppRoutes.login;
+        path == AppRoutes.login) {
+      return true;
+    }
+    // W6 D-W6-1: supervisor may escalate into existing teacher-owned workflows.
+    if (role == AppRoles.supervisor &&
+        SupervisorEscalationPaths.isAllowed(path)) {
+      return true;
+    }
+    return false;
   }
 }
 

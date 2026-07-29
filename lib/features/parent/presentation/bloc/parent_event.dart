@@ -50,6 +50,28 @@ class LoadPaymentsEvent extends ParentEvent {
   List<Object?> get props => [parentId];
 }
 
+/// تحميل طلبات الاستئذان الخاصة بولي الأمر (W7 Slice 1)
+class LoadAbsenceRequestsEvent extends ParentEvent {
+  final String parentId;
+  const LoadAbsenceRequestsEvent(this.parentId);
+
+  @override
+  List<Object?> get props => [parentId];
+}
+
+/// حلقات الطالب لنموذج الاستئذان — يتطلب parentId للتحقق من ملكية الابن
+class LoadStudentHalaqatEvent extends ParentEvent {
+  final String parentId;
+  final String studentId;
+  const LoadStudentHalaqatEvent({
+    required this.parentId,
+    required this.studentId,
+  });
+
+  @override
+  List<Object?> get props => [parentId, studentId];
+}
+
 /// تقديم طلب استئذان عن حصة
 class SubmitAbsenceRequestEvent extends ParentEvent {
   final AbsenceRequestEntity request;

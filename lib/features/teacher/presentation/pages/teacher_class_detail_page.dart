@@ -15,6 +15,7 @@ import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../utils/assign_sheet_deep_link_gate.dart';
+import '../utils/teacher_workflow_ownership.dart';
 
 class TeacherClassDetailPage extends StatefulWidget {
   final String halaqaId;
@@ -46,9 +47,11 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    final canWrite = TeacherWorkflowOwnership.canExecute(context);
     _assignGate = AssignSheetDeepLinkGate(
       expectedHalaqaId: widget.halaqaId,
-      armed: widget.openAssignSheet,
+      // Rule 6: escalation may open this page; only the teacher executes assign.
+      armed: widget.openAssignSheet && canWrite,
     );
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -179,12 +182,56 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
         }
 
         if (state.halaqatStatus == SectionStatus.loaded && halaqa == null) {
+          // W6 D-W6-1: cross-role escalation may open this page without the
+          // halaqa living in TeacherBloc.halaqat (supervisor uid ≠ teacherId).
+          // Students still load by halaqaId — keep an operational shell.
+          final studentsReady =
+              state.studentsStatus == SectionStatus.loaded &&
+              state.studentsHalaqaId == widget.halaqaId;
+          if (!studentsReady) {
+            if (state.studentsStatus == SectionStatus.loading ||
+                state.studentsStatus == SectionStatus.initial) {
+              return Scaffold(
+                backgroundColor: AppColors.background,
+                appBar: AppBar(title: const Text('الحلقة')),
+                body: const AppLoadingWidget(),
+              );
+            }
+            return Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: AppBar(title: const Text('الحلقة')),
+              body: AppErrorWidget(
+                message:
+                    state.studentsError ?? 'لم يتم العثور على بيانات الحلقة',
+                onRetry: () {
+                  context.read<TeacherBloc>().add(
+                    LoadHalaqaStudentsEvent(widget.halaqaId),
+                  );
+                },
+              ),
+            );
+          }
+
           return Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(title: const Text('الحلقة')),
-            body: AppErrorWidget(
-              message: 'لم يتم العثور على بيانات الحلقة',
-              onRetry: _retryHalaqat,
+            body: ListView(
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              children: [
+                Text(
+                  'طلاب الحلقة: ${state.students.length}',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'توجيه إشرافي — التنفيذ يبقى ملك معلم الحلقة (لا واجهة كتابة للمشرف)',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -193,6 +240,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
             ? null
             : halaqaScheduleLabel(halaqa.schedule);
         final meetingLink = halaqa?.meetingLink.trim() ?? '';
+        final canWrite = TeacherWorkflowOwnership.canExecute(context);
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -207,22 +255,23 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                 foregroundColor: Colors.white,
                 title: Text(halaqa?.name ?? 'الحلقة'),
                 actions: [
-                  TextButton(
-                    onPressed: halaqa == null
-                        ? null
-                        : () => _openSendAssignmentSheet(
-                            context,
-                            studentCount: halaqa.studentIds.length,
-                          ),
-                    child: const Text(
-                      'تكليف',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'NotoNaskhArabic',
-                        fontWeight: FontWeight.w700,
+                  if (canWrite)
+                    TextButton(
+                      onPressed: halaqa == null
+                          ? null
+                          : () => _openSendAssignmentSheet(
+                              context,
+                              studentCount: halaqa.studentIds.length,
+                            ),
+                      child: const Text(
+                        'تكليف',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'NotoNaskhArabic',
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
                 ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: _HalaqaStatsHeader(

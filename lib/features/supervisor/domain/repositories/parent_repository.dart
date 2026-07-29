@@ -19,6 +19,13 @@ abstract class SupervisorRepository {
     required String halaqaId,
     required String studentId,
   });
+
+  /// Display names for [userIds] from `users` (W6 D-W6-4).
+  ///
+  /// Missing users are omitted from the map — callers fall back in presentation.
+  Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
+    List<String> userIds,
+  );
 }
 
 class SupervisorIdParams extends Equatable {

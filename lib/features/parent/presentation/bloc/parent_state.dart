@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/repositories/parent_repositories.dart';
 
 class _Unset {
   const _Unset();
@@ -26,6 +27,18 @@ class ParentState extends Equatable {
   final List<PaymentEntity> payments;
   final String? paymentsError;
 
+  // ── قائمة طلبات الاستئذان (W7 Slice 1) ────────────────────────────────
+  final SectionStatus absenceRequestsStatus;
+  final List<AbsenceRequestEntity> absenceRequests;
+  final String? absenceRequestsError;
+  final String? absenceRequestsParentId;
+
+  // ── حلقات الطالب لنموذج الاستئذان ─────────────────────────────────────
+  final SectionStatus studentHalaqatStatus;
+  final List<ParentHalaqaOption> studentHalaqat;
+  final String? studentHalaqatError;
+  final String? studentHalaqatStudentId;
+
   // ── تقديم طلب استئذان ─────────────────────────────────────────────────
   final SubmissionStatus absenceSubmissionStatus;
   final String? absenceSubmissionError;
@@ -46,6 +59,14 @@ class ParentState extends Equatable {
     this.paymentsStatus = SectionStatus.initial,
     this.payments = const [],
     this.paymentsError,
+    this.absenceRequestsStatus = SectionStatus.initial,
+    this.absenceRequests = const [],
+    this.absenceRequestsError,
+    this.absenceRequestsParentId,
+    this.studentHalaqatStatus = SectionStatus.initial,
+    this.studentHalaqat = const [],
+    this.studentHalaqatError,
+    this.studentHalaqatStudentId,
     this.absenceSubmissionStatus = SubmissionStatus.idle,
     this.absenceSubmissionError,
     this.paymentInitiationStatus = SubmissionStatus.idle,
@@ -66,6 +87,14 @@ class ParentState extends Equatable {
     SectionStatus? paymentsStatus,
     List<PaymentEntity>? payments,
     Object? paymentsError = _unset,
+    SectionStatus? absenceRequestsStatus,
+    List<AbsenceRequestEntity>? absenceRequests,
+    Object? absenceRequestsError = _unset,
+    Object? absenceRequestsParentId = _unset,
+    SectionStatus? studentHalaqatStatus,
+    List<ParentHalaqaOption>? studentHalaqat,
+    Object? studentHalaqatError = _unset,
+    Object? studentHalaqatStudentId = _unset,
     SubmissionStatus? absenceSubmissionStatus,
     Object? absenceSubmissionError = _unset,
     SubmissionStatus? paymentInitiationStatus,
@@ -93,6 +122,23 @@ class ParentState extends Equatable {
       paymentsError: identical(paymentsError, _unset)
           ? this.paymentsError
           : paymentsError as String?,
+      absenceRequestsStatus:
+          absenceRequestsStatus ?? this.absenceRequestsStatus,
+      absenceRequests: absenceRequests ?? this.absenceRequests,
+      absenceRequestsError: identical(absenceRequestsError, _unset)
+          ? this.absenceRequestsError
+          : absenceRequestsError as String?,
+      absenceRequestsParentId: identical(absenceRequestsParentId, _unset)
+          ? this.absenceRequestsParentId
+          : absenceRequestsParentId as String?,
+      studentHalaqatStatus: studentHalaqatStatus ?? this.studentHalaqatStatus,
+      studentHalaqat: studentHalaqat ?? this.studentHalaqat,
+      studentHalaqatError: identical(studentHalaqatError, _unset)
+          ? this.studentHalaqatError
+          : studentHalaqatError as String?,
+      studentHalaqatStudentId: identical(studentHalaqatStudentId, _unset)
+          ? this.studentHalaqatStudentId
+          : studentHalaqatStudentId as String?,
       absenceSubmissionStatus:
           absenceSubmissionStatus ?? this.absenceSubmissionStatus,
       absenceSubmissionError: identical(absenceSubmissionError, _unset)
@@ -121,6 +167,14 @@ class ParentState extends Equatable {
     paymentsStatus,
     payments,
     paymentsError,
+    absenceRequestsStatus,
+    absenceRequests,
+    absenceRequestsError,
+    absenceRequestsParentId,
+    studentHalaqatStatus,
+    studentHalaqat,
+    studentHalaqatError,
+    studentHalaqatStudentId,
     absenceSubmissionStatus,
     absenceSubmissionError,
     paymentInitiationStatus,

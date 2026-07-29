@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../../domain/usecases/get_supervised_halaqat_usecase.dart';
+import '../../domain/usecases/get_supervisor_day_board_usecase.dart';
 import '../../domain/usecases/issue_achievement_usecase.dart';
 import '../../domain/usecases/register_new_student_usecase.dart';
 import '../../domain/usecases/submit_supervisor_report_usecase.dart';
@@ -13,17 +14,20 @@ import 'supervisor_state.dart';
 @singleton
 class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
   final GetSupervisedHalaqatUseCase getSupervisedHalaqat;
+  final GetSupervisorDayBoardUseCase getSupervisorDayBoard;
   final IssueAchievementUseCase issueAchievement;
   final SubmitSupervisorReportUseCase submitSupervisorReport;
   final RegisterNewStudentUseCase registerNewStudent;
 
   SupervisorBloc({
     required this.getSupervisedHalaqat,
+    required this.getSupervisorDayBoard,
     required this.issueAchievement,
     required this.submitSupervisorReport,
     required this.registerNewStudent,
   }) : super(SupervisorState.initial()) {
     on<LoadSupervisedHalaqatEvent>(_onLoadHalaqat);
+    on<LoadSupervisorDayBoardEvent>(_onLoadDayBoard);
     on<IssueAchievementEvent>(_onIssueAchievement);
     on<ResetIssueAchievementEvent>(_onResetIssueAchievement);
     on<SubmitSupervisorReportEvent>(_onSubmitReport);
@@ -31,10 +35,6 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<RegisterNewStudentEvent>(_onRegisterStudent);
     on<ResetRegisterStudentEvent>(_onResetRegisterStudent);
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // الحلقات
-  // ══════════════════════════════════════════════════════════════════════
 
   Future<void> _onLoadHalaqat(
     LoadSupervisedHalaqatEvent event,
@@ -48,22 +48,51 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       SupervisorIdParams(event.supervisorId),
     );
 
-    result.fold(
-      (failure) => emit(
+    await result.fold(
+      (failure) async => emit(
         state.copyWith(
           halaqatStatus: SectionStatus.error,
           halaqatError: failure.message,
         ),
       ),
-      (halaqat) => emit(
-        state.copyWith(halaqatStatus: SectionStatus.loaded, halaqat: halaqat),
-      ),
+      (halaqat) async {
+        emit(
+          state.copyWith(halaqatStatus: SectionStatus.loaded, halaqat: halaqat),
+        );
+        await _deriveDayBoard(emit);
+      },
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // إرسال تشجيع
-  // ══════════════════════════════════════════════════════════════════════
+  Future<void> _onLoadDayBoard(
+    LoadSupervisorDayBoardEvent event,
+    Emitter<SupervisorState> emit,
+  ) => _deriveDayBoard(emit);
+
+  Future<void> _deriveDayBoard(Emitter<SupervisorState> emit) async {
+    emit(
+      state.copyWith(
+        dayBoardStatus: SectionStatus.loading,
+        dayBoardError: null,
+      ),
+    );
+
+    final result = await getSupervisorDayBoard(
+      SupervisorDayBoardParams(halaqat: state.halaqat),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          dayBoardStatus: SectionStatus.error,
+          dayBoardError: failure.message,
+        ),
+      ),
+      (board) => emit(
+        state.copyWith(dayBoardStatus: SectionStatus.loaded, dayBoard: board),
+      ),
+    );
+  }
 
   Future<void> _onIssueAchievement(
     IssueAchievementEvent event,
@@ -103,10 +132,6 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // رفع تقرير
-  // ══════════════════════════════════════════════════════════════════════
-
   Future<void> _onSubmitReport(
     SubmitSupervisorReportEvent event,
     Emitter<SupervisorState> emit,
@@ -142,10 +167,6 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       ),
     );
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // تسجيل ملتحق جديد
-  // ══════════════════════════════════════════════════════════════════════
 
   Future<void> _onRegisterStudent(
     RegisterNewStudentEvent event,

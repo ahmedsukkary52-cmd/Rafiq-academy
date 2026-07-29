@@ -74,4 +74,16 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
       return Left(ServerFailure(e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
+    List<String> userIds,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getUserDisplayNames(userIds));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
 }

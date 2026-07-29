@@ -11,6 +11,7 @@ enum AbsenceRequestStatus { pending, approved, rejected }
 class AbsenceRequestEntity extends Equatable {
   final String id;
   final String studentId;
+  final String halaqaId;
   final String requestedBy;
   final DateTime date;
   final String reason;
@@ -20,6 +21,7 @@ class AbsenceRequestEntity extends Equatable {
   const AbsenceRequestEntity({
     required this.id,
     required this.studentId,
+    required this.halaqaId,
     required this.requestedBy,
     required this.date,
     required this.reason,
@@ -31,6 +33,7 @@ class AbsenceRequestEntity extends Equatable {
   List<Object?> get props => [
     id,
     studentId,
+    halaqaId,
     requestedBy,
     date,
     reason,

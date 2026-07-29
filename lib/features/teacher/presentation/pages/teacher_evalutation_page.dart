@@ -11,6 +11,7 @@ import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../utils/teacher_workflow_ownership.dart';
 
 class TeacherEvaluationsPage extends StatefulWidget {
   final String halaqaId;
@@ -78,22 +79,23 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         appBar: AppBar(
           title: const Text('التقييمات'),
           actions: [
-            TextButton.icon(
-              onPressed: () => _showAddEvaluationSheet(context),
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: const Text(
-                '+ تقييم جديد',
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
+            if (TeacherWorkflowOwnership.canExecute(context))
+              TextButton.icon(
+                onPressed: () => _showAddEvaluationSheet(context),
+                icon: const Icon(
+                  Icons.add_rounded,
                   color: Colors.white,
-                  fontSize: 13,
+                  size: 18,
+                ),
+                label: const Text(
+                  '+ تقييم جديد',
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         body: BlocBuilder<TeacherBloc, TeacherState>(
@@ -231,7 +233,9 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
           final record = items[i];
           return _EvaluationCard(
             record: record,
-            onReviewPending: record.isPendingReview
+            onReviewPending:
+                record.isPendingReview &&
+                    TeacherWorkflowOwnership.canExecute(context)
                 ? () => _showReviewPendingSheet(context, record)
                 : null,
           );

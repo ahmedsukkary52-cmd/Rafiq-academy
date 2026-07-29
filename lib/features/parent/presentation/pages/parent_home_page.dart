@@ -162,6 +162,46 @@ class _ParentHomePageState extends State<ParentHomePage> {
                 );
               }),
               const SizedBox(height: AppSizes.paddingM),
+              AppCard(
+                onTap: () => context.push(AppRoutes.parentAbsence),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.chevron_left_rounded,
+                      color: AppColors.primary,
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'طلبات الاستئذان',
+                          style: AppTextStyles.titleLarge,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'تقديم ومتابعة طلباتك',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: AppColors.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                      child: const Icon(
+                        Icons.event_busy_outlined,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSizes.paddingM),
               const Text(
                 'التقرير الأسبوعي',
                 style: AppTextStyles.headlineMedium,

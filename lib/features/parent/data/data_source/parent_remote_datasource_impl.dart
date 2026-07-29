@@ -178,9 +178,80 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   @override
   Future<void> submitAbsenceRequest(AbsenceRequestModel request) async {
     try {
-      await firestore
+      final id = request.id.trim();
+      if (id.isEmpty) {
+        throw const ServerException('معرّف طلب الاستئذان غير صالح');
+      }
+
+      final ref = firestore
           .collection(FirestoreCollections.absenceRequests)
-          .add(request.toFirestore());
+          .doc(id);
+      final existing = await ref.get();
+      if (existing.exists) {
+        final raw = existing.data()?['status'];
+        final status = (raw is String ? raw : '').trim();
+        if (status == 'approved' || status == 'rejected') {
+          throw const ServerException(
+            'لا يمكن تعديل طلب استئذان بعد اتخاذ القرار',
+          );
+        }
+      }
+
+      // Full set (not merge): resubmit clears reviewedBy and stays pending.
+      // Never touches attendanceRecords (W7 D-W7-2 / D-W7-3).
+      await ref.set({
+        'studentId': request.studentId,
+        'halaqaId': request.halaqaId,
+        'requestedBy': request.requestedBy,
+        'date': Timestamp.fromDate(request.date),
+        'reason': request.reason,
+        'status': 'pending',
+      });
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AbsenceRequestModel>> getAbsenceRequestsForParent(
+    String parentId,
+  ) async {
+    try {
+      final uid = parentId.trim();
+      if (uid.isEmpty) return const [];
+
+      final snap = await firestore
+          .collection(FirestoreCollections.absenceRequests)
+          .where('requestedBy', isEqualTo: uid)
+          .get();
+
+      final items = snap.docs.map(AbsenceRequestModel.fromFirestore).toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+      return items;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<({String id, String name})>> getHalaqatForStudent(
+    String studentId,
+  ) async {
+    try {
+      final sid = studentId.trim();
+      if (sid.isEmpty) return const [];
+
+      final snap = await firestore
+          .collection(FirestoreCollections.halaqat)
+          .where('studentIds', arrayContains: sid)
+          .get();
+
+      return snap.docs.map((doc) {
+        final data = doc.data();
+        final name = (data['name'] as String?)?.trim() ?? '';
+        return (id: doc.id, name: name.isEmpty ? doc.id : name);
+      }).toList();
     } catch (e) {
       throw ServerException(e.toString());
     }

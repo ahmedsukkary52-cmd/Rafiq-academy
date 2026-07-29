@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../domain/read_models/supervisor_day_board.dart';
 
 class _Unset {
   const _Unset();
@@ -14,6 +15,11 @@ class SupervisorState extends Equatable {
   final SectionStatus halaqatStatus;
   final List<HalaqaEntity> halaqat;
   final String? halaqatError;
+
+  // ── نظرة يوم الإشراف (W6) ─────────────────────────────────────────────
+  final SectionStatus dayBoardStatus;
+  final SupervisorDayBoard dayBoard;
+  final String? dayBoardError;
 
   // ── إرسال تشجيع/وسام ──────────────────────────────────────────────────
   final SubmissionStatus issueAchievementStatus;
@@ -31,6 +37,9 @@ class SupervisorState extends Equatable {
     this.halaqatStatus = SectionStatus.initial,
     this.halaqat = const [],
     this.halaqatError,
+    this.dayBoardStatus = SectionStatus.initial,
+    this.dayBoard = SupervisorDayBoard.empty,
+    this.dayBoardError,
     this.issueAchievementStatus = SubmissionStatus.idle,
     this.issueAchievementError,
     this.submitReportStatus = SubmissionStatus.idle,
@@ -45,6 +54,9 @@ class SupervisorState extends Equatable {
     SectionStatus? halaqatStatus,
     List<HalaqaEntity>? halaqat,
     Object? halaqatError = _unset,
+    SectionStatus? dayBoardStatus,
+    SupervisorDayBoard? dayBoard,
+    Object? dayBoardError = _unset,
     SubmissionStatus? issueAchievementStatus,
     Object? issueAchievementError = _unset,
     SubmissionStatus? submitReportStatus,
@@ -58,6 +70,11 @@ class SupervisorState extends Equatable {
       halaqatError: identical(halaqatError, _unset)
           ? this.halaqatError
           : halaqatError as String?,
+      dayBoardStatus: dayBoardStatus ?? this.dayBoardStatus,
+      dayBoard: dayBoard ?? this.dayBoard,
+      dayBoardError: identical(dayBoardError, _unset)
+          ? this.dayBoardError
+          : dayBoardError as String?,
       issueAchievementStatus:
           issueAchievementStatus ?? this.issueAchievementStatus,
       issueAchievementError: identical(issueAchievementError, _unset)
@@ -80,6 +97,9 @@ class SupervisorState extends Equatable {
     halaqatStatus,
     halaqat,
     halaqatError,
+    dayBoardStatus,
+    dayBoard,
+    dayBoardError,
     issueAchievementStatus,
     issueAchievementError,
     submitReportStatus,

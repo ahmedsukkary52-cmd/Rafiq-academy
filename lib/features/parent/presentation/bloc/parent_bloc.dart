@@ -3,7 +3,9 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/repositories/parent_repositories.dart';
+import '../../domain/usecases/get_absence_requests_usecase.dart';
 import '../../domain/usecases/get_children_ids_usecase.dart';
+import '../../domain/usecases/get_halaqat_for_student_usecase.dart';
 import '../../domain/usecases/get_payments_usecase.dart';
 import '../../domain/usecases/get_weekly_report_usecase.dart';
 import '../../domain/usecases/initiate_payment_usecase.dart';
@@ -19,6 +21,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   final GetChildrenIdsUseCase getChildrenIds;
   final GetWeeklyReportUseCase getWeeklyReport;
   final GetPaymentsUseCase getPayments;
+  final GetAbsenceRequestsUseCase getAbsenceRequests;
+  final GetHalaqatForStudentUseCase getHalaqatForStudent;
   final SubmitAbsenceRequestUseCase submitAbsenceRequest;
   final InitiatePaymentUseCase initiatePayment;
 
@@ -26,6 +30,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     required this.getChildrenIds,
     required this.getWeeklyReport,
     required this.getPayments,
+    required this.getAbsenceRequests,
+    required this.getHalaqatForStudent,
     required this.submitAbsenceRequest,
     required this.initiatePayment,
   }) : super(ParentState.initial()) {
@@ -33,6 +39,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<SelectChildEvent>(_onSelectChild);
     on<LoadWeeklyReportEvent>(_onLoadWeeklyReport);
     on<LoadPaymentsEvent>(_onLoadPayments);
+    on<LoadAbsenceRequestsEvent>(_onLoadAbsenceRequests);
+    on<LoadStudentHalaqatEvent>(_onLoadStudentHalaqat);
     on<SubmitAbsenceRequestEvent>(_onSubmitAbsenceRequest);
     on<ResetAbsenceSubmissionEvent>(_onResetAbsenceSubmission);
     on<InitiatePaymentEvent>(_onInitiatePayment);
@@ -184,6 +192,114 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   }
 
   // ══════════════════════════════════════════════════════════════════════
+  // قائمة طلبات الاستئذان
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadAbsenceRequests(
+    LoadAbsenceRequestsEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        absenceRequestsStatus: SectionStatus.loading,
+        absenceRequestsError: null,
+        absenceRequestsParentId: event.parentId,
+      ),
+    );
+
+    final result = await getAbsenceRequests(ParentIdParams(event.parentId));
+
+    if (state.absenceRequestsParentId != null &&
+        state.absenceRequestsParentId != event.parentId) {
+      return;
+    }
+
+    result.fold(
+      (failure) {
+        if (state.absenceRequestsParentId != null &&
+            state.absenceRequestsParentId != event.parentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            absenceRequestsStatus: SectionStatus.error,
+            absenceRequestsError: failure.message,
+          ),
+        );
+      },
+      (requests) {
+        if (state.absenceRequestsParentId != null &&
+            state.absenceRequestsParentId != event.parentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            absenceRequestsStatus: SectionStatus.loaded,
+            absenceRequests: requests,
+          ),
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // حلقات الطالب (نموذج الاستئذان)
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadStudentHalaqat(
+    LoadStudentHalaqatEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        studentHalaqatStatus: SectionStatus.loading,
+        studentHalaqatError: null,
+        studentHalaqat: const [],
+        studentHalaqatStudentId: event.studentId,
+      ),
+    );
+
+    final result = await getHalaqatForStudent(
+      StudentHalaqatParams(
+        parentId: event.parentId,
+        studentId: event.studentId,
+      ),
+    );
+
+    if (state.studentHalaqatStudentId != null &&
+        state.studentHalaqatStudentId != event.studentId) {
+      return;
+    }
+
+    result.fold(
+      (failure) {
+        if (state.studentHalaqatStudentId != null &&
+            state.studentHalaqatStudentId != event.studentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            studentHalaqatStatus: SectionStatus.error,
+            studentHalaqatError: failure.message,
+          ),
+        );
+      },
+      (halaqat) {
+        if (state.studentHalaqatStudentId != null &&
+            state.studentHalaqatStudentId != event.studentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            studentHalaqatStatus: SectionStatus.loaded,
+            studentHalaqat: halaqat,
+          ),
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
   // تقديم طلب استئذان
   // ══════════════════════════════════════════════════════════════════════
 
@@ -207,9 +323,14 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
           absenceSubmissionError: failure.message,
         ),
       ),
-      (_) => emit(
-        state.copyWith(absenceSubmissionStatus: SubmissionStatus.success),
-      ),
+      (_) {
+        emit(state.copyWith(absenceSubmissionStatus: SubmissionStatus.success));
+        final parentId =
+            state.absenceRequestsParentId ?? event.request.requestedBy.trim();
+        if (parentId.isNotEmpty) {
+          add(LoadAbsenceRequestsEvent(parentId));
+        }
+      },
     );
   }
 

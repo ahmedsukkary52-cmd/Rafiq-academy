@@ -81,6 +81,7 @@ class ParentRepositoryImpl implements ParentRepository {
         AbsenceRequestModel(
           id: request.id,
           studentId: request.studentId,
+          halaqaId: request.halaqaId,
           requestedBy: request.requestedBy,
           date: request.date,
           reason: request.reason,
@@ -89,6 +90,34 @@ class ParentRepositoryImpl implements ParentRepository {
         ),
       );
       return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForParent(String parentId) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getAbsenceRequestsForParent(parentId),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<ParentHalaqaOption>>> getHalaqatForStudent(
+    String studentId,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      final rows = await remoteDatasource.getHalaqatForStudent(studentId);
+      return Right([
+        for (final row in rows) ParentHalaqaOption(id: row.id, name: row.name),
+      ]);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

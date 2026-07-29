@@ -6,6 +6,7 @@ class AbsenceRequestModel extends AbsenceRequestEntity {
   const AbsenceRequestModel({
     required super.id,
     required super.studentId,
+    required super.halaqaId,
     required super.requestedBy,
     required super.date,
     required super.reason,
@@ -18,6 +19,7 @@ class AbsenceRequestModel extends AbsenceRequestEntity {
     return AbsenceRequestModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
+      halaqaId: data['halaqaId'] ?? '',
       requestedBy: data['requestedBy'] ?? '',
       date: (data['date'] as Timestamp).toDate(),
       reason: data['reason'] ?? '',
@@ -28,6 +30,7 @@ class AbsenceRequestModel extends AbsenceRequestEntity {
 
   Map<String, dynamic> toFirestore() => {
     'studentId': studentId,
+    'halaqaId': halaqaId,
     'requestedBy': requestedBy,
     'date': Timestamp.fromDate(date),
     'reason': reason,

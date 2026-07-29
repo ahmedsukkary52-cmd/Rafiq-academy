@@ -99,6 +99,13 @@ class _FakeParentRepository implements ParentRepository {
     AbsenceRequestEntity request,
   ) => throw UnimplementedError();
   @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForParent(String parentId) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, List<ParentHalaqaOption>>> getHalaqatForStudent(
+    String studentId,
+  ) => throw UnimplementedError();
+  @override
   Stream<Either<Failure, List<String>>> watchChildrenAssignments(
     String parentId,
   ) => throw UnimplementedError();

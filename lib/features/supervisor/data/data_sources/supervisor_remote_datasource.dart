@@ -13,4 +13,7 @@ abstract class SupervisorRemoteDatasource {
     required String halaqaId,
     required String studentId,
   });
+
+  /// `users/{id}.name` for the given ids (chunked `whereIn`).
+  Future<Map<String, String>> getUserDisplayNames(List<String> userIds);
 }

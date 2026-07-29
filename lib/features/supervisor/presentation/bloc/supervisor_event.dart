@@ -20,6 +20,11 @@ class LoadSupervisedHalaqatEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId];
 }
 
+/// Derive today's oversight board from already-loaded supervised halaqat (W6).
+class LoadSupervisorDayBoardEvent extends SupervisorEvent {
+  const LoadSupervisorDayBoardEvent();
+}
+
 /// إرسال تشجيع/وسام لطالب متميز
 class IssueAchievementEvent extends SupervisorEvent {
   final AchievementIssueEntity data;

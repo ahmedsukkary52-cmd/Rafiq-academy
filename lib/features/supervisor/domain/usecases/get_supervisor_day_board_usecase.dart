@@ -8,55 +8,73 @@ import '../../../../shared/domain/halaqa_day_readiness.dart';
 import '../../../schedule/data/mappers/halaqa_weekly_sessions_mapper.dart';
 import '../../../schedule/data/models/halaqa_schedule_source_model.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
-import '../read_models/teacher_day_agenda.dart';
-import '../repositories/teacher_repository.dart';
+import '../../../teacher/domain/repositories/teacher_repository.dart';
+import '../read_models/supervisor_day_board.dart';
+import '../repositories/parent_repository.dart';
 
-class TodayAgendaParams extends Equatable {
-  /// Teacher's halaqat, already loaded by the dashboard flow (no extra read).
+class SupervisorDayBoardParams extends Equatable {
+  /// Supervised halaqat already loaded (no extra halaqa list read).
   final List<HalaqaEntity> halaqat;
 
   /// Injectable clock for deterministic tests. Defaults to [DateTime.now].
   final DateTime? now;
 
-  const TodayAgendaParams({required this.halaqat, this.now});
+  const SupervisorDayBoardParams({required this.halaqat, this.now});
 
   @override
   List<Object?> get props => [halaqat, now];
 }
 
-/// W3 application orchestrator: determine today's work → determine readiness.
+/// Builds the supervisor day board from shared readiness facts (W6 Slice 1).
 ///
-/// Owns **no** business rules. It only:
-/// - asks [HalaqaWeeklySessionsMapper.mapTodayOperationalDays] for today's
-///   halaqat in D6/D7 order,
-/// - asks [HalaqaDayReadinessProjector] for the three W3 pillars (W6 D-W6-3),
-/// - maps explainable gaps to [TeacherAgendaAction] for the teacher UI.
+/// Owns **no** readiness rules — only:
+/// - today's sessions via [HalaqaWeeklySessionsMapper.mapTodayOperationalDays]
+/// - operational reads via [TeacherRepository] (existing W1/W2 fact sources)
+/// - [HalaqaDayReadinessProjector] for academy facts (D-W6-3 / Rule 5)
+/// - teacher display-name enrichment (D-W6-4)
 ///
-/// Navigation stays in the widget. [TeacherDayAgenda] is a read projection.
+/// Does **not** exception-sort (Rule 3 + 5 — presentation). Does **not** invent
+/// supervisor attendance/homework/review logic.
 @lazySingleton
-class GetTodayAgendaUseCase
-    extends UseCase<TeacherDayAgenda, TodayAgendaParams> {
-  final TeacherRepository repository;
+class GetSupervisorDayBoardUseCase
+    extends UseCase<SupervisorDayBoard, SupervisorDayBoardParams> {
+  final TeacherRepository teacherRepository;
+  final SupervisorRepository supervisorRepository;
   final HalaqaWeeklySessionsMapper _sessionsMapper;
 
-  GetTodayAgendaUseCase(this.repository)
-    : _sessionsMapper = const HalaqaWeeklySessionsMapper();
+  GetSupervisorDayBoardUseCase({
+    required this.teacherRepository,
+    required this.supervisorRepository,
+  }) : _sessionsMapper = const HalaqaWeeklySessionsMapper();
 
   @override
-  Future<Either<Failure, TeacherDayAgenda>> call(
-    TodayAgendaParams params,
+  Future<Either<Failure, SupervisorDayBoard>> call(
+    SupervisorDayBoardParams params,
   ) async {
     final now = params.now ?? DateTime.now();
     final byId = {for (final h in params.halaqat) h.id: h};
 
-    // 1. Today's operational days — D6/D7 owned by the Pre-Slice mapper.
     final days = _sessionsMapper.mapTodayOperationalDays(
       params.halaqat.map(_sourceOf),
       now: now,
     );
 
-    // 2. Readiness per halaqa; keep only halaqat with remaining work.
-    final items = <TeacherAgendaItem>[];
+    final teacherIds = <String>{};
+    for (final day in days) {
+      final halaqa = byId[day.halaqaId];
+      if (halaqa == null) continue;
+      final tid = halaqa.teacherId.trim();
+      if (tid.isNotEmpty) teacherIds.add(tid);
+    }
+
+    final namesEither = await supervisorRepository.getUserDisplayNames(
+      teacherIds.toList(),
+    );
+    final namesFailure = namesEither.fold<Failure?>((l) => l, (_) => null);
+    if (namesFailure != null) return Left(namesFailure);
+    final names = namesEither.getOrElse((_) => const <String, String>{});
+
+    final items = <SupervisorDayBoardItem>[];
     for (final day in days) {
       final halaqa = byId[day.halaqaId];
       if (halaqa == null) continue;
@@ -68,20 +86,22 @@ class GetTodayAgendaUseCase
       final readiness = readinessEither.getOrElse(
         (_) => HalaqaDayReadiness.complete,
       );
-      if (readiness.isComplete) continue;
+      final teacherId = halaqa.teacherId.trim();
 
       items.add(
-        TeacherAgendaItem(
+        SupervisorDayBoardItem(
           halaqaId: halaqa.id,
           halaqaName: halaqa.name,
+          teacherId: teacherId,
+          teacherDisplayName: names[teacherId] ?? '',
           startAt: day.session.startAt,
-          pendingActions: readiness.gaps.map(_actionFor).toList(),
+          readiness: readiness,
         ),
       );
     }
 
     return Right(
-      TeacherDayAgenda(items: items, sessionsTodayCount: days.length),
+      SupervisorDayBoard(items: items, sessionsTodayCount: days.length),
     );
   }
 
@@ -89,7 +109,7 @@ class GetTodayAgendaUseCase
     HalaqaEntity halaqa,
     DateTime now,
   ) async {
-    final attendanceEither = await repository.getHalaqaAttendanceForDate(
+    final attendanceEither = await teacherRepository.getHalaqaAttendanceForDate(
       halaqaId: halaqa.id,
       date: now,
     );
@@ -100,18 +120,18 @@ class GetTodayAgendaUseCase
     if (attendanceFailure != null) return Left(attendanceFailure);
     final records = attendanceEither.getOrElse((_) => const []);
 
-    // Skip homework read when roster is empty — same guard as before W6
-    // (aligns with sendAssignment; projector also ignores homework then).
     DateTime? latestDue;
     final hasRoster = halaqa.studentIds.any((id) => id.trim().isNotEmpty);
     if (hasRoster) {
-      final dueEither = await repository.getLatestAssignmentDueDate(halaqa.id);
+      final dueEither = await teacherRepository.getLatestAssignmentDueDate(
+        halaqa.id,
+      );
       final dueFailure = dueEither.fold<Failure?>((l) => l, (_) => null);
       if (dueFailure != null) return Left(dueFailure);
       latestDue = dueEither.getOrElse((_) => null);
     }
 
-    final reviewsEither = await repository.getHalaqaRecitationRecords(
+    final reviewsEither = await teacherRepository.getHalaqaRecitationRecords(
       halaqa.id,
     );
     final reviewsFailure = reviewsEither.fold<Failure?>((l) => l, (_) => null);
@@ -131,12 +151,6 @@ class GetTodayAgendaUseCase
       ),
     );
   }
-
-  TeacherAgendaAction _actionFor(HalaqaDayGap gap) => switch (gap.kind) {
-    HalaqaDayGapKind.attendanceIncomplete => TeacherAgendaAction.takeAttendance,
-    HalaqaDayGapKind.homeworkPending => TeacherAgendaAction.sendHomework,
-    HalaqaDayGapKind.reviewsPending => TeacherAgendaAction.reviewRecitations,
-  };
 
   HalaqaScheduleSourceModel _sourceOf(HalaqaEntity h) {
     return HalaqaScheduleSourceModel(

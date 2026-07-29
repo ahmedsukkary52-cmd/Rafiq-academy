@@ -79,4 +79,37 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       throw ServerException(e.toString());
     }
   }
+
+  @override
+  Future<Map<String, String>> getUserDisplayNames(List<String> userIds) async {
+    try {
+      final unique = userIds
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+      if (unique.isEmpty) return const {};
+
+      final names = <String, String>{};
+      // Firestore whereIn limit is 30.
+      for (var i = 0; i < unique.length; i += 30) {
+        final chunk = unique.sublist(
+          i,
+          i + 30 > unique.length ? unique.length : i + 30,
+        );
+        final snap = await firestore
+            .collection(FirestoreCollections.users)
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        for (final doc in snap.docs) {
+          final raw = doc.data()['name'];
+          final name = raw is String ? raw.trim() : '';
+          if (name.isNotEmpty) names[doc.id] = name;
+        }
+      }
+      return names;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
 }

@@ -1,7 +1,7 @@
 # W7 — Parent Absence Request (استئذان) Lifecycle
 ## Phase 0 Technical Design (Investigation Only — No Implementation Yet)
 
-**Status:** Phase 0 approved · Pre-Slice Pass · Slice 1 Pass · Slice 2 Pass · awaiting Slice 3 approval  
+**Status:** Phase 0 approved · Pre-Slice–Slice 3 Pass · **W7 complete** — awaiting approval before W8 recommendation  
 **Date:** 2026-07-29  
 **Predecessors:** W1–W6 complete; `docs/POST_W6_PRODUCT_AUDIT.md` (W7 recommendation approved)  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.
@@ -27,6 +27,7 @@
 | Explainability from academy facts | W6 Rule 7 | Every displayed request state must cite request + attendance facts |
 | Domain ownership over feature ownership | Standing | One owner per rule; extract only for real domain concepts |
 | **Rule 1 — Teacher decisions classify the request, not attendance** | **Locked (Slice 2)** | Approve/reject changes **only** the absence request. Attendance remains the only operational presence record. The workflow **never** infers or rewrites attendance from a request decision. |
+| **Rule 2 — Workflow outcomes are projections, not new business facts** | **Locked (Slice 3)** | Parent outcome, supervisor visibility, and any future observer **derive** from existing `absenceRequests` + attendance facts. No new workflow state, sync flag, or duplicated lifecycle. Observers never own the workflow. |
 
 ### Standing boundaries
 
@@ -289,9 +290,12 @@ See §3.5. **Recommendation: A** if parent/teacher/supervisor need inbox-quality
 |----|--------|
 | Architectural constraints (SSOT, no request-owned attendance, reuse W2/W4/W5/W6) | **Locked** |
 | **Rule 1** — Teacher decisions classify the request, not attendance | **Locked** (Slice 2) |
+| **Rule 2** — Workflow outcomes are projections, not new business facts | **Locked** (Slice 3) |
 | **D-W7-2** | **Approved** — submit allowed before attendance; never auto-modifies attendance |
 | **D-W7-3** | **Approved** — approve/reject updates request status only |
-| D-W7-1, D-W7-4…D-W7-10 | Follow recommendations unless later overridden |
+| **D-W7-6** | **Locked for Slice 3 = B** — role UIs project `absenceRequests` (no new academy event kinds; avoids duplicated lifecycle under Rule 2) |
+| **D-W7-7** | **Locked for Slice 3 = A** — supervisor read-only request context on supervised halaqat |
+| D-W7-1, D-W7-4, D-W7-5, D-W7-8…D-W7-10 | Follow recommendations unless later overridden |
 
 ---
 

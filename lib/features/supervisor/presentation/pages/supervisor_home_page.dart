@@ -12,6 +12,7 @@ import '../../domain/entities/supervisor_report_entity.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
+import '../widgets/supervisor_absence_requests_section.dart';
 import '../widgets/supervisor_day_board_section.dart';
 
 enum _ActiveDialog { none, achievement, report, registerStudent }
@@ -270,6 +271,44 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
                       onRetry: () => context.read<SupervisorBloc>().add(
                         const LoadSupervisorDayBoardEvent(),
                       ),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSizes.paddingL),
+                BlocBuilder<SupervisorBloc, SupervisorState>(
+                  buildWhen: (prev, curr) =>
+                      prev.absenceRequestsStatus !=
+                          curr.absenceRequestsStatus ||
+                      prev.absenceRequests != curr.absenceRequests ||
+                      prev.absenceRequestsError != curr.absenceRequestsError ||
+                      prev.halaqat != curr.halaqat,
+                  builder: (context, reqState) {
+                    final auth = context.read<AuthBloc>().state;
+                    final supervisorId = auth is AuthAuthenticated
+                        ? auth.user.uid
+                        : null;
+                    return SupervisorAbsenceRequestsSection(
+                      status: reqState.absenceRequestsStatus,
+                      requests: reqState.absenceRequests,
+                      error: reqState.absenceRequestsError,
+                      onRetry: () {
+                        if (supervisorId == null) return;
+                        context.read<SupervisorBloc>().add(
+                          LoadSupervisedAbsenceRequestsEvent(
+                            supervisorId: supervisorId,
+                            date: DateTime.now(),
+                          ),
+                        );
+                      },
+                      halaqaName: (id) {
+                        for (final h in reqState.halaqat) {
+                          if (h.id == id) {
+                            final name = h.name.trim();
+                            return name.isEmpty ? id : name;
+                          }
+                        }
+                        return id;
+                      },
                     );
                   },
                 ),

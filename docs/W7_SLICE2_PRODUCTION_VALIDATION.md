@@ -62,4 +62,4 @@
 
 ## Stop
 
-**Awaiting approval before Slice 3** (parent outcome visibility / events if D-W7-6 = A; supervisor read-only if D-W7-7 = A).
+Slice 3 / W7 completion — see `docs/W7_SLICE3_PRODUCTION_VALIDATION.md` and `docs/W7_COMPLETION_PRODUCTION_VALIDATION.md`.

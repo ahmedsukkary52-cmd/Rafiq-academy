@@ -7,6 +7,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../domain/absence_request_projection.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/repositories/parent_repositories.dart';
 import '../bloc/parent_bloc.dart';
@@ -202,8 +203,16 @@ class _ParentAbsenceRequestsPageState extends State<ParentAbsenceRequestsPage> {
                 ),
                 const SizedBox(height: AppSizes.paddingL),
                 const Text(
-                  'طلباتي',
+                  'نتائج طلباتي',
                   style: AppTextStyles.headlineMedium,
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'الحالة تُعرض من سجل الاستئذان الحالي — وليست بديلاً عن سجل الحضور.',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textHint,
+                  ),
                   textAlign: TextAlign.right,
                 ),
                 const SizedBox(height: 8),
@@ -485,6 +494,9 @@ class _RequestTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reviewedBy = request.reviewedBy?.trim() ?? '';
+    final decided = AbsenceRequestProjection.isDecided(request);
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -507,10 +519,25 @@ class _RequestTile extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
+            'طالب: ${request.studentId}',
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.right,
+          ),
+          Text(
             'حلقة: ${request.halaqaId}',
             style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
             textAlign: TextAlign.right,
           ),
+          if (decided && reviewedBy.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'قرار المعلم: ${AbsenceRequestProjection.statusLabel(request.status)} · راجع $reviewedBy',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textHint,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ],
         ],
       ),
     );
@@ -524,10 +551,11 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      AbsenceRequestStatus.pending => ('قيد المراجعة', AppColors.warning),
-      AbsenceRequestStatus.approved => ('مقبول', AppColors.success),
-      AbsenceRequestStatus.rejected => ('مرفوض', AppColors.error),
+    final label = AbsenceRequestProjection.statusLabel(status);
+    final color = switch (status) {
+      AbsenceRequestStatus.pending => AppColors.warning,
+      AbsenceRequestStatus.approved => AppColors.success,
+      AbsenceRequestStatus.rejected => AppColors.error,
     };
 
     return Container(
@@ -565,7 +593,7 @@ class _EmptyRequests extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'بعد الإرسال ستظهر طلباتك هنا بحالتها.',
+            'بعد الإرسال والمراجعة ستظهر نتيجة كل طلب هنا من سجل الاستئذان.',
             style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
             textAlign: TextAlign.center,
           ),

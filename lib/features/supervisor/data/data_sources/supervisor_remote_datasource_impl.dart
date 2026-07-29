@@ -4,6 +4,8 @@ import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_r
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/utils/attendance_policy.dart';
+import '../../../parent/data/models/parent_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
@@ -108,6 +110,38 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
         }
       }
       return names;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AbsenceRequestModel>> getAbsenceRequestsForHalaqatOnDate({
+    required List<String> halaqaIds,
+    required DateTime date,
+  }) async {
+    try {
+      final day = AttendancePolicy.dayStart(date);
+      final items = <AbsenceRequestModel>[];
+      for (final rawId in halaqaIds) {
+        final halaqaId = rawId.trim();
+        if (halaqaId.isEmpty) continue;
+        final snap = await firestore
+            .collection(FirestoreCollections.absenceRequests)
+            .where('halaqaId', isEqualTo: halaqaId)
+            .get();
+        for (final doc in snap.docs) {
+          final model = AbsenceRequestModel.fromFirestore(doc);
+          if (!AttendancePolicy.isSameCalendarDay(model.date, day)) continue;
+          items.add(model);
+        }
+      }
+      items.sort((a, b) {
+        final byStatus = a.status.index.compareTo(b.status.index);
+        if (byStatus != 0) return byStatus;
+        return a.studentId.compareTo(b.studentId);
+      });
+      return items;
     } catch (e) {
       throw ServerException(e.toString());
     }

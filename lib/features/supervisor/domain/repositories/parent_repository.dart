@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../entities/achievement_issue_entity.dart';
 import '../entities/supervisor_report_entity.dart';
@@ -26,6 +27,13 @@ abstract class SupervisorRepository {
   Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
     List<String> userIds,
   );
+
+  /// Read-only استئذان docs for [halaqaIds] on [date] (W7 Rule 2 projection).
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForHalaqatOnDate({
+    required List<String> halaqaIds,
+    required DateTime date,
+  });
 }
 
 class SupervisorIdParams extends Equatable {

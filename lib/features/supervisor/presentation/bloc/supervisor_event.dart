@@ -25,6 +25,20 @@ class LoadSupervisorDayBoardEvent extends SupervisorEvent {
   const LoadSupervisorDayBoardEvent();
 }
 
+/// Read-only استئذان projection for today (W7 Slice 3).
+class LoadSupervisedAbsenceRequestsEvent extends SupervisorEvent {
+  final String supervisorId;
+  final DateTime date;
+
+  const LoadSupervisedAbsenceRequestsEvent({
+    required this.supervisorId,
+    required this.date,
+  });
+
+  @override
+  List<Object?> get props => [supervisorId, date];
+}
+
 /// إرسال تشجيع/وسام لطالب متميز
 class IssueAchievementEvent extends SupervisorEvent {
   final AchievementIssueEntity data;

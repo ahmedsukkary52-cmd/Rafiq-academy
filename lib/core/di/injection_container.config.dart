@@ -283,6 +283,8 @@ import 'package:rafiq_academy/features/supervisor/data/repositories/supervisor_r
     as _i582;
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart'
     as _i307;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart'
+    as _i904;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_halaqat_usecase.dart'
     as _i704;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor_day_board_usecase.dart'
@@ -673,6 +675,11 @@ extension GetItInjectableX on _i174.GetIt {
         firebaseAuth: gh<_i59.FirebaseAuth>(),
       ),
     );
+    gh.lazySingleton<_i904.GetSupervisedAbsenceRequestsUseCase>(
+      () => _i904.GetSupervisedAbsenceRequestsUseCase(
+        gh<_i307.SupervisorRepository>(),
+      ),
+    );
     gh.lazySingleton<_i704.GetSupervisedHalaqatUseCase>(
       () => _i704.GetSupervisedHalaqatUseCase(gh<_i307.SupervisorRepository>()),
     );
@@ -1011,6 +1018,17 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i1070.UpdateRecitationReviewUseCase(gh<_i1050.TeacherRepository>()),
     );
+    gh.singleton<_i149.SupervisorBloc>(
+      () => _i149.SupervisorBloc(
+        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
+        getSupervisorDayBoard: gh<_i824.GetSupervisorDayBoardUseCase>(),
+        getSupervisedAbsenceRequests:
+            gh<_i904.GetSupervisedAbsenceRequestsUseCase>(),
+        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
+        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
+        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
+      ),
+    );
     gh.singleton<_i933.TeacherBloc>(
       () => _i933.TeacherBloc(
         getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
@@ -1026,15 +1044,6 @@ extension GetItInjectableX on _i174.GetIt {
         getTodayAgenda: gh<_i271.GetTodayAgendaUseCase>(),
         getPendingAbsenceRequests: gh<_i775.GetPendingAbsenceRequestsUseCase>(),
         reviewAbsenceRequest: gh<_i182.ReviewAbsenceRequestUseCase>(),
-      ),
-    );
-    gh.singleton<_i149.SupervisorBloc>(
-      () => _i149.SupervisorBloc(
-        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
-        getSupervisorDayBoard: gh<_i824.GetSupervisorDayBoardUseCase>(),
-        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
-        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
-        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
       ),
     );
     return this;

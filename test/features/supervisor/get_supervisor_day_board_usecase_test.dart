@@ -163,6 +163,12 @@ class _FakeSupervisorRepository implements SupervisorRepository {
     required String halaqaId,
     required String studentId,
   }) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForHalaqatOnDate({
+    required List<String> halaqaIds,
+    required DateTime date,
+  }) => throw UnimplementedError();
 }
 
 void main() {

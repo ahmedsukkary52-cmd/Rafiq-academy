@@ -145,7 +145,20 @@ void main() {
       expect(signal.body, 'تم تعيين تكليف لـ أحمد: البقرة 1-5');
     });
 
-    test('homework reviewed includes grade when present', () {
+    test('homework reviewed preserves legacy student wording', () {
+      final event = reviewed();
+      final signal = InAppAcademySignalComposer.compose(
+        events: [event],
+        observerIdsByEventId: {
+          event.eventId: ['s1'],
+        },
+      ).single;
+
+      expect(signal.title, 'تم تقييم تسميعك');
+      expect(signal.body, 'راجع صفحة التقييمات لمعرفة الدرجة والملاحظات');
+    });
+
+    test('homework reviewed parent copy includes enriched name and grade', () {
       final event = reviewed();
       final signal = InAppAcademySignalComposer.compose(
         events: [event],

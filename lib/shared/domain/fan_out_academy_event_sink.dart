@@ -3,34 +3,51 @@ import 'academy_event_sink.dart';
 
 /// Fans each publish out to registered [AcademyEventHandler]s independently.
 ///
-/// The publisher never sees the handler list — only [AcademyEventSink].
-/// One handler's failure does not stop the others; the call fails only if
-/// **every** handler fails (so a sole in-app handler still surfaces unpublished
-/// warnings for the teacher).
+/// - Preserves the publisher's event order for every handler.
+/// - Best-effort: one handler failure never stops the rest.
+/// - Returns a per-handler [AcademyEventPublishReport].
+/// - Throws only when **every** handler fails (so a sole in-app handler still
+///   surfaces unpublished warnings for the teacher).
 class FanOutAcademyEventSink implements AcademyEventSink {
   final List<AcademyEventHandler> handlers;
 
   const FanOutAcademyEventSink({required this.handlers});
 
   @override
-  Future<void> publish(Iterable<AcademyEvent> events) async {
-    final pending = events.toList();
-    if (pending.isEmpty) return;
-    if (handlers.isEmpty) return;
+  Future<AcademyEventPublishReport> publish(
+    Iterable<AcademyEvent> events,
+  ) async {
+    // Materialize once so every handler sees the same ordered snapshot.
+    final pending = List<AcademyEvent>.unmodifiable(events.toList());
+    if (pending.isEmpty) return const AcademyEventPublishReport.empty();
+    if (handlers.isEmpty) return const AcademyEventPublishReport.empty();
 
-    final errors = <Object>[];
+    final reports = <AcademyEventHandlerReport>[];
     for (final handler in handlers) {
       try {
         await handler.handle(pending);
+        reports.add(
+          AcademyEventHandlerReport(handlerName: handler.name, succeeded: true),
+        );
       } catch (e) {
-        errors.add(e);
+        reports.add(
+          AcademyEventHandlerReport(
+            handlerName: handler.name,
+            succeeded: false,
+            error: e,
+          ),
+        );
       }
     }
 
-    if (errors.length == handlers.length) {
-      final first = errors.first;
-      if (first is Exception) throw first;
-      throw Exception(first.toString());
+    final report = AcademyEventPublishReport(reports);
+    if (report.allFailed) {
+      final firstError = reports
+          .map((r) => r.error)
+          .firstWhere((e) => e != null, orElse: () => null);
+      if (firstError is Exception) throw firstError;
+      throw Exception(firstError?.toString() ?? 'all handlers failed');
     }
+    return report;
   }
 }

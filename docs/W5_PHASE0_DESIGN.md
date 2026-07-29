@@ -1,7 +1,7 @@
 # W5 — Parent Academic Awareness
 ## Phase 0 Technical Design
 
-**Status:** Phase 0 approved · **Pre-Slice Pass** · **Slice 1 Pass** — await approval before Slice 2.  
+**Status:** Phase 0 approved · **Pre-Slice Pass** · **Slice 1 Pass** · **Slice 2 Pass** — await approval before continuing.  
 **Date:** 2026-07-29  
 **Predecessors:** W1–W4 complete; Post-W4 cross-workflow audit approved  
 **Standing rule:** If an assumption is wrong: **stop**, update this document, then continue.
@@ -89,6 +89,34 @@ Observers / delivery may **enrich** later by reading repositories (e.g. student 
 | Publisher ignorance | The event publisher (`AcademyEventSink.publish` caller) must not know which observers are registered |
 
 Concrete W5 shape: a fan-out sink invokes registered handlers; emitters depend only on `AcademyEventSink`.
+
+#### 8. Event ordering (**approved**)
+
+For a single business transaction, observers must see `AcademyEvent`s in the **same logical order** in which the domain facts occurred.
+
+| Rule | Meaning |
+|------|---------|
+| Publisher owns order | The emitter builds the ordered event list; the sink preserves that sequence |
+| No registration-order dependence | Handlers must not infer meaning from the order they were registered |
+| No implementation leakage | Observers must not rely on handler/channel internals for ordering |
+
+#### 9. Delivery isolation (**approved**)
+
+Fan-out is **best-effort**.
+
+| Rule | Meaning |
+|------|---------|
+| Continue on failure | A failure in one handler must not stop the remaining handlers |
+| Independent results | Every handler reports its own result; the fan-out aggregates without hiding per-handler outcomes |
+| Unpublished warning | With today’s sole in-app handler, total failure still surfaces `hasUnpublishedEvents` (B-R8) |
+
+#### 10. Idempotency ownership (**approved**)
+
+| Rule | Meaning |
+|------|---------|
+| Event ids | Deterministic `eventId`s guarantee the same domain fact is published as one operational identity |
+| Handler tolerance | Handlers must still tolerate duplicate delivery (e.g. deterministic in-app signal ids / upsert) |
+| Shared responsibility | Do not rely only on the publisher for correctness |
 
 ### Debt-track boundary
 

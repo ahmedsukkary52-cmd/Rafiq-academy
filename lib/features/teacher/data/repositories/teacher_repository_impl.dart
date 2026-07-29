@@ -36,10 +36,10 @@ class TeacherRepositoryImpl implements TeacherRepository {
   ) async {
     if (events.isEmpty) return const AcademyEventPublication.none();
     try {
-      await eventSink.publish(events);
+      final report = await eventSink.publish(events);
       return AcademyEventPublication(
         eventCount: events.length,
-        eventsPublished: true,
+        eventsPublished: report.anySucceeded,
       );
     } catch (_) {
       return AcademyEventPublication(
@@ -158,21 +158,24 @@ class TeacherRepositoryImpl implements TeacherRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> updateRecitationReview(
+  Future<Either<Failure, AcademyEventPublication>> updateRecitationReview(
     UpdateRecitationReviewParams params,
   ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+
+    final List<AcademyEvent> events;
     try {
-      await remoteDatasource.updateRecitationReview(
+      events = await remoteDatasource.updateRecitationReview(
         recordId: params.recordId,
         grade: params.grade,
         behaviorGrade: params.behaviorGrade,
         notes: params.notes,
       );
-      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }
+
+    return Right(await _publishAfterCommit(events));
   }
 
   @override

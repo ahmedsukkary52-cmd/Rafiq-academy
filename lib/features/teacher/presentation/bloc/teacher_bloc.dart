@@ -351,6 +351,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         recitationSubmissionStatus: SubmissionStatus.submitting,
         recitationSubmissionError: null,
+        recitationEventsUnpublished: false,
       ),
     );
 
@@ -371,9 +372,12 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           recitationSubmissionError: failure.message,
         ),
       ),
-      (_) {
+      (outcome) {
         emit(
-          state.copyWith(recitationSubmissionStatus: SubmissionStatus.success),
+          state.copyWith(
+            recitationSubmissionStatus: SubmissionStatus.success,
+            recitationEventsUnpublished: outcome.hasUnpublishedEvents,
+          ),
         );
         add(LoadHalaqaEvaluationsEvent(event.halaqaId));
         add(const LoadTodayAgendaEvent());
@@ -389,6 +393,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         recitationSubmissionStatus: SubmissionStatus.idle,
         recitationSubmissionError: null,
+        recitationEventsUnpublished: false,
       ),
     );
   }

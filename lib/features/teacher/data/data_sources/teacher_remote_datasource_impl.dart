@@ -224,7 +224,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   }
 
   @override
-  Future<void> updateRecitationReview({
+  Future<List<AcademyEvent>> updateRecitationReview({
     required String recordId,
     required RecitationGrade grade,
     required RecitationGrade behaviorGrade,
@@ -234,6 +234,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
       final ref = firestore
           .collection(FirestoreCollections.recitationRecords)
           .doc(recordId);
+
+      late final HomeworkReviewed event;
 
       await firestore.runTransaction((txn) async {
         final snap = await txn.get(ref);
@@ -257,21 +259,25 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         });
 
         final studentId = data['studentId'] as String? ?? '';
-        if (studentId.isNotEmpty) {
-          final notifRef = firestore
-              .collection(FirestoreCollections.notifications)
-              .doc();
-          txn.set(notifRef, {
-            'audience': studentId,
-            'title': 'تم تقييم تسميعك',
-            'body': 'راجع صفحة التقييمات لمعرفة الدرجة والملاحظات',
-            'type': NotificationTypes.assignment,
-            'readBy': <String>[],
-            'hasAudioAlert': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+        if (studentId.trim().isEmpty) {
+          throw const ServerException('سجل التسميع بدون طالب');
         }
+
+        final rawDate = data['date'];
+        final date = rawDate is Timestamp ? rawDate.toDate() : DateTime.now();
+
+        event = HomeworkReviewed(
+          recitationRecordId: recordId,
+          studentId: studentId,
+          halaqaId: (data['halaqaId'] as String?) ?? '',
+          date: date,
+          grade: grade.label,
+          behaviorGrade: behaviorGrade.label,
+          versesRange: (data['versesRange'] as String?) ?? '',
+        );
       });
+
+      return [event];
     } on ServerException {
       rethrow;
     } catch (e) {

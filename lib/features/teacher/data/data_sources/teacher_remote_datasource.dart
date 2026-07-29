@@ -22,7 +22,10 @@ abstract class TeacherRemoteDatasource {
     required DateTime date,
   });
   Future<void> addRecitationRecord(RecitationRecordModel record);
-  Future<void> updateRecitationReview({
+
+  /// Pending → reviewed transition. Returns [HomeworkReviewed] for the
+  /// committed fact — no notification writes.
+  Future<List<AcademyEvent>> updateRecitationReview({
     required String recordId,
     required RecitationGrade grade,
     required RecitationGrade behaviorGrade,

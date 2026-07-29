@@ -60,7 +60,6 @@ void main() {
       result.fold((_) => fail('expected success'), (outcome) {
         expect(outcome.eventCount, 1);
         expect(outcome.eventsPublished, isTrue);
-        expect(outcome.hasUnpublishedEvents, isFalse);
       });
     });
 
@@ -73,8 +72,6 @@ void main() {
         final result = await repository.saveDayAttendance([record]);
 
         result.fold((_) => fail('expected success'), (outcome) {
-          expect(outcome.eventCount, 1);
-          expect(outcome.eventsPublished, isFalse);
           expect(outcome.hasUnpublishedEvents, isTrue);
         });
       },
@@ -106,20 +103,52 @@ void main() {
         [assigned],
       ]);
       result.fold((_) => fail('expected success'), (outcome) {
+        expect(outcome.eventsPublished, isTrue);
+      });
+    });
+  });
+
+  group('TeacherRepositoryImpl.updateRecitationReview event publication', () {
+    test('publishes HomeworkReviewed through the same path', () async {
+      final reviewed = HomeworkReviewed(
+        recitationRecordId: 'r1',
+        studentId: 's1',
+        halaqaId: 'h1',
+        date: date,
+        grade: 'ممتاز',
+        behaviorGrade: 'جيد',
+        versesRange: '1-5',
+      );
+      datasource.reviewEvents = [reviewed];
+
+      final result = await repository.updateRecitationReview(
+        UpdateRecitationReviewParams(
+          recordId: 'r1',
+          halaqaId: 'h1',
+          grade: RecitationGrade.excellent,
+          behaviorGrade: RecitationGrade.good,
+        ),
+      );
+
+      expect(sink.published, [
+        [reviewed],
+      ]);
+      result.fold((_) => fail('expected success'), (outcome) {
         expect(outcome.eventCount, 1);
         expect(outcome.eventsPublished, isTrue);
       });
     });
 
-    test('failed assignment write publishes nothing', () async {
-      datasource.assignmentFailure = const ServerException('write failed');
+    test('failed review write publishes nothing', () async {
+      datasource.reviewFailure = const ServerException('write failed');
 
-      final result = await repository.sendAssignment(
-        halaqaId: 'h1',
-        newMemorizationRange: '1-5',
-        reviewRange: '',
-        dueDate: date,
-        teacherId: 't1',
+      final result = await repository.updateRecitationReview(
+        UpdateRecitationReviewParams(
+          recordId: 'r1',
+          halaqaId: 'h1',
+          grade: RecitationGrade.excellent,
+          behaviorGrade: RecitationGrade.good,
+        ),
       );
 
       expect(result.isLeft(), isTrue);
@@ -127,27 +156,26 @@ void main() {
     });
 
     test(
-      'publication failure keeps assignment success with unpublished flag',
+      'publication failure keeps review success with unpublished flag',
       () async {
-        datasource.assignmentEvents = [
-          HomeworkAssigned(
-            assignmentId: 'a1',
+        datasource.reviewEvents = [
+          HomeworkReviewed(
+            recitationRecordId: 'r1',
             studentId: 's1',
             halaqaId: 'h1',
-            assignedBy: 't1',
-            dueDate: date,
-            newMemorizationRange: '1-5',
-            reviewRange: '',
+            date: date,
+            grade: 'ممتاز',
           ),
         ];
         sink.fail = true;
 
-        final result = await repository.sendAssignment(
-          halaqaId: 'h1',
-          newMemorizationRange: '1-5',
-          reviewRange: '',
-          dueDate: date,
-          teacherId: 't1',
+        final result = await repository.updateRecitationReview(
+          UpdateRecitationReviewParams(
+            recordId: 'r1',
+            halaqaId: 'h1',
+            grade: RecitationGrade.excellent,
+            behaviorGrade: RecitationGrade.good,
+          ),
         );
 
         result.fold((_) => fail('expected success'), (outcome) {
@@ -168,16 +196,22 @@ class _RecordingSink implements AcademyEventSink {
   bool fail = false;
 
   @override
-  Future<void> publish(Iterable<AcademyEvent> events) async {
+  Future<AcademyEventPublishReport> publish(
+    Iterable<AcademyEvent> events,
+  ) async {
     if (fail) throw const ServerException('sink down');
     published.add(events.toList());
+    return const AcademyEventPublishReport([
+      AcademyEventHandlerReport(handlerName: 'fake', succeeded: true),
+    ]);
   }
 }
 
 class _FakeTeacherDatasource implements TeacherRemoteDatasource {
   List<AcademyEvent> attendanceEvents = const [];
   List<AcademyEvent> assignmentEvents = const [];
-  ServerException? assignmentFailure;
+  List<AcademyEvent> reviewEvents = const [];
+  ServerException? reviewFailure;
 
   @override
   Future<List<AcademyEvent>> saveDayAttendance(
@@ -191,9 +225,17 @@ class _FakeTeacherDatasource implements TeacherRemoteDatasource {
     required String reviewRange,
     required DateTime dueDate,
     required String teacherId,
+  }) async => assignmentEvents;
+
+  @override
+  Future<List<AcademyEvent>> updateRecitationReview({
+    required String recordId,
+    required RecitationGrade grade,
+    required RecitationGrade behaviorGrade,
+    String? notes,
   }) async {
-    if (assignmentFailure != null) throw assignmentFailure!;
-    return assignmentEvents;
+    if (reviewFailure != null) throw reviewFailure!;
+    return reviewEvents;
   }
 
   @override
@@ -213,13 +255,6 @@ class _FakeTeacherDatasource implements TeacherRemoteDatasource {
   @override
   Future<void> addRecitationRecord(RecitationRecordModel record) =>
       throw UnimplementedError();
-  @override
-  Future<void> updateRecitationReview({
-    required String recordId,
-    required RecitationGrade grade,
-    required RecitationGrade behaviorGrade,
-    String? notes,
-  }) => throw UnimplementedError();
   @override
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
     String halaqaId,

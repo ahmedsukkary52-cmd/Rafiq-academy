@@ -34,7 +34,7 @@ class InAppAcademySignalComposer {
               eventId: event.eventId,
             ),
             audience: observerId,
-            title: _title(event),
+            title: _title(event, observerId: observerId),
             body: _body(
               event,
               observerId: observerId,
@@ -55,12 +55,14 @@ class InAppAcademySignalComposer {
     HomeworkAssigned() || HomeworkReviewed() => NotificationTypes.assignment,
   };
 
-  static String _title(AcademyEvent event) => switch (event) {
-    StudentAbsentRecorded() => 'تم تسجيل غياب',
-    StudentAbsenceCorrected() => 'تم تحديث الحضور',
-    HomeworkAssigned() => 'تكليف جديد',
-    HomeworkReviewed() => 'تم تقييم التسميع',
-  };
+  static String _title(AcademyEvent event, {required String observerId}) =>
+      switch (event) {
+        StudentAbsentRecorded() => 'تم تسجيل غياب',
+        StudentAbsenceCorrected() => 'تم تحديث الحضور',
+        HomeworkAssigned() => 'تكليف جديد',
+        HomeworkReviewed(:final studentId) =>
+          observerId == studentId ? 'تم تقييم تسميعك' : 'تم تقييم التسميع',
+      };
 
   static String _body(
     AcademyEvent event, {
@@ -85,10 +87,11 @@ class InAppAcademySignalComposer {
           newMemorizationRange: newMemorizationRange,
           reviewRange: reviewRange,
         ),
-      HomeworkReviewed(:final grade) =>
-        grade == null || grade.trim().isEmpty
-            ? 'تم تقييم تسميع $name'
-            : 'تم تقييم تسميع $name: ${grade.trim()}',
+      HomeworkReviewed(:final studentId, :final grade) => _homeworkReviewedBody(
+        forSubjectStudent: observerId == studentId,
+        studentLabel: name,
+        grade: grade,
+      ),
     };
   }
 
@@ -113,6 +116,21 @@ class InAppAcademySignalComposer {
       return 'تم تعيين تكليف جديد لـ $studentLabel';
     }
     return 'تم تعيين تكليف لـ $studentLabel: $rangeHint';
+  }
+
+  static String _homeworkReviewedBody({
+    required bool forSubjectStudent,
+    required String studentLabel,
+    required String? grade,
+  }) {
+    if (forSubjectStudent) {
+      return 'راجع صفحة التقييمات لمعرفة الدرجة والملاحظات';
+    }
+    final trimmed = grade?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return 'تم تقييم تسميع $studentLabel';
+    }
+    return 'تم تقييم تسميع $studentLabel: $trimmed';
   }
 
   static String _statusLabel(String status) => switch (status) {

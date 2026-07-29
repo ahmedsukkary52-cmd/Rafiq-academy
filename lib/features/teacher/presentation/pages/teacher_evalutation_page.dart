@@ -509,7 +509,14 @@ class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
       listener: (context, state) {
         if (state.recitationSubmissionStatus == SubmissionStatus.success) {
           Navigator.pop(context);
-          AppSnackBar.showSuccess(context, 'تم حفظ المراجعة بنجاح');
+          if (state.recitationEventsUnpublished) {
+            AppSnackBar.showInfo(
+              context,
+              'تم حفظ المراجعة، لكن تعذّر نشر التحديثات',
+            );
+          } else {
+            AppSnackBar.showSuccess(context, 'تم حفظ المراجعة بنجاح');
+          }
           context.read<TeacherBloc>().add(
             const ResetRecitationSubmissionEvent(),
           );

@@ -11,8 +11,8 @@ import '../datasources/notifications_remote_datasource.dart';
 
 /// In-app delivery handler — one independent observer of the event stream.
 ///
-/// Resolves who should know (observer layer), enriches display names when
-/// needed (delivery concern), composes inbox rows, writes signals.
+/// Tolerates duplicate delivery via deterministic [NotificationSignal] ids
+/// (upsert). Must not assume it is the only handler.
 @lazySingleton
 class InAppAcademyEventHandler implements AcademyEventHandler {
   final AcademyEventObserverResolver observerResolver;
@@ -24,6 +24,9 @@ class InAppAcademyEventHandler implements AcademyEventHandler {
     required this.notificationsDatasource,
     required this.firestore,
   });
+
+  @override
+  String get name => 'in_app';
 
   @override
   Future<void> handle(Iterable<AcademyEvent> events) async {

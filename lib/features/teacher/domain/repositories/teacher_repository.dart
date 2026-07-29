@@ -44,8 +44,10 @@ abstract class TeacherRepository {
     RecitationRecordEntity record,
   );
 
-  /// مراجعة تسميع معلّق (نفس المستند — لا إنشاء جديد)
-  Future<Either<Failure, Unit>> updateRecitationReview(
+  /// مراجعة تسميع معلّق (نفس المستند — لا إنشاء جديد).
+  ///
+  /// Commits the review then publishes [HomeworkReviewed].
+  Future<Either<Failure, AcademyEventPublication>> updateRecitationReview(
     UpdateRecitationReviewParams params,
   );
 

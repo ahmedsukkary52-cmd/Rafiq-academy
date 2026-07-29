@@ -163,6 +163,8 @@ import 'package:rafiq_academy/features/homework/presentation/bloc/homework_bloc.
     as _i421;
 import 'package:rafiq_academy/features/notifications/data/datasources/notifications_remote_datasource.dart'
     as _i676;
+import 'package:rafiq_academy/features/notifications/data/observers/default_academy_event_observer_resolver.dart'
+    as _i990;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
     as _i579;
 import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_sink.dart'
@@ -317,6 +319,8 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/update_recitation
     as _i1070;
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
     as _i933;
+import 'package:rafiq_academy/shared/domain/academy_event_observer_resolver.dart'
+    as _i937;
 import 'package:rafiq_academy/shared/domain/academy_event_sink.dart' as _i273;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -741,12 +745,6 @@ extension GetItInjectableX on _i174.GetIt {
         getTopStudents: gh<_i1010.GetTopStudentsUseCase>(),
       ),
     );
-    gh.lazySingleton<_i273.AcademyEventSink>(
-      () => _i448.InAppAcademyEventSink(
-        parentRepository: gh<_i493.ParentRepository>(),
-        notificationsDatasource: gh<_i676.NotificationsRemoteDatasource>(),
-      ),
-    );
     gh.singleton<_i409.AdminBloc>(
       () => _i409.AdminBloc(
         getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
@@ -776,6 +774,11 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i888.SubmitAbsenceRequestUseCase>(
       () => _i888.SubmitAbsenceRequestUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i937.AcademyEventObserverResolver>(
+      () => _i990.DefaultAcademyEventObserverResolver(
+        parentRepository: gh<_i493.ParentRepository>(),
+      ),
     );
     gh.lazySingleton<_i224.GetAchievementsUseCase>(
       () => _i224.GetAchievementsUseCase(gh<_i724.StudentRepository>()),
@@ -858,13 +861,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i186.GenerateCertificatePdfUseCase>(
       () => _i186.GenerateCertificatePdfUseCase(gh<_i888.AwardsRepository>()),
     );
-    gh.lazySingleton<_i1050.TeacherRepository>(
-      () => _i63.TeacherRepositoryImpl(
-        remoteDatasource: gh<_i717.TeacherRemoteDatasource>(),
-        networkInfo: gh<_i696.NetworkInfo>(),
-        eventSink: gh<_i273.AcademyEventSink>(),
-      ),
-    );
     gh.singleton<_i149.SupervisorBloc>(
       () => _i149.SupervisorBloc(
         getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
@@ -903,6 +899,55 @@ extension GetItInjectableX on _i174.GetIt {
         updateAvatarSelection: gh<_i479.UpdateAvatarSelectionUseCase>(),
       ),
     );
+    gh.singleton<_i532.PostsBloc>(
+      () => _i532.PostsBloc(
+        watchPosts: gh<_i918.WatchPostsUseCase>(),
+        watchComments: gh<_i918.WatchCommentsUseCase>(),
+        createPost: gh<_i918.CreatePostUseCase>(),
+        toggleLike: gh<_i918.ToggleLikeUseCase>(),
+        addComment: gh<_i918.AddCommentUseCase>(),
+        togglePin: gh<_i918.TogglePinUseCase>(),
+        deletePost: gh<_i918.DeletePostUseCase>(),
+      ),
+    );
+    gh.factory<_i285.AwardsBloc>(
+      () => _i285.AwardsBloc(
+        getAwardsStats: gh<_i186.GetAwardsStatsUseCase>(),
+        getGrantedAwards: gh<_i186.GetGrantedAwardsUseCase>(),
+        grantAward: gh<_i186.GrantAwardUseCase>(),
+        generateCertificatePdf: gh<_i186.GenerateCertificatePdfUseCase>(),
+      ),
+    );
+    gh.singleton<_i164.NotificationsBloc>(
+      () => _i164.NotificationsBloc(
+        watchNotifications: gh<_i152.WatchNotificationsUseCase>(),
+        markNotificationAsRead: gh<_i152.MarkNotificationAsReadUseCase>(),
+        markAllNotificationsAsRead:
+            gh<_i152.MarkAllNotificationsAsReadUseCase>(),
+      ),
+    );
+    gh.factory<_i251.ProgressReportBloc>(
+      () => _i251.ProgressReportBloc(
+        getProgressReport: gh<_i235.GetProgressReportUseCase>(),
+        getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i273.AcademyEventSink>(
+      () => _i448.InAppAcademyEventSink(
+        observerResolver: gh<_i937.AcademyEventObserverResolver>(),
+        notificationsDatasource: gh<_i676.NotificationsRemoteDatasource>(),
+      ),
+    );
+    gh.factory<_i951.ScheduleBloc>(
+      () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
+    );
+    gh.lazySingleton<_i1050.TeacherRepository>(
+      () => _i63.TeacherRepositoryImpl(
+        remoteDatasource: gh<_i717.TeacherRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+        eventSink: gh<_i273.AcademyEventSink>(),
+      ),
+    );
     gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
       () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -937,42 +982,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i1070.UpdateRecitationReviewUseCase>(
       () =>
           _i1070.UpdateRecitationReviewUseCase(gh<_i1050.TeacherRepository>()),
-    );
-    gh.singleton<_i532.PostsBloc>(
-      () => _i532.PostsBloc(
-        watchPosts: gh<_i918.WatchPostsUseCase>(),
-        watchComments: gh<_i918.WatchCommentsUseCase>(),
-        createPost: gh<_i918.CreatePostUseCase>(),
-        toggleLike: gh<_i918.ToggleLikeUseCase>(),
-        addComment: gh<_i918.AddCommentUseCase>(),
-        togglePin: gh<_i918.TogglePinUseCase>(),
-        deletePost: gh<_i918.DeletePostUseCase>(),
-      ),
-    );
-    gh.factory<_i285.AwardsBloc>(
-      () => _i285.AwardsBloc(
-        getAwardsStats: gh<_i186.GetAwardsStatsUseCase>(),
-        getGrantedAwards: gh<_i186.GetGrantedAwardsUseCase>(),
-        grantAward: gh<_i186.GrantAwardUseCase>(),
-        generateCertificatePdf: gh<_i186.GenerateCertificatePdfUseCase>(),
-      ),
-    );
-    gh.singleton<_i164.NotificationsBloc>(
-      () => _i164.NotificationsBloc(
-        watchNotifications: gh<_i152.WatchNotificationsUseCase>(),
-        markNotificationAsRead: gh<_i152.MarkNotificationAsReadUseCase>(),
-        markAllNotificationsAsRead:
-            gh<_i152.MarkAllNotificationsAsReadUseCase>(),
-      ),
-    );
-    gh.factory<_i251.ProgressReportBloc>(
-      () => _i251.ProgressReportBloc(
-        getProgressReport: gh<_i235.GetProgressReportUseCase>(),
-        getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
-      ),
-    );
-    gh.factory<_i951.ScheduleBloc>(
-      () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
     );
     gh.singleton<_i933.TeacherBloc>(
       () => _i933.TeacherBloc(

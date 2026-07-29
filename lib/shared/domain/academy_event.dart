@@ -4,24 +4,25 @@ import '../utils/attendance_policy.dart';
 
 /// Stable operational facts in the academy.
 ///
-/// Attendance documents remain the SSOT. An [AcademyEvent] is a derived fact
-/// that delivery channels (in-app notification, later FCM/SMS/…) may project.
-/// Channels never become a second attendance truth.
+/// An [AcademyEvent] is **what happened** — never a notification command.
+/// Delivery channels (in-app, later FCM/SMS/…) project the fact; they do not
+/// redefine it. Emitters must not change when a new observer subscribes.
 ///
-/// W4 implements attendance absence events only. Other event kinds are reserved
-/// names for later workflows — do not invent them here until needed.
+/// SSOT documents (attendance, assignments, recitation records) remain truth.
+/// Events are derived facts that observers may consume.
 sealed class AcademyEvent extends Equatable {
   const AcademyEvent();
 
   /// Deterministic identity of the operational fact (not a delivery message id).
-  ///
-  /// For absence awareness this is keyed by the attendance document id so
-  /// re-saves and corrections address the same fact.
   String get eventId;
+
+  /// Subject student of this fact (when the fact is student-scoped).
+  String get studentId;
 }
 
 /// Student transitioned to an explicit `absent` mark for a calendar day.
 class StudentAbsentRecorded extends AcademyEvent {
+  @override
   final String studentId;
   final String studentName;
   final String halaqaId;
@@ -51,6 +52,7 @@ class StudentAbsentRecorded extends AcademyEvent {
 
 /// Student previously marked explicitly absent was corrected to present/late.
 class StudentAbsenceCorrected extends AcademyEvent {
+  @override
   final String studentId;
   final String studentName;
   final String halaqaId;
@@ -84,7 +86,88 @@ class StudentAbsenceCorrected extends AcademyEvent {
   ];
 }
 
-/// Helpers for stable event / per-recipient delivery identities.
+/// Homework (assignment document) was committed for a student.
+///
+/// Fact only — not "notify parent" / "send inbox card".
+class HomeworkAssigned extends AcademyEvent {
+  final String assignmentId;
+  @override
+  final String studentId;
+  final String studentName;
+  final String halaqaId;
+  final DateTime dueDate;
+  final String newMemorizationRange;
+  final String reviewRange;
+
+  const HomeworkAssigned({
+    required this.assignmentId,
+    required this.studentId,
+    required this.studentName,
+    required this.halaqaId,
+    required this.dueDate,
+    required this.newMemorizationRange,
+    required this.reviewRange,
+  });
+
+  @override
+  String get eventId => AcademyEventIds.homeworkAssigned(assignmentId);
+
+  @override
+  List<Object?> get props => [
+    assignmentId,
+    studentId,
+    studentName,
+    halaqaId,
+    dueDate,
+    newMemorizationRange,
+    reviewRange,
+  ];
+}
+
+/// A recitation record became reviewed (grade available as academy fact).
+///
+/// Fact only — observers decide who should know; channels decide how.
+class HomeworkReviewed extends AcademyEvent {
+  final String recitationRecordId;
+  @override
+  final String studentId;
+  final String studentName;
+  final String halaqaId;
+  final DateTime date;
+
+  /// Grade as stored on the SSOT recitation document (display/wire today).
+  final String? grade;
+  final String? behaviorGrade;
+  final String versesRange;
+
+  const HomeworkReviewed({
+    required this.recitationRecordId,
+    required this.studentId,
+    required this.studentName,
+    required this.halaqaId,
+    required this.date,
+    this.grade,
+    this.behaviorGrade,
+    this.versesRange = '',
+  });
+
+  @override
+  String get eventId => AcademyEventIds.homeworkReviewed(recitationRecordId);
+
+  @override
+  List<Object?> get props => [
+    recitationRecordId,
+    studentId,
+    studentName,
+    halaqaId,
+    date,
+    grade,
+    behaviorGrade,
+    versesRange,
+  ];
+}
+
+/// Deterministic identities of academy facts (not channel message ids).
 class AcademyEventIds {
   const AcademyEventIds._();
 
@@ -92,11 +175,11 @@ class AcademyEventIds {
   static String attendanceAbsence(String attendanceDocumentId) =>
       'attendance_absence_$attendanceDocumentId';
 
-  /// Per-parent delivery document id for the in-app channel (Slice 1+).
-  ///
-  /// Keeps channel idempotency without changing the event identity.
-  static String inAppDeliveryId({
-    required String parentId,
-    required String eventId,
-  }) => '${parentId}_$eventId';
+  /// One operational assign fact per assignment document.
+  static String homeworkAssigned(String assignmentId) =>
+      'homework_assigned_$assignmentId';
+
+  /// One operational review fact per recitation record.
+  static String homeworkReviewed(String recitationRecordId) =>
+      'homework_reviewed_$recitationRecordId';
 }

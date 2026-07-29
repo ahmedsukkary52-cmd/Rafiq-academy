@@ -213,13 +213,10 @@ void main() {
   });
 
   group('AcademyEventIds', () {
-    test('in-app delivery id is parent-scoped', () {
+    test('absence fact id is deterministic', () {
       expect(
-        AcademyEventIds.inAppDeliveryId(
-          parentId: 'p1',
-          eventId: 'attendance_absence_h1_s1_20240603',
-        ),
-        'p1_attendance_absence_h1_s1_20240603',
+        AcademyEventIds.attendanceAbsence('h1_s1_20240603'),
+        'attendance_absence_h1_s1_20240603',
       );
     });
   });

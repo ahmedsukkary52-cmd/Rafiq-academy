@@ -1,25 +1,26 @@
 import 'package:injectable/injectable.dart';
 
-import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/academy_event.dart';
+import '../../../../shared/domain/academy_event_observer_resolver.dart';
 import '../../../../shared/domain/academy_event_sink.dart';
-import '../../../parent/domain/repositories/parent_repositories.dart';
-import '../../domain/services/absence_signal_composer.dart';
+import '../../domain/services/in_app_academy_signal_composer.dart';
 import '../datasources/notifications_remote_datasource.dart';
 
-/// First consumer of academy events: turns them into in-app messages.
+/// In-app delivery projection of academy facts.
 ///
-/// This is the only place where the three responsibilities meet — attendance
-/// supplies facts, the parent feature supplies relationships, and this feature
-/// supplies presentation. Adding FCM/SMS/email later means adding another sink,
-/// not touching the attendance workflow.
+/// Responsibilities stay narrow:
+/// - ask the **observer layer** who should know
+/// - ask the **composer** how to present the fact in-app
+/// - write signals
+///
+/// Does not decide eligibility rules or invent business facts.
 @LazySingleton(as: AcademyEventSink)
 class InAppAcademyEventSink implements AcademyEventSink {
-  final ParentRepository parentRepository;
+  final AcademyEventObserverResolver observerResolver;
   final NotificationsRemoteDatasource notificationsDatasource;
 
   const InAppAcademyEventSink({
-    required this.parentRepository,
+    required this.observerResolver,
     required this.notificationsDatasource,
   });
 
@@ -28,24 +29,14 @@ class InAppAcademyEventSink implements AcademyEventSink {
     final pending = events.toList();
     if (pending.isEmpty) return;
 
-    final studentIds = pending.map(AbsenceSignalComposer.studentIdOf).toList();
+    final observersByEventId = await observerResolver.resolve(pending);
 
-    final recipients = await parentRepository.getParentIdsByStudentIds(
-      studentIds,
-    );
-
-    final parentIdsByStudentId = recipients.fold(
-      // A lookup failure must not be reported as "delivered".
-      (failure) => throw ServerException(failure.message),
-      (map) => map,
-    );
-
-    final signals = AbsenceSignalComposer.compose(
+    final signals = InAppAcademySignalComposer.compose(
       events: pending,
-      parentIdsByStudentId: parentIdsByStudentId,
+      observerIdsByEventId: observersByEventId,
     );
 
-    // No linked parent is a real state, not an error.
+    // No resolved observers is a real state, not an error.
     if (signals.isEmpty) return;
 
     await notificationsDatasource.upsertSignals(signals);

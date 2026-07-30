@@ -6,6 +6,7 @@ import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/academy_event_observer_resolver.dart';
 import '../../../../shared/domain/academy_event_sink.dart';
+import '../../../../shared/utils/firestore_in_query.dart';
 import '../../domain/services/in_app_academy_signal_composer.dart';
 import '../datasources/notifications_remote_datasource.dart';
 
@@ -62,10 +63,8 @@ class InAppAcademyEventHandler implements AcademyEventHandler {
     if (ids.isEmpty) return const {};
 
     try {
-      // Firestore whereIn limit is 30; chunk if needed.
       final names = <String, String>{};
-      for (var i = 0; i < ids.length; i += 30) {
-        final chunk = ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
+      for (final chunk in FirestoreInQuery.chunkIds(ids)) {
         final snap = await firestore
             .collection(FirestoreCollections.users)
             .where(FieldPath.documentId, whereIn: chunk)

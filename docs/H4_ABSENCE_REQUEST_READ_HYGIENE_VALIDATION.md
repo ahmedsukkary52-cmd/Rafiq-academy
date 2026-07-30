@@ -1,6 +1,6 @@
 # H4 — Absence Request Read Hygiene Validation
 
-**Status:** Implemented · awaiting product approval before H5  
+**Status:** Approved (product)  
 **Date:** 2026-07-31  
 **Scope:** Slice H4 only (`docs/PRODUCTION_HARDENING_PHASE0.md`)  
 **Out of scope:** H5+, A-H20 inbox events, server-side date indexes (B-R4), new product features
@@ -57,4 +57,4 @@ One shared استئذان read policy for teacher / supervisor / parent — with
 
 ## Stop gate
 
-**H4 complete for review.** Do **not** start H5 until product approves.
+**H4 approved.** H5 (roster whereIn chunking) may proceed.

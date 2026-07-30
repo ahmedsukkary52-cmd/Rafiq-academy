@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
+import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
@@ -93,12 +94,7 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       if (unique.isEmpty) return const {};
 
       final names = <String, String>{};
-      // Firestore whereIn limit is 30.
-      for (var i = 0; i < unique.length; i += 30) {
-        final chunk = unique.sublist(
-          i,
-          i + 30 > unique.length ? unique.length : i + 30,
-        );
+      for (final chunk in FirestoreInQuery.chunkIds(unique)) {
         final snap = await firestore
             .collection(FirestoreCollections.users)
             .where(FieldPath.documentId, whereIn: chunk)

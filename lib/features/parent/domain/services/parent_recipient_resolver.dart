@@ -1,37 +1,25 @@
+import '../../../../shared/utils/firestore_in_query.dart';
+
 /// Pure helpers for parentProfiles reverse lookup (W4 Pre-Slice).
 ///
-/// Firestore `arrayContainsAny` accepts at most 30 values per query.
+/// Firestore `arrayContainsAny` accepts at most 30 values per query —
+/// same operand limit as [FirestoreInQuery.whereInLimit].
 class ParentRecipientResolver {
   const ParentRecipientResolver._();
 
   /// Firestore `array-contains-any` operand limit.
-  static const int arrayContainsAnyLimit = 30;
+  static const int arrayContainsAnyLimit = FirestoreInQuery.whereInLimit;
 
   /// Normalize and de-duplicate student IDs; drop blanks.
-  static List<String> normalizeStudentIds(Iterable<String> studentIds) {
-    final seen = <String>{};
-    final out = <String>[];
-    for (final raw in studentIds) {
-      final id = raw.trim();
-      if (id.isEmpty || !seen.add(id)) continue;
-      out.add(id);
-    }
-    return out;
-  }
+  static List<String> normalizeStudentIds(Iterable<String> studentIds) =>
+      FirestoreInQuery.normalizeIds(studentIds);
 
   /// Split into chunks of [arrayContainsAnyLimit].
-  static List<List<String>> chunkStudentIds(List<String> studentIds) {
-    final normalized = normalizeStudentIds(studentIds);
-    if (normalized.isEmpty) return const [];
-    final chunks = <List<String>>[];
-    for (var i = 0; i < normalized.length; i += arrayContainsAnyLimit) {
-      final end = (i + arrayContainsAnyLimit < normalized.length)
-          ? i + arrayContainsAnyLimit
-          : normalized.length;
-      chunks.add(normalized.sublist(i, end));
-    }
-    return chunks;
-  }
+  static List<List<String>> chunkStudentIds(List<String> studentIds) =>
+      FirestoreInQuery.chunkIds(
+        studentIds,
+        limit: arrayContainsAnyLimit,
+      );
 
   /// Merge a parent profile into `studentId → parentIds`.
   ///

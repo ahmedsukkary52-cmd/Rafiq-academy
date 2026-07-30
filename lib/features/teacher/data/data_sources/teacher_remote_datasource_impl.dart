@@ -11,6 +11,7 @@ import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/assignment_policy.dart';
 import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
+import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
@@ -55,14 +56,17 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
 
       if (studentIds.isEmpty) return [];
 
-      final usersSnap = await firestore
-          .collection(FirestoreCollections.users)
-          .where(FieldPath.documentId, whereIn: studentIds)
-          .get();
+      // Firestore whereIn max 30 — chunk so large rosters do not hard-fail (H5).
+      final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+      for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
+        final usersSnap = await firestore
+            .collection(FirestoreCollections.users)
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        docs.addAll(usersSnap.docs);
+      }
 
-      return usersSnap.docs
-          .map(HalaqaStudentSummaryModel.fromFirestore)
-          .toList();
+      return docs.map(HalaqaStudentSummaryModel.fromFirestore).toList();
     } on ServerException {
       rethrow;
     } catch (e) {

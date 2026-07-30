@@ -294,7 +294,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // بث إشعار موحّد
+  // بث إشعار موحّد — admin ops only (H3 / A-H15); not AcademyEventSink
   // ══════════════════════════════════════════════════════════════════════
 
   Future<void> _onSendBroadcast(SendBroadcastNotificationEvent event,

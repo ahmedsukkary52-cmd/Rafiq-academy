@@ -11,8 +11,11 @@ import '../datasources/notifications_remote_datasource.dart';
 
 /// In-app delivery handler — one independent observer of the event stream.
 ///
+/// Production DI registers this as the **only** [AcademyEventHandler] today
+/// (H3 / A-H4). Name [name] stays `'in_app'` for publish reports.
+///
 /// Tolerates duplicate delivery via deterministic [NotificationSignal] ids
-/// (upsert). Must not assume it is the only handler.
+/// (upsert). Must not assume it is the only handler forever (B-FCM may add more).
 @lazySingleton
 class InAppAcademyEventHandler implements AcademyEventHandler {
   final AcademyEventObserverResolver observerResolver;

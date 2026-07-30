@@ -133,7 +133,7 @@ class HomeworkAssigned extends AcademyEvent {
 
 /// A recitation record became reviewed (grade available as academy fact).
 ///
-/// Not yet public on a live write path (Slice 2). Payload stays fact-only.
+/// Published from teacher review write path (W5) via [AcademyEventSink].
 class HomeworkReviewed extends AcademyEvent {
   final String recitationRecordId;
   @override

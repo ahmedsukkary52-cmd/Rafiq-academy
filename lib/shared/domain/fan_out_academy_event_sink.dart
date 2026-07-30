@@ -3,6 +3,9 @@ import 'academy_event_sink.dart';
 
 /// Fans each publish out to registered [AcademyEventHandler]s independently.
 ///
+/// This is the **sole** [AcademyEventSink] implementation in production DI
+/// (H3 / A-H4). Handlers are registered once in [DiModule.academyEventSink].
+///
 /// - Preserves the publisher's event order for every handler.
 /// - Best-effort: one handler failure never stops the rest.
 /// - Returns a per-handler [AcademyEventPublishReport].

@@ -12,7 +12,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
 import 'package:cloud_functions/cloud_functions.dart' as _i809;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
-import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
 import 'package:firebase_storage/firebase_storage.dart' as _i457;
 import 'package:flutter/material.dart' as _i409;
 import 'package:get_it/get_it.dart' as _i174;
@@ -348,7 +347,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
-    gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
     gh.lazySingleton<_i457.FirebaseStorage>(() => diModule.firebaseStorage);
     gh.lazySingleton<_i809.FirebaseFunctions>(() => diModule.firebaseFunctions);
     gh.lazySingleton<_i161.InternetConnection>(
@@ -686,9 +684,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i13.IssueAchievementUseCase>(
       () => _i13.IssueAchievementUseCase(gh<_i307.SupervisorRepository>()),
     );
-    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
-      () => _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
-    );
     gh.lazySingleton<_i910.SubmitSupervisorReportUseCase>(
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
@@ -802,6 +797,10 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i890.DefaultAcademyEventObserverResolver(
         parentRepository: gh<_i493.ParentRepository>(),
       ),
+    );
+    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
+      () =>
+          _i499.RegisterNewStudentUseCase(gh<_i928.ApproveNewStudentUseCase>()),
     );
     gh.lazySingleton<_i224.GetAchievementsUseCase>(
       () => _i224.GetAchievementsUseCase(gh<_i724.StudentRepository>()),

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -25,8 +24,8 @@ abstract class DiModule {
   @lazySingleton
   FirebaseFirestore get firebaseFirestore => FirebaseFirestore.instance;
 
-  @lazySingleton
-  FirebaseMessaging get firebaseMessaging => FirebaseMessaging.instance;
+  // FirebaseMessaging intentionally NOT registered (H3 / A-H19).
+  // Package may remain in pubspec for future B-FCM — no token/handlers yet.
 
   @lazySingleton
   FirebaseStorage get firebaseStorage => FirebaseStorage.instance;
@@ -45,8 +44,14 @@ abstract class DiModule {
   NetworkInfo networkInfo(InternetConnection connection) =>
       NetworkInfoImpl(connection);
 
-  /// Single publish port; handlers remain independently registered.
-  /// Adding FCM/analytics later = add a handler here without touching emitters.
+  /// Sole academy-event publish port (H3 / A-H4).
+  ///
+  /// Production story:
+  ///   TeacherRepository → [AcademyEventSink] / [FanOutAcademyEventSink]
+  ///     → [InAppAcademyEventHandler] → composer → upsertSignals
+  ///
+  /// Admin ops broadcast is **not** registered here (see A-H15 quarantine).
+  /// Adding FCM later (B-FCM) = add another [AcademyEventHandler], not a second sink.
   @lazySingleton
   AcademyEventSink academyEventSink(InAppAcademyEventHandler inApp) =>
       FanOutAcademyEventSink(handlers: [inApp]);

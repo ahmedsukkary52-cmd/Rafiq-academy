@@ -1,11 +1,12 @@
 # Production Hardening Sprint — Phase 0 Design
 
-**Status:** Approved · H1 approved · H2 implemented (awaiting H2 sign-off before H3)  
-**Date:** 2026-07-30  
+**Status:** Approved · H1–H2 approved · H3 implemented (awaiting H3 sign-off before H4)  
+**Date:** 2026-07-31  
 **Context:** W1–W8 workflow family **complete and approved**. **No W9.**  
 **Method:** Phase 0 design approved; execution proceeds slice-by-slice.  
 **H1 deliverable:** `docs/H1_IDENTITY_VALIDATION.md`  
 **H2 deliverable:** `docs/H2_DAY_HOMEWORK_SSOT_VALIDATION.md`  
+**H3 deliverable:** `docs/H3_EVENT_DELIVERY_HYGIENE_VALIDATION.md`  
 **Predecessors:** `docs/W8_COMPLETION_PRODUCTION_VALIDATION.md`, `docs/POST_W8_PRODUCT_AUDIT.md`, `docs/POST_W7_PRODUCT_AUDIT.md`, `docs/POST_W6_PRODUCT_AUDIT.md`
 
 ### Standing rule
@@ -77,7 +78,7 @@ Hardening must **preserve behavior**. Prefer extract/share/test/delete-dead over
 | **A-H1** | Incomplete singleton identity reset | `@singleton` Teacher/Student/Parent/Supervisor/Admin/Notifications/Chat/Posts blocs; logout mainly stops notifications (`main.dart`) | W3–W8 observers on shared devices | M | **High** | Pair with **P-E1** |
 | **A-H2** | No `AssignmentPolicy` — latest-due duplicated ×4+ | `orderBy('dueDate', desc).limit(1)` in student / homework / teacher / parent datasources | W1, W3 readiness, W5 | M | **High** | Ex-A-W6-2 |
 | **A-H3** | Calendar-day bypasses of `AttendancePolicy` | Hand-rolled `DateTime(y,m,d)` still in teacher UI, parent bloc, notifications, calendar, progress/review mappers, admin, student schedule | W2, W3, W4, W7 day keys | M | **High** | Ex-A-W6-3 |
-| **A-H4** | Legacy notification composers / dual sink story | Active: `FanOutAcademyEventSink` + in-app handler. Legacy: `AbsenceSignalComposer`, older sink artifacts still in tree | W4/W5 delivery clarity | S | Med | Ex-A-W6-4 |
+| **A-H4** | Legacy notification composers / dual sink story | **Resolved in W5:** sole live path is `FanOutAcademyEventSink` + `InAppAcademyEventHandler`. `AbsenceSignalComposer` / `InAppAcademyEventSink` **deleted** (not in tree). H3 froze docs + DI comments. | W4/W5 delivery clarity | — | Done | Was Ex-A-W6-4 |
 | **A-H5** | استئذان reads unbounded then client-filter | Teacher/supervisor `where('halaqaId')` then filter day; parent `requestedBy` full history | W7 scale + drift | M | **High** | Ex-A-W7-2 |
 | **A-H6** | `AbsenceRequest*` lives under parent; teacher/supervisor import it | Feature-layering inversion | W7 maintainability | S | Med | Ex-A-W7-1 |
 | **A-H7** | Dual awards schemas (`grantedBy`/`grantedAt` vs `issuedBy`/`date`) | Teacher awards vs supervisor issue; student reader tolerates both; stats query may miss supervisor docs | Encouragement surfaces (not Wn core) | M | Med | Coherence |
@@ -88,11 +89,11 @@ Hardening must **preserve behavior**. Prefer extract/share/test/delete-dead over
 | **A-H12** | Homework write-on-read `_ensureHomeworkFields` | Live get/stream paths mutate docs | W1 side-effects / permissions | M | Med | Remove or migrate |
 | **A-H13** | Domain imports schedule **data** mapper | `GetTodayAgendaUseCase` / supervisor board → `halaqa_weekly_sessions_mapper` | W3/W6 layering | S | Low | Domain port |
 | **A-H14** | Operational readiness I/O duplicated | Projector shared; teacher vs supervisor load paths duplicate | W3/W6 drift | M | Med | Ex-A-W6-1 |
-| **A-H15** | Admin broadcast bypasses academy event sink | Direct `notifications` writes with `audience` | Parallel ownership vs W4/W5 | S | Med | Align or quarantine |
+| **A-H15** | Admin broadcast bypasses academy event sink | Quarantined as `AdminOpsBroadcast` ops channel (H3); still direct `notifications.add` with `audience` — **not** sink-routed | Parallel ownership vs W4/W5 | — | Quarantined | Align into sink would be product change |
 | **A-H16** | Supervisor reports write-only | `supervisorReports.add`; no in-app reader | False ops confidence | S | Low–Med | Hide / document / delete UI |
 | **A-H17** | Teacher posts tab placeholder vs full posts feature | `TeacherPostsTab` unavailable; `PostsListPage` exists | Dead nav | S | Low | Wire or remove |
 | **A-H18** | Widespread deprecated `withOpacity` | Analyze infos across UI | Noise hides real defects | S | Low | Touch-as-you-go |
-| **A-H19** | `FirebaseMessaging` registered unused | DI only; no token/handlers | False FCM readiness | S | Low | With B-FCM |
+| **A-H19** | `FirebaseMessaging` registered unused | **Cleared in H3:** removed from `DiModule` / injectable config; package remains for B-FCM | False FCM readiness | — | Done | With B-FCM |
 | **A-H20** | Optional استئذان → inbox events | Accepted D-W7-6 B | Inbox parity only | M | Med | **Optional**; must stay projections |
 
 ---
@@ -211,7 +212,8 @@ Hardening sprint passes when:
 | Slice plan H0–H9 + RB | **Accepted (product)** |
 | Phase 0 design | **Approved** |
 | **H1 Identity (P-E1 + A-H1)** | **Approved (product)** |
-| **H2 Day & homework SSOT** | **Implemented** — see `docs/H2_DAY_HOMEWORK_SSOT_VALIDATION.md` · awaiting sign-off |
-| H3+ | **Blocked** until H2 approved |
+| **H2 Day & homework SSOT** | **Approved (product)** |
+| **H3 Event delivery hygiene** | **Implemented** — see `docs/H3_EVENT_DELIVERY_HYGIENE_VALIDATION.md` · awaiting sign-off |
+| H4+ | **Blocked** until H3 approved |
 
-**Stop after each slice. Do not begin H3 until H2 is approved.**
+**Stop after each slice. Do not begin H4 until H3 is approved.**

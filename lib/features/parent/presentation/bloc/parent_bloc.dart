@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/repositories/parent_repositories.dart';
 import '../../domain/usecases/get_absence_requests_usecase.dart';
 import '../../domain/usecases/get_children_ids_usecase.dart';
@@ -408,7 +409,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     final now = DateTime.now();
     // DateTime.weekday: 1=Monday ... 7=Sunday. السبت = 6.
     final daysSinceSaturday = (now.weekday - DateTime.saturday + 7) % 7;
-    final today = DateTime(now.year, now.month, now.day);
+    final today = AttendancePolicy.dayStart(now);
     return today.subtract(Duration(days: daysSinceSaturday));
   }
 }

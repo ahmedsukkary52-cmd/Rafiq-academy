@@ -1,10 +1,11 @@
 # Production Hardening Sprint — Phase 0 Design
 
-**Status:** Approved · H1 implemented (awaiting H1 product sign-off before H2)  
+**Status:** Approved · H1 approved · H2 implemented (awaiting H2 sign-off before H3)  
 **Date:** 2026-07-30  
 **Context:** W1–W8 workflow family **complete and approved**. **No W9.**  
 **Method:** Phase 0 design approved; execution proceeds slice-by-slice.  
 **H1 deliverable:** `docs/H1_IDENTITY_VALIDATION.md`  
+**H2 deliverable:** `docs/H2_DAY_HOMEWORK_SSOT_VALIDATION.md`  
 **Predecessors:** `docs/W8_COMPLETION_PRODUCTION_VALIDATION.md`, `docs/POST_W8_PRODUCT_AUDIT.md`, `docs/POST_W7_PRODUCT_AUDIT.md`, `docs/POST_W6_PRODUCT_AUDIT.md`
 
 ### Standing rule
@@ -209,7 +210,8 @@ Hardening sprint passes when:
 | Category B B-R1…B-R8 + B-Storage/B-FCM | **Documented** |
 | Slice plan H0–H9 + RB | **Accepted (product)** |
 | Phase 0 design | **Approved** |
-| **H1 Identity (P-E1 + A-H1)** | **Implemented** — see `docs/H1_IDENTITY_VALIDATION.md` · awaiting sign-off |
-| H2+ | **Blocked** until H1 approved |
+| **H1 Identity (P-E1 + A-H1)** | **Approved (product)** |
+| **H2 Day & homework SSOT** | **Implemented** — see `docs/H2_DAY_HOMEWORK_SSOT_VALIDATION.md` · awaiting sign-off |
+| H3+ | **Blocked** until H2 approved |
 
-**Stop after each slice. Do not begin H2 until H1 is approved.**
+**Stop after each slice. Do not begin H3 until H2 is approved.**

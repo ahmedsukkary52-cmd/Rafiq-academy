@@ -4,6 +4,8 @@ import 'package:rafiq_academy/features/student/data/data_source/student_remote_d
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/assignment_homework_fields_ensure.dart';
+import '../../../../shared/domain/assignment_policy.dart';
 import '../models/achievement_model.dart';
 import '../models/assignment_model.dart';
 import '../models/halaqa_model.dart';
@@ -121,14 +123,14 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
     try {
       final snapshot = await firestore
           .collection(FirestoreCollections.assignments)
-          .where('studentId', isEqualTo: studentId)
-          .orderBy('dueDate', descending: true)
-          .limit(1)
+          .where(AssignmentPolicy.studentIdField, isEqualTo: studentId)
+          .orderBy(AssignmentPolicy.dueDateField, descending: true)
+          .limit(AssignmentPolicy.latestLimit)
           .get();
 
       if (snapshot.docs.isEmpty) return null;
       final doc = snapshot.docs.first;
-      await _ensureHomeworkFieldsOnAssignment(doc);
+      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
       final refreshed = await doc.reference.get();
       return AssignmentModel.fromFirestore(refreshed);
     } catch (e) {
@@ -160,31 +162,17 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
   Stream<AssignmentModel?> watchLatestAssignment(String studentId) {
     return firestore
         .collection(FirestoreCollections.assignments)
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('dueDate', descending: true)
-        .limit(1)
+        .where(AssignmentPolicy.studentIdField, isEqualTo: studentId)
+        .orderBy(AssignmentPolicy.dueDateField, descending: true)
+        .limit(AssignmentPolicy.latestLimit)
         .snapshots()
         .asyncMap((snapshot) async {
           if (snapshot.docs.isEmpty) return null;
           final doc = snapshot.docs.first;
-          await _ensureHomeworkFieldsOnAssignment(doc);
+          await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
           final refreshed = await doc.reference.get();
           return AssignmentModel.fromFirestore(refreshed);
         });
-  }
-
-  /// يزرع حقول واجباتي على نفس مستند `assignments` لو ناقصة (مش collection منفصل).
-  Future<void> _ensureHomeworkFieldsOnAssignment(DocumentSnapshot doc) async {
-    final raw = doc.data();
-    if (raw is! Map<String, dynamic>) return;
-    final tasks = raw['tasks'];
-    if (tasks is List && tasks.isNotEmpty) return;
-
-    final seed = AssignmentModel.defaultHomeworkFields(
-      newMemorizationRange: raw['newMemorizationRange'] as String? ?? '',
-      reviewRange: raw['reviewRange'] as String? ?? '',
-    );
-    await doc.reference.set(seed, SetOptions(merge: true));
   }
 
   @override

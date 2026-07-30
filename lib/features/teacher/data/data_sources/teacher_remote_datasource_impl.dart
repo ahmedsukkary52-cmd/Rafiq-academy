@@ -5,6 +5,7 @@ import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/academy_event.dart';
+import '../../../../shared/domain/assignment_policy.dart';
 import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../parent/data/models/parent_model.dart';
@@ -386,17 +387,17 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   @override
   Future<DateTime?> getLatestAssignmentDueDate(String halaqaId) async {
     try {
-      // Same ordering as W1 student "current homework" (latest dueDate),
+      // Same [AssignmentPolicy] as W1 student "current homework" (latest dueDate),
       // scoped to the halaqa so the teacher agenda reuses D7, not a second rule.
       final snapshot = await firestore
           .collection(FirestoreCollections.assignments)
-          .where('halaqaId', isEqualTo: halaqaId)
-          .orderBy('dueDate', descending: true)
-          .limit(1)
+          .where(AssignmentPolicy.halaqaIdField, isEqualTo: halaqaId)
+          .orderBy(AssignmentPolicy.dueDateField, descending: true)
+          .limit(AssignmentPolicy.latestLimit)
           .get();
 
       if (snapshot.docs.isEmpty) return null;
-      final raw = snapshot.docs.first.data()['dueDate'];
+      final raw = snapshot.docs.first.data()[AssignmentPolicy.dueDateField];
       if (raw is Timestamp) return raw.toDate();
       return null;
     } catch (e) {

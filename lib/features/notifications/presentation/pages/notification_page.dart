@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -196,9 +197,8 @@ class NotificationsPage extends StatelessWidget {
   }
 
   String _dateLabel(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(dt.year, dt.month, dt.day);
+    final today = AttendancePolicy.dayStart(DateTime.now());
+    final day = AttendancePolicy.dayStart(dt);
 
     if (day == today) return 'اليوم';
     if (day == today.subtract(const Duration(days: 1))) return 'أمس';

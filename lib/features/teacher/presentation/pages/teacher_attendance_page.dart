@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -67,15 +68,11 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     _loadPendingRequests();
   }
 
-  static DateTime get _today {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
+  static DateTime get _today => AttendancePolicy.dayStart(DateTime.now());
 
   static DateTime get _minDate => _today.subtract(const Duration(days: 30));
 
-  DateTime _normalize(DateTime date) =>
-      DateTime(date.year, date.month, date.day);
+  DateTime _normalize(DateTime date) => AttendancePolicy.dayStart(date);
 
   void _changeDate(DateTime date) {
     final bloc = context.read<TeacherBloc>();
@@ -106,7 +103,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
   bool _isSameDay(DateTime? a, DateTime b) {
     if (a == null) return false;
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+    return AttendancePolicy.isSameCalendarDay(a, b);
   }
 
   @override
@@ -151,9 +148,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           listener: (context, state) {
             final loadedDay = state.dayAttendanceDate;
             if (loadedDay == null ||
-                loadedDay.year != _selectedDate.year ||
-                loadedDay.month != _selectedDate.month ||
-                loadedDay.day != _selectedDate.day) {
+                !AttendancePolicy.isSameCalendarDay(loadedDay, _selectedDate)) {
               return;
             }
             setState(() {

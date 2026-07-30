@@ -7,6 +7,8 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/assignment_homework_fields_ensure.dart';
+import '../../../../shared/domain/assignment_policy.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/assignment_entity.dart';
@@ -28,9 +30,9 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
   Query<Map<String, dynamic>> _latestQuery(String studentId) {
     return firestore
         .collection(FirestoreCollections.assignments)
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('dueDate', descending: true)
-        .limit(1);
+        .where(AssignmentPolicy.studentIdField, isEqualTo: studentId)
+        .orderBy(AssignmentPolicy.dueDateField, descending: true)
+        .limit(AssignmentPolicy.latestLimit);
   }
 
   @override
@@ -39,7 +41,7 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
       final snapshot = await _latestQuery(studentId).get();
       if (snapshot.docs.isEmpty) return null;
       final doc = snapshot.docs.first;
-      await _ensureHomeworkFields(doc);
+      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
       final refreshed = await doc.reference.get();
       return _toHomework(AssignmentModel.fromFirestore(refreshed));
     } catch (e) {
@@ -52,26 +54,10 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
     return _latestQuery(studentId).snapshots().asyncMap((snapshot) async {
       if (snapshot.docs.isEmpty) return null;
       final doc = snapshot.docs.first;
-      await _ensureHomeworkFields(doc);
+      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
       final refreshed = await doc.reference.get();
       return _toHomework(AssignmentModel.fromFirestore(refreshed));
     });
-  }
-
-  /// لو المستند قديم بدون tasks/attachments — نزرع الحقول على نفس الـ document في Firestore.
-  Future<void> _ensureHomeworkFields(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) async {
-    final data = doc.data();
-    if (data == null) return;
-    final tasks = data['tasks'];
-    if (tasks is List && tasks.isNotEmpty) return;
-
-    final seed = AssignmentModel.defaultHomeworkFields(
-      newMemorizationRange: data['newMemorizationRange'] as String? ?? '',
-      reviewRange: data['reviewRange'] as String? ?? '',
-    );
-    await doc.reference.set(seed, SetOptions(merge: true));
   }
 
   HomeworkEntity _toHomework(AssignmentModel a) {

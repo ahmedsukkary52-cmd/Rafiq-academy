@@ -5,8 +5,9 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/halaqa_day_readiness.dart';
-import '../../../schedule/data/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../../schedule/data/models/halaqa_schedule_source_model.dart';
+import '../../../../shared/domain/load_halaqa_day_readiness.dart';
+import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
+import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../read_models/teacher_day_agenda.dart';
 import '../repositories/teacher_repository.dart';
@@ -29,7 +30,8 @@ class TodayAgendaParams extends Equatable {
 /// Owns **no** business rules. It only:
 /// - asks [HalaqaWeeklySessionsMapper.mapTodayOperationalDays] for today's
 ///   halaqat in D6/D7 order,
-/// - asks [HalaqaDayReadinessProjector] for the three W3 pillars (W6 D-W6-3),
+/// - asks [loadHalaqaDayReadiness] / [HalaqaDayReadinessProjector] for the
+///   three W3 pillars (W6 D-W6-3),
 /// - maps explainable gaps to [TeacherAgendaAction] for the teacher UI.
 ///
 /// Navigation stays in the widget. [TeacherDayAgenda] is a read projection.
@@ -51,7 +53,7 @@ class GetTodayAgendaUseCase
 
     // 1. Today's operational days — D6/D7 owned by the Pre-Slice mapper.
     final days = _sessionsMapper.mapTodayOperationalDays(
-      params.halaqat.map(_sourceOf),
+      params.halaqat.map(halaqaScheduleSourceFromEntity),
       now: now,
     );
 
@@ -61,7 +63,11 @@ class GetTodayAgendaUseCase
       final halaqa = byId[day.halaqaId];
       if (halaqa == null) continue;
 
-      final readinessEither = await _readinessFor(halaqa, now);
+      final readinessEither = await loadHalaqaDayReadiness(
+        teacherRepository: repository,
+        halaqa: halaqa,
+        now: now,
+      );
       final failure = readinessEither.fold<Failure?>((l) => l, (_) => null);
       if (failure != null) return Left(failure);
 
@@ -85,73 +91,9 @@ class GetTodayAgendaUseCase
     );
   }
 
-  Future<Either<Failure, HalaqaDayReadiness>> _readinessFor(
-    HalaqaEntity halaqa,
-    DateTime now,
-  ) async {
-    final attendanceEither = await repository.getHalaqaAttendanceForDate(
-      halaqaId: halaqa.id,
-      date: now,
-    );
-    final attendanceFailure = attendanceEither.fold<Failure?>(
-      (l) => l,
-      (_) => null,
-    );
-    if (attendanceFailure != null) return Left(attendanceFailure);
-    final records = attendanceEither.getOrElse((_) => const []);
-
-    // Skip homework read when roster is empty — same guard as before W6
-    // (aligns with sendAssignment; projector also ignores homework then).
-    DateTime? latestDue;
-    final hasRoster = halaqa.studentIds.any((id) => id.trim().isNotEmpty);
-    if (hasRoster) {
-      final dueEither = await repository.getLatestAssignmentDueDate(halaqa.id);
-      final dueFailure = dueEither.fold<Failure?>((l) => l, (_) => null);
-      if (dueFailure != null) return Left(dueFailure);
-      latestDue = dueEither.getOrElse((_) => null);
-    }
-
-    final reviewsEither = await repository.getHalaqaRecitationRecords(
-      halaqa.id,
-    );
-    final reviewsFailure = reviewsEither.fold<Failure?>((l) => l, (_) => null);
-    if (reviewsFailure != null) return Left(reviewsFailure);
-    final recitations = reviewsEither.getOrElse((_) => const []);
-    final pendingReviewCount = recitations
-        .where((r) => r.isPendingReview)
-        .length;
-
-    return Right(
-      HalaqaDayReadinessProjector.project(
-        rosterStudentIds: halaqa.studentIds,
-        markedStudentIds: records.map((r) => r.studentId),
-        now: now,
-        latestAssignmentDueDate: latestDue,
-        pendingReviewCount: pendingReviewCount,
-      ),
-    );
-  }
-
   TeacherAgendaAction _actionFor(HalaqaDayGap gap) => switch (gap.kind) {
     HalaqaDayGapKind.attendanceIncomplete => TeacherAgendaAction.takeAttendance,
     HalaqaDayGapKind.homeworkPending => TeacherAgendaAction.sendHomework,
     HalaqaDayGapKind.reviewsPending => TeacherAgendaAction.reviewRecitations,
   };
-
-  HalaqaScheduleSourceModel _sourceOf(HalaqaEntity h) {
-    return HalaqaScheduleSourceModel(
-      halaqaId: h.id,
-      name: h.name,
-      meetingLink: h.meetingLink,
-      schedule: h.schedule
-          .map(
-            (s) => HalaqaScheduleSlotModel(
-              day: s.day,
-              startTime: s.startTime,
-              endTime: s.endTime,
-            ),
-          )
-          .toList(),
-    );
-  }
 }

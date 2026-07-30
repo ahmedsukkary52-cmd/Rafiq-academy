@@ -33,11 +33,8 @@ class ScheduleRemoteDatasourceImpl implements ScheduleRemoteDatasource {
         schedule: rawSchedule
             .whereType<Map>()
             .map(
-              (e) =>
-              HalaqaScheduleSlotModel.fromMap(
-                Map<String, dynamic>.from(e),
-              ),
-        )
+              (e) => halaqaScheduleSlotFromMap(Map<String, dynamic>.from(e)),
+            )
             .toList(),
       );
     } on ServerException {

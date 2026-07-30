@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/utils/halaqa_schedule_label.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -718,8 +719,7 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _dueDay = DateTime(now.year, now.month, now.day);
+    _dueDay = AttendancePolicy.dayStart(DateTime.now());
   }
 
   @override
@@ -734,11 +734,10 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
 
   String get _dueDayLabel {
     final d = _dueDay;
-    final today = DateTime.now();
-    final todayOnly = DateTime(today.year, today.month, today.day);
-    if (d == todayOnly) return 'اليوم';
+    final todayOnly = AttendancePolicy.dayStart(DateTime.now());
+    if (AttendancePolicy.isSameCalendarDay(d, todayOnly)) return 'اليوم';
     final tomorrow = todayOnly.add(const Duration(days: 1));
-    if (d == tomorrow) return 'غداً';
+    if (AttendancePolicy.isSameCalendarDay(d, tomorrow)) return 'غداً';
     return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
   }
 
@@ -754,7 +753,7 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
     );
     if (picked == null || !mounted) return;
     setState(() {
-      _dueDay = DateTime(picked.year, picked.month, picked.day);
+      _dueDay = AttendancePolicy.dayStart(picked);
     });
   }
 

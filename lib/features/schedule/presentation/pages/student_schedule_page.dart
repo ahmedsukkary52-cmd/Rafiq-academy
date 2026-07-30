@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/presentation/bloc/student_bloc.dart';
@@ -13,9 +14,8 @@ import '../../domain/entities/class_session_entity.dart';
 import '../bloc/schedule_bloc.dart';
 
 String _dayLabel(DateTime dt) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(dt.year, dt.month, dt.day);
+  final today = AttendancePolicy.dayStart(DateTime.now());
+  final day = AttendancePolicy.dayStart(dt);
   final diff = day.difference(today).inDays;
   if (diff == 0) return 'اليوم';
   if (diff == 1) return 'غداً';

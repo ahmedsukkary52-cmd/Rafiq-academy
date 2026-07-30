@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/theme/app_theme.dart';
 
+/// Admin home.
+///
+/// H6 / A-H9: do **not** wire stats / finance / complaints / broadcast /
+/// teacher-management AdminBloc events here — those writers are quarantined
+/// (no product UI). Keep this surface free of parallel ops delivery.
 class AdminHomePage extends StatelessWidget {
   const AdminHomePage({super.key});
 

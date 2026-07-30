@@ -11,6 +11,8 @@ import '../bloc/calendar_bloc.dart';
 import '../bloc/calendar_event.dart';
 import '../bloc/calendar_state.dart';
 
+/// Quarantined (H6 / A-H8): teacher calendar route removed from [AppRouter].
+/// Page kept for possible future product; not reachable from live nav.
 class CalendarPage extends StatefulWidget {
   final String? halaqaId;
 

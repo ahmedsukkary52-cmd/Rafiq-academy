@@ -16,6 +16,8 @@ import '../bloc/posts_bloc.dart';
 import '../bloc/posts_event.dart';
 import '../bloc/posts_state.dart';
 
+/// Quarantined (H6 / A-H17): full posts UI exists but was never routed.
+/// Teacher home no longer shows a posts tab. Do not wire without product decision.
 class PostsListPage extends StatefulWidget {
   final String? halaqaId;
 

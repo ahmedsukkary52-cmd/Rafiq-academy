@@ -7,7 +7,7 @@ import '../../../core/constants/app_constants.dart';
 ///
 /// Write shape: Firestore `notifications.add` with role/`all` [audienceField].
 /// Product UI for broadcast is currently absent (admin home = admit only).
-/// Full removal may follow H6 (A-H9) if product agrees.
+/// H6 / A-H9: non-admit AdminBloc writers remain quarantined (no UI).
 class AdminOpsBroadcast {
   const AdminOpsBroadcast._();
 

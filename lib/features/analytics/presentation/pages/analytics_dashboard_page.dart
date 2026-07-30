@@ -11,6 +11,8 @@ import '../bloc/analytics_bloc.dart';
 import '../bloc/analytics_event.dart';
 import '../bloc/analytics_state.dart';
 
+/// Quarantined (H6 / A-H8): teacher analytics route removed from [AppRouter].
+/// Page kept for possible future product; not reachable from live nav.
 class AnalyticsDashboardPage extends StatefulWidget {
   final String halaqaId;
 

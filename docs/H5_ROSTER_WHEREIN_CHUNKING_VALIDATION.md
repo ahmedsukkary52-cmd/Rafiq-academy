@@ -1,6 +1,6 @@
 # H5 — Roster whereIn Chunking Validation
 
-**Status:** Implemented · awaiting product approval before H6  
+**Status:** Approved (product)  
 **Date:** 2026-07-31  
 **Scope:** Slice H5 only (`docs/PRODUCTION_HARDENING_PHASE0.md`) — **A-H10 roster `whereIn` chunking first**  
 **Out of scope:** H6+, admin payments/complaints pagination, chat unbounded streams, استئذان index work (B-R4), new product features
@@ -52,4 +52,4 @@ Eliminate Firestore `whereIn` / `array-contains-any` hard-fail when id lists exc
 
 ## Stop gate
 
-**H5 complete for review.** Do **not** start H6 until product approves.
+**H5 approved.** H6 (surface cleanup) may proceed.

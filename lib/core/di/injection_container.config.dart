@@ -800,7 +800,7 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
       () =>
-          _i499.RegisterNewStudentUseCase(gh<_i928.ApproveNewStudentUseCase>()),
+          _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
     );
     gh.lazySingleton<_i224.GetAchievementsUseCase>(
       () => _i224.GetAchievementsUseCase(gh<_i724.StudentRepository>()),

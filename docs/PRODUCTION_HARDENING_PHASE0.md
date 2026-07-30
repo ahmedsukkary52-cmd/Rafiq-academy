@@ -1,6 +1,6 @@
 # Production Hardening Sprint — Phase 0 Design
 
-**Status:** Approved · H1–H4 approved · H5 implemented (awaiting H5 sign-off before H6)  
+**Status:** Approved · H1–H5 approved · H6 implemented (awaiting H6 sign-off before H7)  
 **Date:** 2026-07-31  
 **Context:** W1–W8 workflow family **complete and approved**. **No W9.**  
 **Method:** Phase 0 design approved; execution proceeds slice-by-slice.  
@@ -9,6 +9,7 @@
 **H3 deliverable:** `docs/H3_EVENT_DELIVERY_HYGIENE_VALIDATION.md`  
 **H4 deliverable:** `docs/H4_ABSENCE_REQUEST_READ_HYGIENE_VALIDATION.md`  
 **H5 deliverable:** `docs/H5_ROSTER_WHEREIN_CHUNKING_VALIDATION.md`  
+**H6 deliverable:** `docs/H6_SURFACE_CLEANUP_VALIDATION.md`  
 **Predecessors:** `docs/W8_COMPLETION_PRODUCTION_VALIDATION.md`, `docs/POST_W8_PRODUCT_AUDIT.md`, `docs/POST_W7_PRODUCT_AUDIT.md`, `docs/POST_W6_PRODUCT_AUDIT.md`
 
 ### Standing rule
@@ -84,16 +85,16 @@ Hardening must **preserve behavior**. Prefer extract/share/test/delete-dead over
 | **A-H5** | استئذان reads unbounded then client-filter | **H4:** shared `AbsenceRequestFirestoreReads` (same client filters; query shape unchanged pending B-R4 indexes) | W7 scale + drift | — | Consolidated | Was Ex-A-W7-2 |
 | **A-H6** | `AbsenceRequest*` lives under parent; teacher/supervisor import it | **H4:** types in `lib/shared/`; parent re-exports | W7 maintainability | — | Done | Was Ex-A-W7-1 |
 | **A-H7** | Dual awards schemas (`grantedBy`/`grantedAt` vs `issuedBy`/`date`) | Teacher awards vs supervisor issue; student reader tolerates both; stats query may miss supervisor docs | Encouragement surfaces (not Wn core) | M | Med | Coherence |
-| **A-H8** | Orphan routes / unused pages | Analytics, calendar, content, student history routes; `ChatConversationsPage` unregistered; posts tab placeholder vs `PostsListPage` | Ops confusion; wrong wiring risk | S | Low | Cleanup |
-| **A-H9** | AdminBloc writers without UI (except W8 admit) | Stats/finance/complaints/broadcast/teachers wired; home only admit | Accidental parallel delivery (broadcast) | S | Low–Med | Quarantine / document |
+| **A-H8** | Orphan routes / unused pages | Analytics, calendar, content, student history routes; `ChatConversationsPage` unregistered; posts tab placeholder vs `PostsListPage` | Ops confusion; wrong wiring risk | S | Low | **H6:** orphan routes removed; `ChatConversationsPage` deleted; student content kept |
+| **A-H9** | AdminBloc writers without UI (except W8 admit) | Stats/finance/complaints/broadcast/teachers wired; home only admit | Accidental parallel delivery (broadcast) | S | Low–Med | **H6:** documented quarantine; admit-only UI unchanged |
 | **A-H10** | Heavy / unpaginated / unchunked queries | Admin full `payments`/`complaints`; chat streams unbounded; **roster `whereIn` unchunked** (fails >30); استئذان as A-H5 | W2/W3 hard-fail; W7/admin cost | M–L | **High** (roster) | **H5:** roster `whereIn` chunked via `FirestoreInQuery`; rest deferred |
 | **A-H11** | Critical-path test gaps | Strong: membership, readiness, استئذان ids. Weak: admit use case, homework assign/review, router guards, most blocs | Silent W1/W8 regressions | L | **High** | Incremental |
 | **A-H12** | Homework write-on-read `_ensureHomeworkFields` | Live get/stream paths mutate docs | W1 side-effects / permissions | M | Med | Remove or migrate |
 | **A-H13** | Domain imports schedule **data** mapper | `GetTodayAgendaUseCase` / supervisor board → `halaqa_weekly_sessions_mapper` | W3/W6 layering | S | Low | Domain port |
 | **A-H14** | Operational readiness I/O duplicated | Projector shared; teacher vs supervisor load paths duplicate | W3/W6 drift | M | Med | Ex-A-W6-1 |
 | **A-H15** | Admin broadcast bypasses academy event sink | Quarantined as `AdminOpsBroadcast` ops channel (H3); still direct `notifications.add` with `audience` — **not** sink-routed | Parallel ownership vs W4/W5 | — | Quarantined | Align into sink would be product change |
-| **A-H16** | Supervisor reports write-only | `supervisorReports.add`; no in-app reader | False ops confidence | S | Low–Med | Hide / document / delete UI |
-| **A-H17** | Teacher posts tab placeholder vs full posts feature | `TeacherPostsTab` unavailable; `PostsListPage` exists | Dead nav | S | Low | Wire or remove |
+| **A-H16** | Supervisor reports write-only | `supervisorReports.add`; no in-app reader | False ops confidence | S | Low–Med | **H6:** product UI hidden; write stack ops-only |
+| **A-H17** | Teacher posts tab placeholder vs full posts feature | `TeacherPostsTab` unavailable; `PostsListPage` exists | Dead nav | S | Low | **H6:** posts tab removed; `PostsListPage` quarantined unwired |
 | **A-H18** | Widespread deprecated `withOpacity` | Analyze infos across UI | Noise hides real defects | S | Low | Touch-as-you-go |
 | **A-H19** | `FirebaseMessaging` registered unused | **Cleared in H3:** removed from `DiModule` / injectable config; package remains for B-FCM | False FCM readiness | — | Done | With B-FCM |
 | **A-H20** | Optional استئذان → inbox events | Accepted D-W7-6 B | Inbox parity only | M | Med | **Optional**; must stay projections |
@@ -217,7 +218,8 @@ Hardening sprint passes when:
 | **H2 Day & homework SSOT** | **Approved (product)** |
 | **H3 Event delivery hygiene** | **Approved (product)** |
 | **H4 استئذان read hygiene** | **Approved (product)** |
-| **H5 Roster whereIn chunking** | **Implemented** — see `docs/H5_ROSTER_WHEREIN_CHUNKING_VALIDATION.md` · awaiting sign-off |
-| H6+ | **Blocked** until H5 approved |
+| **H5 Roster whereIn chunking** | **Approved (product)** |
+| **H6 Surface cleanup** | **Implemented** — see `docs/H6_SURFACE_CLEANUP_VALIDATION.md` · awaiting sign-off |
+| H7+ | **Blocked** until H6 approved |
 
-**Stop after each slice. Do not begin H6 until H5 is approved.**
+**Stop after each slice. Do not begin H7 until H6 is approved.**

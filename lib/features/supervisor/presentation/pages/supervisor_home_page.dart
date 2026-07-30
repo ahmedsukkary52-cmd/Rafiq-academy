@@ -8,16 +8,17 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
-import '../../domain/entities/supervisor_report_entity.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_absence_requests_section.dart';
 import '../widgets/supervisor_day_board_section.dart';
 
-enum _ActiveDialog { none, achievement, report, registerStudent }
+enum _ActiveDialog { none, achievement, registerStudent }
 
 /// Supervisor home — halaqat list, detail, and write actions (Sprints 1–5).
+///
+/// H6 / A-H16: “رفع تقرير” UI removed (write-only ops path; no in-app reader).
 class SupervisorHomePage extends StatefulWidget {
   const SupervisorHomePage({super.key});
 
@@ -31,7 +32,6 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
   _ActiveDialog _activeDialog = _ActiveDialog.none;
 
   static const _achievementTypes = ['star', 'badge', 'certificate'];
-  static const _reportTypes = ['periodic', 'incident', 'general'];
 
   @override
   void initState() {
@@ -94,29 +94,6 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
     if (mounted) _activeDialog = _ActiveDialog.none;
   }
 
-  Future<void> _openSubmitReportDialog(HalaqaEntity halaqa) async {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) return;
-
-    _activeDialog = _ActiveDialog.report;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => _SubmitReportDialog(
-        supervisorId: authState.user.uid,
-        halaqaId: halaqa.id,
-        teacherId: halaqa.teacherId.trim().isEmpty ? null : halaqa.teacherId,
-        reportTypes: _reportTypes,
-        onSubmit: (report) {
-          context.read<SupervisorBloc>().add(
-            SubmitSupervisorReportEvent(report),
-          );
-        },
-      ),
-    );
-    if (mounted) _activeDialog = _ActiveDialog.none;
-  }
-
   Future<void> _openRegisterStudentDialog(HalaqaEntity halaqa) async {
     _activeDialog = _ActiveDialog.registerStudent;
     await showDialog<void>(
@@ -160,27 +137,6 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
               AppSnackBar.showError(
                 context,
                 state.issueAchievementError ?? 'تعذر منح الإنجاز',
-              );
-            }
-          },
-        ),
-        BlocListener<SupervisorBloc, SupervisorState>(
-          listenWhen: (prev, curr) =>
-              prev.submitReportStatus != curr.submitReportStatus ||
-              prev.submitReportError != curr.submitReportError,
-          listener: (context, state) {
-            if (state.submitReportStatus == SubmissionStatus.success) {
-              if (_activeDialog == _ActiveDialog.report) {
-                _closeActiveDialog();
-              }
-              AppSnackBar.showSuccess(context, 'تم رفع التقرير بنجاح');
-              context.read<SupervisorBloc>().add(
-                const ResetSubmitReportEvent(),
-              );
-            } else if (state.submitReportStatus == SubmissionStatus.error) {
-              AppSnackBar.showError(
-                context,
-                state.submitReportError ?? 'تعذر رفع التقرير',
               );
             }
           },
@@ -349,8 +305,6 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
                             halaqa: selected,
                             onIssueAchievement: () =>
                                 _openIssueAchievementDialog(selected!),
-                            onSubmitReport: () =>
-                                _openSubmitReportDialog(selected!),
                             onRegisterStudent: () =>
                                 _openRegisterStudentDialog(selected!),
                             formatValue: _orUnavailable,
@@ -587,162 +541,6 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
   };
 }
 
-class _SubmitReportDialog extends StatefulWidget {
-  final String supervisorId;
-  final String halaqaId;
-  final String? teacherId;
-  final List<String> reportTypes;
-  final ValueChanged<SupervisorReportEntity> onSubmit;
-
-  const _SubmitReportDialog({
-    required this.supervisorId,
-    required this.halaqaId,
-    required this.teacherId,
-    required this.reportTypes,
-    required this.onSubmit,
-  });
-
-  @override
-  State<_SubmitReportDialog> createState() => _SubmitReportDialogState();
-}
-
-class _SubmitReportDialogState extends State<_SubmitReportDialog> {
-  final _contentCtrl = TextEditingController();
-  late String _type;
-
-  @override
-  void initState() {
-    super.initState();
-    _type = widget.reportTypes.first;
-  }
-
-  @override
-  void dispose() {
-    _contentCtrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final content = _contentCtrl.text.trim();
-    if (content.isEmpty) return;
-
-    widget.onSubmit(
-      SupervisorReportEntity(
-        id: '',
-        supervisorId: widget.supervisorId,
-        halaqaId: widget.halaqaId,
-        teacherId: widget.teacherId,
-        type: _type,
-        content: content,
-        date: DateTime.now(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<SupervisorBloc, SupervisorState>(
-      buildWhen: (prev, curr) =>
-          prev.submitReportStatus != curr.submitReportStatus,
-      builder: (context, state) {
-        final submitting =
-            state.submitReportStatus == SubmissionStatus.submitting;
-        final canSubmit = _contentCtrl.text.trim().isNotEmpty;
-
-        return AlertDialog(
-          title: const Text(
-            'رفع تقرير',
-            textAlign: TextAlign.right,
-            style: AppTextStyles.headlineMedium,
-          ),
-          content: SizedBox(
-            width: 360,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('نوع التقرير', style: AppTextStyles.labelLarge),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceGrey,
-                      borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _type,
-                        isExpanded: true,
-                        items: widget.reportTypes
-                            .map(
-                              (t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(
-                                  _reportTypeLabel(t),
-                                  style: AppTextStyles.bodyMedium,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: submitting
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setState(() => _type = value);
-                              },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('محتوى التقرير', style: AppTextStyles.labelLarge),
-                  const SizedBox(height: 6),
-                  AppTextField(
-                    hint: 'اكتب تفاصيل التقرير…',
-                    controller: _contentCtrl,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  if (submitting) ...[
-                    const SizedBox(height: 16),
-                    const Center(child: AppLoadingWidget()),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: submitting
-                  ? null
-                  : () {
-                      context.read<SupervisorBloc>().add(
-                        const ResetSubmitReportEvent(),
-                      );
-                      Navigator.of(context).pop();
-                    },
-              child: const Text('إلغاء'),
-            ),
-            AppButton(
-              label: 'إرسال',
-              width: 100,
-              height: 40,
-              onPressed: submitting || !canSubmit ? null : _submit,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  static String _reportTypeLabel(String type) => switch (type) {
-    'periodic' => 'دوري',
-    'incident' => 'بلاغ',
-    'general' => 'عام',
-    _ => type,
-  };
-}
-
 class _RegisterStudentDialog extends StatefulWidget {
   final String halaqaId;
   final ValueChanged<String> onSubmit;
@@ -928,14 +726,12 @@ class _HalaqaCard extends StatelessWidget {
 class _HalaqaDetailSection extends StatelessWidget {
   final HalaqaEntity halaqa;
   final VoidCallback onIssueAchievement;
-  final VoidCallback onSubmitReport;
   final VoidCallback onRegisterStudent;
   final String Function(String) formatValue;
 
   const _HalaqaDetailSection({
     required this.halaqa,
     required this.onIssueAchievement,
-    required this.onSubmitReport,
     required this.onRegisterStudent,
     required this.formatValue,
   });
@@ -996,8 +792,6 @@ class _HalaqaDetailSection extends StatelessWidget {
           trailing: 'فتح',
           onTap: onIssueAchievement,
         ),
-        const SizedBox(height: 8),
-        _ActionRow(label: 'رفع تقرير', trailing: 'فتح', onTap: onSubmitReport),
         const SizedBox(height: 8),
         _ActionRow(
           label: 'تسجيل طالب',

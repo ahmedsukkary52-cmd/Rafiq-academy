@@ -46,6 +46,7 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   }
 
   @override
+  // H6 / A-H16: write-only ops path — product UI removed; no in-app reader.
   Future<void> submitReport(SupervisorReportEntity report) async {
     try {
       await firestore.collection(FirestoreCollections.supervisorReports).add({

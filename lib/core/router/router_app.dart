@@ -40,14 +40,8 @@ import '../../features/teacher/presentation/pages/teacher_home_page.dart';
 import '../../features/teacher/presentation/pages/teacher_class_detail_page.dart';
 import '../../features/teacher/presentation/pages/teacher_attendance_page.dart';
 
-// Analytics
-import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
-
 // Awards
 import '../../features/awards/presentation/pages/awards_page.dart';
-
-// Calendar
-import '../../features/calendar/presentation/pages/calendar_page.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -68,7 +62,7 @@ class AppRoutes {
   static const String studentAchieve = '/student/achievements';
   static const String studentMushaf = '/student/mushaf';
   static const String studentNotifs = '/student/notifications';
-  static const String studentHistory = '/student/history';
+  // H6 / A-H8: studentHistory placeholder route removed (was unreachable).
   static const String studentAvatar = '/student/avatar';
   static const String studentSettings = '/student/settings';
   static const String studentBadges = '/student/badges';
@@ -84,10 +78,9 @@ class AppRoutes {
   static const String teacherAttend = '/teacher/attendance/:halaqaId';
   static const String teacherEvals = '/teacher/halaqa/:halaqaId/evaluations';
   static const String teacherStudent = '/teacher/student/:studentId';
-  static const String teacherAnalytics = '/teacher/halaqa/:halaqaId/analytics';
+  // H6 / A-H8: teacherAnalytics / teacherCalendar / teacherContent routes removed
+  // (orphan deep-links; student content path kept).
   static const String teacherAwards = '/teacher/halaqa/:halaqaId/awards';
-  static const String teacherCalendar = '/teacher/calendar';
-  static const String teacherContent = '/teacher/content';
   static const String teacherChat = '/teacher/chat/:conversationId';
   static const String teacherNotifs = '/teacher/notifications';
 
@@ -240,14 +233,11 @@ class AppRouter {
             },
           ),
           GoRoute(
-            path: 'history',
-            builder: (_, __) => const _PlaceholderPage(title: 'السجل'),
-          ),
-          GoRoute(
             path: 'avatar',
             builder: (_, __) => const AvatarSelectionPage(),
           ),
           GoRoute(path: 'settings', builder: (_, __) => const SettingsPage()),
+          // Live student content (not an H6 orphan — teacher content route removed).
           GoRoute(
             path: 'content',
             builder: (_, __) => const ContentLibraryPage(),
@@ -294,12 +284,6 @@ class AppRouter {
                 ),
               ),
               GoRoute(
-                path: 'analytics',
-                builder: (_, state) => AnalyticsDashboardPage(
-                  halaqaId: state.pathParameters['halaqaId']!,
-                ),
-              ),
-              GoRoute(
                 path: 'awards',
                 builder: (_, state) =>
                     AwardsPage(halaqaId: state.pathParameters['halaqaId']!),
@@ -319,13 +303,6 @@ class AppRouter {
             builder: (_, state) => StudentProfilePage(
               studentId: state.pathParameters['studentId']!,
             ),
-          ),
-          // التقويم
-          GoRoute(path: 'calendar', builder: (_, __) => const CalendarPage()),
-          // مكتبة المحتوى
-          GoRoute(
-            path: 'content',
-            builder: (_, __) => const ContentLibraryPage(),
           ),
           // شاشة المحادثة
           GoRoute(
@@ -408,26 +385,5 @@ class AppRouter {
 class _BlocListenable extends ChangeNotifier {
   _BlocListenable(AuthBloc bloc) {
     bloc.stream.listen((_) => notifyListeners());
-  }
-}
-
-// ── Placeholder ────────────────────────────────────────────────────────────
-
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(
-          '$title — Coming Soon',
-          style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
-        ),
-      ),
-    );
   }
 }

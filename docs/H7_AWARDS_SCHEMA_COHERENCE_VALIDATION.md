@@ -1,6 +1,6 @@
 # H7 — Awards Schema Coherence Validation
 
-**Status:** Implemented · awaiting product approval before H8  
+**Status:** Approved (product)  
 **Date:** 2026-07-31  
 **Scope:** Slice H7 only (`docs/PRODUCTION_HARDENING_PHASE0.md`) — **A-H7**  
 **Out of scope:** H8 test belt, type-vocab UX merge, points/stars policy change, legacy doc migration, new awards product features
@@ -59,4 +59,4 @@ Legacy single-shape docs remain readable via resolve helpers.
 
 ## Stop gate
 
-**H7 complete for review.** Do **not** start H8 until product approves.
+**H7 approved.** H8 (test belt) may proceed.

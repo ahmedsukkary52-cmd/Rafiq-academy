@@ -92,6 +92,41 @@ class AppRoutes {
   static const String admin = '/admin';
 }
 
+/// Pure role → home route and path allowlist used by [AppRouter] (H8 / A-H11).
+///
+/// Extracted so regression tests can lock W1–W8 navigation contracts without
+/// spinning up GoRouter / AuthBloc.
+class AppRouteAccess {
+  const AppRouteAccess._();
+
+  /// Home path for an authenticated [role], or login for unknown roles.
+  static String homeForRole(String role) => switch (role) {
+    AppRoles.student => AppRoutes.student,
+    AppRoles.parent => AppRoutes.parent,
+    AppRoles.teacher => AppRoutes.teacher,
+    AppRoles.supervisor => AppRoutes.supervisor,
+    AppRoles.admin => AppRoutes.admin,
+    _ => AppRoutes.login,
+  };
+
+  /// Whether [path] is allowed for [role] (prefix home + splash/login +
+  /// supervisor escalation into teacher-owned operational routes).
+  static bool isAllowed({required String path, required String role}) {
+    final roleRoute = homeForRole(role);
+    if (path.startsWith(roleRoute) ||
+        path == AppRoutes.splash ||
+        path == AppRoutes.login) {
+      return true;
+    }
+    // W6 D-W6-1: supervisor may escalate into existing teacher-owned workflows.
+    if (role == AppRoles.supervisor &&
+        SupervisorEscalationPaths.isAllowed(path)) {
+      return true;
+    }
+    return false;
+  }
+}
+
 class AppRouter {
   final AuthBloc authBloc;
   final ValueNotifier<bool> onboardingSeen;
@@ -356,30 +391,10 @@ class AppRouter {
     ),
   );
 
-  static String _routeForRole(String role) => switch (role) {
-    AppRoles.student => AppRoutes.student,
-    AppRoles.parent => AppRoutes.parent,
-    AppRoles.teacher => AppRoutes.teacher,
-    AppRoles.supervisor => AppRoutes.supervisor,
-    AppRoles.admin => AppRoutes.admin,
-    _ => AppRoutes.login,
-  };
+  static String _routeForRole(String role) => AppRouteAccess.homeForRole(role);
 
-  static bool _isAllowedRoute(String path, String role) {
-    final roleRoute = _routeForRole(role);
-    // كل route بيبدأ بـ roleRoute مسموح، + Auth routes
-    if (path.startsWith(roleRoute) ||
-        path == AppRoutes.splash ||
-        path == AppRoutes.login) {
-      return true;
-    }
-    // W6 D-W6-1: supervisor may escalate into existing teacher-owned workflows.
-    if (role == AppRoles.supervisor &&
-        SupervisorEscalationPaths.isAllowed(path)) {
-      return true;
-    }
-    return false;
-  }
+  static bool _isAllowedRoute(String path, String role) =>
+      AppRouteAccess.isAllowed(path: path, role: role);
 }
 
 class _BlocListenable extends ChangeNotifier {

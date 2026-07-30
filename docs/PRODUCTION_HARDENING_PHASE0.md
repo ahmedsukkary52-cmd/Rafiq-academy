@@ -1,6 +1,6 @@
 # Production Hardening Sprint — Phase 0 Design
 
-**Status:** Approved · H1–H6 approved · H7 implemented (awaiting H7 sign-off before H8)  
+**Status:** Approved · H1–H7 approved · H8 implemented (awaiting H8 / completion sign-off)  
 **Date:** 2026-07-31  
 **Context:** W1–W8 workflow family **complete and approved**. **No W9.**  
 **Method:** Phase 0 design approved; execution proceeds slice-by-slice.  
@@ -11,6 +11,8 @@
 **H5 deliverable:** `docs/H5_ROSTER_WHEREIN_CHUNKING_VALIDATION.md`  
 **H6 deliverable:** `docs/H6_SURFACE_CLEANUP_VALIDATION.md`  
 **H7 deliverable:** `docs/H7_AWARDS_SCHEMA_COHERENCE_VALIDATION.md`  
+**H8 deliverable:** `docs/H8_TEST_BELT_VALIDATION.md`  
+**Completion:** `docs/PRODUCTION_HARDENING_COMPLETION_VALIDATION.md`  
 **Predecessors:** `docs/W8_COMPLETION_PRODUCTION_VALIDATION.md`, `docs/POST_W8_PRODUCT_AUDIT.md`, `docs/POST_W7_PRODUCT_AUDIT.md`, `docs/POST_W6_PRODUCT_AUDIT.md`
 
 ### Standing rule
@@ -89,7 +91,7 @@ Hardening must **preserve behavior**. Prefer extract/share/test/delete-dead over
 | **A-H8** | Orphan routes / unused pages | Analytics, calendar, content, student history routes; `ChatConversationsPage` unregistered; posts tab placeholder vs `PostsListPage` | Ops confusion; wrong wiring risk | S | Low | **H6:** orphan routes removed; `ChatConversationsPage` deleted; student content kept |
 | **A-H9** | AdminBloc writers without UI (except W8 admit) | Stats/finance/complaints/broadcast/teachers wired; home only admit | Accidental parallel delivery (broadcast) | S | Low–Med | **H6:** documented quarantine; admit-only UI unchanged |
 | **A-H10** | Heavy / unpaginated / unchunked queries | Admin full `payments`/`complaints`; chat streams unbounded; **roster `whereIn` unchunked** (fails >30); استئذان as A-H5 | W2/W3 hard-fail; W7/admin cost | M–L | **High** (roster) | **H5:** roster `whereIn` chunked via `FirestoreInQuery`; rest deferred |
-| **A-H11** | Critical-path test gaps | Strong: membership, readiness, استئذان ids. Weak: admit use case, homework assign/review, router guards, most blocs | Silent W1/W8 regressions | L | **High** | Incremental |
+| **A-H11** | Critical-path test gaps | Strong: membership, readiness, استئذان ids. Weak: admit use case, homework assign/review, router guards, most blocs | Silent W1/W8 regressions | L | **High** | **H8:** admit/register/attendance/assign UC + router allowlist tests; blocs deferred |
 | **A-H12** | Homework write-on-read `_ensureHomeworkFields` | Live get/stream paths mutate docs | W1 side-effects / permissions | M | Med | Remove or migrate |
 | **A-H13** | Domain imports schedule **data** mapper | `GetTodayAgendaUseCase` / supervisor board → `halaqa_weekly_sessions_mapper` | W3/W6 layering | S | Low | Domain port |
 | **A-H14** | Operational readiness I/O duplicated | Projector shared; teacher vs supervisor load paths duplicate | W3/W6 drift | M | Med | Ex-A-W6-1 |
@@ -221,7 +223,9 @@ Hardening sprint passes when:
 | **H4 استئذان read hygiene** | **Approved (product)** |
 | **H5 Roster whereIn chunking** | **Approved (product)** |
 | **H6 Surface cleanup** | **Approved (product)** |
-| **H7 Awards schema coherence** | **Implemented** — see `docs/H7_AWARDS_SCHEMA_COHERENCE_VALIDATION.md` · awaiting sign-off |
-| H8+ | **Blocked** until H7 approved |
+| **H7 Awards schema coherence** | **Approved (product)** |
+| **H8 Test belt** | **Implemented** — see `docs/H8_TEST_BELT_VALIDATION.md` · awaiting sign-off |
+| **Category A completion (H1–H8)** | **Documented** — see `docs/PRODUCTION_HARDENING_COMPLETION_VALIDATION.md` · awaiting sign-off |
+| H9 / Category B / new product | **Blocked** until H8 + completion approved |
 
-**Stop after each slice. Do not begin H8 until H7 is approved.**
+**Stop after H8. Do not begin H9, Category B, or new product work until completion is approved.**

@@ -22,14 +22,18 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     on<RefreshAnalyticsEvent>(_onRefresh);
   }
 
-  Future<void> _onLoadDashboard(LoadHalaqaAnalyticsDashboardEvent event,
-      Emitter<AnalyticsState> emit,) async {
+  Future<void> _onLoadDashboard(
+    LoadHalaqaAnalyticsDashboardEvent event,
+    Emitter<AnalyticsState> emit,
+  ) async {
     // نبدأ كل الأقسام بـ loading مع بعض
-    emit(state.copyWith(
-      analyticsStatus: SectionStatus.loading,
-      atRiskStatus: SectionStatus.loading,
-      topStudentsStatus: SectionStatus.loading,
-    ));
+    emit(
+      state.copyWith(
+        analyticsStatus: SectionStatus.loading,
+        atRiskStatus: SectionStatus.loading,
+        topStudentsStatus: SectionStatus.loading,
+      ),
+    );
 
     // نجيب الثلاث قطع بالتوازي - أسرع من التتابع
     await Future.wait([
@@ -39,75 +43,93 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     ]);
   }
 
-  Future<void> _onRefresh(RefreshAnalyticsEvent event,
-      Emitter<AnalyticsState> emit,) async {
+  Future<void> _onRefresh(
+    RefreshAnalyticsEvent event,
+    Emitter<AnalyticsState> emit,
+  ) async {
     final now = DateTime.now();
     final oneMonth = now.subtract(const Duration(days: 30));
 
-    add(LoadHalaqaAnalyticsDashboardEvent(
-      halaqaId: event.halaqaId,
-      from: oneMonth,
-      to: now,
-    ));
-  }
-
-  Future<void> _loadAnalytics(LoadHalaqaAnalyticsDashboardEvent event,
-      Emitter<AnalyticsState> emit,) async {
-    final result = await getHalaqaAnalytics(HalaqaAnalyticsParams(
-      halaqaId: event.halaqaId,
-      from: event.from,
-      to: event.to,
-    ));
-
-    result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            analyticsStatus: SectionStatus.error,
-            analyticsError: failure.message,
-          )),
-          (analytics) =>
-          emit(state.copyWith(
-            analyticsStatus: SectionStatus.loaded,
-            analytics: analytics,
-          )),
+    add(
+      LoadHalaqaAnalyticsDashboardEvent(
+        halaqaId: event.halaqaId,
+        from: oneMonth,
+        to: now,
+      ),
     );
   }
 
-  Future<void> _loadAtRisk(String halaqaId,
-      Emitter<AnalyticsState> emit,) async {
+  Future<void> _loadAnalytics(
+    LoadHalaqaAnalyticsDashboardEvent event,
+    Emitter<AnalyticsState> emit,
+  ) async {
+    final result = await getHalaqaAnalytics(
+      HalaqaAnalyticsParams(
+        halaqaId: event.halaqaId,
+        from: event.from,
+        to: event.to,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          analyticsStatus: SectionStatus.error,
+          analyticsError: failure.message,
+        ),
+      ),
+      (analytics) => emit(
+        state.copyWith(
+          analyticsStatus: SectionStatus.loaded,
+          analytics: analytics,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadAtRisk(
+    String halaqaId,
+    Emitter<AnalyticsState> emit,
+  ) async {
     final result = await getAtRiskStudents(HalaqaIdParams(halaqaId));
 
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            atRiskStatus: SectionStatus.error,
-            atRiskError: failure.message,
-          )),
-          (students) =>
-          emit(state.copyWith(
-            atRiskStatus: SectionStatus.loaded,
-            atRiskStudents: students,
-          )),
+      (failure) => emit(
+        state.copyWith(
+          atRiskStatus: SectionStatus.error,
+          atRiskError: failure.message,
+        ),
+      ),
+      (students) => emit(
+        state.copyWith(
+          atRiskStatus: SectionStatus.loaded,
+          atRiskStudents: students,
+        ),
+      ),
     );
   }
 
-  Future<void> _loadTopStudents(String halaqaId,
-      Emitter<AnalyticsState> emit,) async {
+  Future<void> _loadTopStudents(
+    String halaqaId,
+    Emitter<AnalyticsState> emit,
+  ) async {
     final result = await getTopStudents(
       TopStudentsParams(halaqaId: halaqaId, limit: 5),
     );
 
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            topStudentsStatus: SectionStatus.error,
-            topStudentsError: failure.message,
-          )),
-          (students) =>
-          emit(state.copyWith(
-            topStudentsStatus: SectionStatus.loaded,
-            topStudents: students,
-          )),
+      (failure) => emit(
+        state.copyWith(
+          topStudentsStatus: SectionStatus.error,
+          topStudentsError: failure.message,
+        ),
+      ),
+      (students) => emit(
+        state.copyWith(
+          topStudentsStatus: SectionStatus.loaded,
+          topStudents: students,
+        ),
+      ),
     );
   }
 }

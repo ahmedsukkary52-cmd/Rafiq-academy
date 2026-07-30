@@ -31,7 +31,7 @@ class GetHalaqaAttendanceForDateUseCase
   Future<Either<Failure, List<AttendanceRecordEntity>>> call(
     HalaqaAttendanceDateParams params,
   ) => repository.getHalaqaAttendanceForDate(
-        halaqaId: params.halaqaId,
-        date: params.date,
-      );
+    halaqaId: params.halaqaId,
+    date: params.date,
+  );
 }

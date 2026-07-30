@@ -8,13 +8,7 @@ class AppRoles {
   static const String supervisor = 'supervisor';
   static const String admin = 'admin';
 
-  static const List<String> all = [
-    student,
-    parent,
-    teacher,
-    supervisor,
-    admin,
-  ];
+  static const List<String> all = [student, parent, teacher, supervisor, admin];
 }
 
 /// أسماء collections في Firestore
@@ -66,6 +60,7 @@ class NotificationTypes {
   static const String achievement = 'achievement';
   static const String payment = 'payment';
   static const String assignment = 'assignment';
+  static const String attendance = 'attendance';
   static const String general = 'general';
 }
 
@@ -76,4 +71,16 @@ class AppConstants {
   static const String appName = 'رفيق - أكاديمية التحفيظ';
   static const Duration snackBarDuration = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 300);
+}
+
+/// Feature flags tied to infra readiness (ADR-006 / W1 D8).
+///
+/// Flip [audioUploadsEnabled] to `true` when Firebase Storage (Blaze) is
+/// approved — homework recitation then becomes required for finish without
+/// redesigning the W1 workflow.
+class AppCapabilities {
+  const AppCapabilities._();
+
+  /// When false: recitation tasks are optional/deferred; no Storage uploads.
+  static const bool audioUploadsEnabled = false;
 }

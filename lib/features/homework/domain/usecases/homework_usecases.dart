@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
@@ -32,8 +33,17 @@ class WatchLatestHomeworkUseCase
   WatchLatestHomeworkUseCase(this.repository);
 
   @override
-  Stream<Either<Failure, HomeworkEntity?>> call(StudentUidParams params) =>
-      repository.watchLatestHomework(params.uid).map(Right.new);
+  Stream<Either<Failure, HomeworkEntity?>> call(
+    StudentUidParams params,
+  ) async* {
+    try {
+      await for (final hw in repository.watchLatestHomework(params.uid)) {
+        yield Right(hw);
+      }
+    } catch (e) {
+      yield Left(ServerFailure(e.toString()));
+    }
+  }
 }
 
 class ToggleHomeworkTaskParams {
@@ -61,6 +71,8 @@ class ToggleHomeworkTaskUseCase
           taskId: params.taskId,
         ),
       );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -77,6 +89,8 @@ class CompleteHomeworkUseCase extends UseCase<int, String> {
   Future<Either<Failure, int>> call(String homeworkId) async {
     try {
       return Right(await repository.completeHomework(homeworkId));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }
@@ -96,6 +110,8 @@ class SubmitHomeworkRecitationUseCase
   ) async {
     try {
       return Right(await repository.submitRecitation(params));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(e.toString()));
     }

@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../audio_library/domain/entities/audio_entities.dart';
 import '../../../audio_library/presentation/bloc/audio_bloc.dart';
 import '../../../audio_library/presentation/bloc/audio_event.dart';
@@ -589,21 +590,21 @@ class _RecitersShimmerState extends State<_RecitersShimmer>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) {
-        final opacity = 0.06 + 0.12 * _anim.value;
-        return ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          itemCount: 5,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (_, __) => Container(
-            width: 120,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(opacity),
-              borderRadius: BorderRadius.circular(20),
-            ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        itemCount: 5,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, __) => Container(
+          width: 120,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
           ),
-        );
+        ),
+      ),
+      builder: (_, child) {
+        return Opacity(opacity: 0.06 + 0.12 * _anim.value, child: child);
       },
     );
   }
@@ -743,9 +744,7 @@ class _SurahTile extends StatelessWidget {
 
   String _formatDuration(Duration d) {
     if (d <= Duration.zero) return '--:--';
-    final m = d.inMinutes;
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    return formatDurationMmSs(d);
   }
 
   @override
@@ -917,26 +916,22 @@ class _SurahsShimmerState extends State<_SurahsShimmer>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) {
-        final c = Color.lerp(
-          const Color(0xFFE8E9F0),
-          const Color(0xFFF5F6FA),
-          _anim.value,
-        )!;
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          itemCount: 8,
-          itemBuilder: (_, __) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Container(
-              height: 70,
-              decoration: BoxDecoration(
-                color: c,
-                borderRadius: BorderRadius.circular(14),
-              ),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        itemCount: 8,
+        itemBuilder: (_, __) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            height: 70,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8E9F0),
+              borderRadius: BorderRadius.circular(14),
             ),
           ),
-        );
+        ),
+      ),
+      builder: (_, child) {
+        return Opacity(opacity: 0.55 + 0.45 * _anim.value, child: child);
       },
     );
   }
@@ -986,7 +981,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               hasFilter
                   ? 'جرب البحث بكلمة أخرى أو اختر قارئاً آخر'
-                  : 'سيتم إضافة التلاوات قريباً',
+                  : 'لا توجد تلاوات متاحة حالياً',
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 color: AppColors.textSecondary,

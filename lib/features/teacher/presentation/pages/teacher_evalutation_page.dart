@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -10,6 +11,7 @@ import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../utils/teacher_workflow_ownership.dart';
 
 class TeacherEvaluationsPage extends StatefulWidget {
   final String halaqaId;
@@ -42,9 +44,7 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
     );
   }
 
-  List<RecitationRecordEntity> _filtered(
-    List<RecitationRecordEntity> records,
-  ) {
+  List<RecitationRecordEntity> _filtered(List<RecitationRecordEntity> records) {
     final now = DateTime.now();
     if (_filterIndex == 2) return records;
 
@@ -64,7 +64,7 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   Widget build(BuildContext context) {
     return BlocListener<TeacherBloc, TeacherState>(
       listenWhen: (prev, curr) =>
-      prev.evaluationsStatus != curr.evaluationsStatus ||
+          prev.evaluationsStatus != curr.evaluationsStatus ||
           prev.evaluations != curr.evaluations,
       listener: (context, state) {
         if (state.evaluationsStatus == SectionStatus.loaded) {
@@ -79,29 +79,36 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         appBar: AppBar(
           title: const Text('التقييمات'),
           actions: [
-            TextButton.icon(
-              onPressed: () => _showAddEvaluationSheet(context),
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: const Text(
-                '+ تقييم جديد',
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
+            if (TeacherWorkflowOwnership.canExecute(context))
+              TextButton.icon(
+                onPressed: () => _showAddEvaluationSheet(context),
+                icon: const Icon(
+                  Icons.add_rounded,
                   color: Colors.white,
-                  fontSize: 13,
+                  size: 18,
+                ),
+                label: const Text(
+                  '+ تقييم جديد',
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         body: BlocBuilder<TeacherBloc, TeacherState>(
+          buildWhen: (previous, current) =>
+              previous.evaluationsStatus != current.evaluationsStatus ||
+              previous.evaluations != current.evaluations ||
+              previous.evaluationsError != current.evaluationsError ||
+              previous.studentsStatus != current.studentsStatus ||
+              previous.students != current.students,
           builder: (context, state) {
             final isRefreshing =
                 _shellReady &&
-                    (state.evaluationsStatus == SectionStatus.loading);
+                (state.evaluationsStatus == SectionStatus.loading);
 
             return Column(
               children: [
@@ -170,8 +177,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   Widget _buildList(TeacherState state) {
     final isInitialLoading =
         !_shellReady &&
-            (state.evaluationsStatus == SectionStatus.loading ||
-                state.evaluationsStatus == SectionStatus.initial);
+        (state.evaluationsStatus == SectionStatus.loading ||
+            state.evaluationsStatus == SectionStatus.initial);
 
     if (isInitialLoading) {
       return const AppLoadingWidget();
@@ -190,22 +197,50 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
     final items = _filtered(source);
 
     if (items.isEmpty) {
-      return const Center(
-        child: Text(
-          'لا توجد تقييمات بعد',
-          style: AppTextStyles.bodyMedium,
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async {
+          _retry();
+          await Future<void>.delayed(const Duration(milliseconds: 600));
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 120),
+            Center(
+              child: Text(
+                'لا توجد تقييمات بعد',
+                style: AppTextStyles.bodyMedium,
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final record = items[i];
-        return _EvaluationCard(record: record);
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () async {
+        _retry();
+        await Future<void>.delayed(const Duration(milliseconds: 600));
       },
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, i) {
+          final record = items[i];
+          return _EvaluationCard(
+            record: record,
+            onReviewPending:
+                record.isPendingReview &&
+                    TeacherWorkflowOwnership.canExecute(context)
+                ? () => _showReviewPendingSheet(context, record)
+                : null,
+          );
+        },
+      ),
     );
   }
 
@@ -224,14 +259,35 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         value: bloc,
         child: _AddEvaluationSheet(halaqaId: widget.halaqaId),
       ),
-    );
+    ).whenComplete(() {
+      bloc.add(const ResetRecitationSubmissionEvent());
+    });
+  }
+
+  void _showReviewPendingSheet(
+    BuildContext context,
+    RecitationRecordEntity record,
+  ) {
+    final bloc = context.read<TeacherBloc>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: _ReviewPendingSheet(record: record),
+      ),
+    ).whenComplete(() {
+      bloc.add(const ResetRecitationSubmissionEvent());
+    });
   }
 }
 
 class _EvaluationCard extends StatelessWidget {
   final RecitationRecordEntity record;
+  final VoidCallback? onReviewPending;
 
-  const _EvaluationCard({required this.record});
+  const _EvaluationCard({required this.record, this.onReviewPending});
 
   bool get _isPending => record.isPendingReview;
 
@@ -247,10 +303,7 @@ class _EvaluationCard extends StatelessWidget {
     };
   }
 
-  String get _dateLabel {
-    final d = record.date;
-    return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
-  }
+  String get _dateLabel => formatDateYmd(record.date);
 
   String get _typeLabel =>
       record.type == RecitationType.memorization ? 'الحفظ' : 'المراجعة';
@@ -276,6 +329,7 @@ class _EvaluationCard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: AppCard(
+            onTap: onReviewPending,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -289,9 +343,7 @@ class _EvaluationCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.secondaryBg,
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusM,
-                          ),
+                          borderRadius: BorderRadius.circular(AppSizes.radiusM),
                         ),
                         child: Text(
                           'بانتظار المراجعة',
@@ -313,9 +365,7 @@ class _EvaluationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  record.studentName.isNotEmpty
-                      ? record.studentName
-                      : 'طالب',
+                  record.studentName.isNotEmpty ? record.studentName : 'طالب',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -327,30 +377,34 @@ class _EvaluationCard extends StatelessWidget {
                 if (_isPending) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'تسميع مرسل من الطالب — لم يُقيَّم بعد',
+                    'تسميع مرسل من الطالب — اضغط للمراجعة',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),
                     textAlign: TextAlign.right,
                   ),
-                ] else
-                  ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _GradeBox(
-                          label: 'السلوك',
-                          grade: record.behaviorGrade,
-                        ),
-                        const SizedBox(width: 8),
-                        _GradeBox(
-                          label: _typeLabel,
-                          grade: record.grade,
-                        ),
-                      ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'مراجعة',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _GradeBox(label: 'السلوك', grade: record.behaviorGrade),
+                      const SizedBox(width: 8),
+                      _GradeBox(label: _typeLabel, grade: record.grade),
+                    ],
+                  ),
+                ],
                 if (!_isPending &&
                     record.notes != null &&
                     record.notes!.isNotEmpty) ...[
@@ -426,6 +480,175 @@ class _GradeBox extends StatelessWidget {
   }
 }
 
+/// مراجعة تسميع معلّق — يحدّث نفس مستند recitationRecords (Slice 3).
+class _ReviewPendingSheet extends StatefulWidget {
+  final RecitationRecordEntity record;
+
+  const _ReviewPendingSheet({required this.record});
+
+  @override
+  State<_ReviewPendingSheet> createState() => _ReviewPendingSheetState();
+}
+
+class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
+  RecitationGrade _typeGrade = RecitationGrade.good;
+  RecitationGrade _behGrade = RecitationGrade.good;
+  final _notesCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _typeLabel =>
+      widget.record.type == RecitationType.memorization ? 'الحفظ' : 'المراجعة';
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+          prev.recitationSubmissionStatus != curr.recitationSubmissionStatus,
+      listener: (context, state) {
+        if (state.recitationSubmissionStatus == SubmissionStatus.success) {
+          Navigator.pop(context);
+          if (state.recitationEventsUnpublished) {
+            AppSnackBar.showInfo(
+              context,
+              'تم حفظ المراجعة، لكن تعذّر نشر التحديثات',
+            );
+          } else {
+            AppSnackBar.showSuccess(context, 'تم حفظ المراجعة بنجاح');
+          }
+          context.read<TeacherBloc>().add(
+            const ResetRecitationSubmissionEvent(),
+          );
+        } else if (state.recitationSubmissionStatus == SubmissionStatus.error) {
+          AppSnackBar.showError(
+            context,
+            state.recitationSubmissionError ?? 'فشل حفظ المراجعة',
+          );
+          context.read<TeacherBloc>().add(
+            const ResetRecitationSubmissionEvent(),
+          );
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusXL),
+          ),
+        ),
+        padding: EdgeInsets.only(
+          top: AppSizes.paddingL,
+          left: AppSizes.paddingM,
+          right: AppSizes.paddingM,
+          bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('مراجعة التسميع', style: AppTextStyles.headlineMedium),
+              const SizedBox(height: 12),
+              Text(
+                record.studentName.isNotEmpty ? record.studentName : 'طالب',
+                style: AppTextStyles.titleMedium,
+                textAlign: TextAlign.right,
+              ),
+              if (record.versesRange.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  record.versesRange,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ],
+              if ((record.audioUrl ?? '').isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'يتوفر تسجيل صوتي من الطالب',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.primaryDark,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ],
+              const SizedBox(height: 20),
+              _Label(_typeLabel),
+              _GradeSelector(
+                value: _typeGrade,
+                onChanged: (g) => setState(() => _typeGrade = g),
+              ),
+              const SizedBox(height: 12),
+              const _Label('السلوك'),
+              _GradeSelector(
+                value: _behGrade,
+                onChanged: (g) => setState(() => _behGrade = g),
+              ),
+              const SizedBox(height: 16),
+              const _Label('ملاحظات (اختياري)'),
+              AppTextField(hint: 'أضف ملاحظاتك هنا...', controller: _notesCtrl),
+              const SizedBox(height: 24),
+              BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.recitationSubmissionStatus !=
+                    current.recitationSubmissionStatus,
+                builder: (context, state) {
+                  final isLoading =
+                      state.recitationSubmissionStatus ==
+                      SubmissionStatus.submitting;
+                  return AppButton(
+                    label: 'حفظ المراجعة',
+                    isLoading: isLoading,
+                    onPressed: isLoading ? null : _submit,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) {
+      AppSnackBar.showError(context, 'يجب تسجيل الدخول لحفظ المراجعة');
+      return;
+    }
+
+    context.read<TeacherBloc>().add(
+      UpdateRecitationReviewEvent(
+        recordId: widget.record.id,
+        halaqaId: widget.record.halaqaId,
+        grade: _typeGrade,
+        behaviorGrade: _behGrade,
+        notes: _notesCtrl.text.trim().isNotEmpty
+            ? _notesCtrl.text.trim()
+            : null,
+      ),
+    );
+  }
+}
+
 class _AddEvaluationSheet extends StatefulWidget {
   final String halaqaId;
 
@@ -451,9 +674,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
   }
 
   void _retryStudents() {
-    context.read<TeacherBloc>().add(
-      LoadHalaqaStudentsEvent(widget.halaqaId),
-    );
+    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
   }
 
   @override
@@ -468,8 +689,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
           context.read<TeacherBloc>().add(
             const ResetRecitationSubmissionEvent(),
           );
-        } else if (state.recitationSubmissionStatus ==
-            SubmissionStatus.error) {
+        } else if (state.recitationSubmissionStatus == SubmissionStatus.error) {
           AppSnackBar.showError(
             context,
             state.recitationSubmissionError ?? 'فشل حفظ التقييم',
@@ -512,6 +732,10 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
               const SizedBox(height: 20),
               const _Label('الطالب'),
               BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.studentsStatus != current.studentsStatus ||
+                    previous.students != current.students ||
+                    previous.studentsError != current.studentsError,
                 builder: (context, state) {
                   if (state.studentsStatus == SectionStatus.loading ||
                       state.studentsStatus == SectionStatus.initial) {
@@ -566,7 +790,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
                   }
                   return DropdownButtonFormField<String>(
                     initialValue:
-                    _selectedStudentId != null &&
+                        _selectedStudentId != null &&
                             state.students.any(
                               (s) => s.uid == _selectedStudentId,
                             )
@@ -612,9 +836,8 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
                   _TypeChip(
                     label: 'حفظ',
                     selected: _type == RecitationType.memorization,
-                    onTap: () => setState(
-                      () => _type = RecitationType.memorization,
-                    ),
+                    onTap: () =>
+                        setState(() => _type = RecitationType.memorization),
                   ),
                 ],
               ),
@@ -640,12 +863,12 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
               ),
               const SizedBox(height: 16),
               const _Label('ملاحظات (اختياري)'),
-              AppTextField(
-                hint: 'أضف ملاحظاتك هنا...',
-                controller: _notesCtrl,
-              ),
+              AppTextField(hint: 'أضف ملاحظاتك هنا...', controller: _notesCtrl),
               const SizedBox(height: 24),
               BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.recitationSubmissionStatus !=
+                    current.recitationSubmissionStatus,
                 builder: (context, state) {
                   final isLoading =
                       state.recitationSubmissionStatus ==

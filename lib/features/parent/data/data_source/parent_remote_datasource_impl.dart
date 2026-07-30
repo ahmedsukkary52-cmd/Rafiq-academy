@@ -5,7 +5,10 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/absence_request_firestore_reads.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/services/parent_recipient_resolver.dart';
 import '../models/parent_model.dart';
 
 @LazySingleton(as: ParentRemoteDatasource)
@@ -29,6 +32,42 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       if (!doc.exists) return [];
       final data = doc.data() as Map<String, dynamic>;
       return List<String>.from(data['childrenIds'] ?? []);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<Map<String, List<String>>> getParentIdsByStudentIds(
+    List<String> studentIds,
+  ) async {
+    try {
+      final requested = ParentRecipientResolver.normalizeStudentIds(studentIds);
+      if (requested.isEmpty) return {};
+
+      final requestedSet = requested.toSet();
+      final result = <String, List<String>>{};
+      final chunks = ParentRecipientResolver.chunkStudentIds(requested);
+
+      for (final chunk in chunks) {
+        final snap = await firestore
+            .collection(FirestoreCollections.parentProfiles)
+            .where('childrenIds', arrayContainsAny: chunk)
+            .get();
+
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final children = List<String>.from(data['childrenIds'] ?? []);
+          ParentRecipientResolver.mergeParentProfile(
+            into: result,
+            parentId: doc.id,
+            childrenIds: children,
+            requestedStudentIds: requestedSet,
+          );
+        }
+      }
+
+      return result;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -66,22 +105,54 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
       final studentName = (userDoc.data())?['name'] ?? '';
 
-      final attended = attendanceSnap.docs
-          .where((d) => (d.data())['status'] == 'present')
-          .length;
+      final statuses = AttendancePolicy.uniqueDayStatuses(
+        attendanceSnap.docs.map((d) {
+          final data = d.data();
+          final rawDate = data['date'];
+          final date = rawDate is Timestamp
+              ? rawDate.toDate()
+              : (rawDate as DateTime? ?? weekStart);
+          return AttendanceMarkRef(
+            id: d.id,
+            halaqaId: (data['halaqaId'] as String?) ?? '',
+            studentId: studentId,
+            date: date,
+            status: data['status'] as String?,
+          );
+        }),
+      );
+      final attended = AttendancePolicy.countAttended(statuses);
 
-      final lastNote = recitationSnap.docs.isNotEmpty
-          ? (recitationSnap.docs.last.data())['notes'] as String? ?? ''
+      // D6 / Slice 5: count and surface only reviewed recitations — pending
+      // homework submits are not final parent-facing activity.
+      final reviewedDocs =
+          recitationSnap.docs.where((d) {
+            final status = d.data()['reviewStatus'] as String? ?? 'reviewed';
+            return status != 'pending';
+          }).toList()..sort((a, b) {
+            final ad =
+                (a.data()['date'] as Timestamp?)?.toDate() ?? DateTime(0);
+            final bd =
+                (b.data()['date'] as Timestamp?)?.toDate() ?? DateTime(0);
+            return ad.compareTo(bd);
+          });
+
+      var lastNote = reviewedDocs.isNotEmpty
+          ? (reviewedDocs.last.data())['notes'] as String? ?? ''
           : '';
+      // Student-submit placeholder is not a teacher note.
+      if (lastNote.contains('بانتظار المراجعة')) {
+        lastNote = '';
+      }
 
       return WeeklyReportModel.fromMap(
         studentId: studentId,
         studentName: studentName,
         weekStart: weekStart,
         data: {
-          'totalVersesMemorized': recitationSnap.docs.length,
+          'totalVersesMemorized': reviewedDocs.length,
           'attendedSessions': attended,
-          'totalSessions': attendanceSnap.docs.length,
+          'totalSessions': statuses.length,
           'teacherNotes': lastNote,
         },
       );
@@ -108,9 +179,73 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   @override
   Future<void> submitAbsenceRequest(AbsenceRequestModel request) async {
     try {
-      await firestore
+      final id = request.id.trim();
+      if (id.isEmpty) {
+        throw const ServerException('معرّف طلب الاستئذان غير صالح');
+      }
+
+      final ref = firestore
           .collection(FirestoreCollections.absenceRequests)
-          .add(request.toFirestore());
+          .doc(id);
+      final existing = await ref.get();
+      if (existing.exists) {
+        final raw = existing.data()?['status'];
+        final status = (raw is String ? raw : '').trim();
+        if (status == 'approved' || status == 'rejected') {
+          throw const ServerException(
+            'لا يمكن تعديل طلب استئذان بعد اتخاذ القرار',
+          );
+        }
+      }
+
+      // Full set (not merge): resubmit clears reviewedBy and stays pending.
+      // Never touches attendanceRecords (W7 D-W7-2 / D-W7-3).
+      await ref.set({
+        'studentId': request.studentId,
+        'halaqaId': request.halaqaId,
+        'requestedBy': request.requestedBy,
+        'date': Timestamp.fromDate(request.date),
+        'reason': request.reason,
+        'status': 'pending',
+      });
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AbsenceRequestModel>> getAbsenceRequestsForParent(
+    String parentId,
+  ) async {
+    try {
+      return await AbsenceRequestFirestoreReads.forParent(
+        firestore: firestore,
+        parentId: parentId,
+      );
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<({String id, String name})>> getHalaqatForStudent(
+    String studentId,
+  ) async {
+    try {
+      final sid = studentId.trim();
+      if (sid.isEmpty) return const [];
+
+      final snap = await firestore
+          .collection(FirestoreCollections.halaqat)
+          .where('studentIds', arrayContains: sid)
+          .get();
+
+      return snap.docs.map((doc) {
+        final data = doc.data();
+        final name = (data['name'] as String?)?.trim() ?? '';
+        return (id: doc.id, name: name.isEmpty ? doc.id : name);
+      }).toList();
     } catch (e) {
       throw ServerException(e.toString());
     }

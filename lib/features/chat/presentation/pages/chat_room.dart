@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -96,14 +97,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       color: Colors.white,
                     ),
                   ),
-                  const Text(
-                    'متصل الآن',
-                    style: TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 11,
-                      color: Colors.white70,
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(width: 10),
@@ -115,18 +108,16 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.more_vert_rounded),
-              onPressed: () {},
-            ),
-          ],
         ),
         body: Column(
           children: [
             // ── قائمة الرسائل ──────────────────────────────────
             Expanded(
               child: BlocBuilder<ChatRoomBloc, ChatRoomState>(
+                buildWhen: (previous, current) =>
+                    previous.messages != current.messages ||
+                    previous.messagesStatus != current.messagesStatus ||
+                    previous.messagesError != current.messagesError,
                 builder: (context, state) {
                   if (state.messagesStatus == SectionStatus.loading) {
                     return const AppLoadingWidget();
@@ -154,7 +145,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
                   // نمرر عناصر بتاريخ لتجميع الرسائل بالأيام
                   final messages = state.messages;
-                  _scrollToBottom();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToBottom();
+                  });
 
                   return ListView.builder(
                     controller: _scrollCtrl,
@@ -184,6 +177,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
             // ── Error ──────────────────────────────────────────
             BlocBuilder<ChatRoomBloc, ChatRoomState>(
+              buildWhen: (previous, current) =>
+                  previous.sendError != current.sendError,
               builder: (context, state) {
                 if (state.sendError != null) {
                   return Container(
@@ -239,7 +234,10 @@ class _MessageBubble extends StatelessWidget {
         children: [
           if (isMine) ...[
             // وقت الإرسال يمين
-            Text(_formatTime(message.sentAt), style: AppTextStyles.labelSmall),
+            Text(
+              formatTimeHm12Ar(message.sentAt),
+              style: AppTextStyles.labelSmall,
+            ),
             const SizedBox(width: 6),
             // نقاط القراءة
             const Text(
@@ -291,18 +289,14 @@ class _MessageBubble extends StatelessWidget {
 
           if (!isMine) ...[
             const SizedBox(width: 6),
-            Text(_formatTime(message.sentAt), style: AppTextStyles.labelSmall),
+            Text(
+              formatTimeHm12Ar(message.sentAt),
+              style: AppTextStyles.labelSmall,
+            ),
           ],
         ],
       ),
     );
-  }
-
-  String _formatTime(DateTime dt) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour < 12 ? 'ص' : 'م';
-    return '$h:$m $period';
   }
 }
 

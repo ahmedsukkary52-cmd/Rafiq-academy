@@ -28,30 +28,54 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       _onStartWatching,
       transformer: restartable(),
     );
+    on<StopWatchingNotificationsEvent>(_onStopWatching);
     on<MarkNotificationAsReadEvent>(_onMarkAsRead);
     on<MarkAllNotificationsAsReadEvent>(_onMarkAllAsRead);
+  }
+
+  Future<void> _onStopWatching(
+    StopWatchingNotificationsEvent event,
+    Emitter<NotificationsState> emit,
+  ) async {
+    _currentUid = null;
+    emit(NotificationsState.initial());
   }
 
   Future<void> _onStartWatching(
     StartWatchingNotificationsEvent event,
     Emitter<NotificationsState> emit,
   ) async {
+    // The bloc is a singleton, so a different identity must not inherit the
+    // previous account's list while the new stream is still loading.
+    final identityChanged = _currentUid != null && _currentUid != event.uid;
     _currentUid = event.uid;
 
-    emit(state.copyWith(status: SectionStatus.loading, error: null));
+    emit(
+      identityChanged
+          ? NotificationsState.initial().copyWith(status: SectionStatus.loading)
+          : state.copyWith(status: SectionStatus.loading, error: null),
+    );
 
     await emit.forEach(
       watchNotifications(
         WatchNotificationsParams(uid: event.uid, role: event.role),
       ),
-      onData: (either) => either.fold(
-        (failure) =>
-            state.copyWith(status: SectionStatus.error, error: failure.message),
-        (notifications) => state.copyWith(
-          status: SectionStatus.loaded,
-          notifications: notifications,
-        ),
-      ),
+      onData: (either) {
+        // Logout (or a newer watch) may have cleared identity while this
+        // subscription was still delivering — ignore stale snapshots.
+        if (_currentUid != event.uid) return state;
+
+        return either.fold(
+          (failure) => state.copyWith(
+            status: SectionStatus.error,
+            error: failure.message,
+          ),
+          (notifications) => state.copyWith(
+            status: SectionStatus.loaded,
+            notifications: notifications,
+          ),
+        );
+      },
     );
   }
 

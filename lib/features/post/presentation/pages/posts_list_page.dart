@@ -16,6 +16,8 @@ import '../bloc/posts_bloc.dart';
 import '../bloc/posts_event.dart';
 import '../bloc/posts_state.dart';
 
+/// Quarantined (H6 / A-H17): full posts UI exists but was never routed.
+/// Teacher home no longer shows a posts tab. Do not wire without product decision.
 class PostsListPage extends StatefulWidget {
   final String? halaqaId;
 
@@ -83,6 +85,10 @@ class _PostsListPageState extends State<PostsListPage> {
           ],
         ),
         body: BlocBuilder<PostsBloc, PostsState>(
+          buildWhen: (previous, current) =>
+              previous.postsStatus != current.postsStatus ||
+              previous.posts != current.posts ||
+              previous.postsError != current.postsError,
           builder: (context, state) {
             if (state.postsStatus == SectionStatus.loading) {
               return const AppLoadingWidget();
@@ -637,6 +643,10 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     const SectionHeader(title: 'التعليقات'),
                     const SizedBox(height: 12),
                     BlocBuilder<PostsBloc, PostsState>(
+                      buildWhen: (previous, current) =>
+                          previous.commentsStatus != current.commentsStatus ||
+                          previous.comments != current.comments ||
+                          previous.commentsError != current.commentsError,
                       builder: (context, state) {
                         if (state.commentsStatus == SectionStatus.loading) {
                           return const Center(

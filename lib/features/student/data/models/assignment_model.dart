@@ -35,27 +35,30 @@ class AssignmentModel extends AssignmentEntity {
       reviewRange: data['reviewRange'] ?? '',
       dueDate: (data['dueDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       title: data['title'] as String? ?? '',
-      tasks: tasksRaw
-          ?.whereType<Map>()
-          .map((e) =>
-          AssignmentTaskEntity.fromMap(
-            Map<String, dynamic>.from(e),
-          ))
-          .toList() ??
+      tasks:
+          tasksRaw
+              ?.whereType<Map>()
+              .map(
+                (e) =>
+                    AssignmentTaskEntity.fromMap(Map<String, dynamic>.from(e)),
+              )
+              .toList() ??
           const [],
       teacherVoiceNote: voiceRaw != null
           ? AssignmentVoiceNoteEntity.fromMap(voiceRaw)
           : null,
-      attachments: attachmentsRaw
-          ?.whereType<Map>()
-          .map((e) =>
-          AssignmentAttachmentEntity.fromMap(
-            Map<String, dynamic>.from(e),
-          ))
-          .toList() ??
+      attachments:
+          attachmentsRaw
+              ?.whereType<Map>()
+              .map(
+                (e) => AssignmentAttachmentEntity.fromMap(
+                  Map<String, dynamic>.from(e),
+                ),
+              )
+              .toList() ??
           const [],
-      isSubmitted: data['isSubmitted'] as bool? ??
-          (data['status'] == 'completed'),
+      isSubmitted:
+          data['isSubmitted'] as bool? ?? (data['status'] == 'completed'),
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -69,22 +72,24 @@ class AssignmentModel extends AssignmentEntity {
     'dueDate': Timestamp.fromDate(dueDate),
     'title': title,
     'tasks': tasks.map((t) => t.toMap()).toList(),
-    if (teacherVoiceNote != null)
-      'teacherVoiceNote': teacherVoiceNote!.toMap(),
+    if (teacherVoiceNote != null) 'teacherVoiceNote': teacherVoiceNote!.toMap(),
     'attachments': attachments.map((a) => a.toMap()).toList(),
     'isSubmitted': isSubmitted,
-    if (completedAt != null)
-      'completedAt': Timestamp.fromDate(completedAt!),
+    if (completedAt != null) 'completedAt': Timestamp.fromDate(completedAt!),
   };
 
-  /// حقول واجباتي الافتراضية لنفس مستند التكليف (seed على الـ document الحقيقي).
+  /// Default homework fields on the same assignment document (SSOT).
+  ///
+  /// No placeholder media, dummy PDFs, or invented quiz content.
+  /// Voice notes / attachments are omitted until a real teacher source exists.
   static Map<String, dynamic> defaultHomeworkFields({
     required String newMemorizationRange,
     required String reviewRange,
     String? teacherName,
   }) {
-    final rangeLabel =
-    newMemorizationRange.isNotEmpty ? newMemorizationRange : 'الورد اليومي';
+    final rangeLabel = newMemorizationRange.isNotEmpty
+        ? newMemorizationRange
+        : 'الورد اليومي';
     return {
       'title': rangeLabel,
       'isSubmitted': false,
@@ -112,29 +117,8 @@ class AssignmentModel extends AssignmentEntity {
           'isCompleted': false,
           'kind': 'recitation',
         },
-        {
-          'id': 't4',
-          'title': 'حل اختبار الفهم القصير',
-          'points': 25,
-          'isCompleted': false,
-          'kind': 'quiz',
-        },
       ],
-      'teacherVoiceNote': {
-        'teacherName': teacherName ?? 'المعلم',
-        'audioUrl':
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-        'durationSeconds': 45,
-      },
-      'attachments': [
-        {
-          'id': 'a1',
-          'name': 'ورقة-تمارين-التجويد.pdf',
-          'url':
-          'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-          'sizeLabel': '٢٤٠ كيلوبايت',
-        },
-      ],
+      'attachments': <Map<String, dynamic>>[],
     };
   }
 }

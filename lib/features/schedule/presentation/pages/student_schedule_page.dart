@@ -6,22 +6,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../bloc/schedule_bloc.dart';
 
-String _formatTime(DateTime dt) {
-  final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-  final minute = dt.minute.toString().padLeft(2, '0');
-  final period = dt.hour < 12 ? 'ص' : 'م';
-  return '$hour:$minute $period';
-}
-
 String _dayLabel(DateTime dt) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(dt.year, dt.month, dt.day);
+  final today = AttendancePolicy.dayStart(DateTime.now());
+  final day = AttendancePolicy.dayStart(dt);
   final diff = day.difference(today).inDays;
   if (diff == 0) return 'اليوم';
   if (diff == 1) return 'غداً';
@@ -87,6 +81,10 @@ class _ScheduleView extends StatelessWidget {
         ),
       ),
       body: BlocBuilder<ScheduleBloc, ScheduleState>(
+        buildWhen: (previous, current) =>
+            previous.status != current.status ||
+            previous.sessions != current.sessions ||
+            previous.errorMessage != current.errorMessage,
         builder: (context, state) {
           if (state.status == SectionStatus.loading ||
               state.status == SectionStatus.initial) {
@@ -213,7 +211,7 @@ class _FeaturedSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeLabel =
-        '${_dayLabel(session.startAt)} — ${_formatTime(session.startAt)} إلى ${_formatTime(session.endAt)}';
+        '${_dayLabel(session.startAt)} — ${formatTimeHm12Ar(session.startAt)} إلى ${formatTimeHm12Ar(session.endAt)}';
 
     return Container(
       padding: const EdgeInsets.all(AppSizes.paddingL),
@@ -405,7 +403,7 @@ class _SessionListTile extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              _formatTime(session.startAt).replaceFirst(' ', '\n'),
+              formatTimeHm12Ar(session.startAt).replaceFirst(' ', '\n'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/halaqa_schedule_label.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -44,8 +45,8 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
     final bloc = context.read<TeacherBloc>();
     _loadHalaqat();
     await bloc.stream.firstWhere(
-          (s) =>
-      s.halaqatStatus == SectionStatus.loaded ||
+      (s) =>
+          s.halaqatStatus == SectionStatus.loaded ||
           s.halaqatStatus == SectionStatus.error,
     );
   }
@@ -54,10 +55,12 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('حلقاتي'),
-      ),
+      appBar: AppBar(title: const Text('حلقاتي')),
       body: BlocBuilder<TeacherBloc, TeacherState>(
+        buildWhen: (previous, current) =>
+            previous.halaqatStatus != current.halaqatStatus ||
+            previous.halaqat != current.halaqat ||
+            previous.halaqatError != current.halaqatError,
         builder: (context, state) {
           if (state.halaqatStatus == SectionStatus.loading ||
               state.halaqatStatus == SectionStatus.initial) {
@@ -77,10 +80,7 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   SizedBox(
-                    height: MediaQuery
-                        .of(context)
-                        .size
-                        .height * 0.5,
+                    height: MediaQuery.of(context).size.height * 0.5,
                     child: const _EmptyHalaqat(),
                   ),
                 ],
@@ -113,7 +113,10 @@ class _HalaqaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheduleLabel = _scheduleLabel(halaqa);
+    final scheduleLabel = halaqaScheduleLabel(
+      halaqa.schedule,
+      compactDays: true,
+    );
 
     return AppCard(
       child: Column(
@@ -127,9 +130,7 @@ class _HalaqaCard extends StatelessWidget {
                 color: AppColors.secondaryBg,
                 textColor: AppColors.secondary,
                 onTap: () =>
-                    context.push(
-                      '/teacher/halaqa/${halaqa.id}/evaluations',
-                    ),
+                    context.push('/teacher/halaqa/${halaqa.id}/evaluations'),
               ),
               const SizedBox(width: 8),
               _ActionChip(
@@ -137,9 +138,7 @@ class _HalaqaCard extends StatelessWidget {
                 color: AppColors.primary,
                 textColor: Colors.white,
                 onTap: () {
-                  context.read<TeacherBloc>().add(
-                    SelectHalaqaEvent(halaqa.id),
-                  );
+                  context.read<TeacherBloc>().add(SelectHalaqaEvent(halaqa.id));
                   context.push('/teacher/halaqa/${halaqa.id}');
                 },
               ),
@@ -175,48 +174,6 @@ class _HalaqaCard extends StatelessWidget {
       ),
     );
   }
-
-  /// Accurate compact schedule from already-loaded slots only.
-  /// If times differ across entries, show days only (no false shared time).
-  String? _scheduleLabel(HalaqaEntity halaqa) {
-    final schedule = halaqa.schedule;
-    if (schedule.isEmpty) return null;
-
-    final days = schedule
-        .map((s) => _dayShort(s.day))
-        .where((d) => d.isNotEmpty)
-        .toList();
-    final daysLabel = days.join('، ');
-
-    final timeKeys = <String>{};
-    for (final slot in schedule) {
-      final start = slot.startTime.trim();
-      final end = slot.endTime.trim();
-      if (start.isEmpty && end.isEmpty) continue;
-      timeKeys.add(end.isEmpty ? start : '$start–$end');
-    }
-
-    if (daysLabel.isEmpty && timeKeys.isEmpty) return null;
-    if (timeKeys.isEmpty) return daysLabel.isEmpty ? null : daysLabel;
-    if (timeKeys.length == 1) {
-      final timeLabel = timeKeys.first;
-      if (daysLabel.isEmpty) return timeLabel;
-      return '$daysLabel · $timeLabel';
-    }
-    // Multiple different times — do not attach first slot's time to all days.
-    return daysLabel.isEmpty ? null : daysLabel;
-  }
-
-  String _dayShort(String day) => switch (day.trim()) {
-    'الأحد' => 'أح',
-    'الاثنين' => 'إث',
-    'الثلاثاء' => 'ثل',
-    'الأربعاء' => 'أر',
-    'الخميس' => 'خم',
-    'الجمعة' => 'جم',
-    'السبت' => 'سب',
-    _ => day.trim(),
-  };
 }
 
 class _ActionChip extends StatelessWidget {

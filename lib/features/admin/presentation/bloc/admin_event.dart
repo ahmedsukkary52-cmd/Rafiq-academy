@@ -151,3 +151,8 @@ class LoadTeacherActivityLogEvent extends AdminEvent {
   @override
   List<Object?> get props => [teacherId, from, to];
 }
+
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearAdminSessionEvent extends AdminEvent {
+  const ClearAdminSessionEvent();
+}

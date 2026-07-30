@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
 
@@ -18,6 +19,11 @@ class LoadTeacherHalaqatEvent extends TeacherEvent {
 
   @override
   List<Object?> get props => [teacherId];
+}
+
+/// إعادة اشتقاق أجندة اليوم من الحلقات المحمّلة حالياً (W3 — بدون تحميل جديد)
+class LoadTodayAgendaEvent extends TeacherEvent {
+  const LoadTodayAgendaEvent();
 }
 
 /// اختيار حلقة معيّنة من القائمة - بيحمّل طلابها تلقائياً
@@ -50,27 +56,12 @@ class LoadHalaqaEvaluationsEvent extends TeacherEvent {
   List<Object?> get props => [halaqaId];
 }
 
-/// تسجيل حضور/غياب/تأخير لطالب بنقرة واحدة.
-/// بيتعمل لها Optimistic Update فوراً في الـ UI قبل ما الكتابة في
-/// Firestore تخلص، عشان الاستجابة تكون فورية للمعلم.
-class RecordAttendanceEvent extends TeacherEvent {
-  final AttendanceRecordEntity record;
-
-  const RecordAttendanceEvent(this.record);
-
-  @override
-  List<Object?> get props => [record];
-}
-
 /// تحميل سجلات الحضور لحلقة في يوم معيّن
 class LoadHalaqaAttendanceEvent extends TeacherEvent {
   final String halaqaId;
   final DateTime date;
 
-  const LoadHalaqaAttendanceEvent({
-    required this.halaqaId,
-    required this.date,
-  });
+  const LoadHalaqaAttendanceEvent({required this.halaqaId, required this.date});
 
   @override
   List<Object?> get props => [halaqaId, date];
@@ -99,6 +90,26 @@ class AddRecitationRecordEvent extends TeacherEvent {
 
   @override
   List<Object?> get props => [record];
+}
+
+/// مراجعة تسميع معلّق (تحديث نفس السجل)
+class UpdateRecitationReviewEvent extends TeacherEvent {
+  final String recordId;
+  final String halaqaId;
+  final RecitationGrade grade;
+  final RecitationGrade behaviorGrade;
+  final String? notes;
+
+  const UpdateRecitationReviewEvent({
+    required this.recordId,
+    required this.halaqaId,
+    required this.grade,
+    required this.behaviorGrade,
+    this.notes,
+  });
+
+  @override
+  List<Object?> get props => [recordId, halaqaId, grade, behaviorGrade, notes];
 }
 
 /// إرجاع حالة إرسال التسميع لـ idle بعد ما الـ UI يعرض النتيجة
@@ -135,4 +146,47 @@ class SendAssignmentEvent extends TeacherEvent {
 /// إرجاع حالة إرسال التكليف لـ idle بعد ما الـ UI يعرض النتيجة
 class ResetAssignmentSubmissionEvent extends TeacherEvent {
   const ResetAssignmentSubmissionEvent();
+}
+
+/// Pending استئذان for a halaqa calendar day (W7 Slice 2 — contextual only)
+class LoadPendingAbsenceRequestsEvent extends TeacherEvent {
+  final String teacherId;
+  final String halaqaId;
+  final DateTime date;
+
+  const LoadPendingAbsenceRequestsEvent({
+    required this.teacherId,
+    required this.halaqaId,
+    required this.date,
+  });
+
+  @override
+  List<Object?> get props => [teacherId, halaqaId, date];
+}
+
+/// Approve or reject an استئذان (request status only — Rule 1)
+class ReviewAbsenceRequestEvent extends TeacherEvent {
+  final String requestId;
+  final String halaqaId;
+  final String teacherId;
+  final AbsenceRequestStatus decision;
+
+  const ReviewAbsenceRequestEvent({
+    required this.requestId,
+    required this.halaqaId,
+    required this.teacherId,
+    required this.decision,
+  });
+
+  @override
+  List<Object?> get props => [requestId, halaqaId, teacherId, decision];
+}
+
+class ResetAbsenceReviewEvent extends TeacherEvent {
+  const ResetAbsenceReviewEvent();
+}
+
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearTeacherSessionEvent extends TeacherEvent {
+  const ClearTeacherSessionEvent();
 }

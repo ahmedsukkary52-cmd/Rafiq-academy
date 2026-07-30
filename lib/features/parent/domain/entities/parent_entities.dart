@@ -1,34 +1,9 @@
 import 'package:equatable/equatable.dart';
 
-// ══════════════════════════════════════════════════════════════════════════════
-// AbsenceRequestEntity - طلب استئذان من ولي الأمر
-// ══════════════════════════════════════════════════════════════════════════════
+import '../../../../shared/utils/attendance_policy.dart';
 
-enum AbsenceRequestStatus { pending, approved, rejected }
-
-class AbsenceRequestEntity extends Equatable {
-  final String id;
-  final String studentId;
-  final String requestedBy;
-  final DateTime date;
-  final String reason;
-  final AbsenceRequestStatus status;
-  final String? reviewedBy;
-
-  const AbsenceRequestEntity({
-    required this.id,
-    required this.studentId,
-    required this.requestedBy,
-    required this.date,
-    required this.reason,
-    required this.status,
-    this.reviewedBy,
-  });
-
-  @override
-  List<Object?> get props =>
-      [id, studentId, requestedBy, date, reason, status, reviewedBy];
-}
+// AbsenceRequest* types live in shared (H4 / A-H6).
+export '../../../../shared/domain/absence_request.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PaymentEntity - الرسوم والاشتراكات
@@ -58,8 +33,16 @@ class PaymentEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props =>
-      [id, studentId, parentId, amount, dueDate, paidAt, status, method];
+  List<Object?> get props => [
+    id,
+    studentId,
+    parentId,
+    amount,
+    dueDate,
+    paidAt,
+    status,
+    method,
+  ];
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -85,8 +68,10 @@ class WeeklyReportEntity extends Equatable {
     required this.teacherNotes,
   });
 
-  double get attendancePercent =>
-      totalSessions == 0 ? 0 : (attendedSessions / totalSessions) * 100;
+  double get attendancePercent => AttendancePolicy.attendancePercent(
+    attended: attendedSessions,
+    total: totalSessions,
+  );
 
   @override
   List<Object?> get props => [

@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
@@ -70,6 +71,37 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
         studentId: studentId,
       );
       return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
+    List<String> userIds,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getUserDisplayNames(userIds));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForHalaqatOnDate({
+    required List<String> halaqaIds,
+    required DateTime date,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getAbsenceRequestsForHalaqatOnDate(
+          halaqaIds: halaqaIds,
+          date: date,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

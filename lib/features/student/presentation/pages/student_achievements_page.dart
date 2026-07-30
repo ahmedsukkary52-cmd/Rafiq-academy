@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -231,7 +232,7 @@ class _Header extends StatelessWidget {
                 const SizedBox(width: 12),
                 _StatTile(
                   value: '$memorizationAccuracy%',
-                  label: 'دقة الحفظ',
+                  label: 'نسبة التقدم',
                   color: const Color(0xFF34D18B),
                 ),
               ],
@@ -327,7 +328,10 @@ class _AchievementRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
             ),
             alignment: Alignment.center,
-            child: Text(_iconFor(achievement.type), style: const TextStyle(fontSize: 30)),
+            child: Text(
+              _iconFor(achievement.type),
+              style: const TextStyle(fontSize: 30),
+            ),
           ),
           const SizedBox(width: 18),
           Expanded(
@@ -342,10 +346,7 @@ class _AchievementRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'بواسطة $issuer',
-                  style: AppTextStyles.bodyMedium,
-                ),
+                Text('بواسطة $issuer', style: AppTextStyles.bodyMedium),
                 const SizedBox(height: 2),
                 Text(
                   dateLabel,
@@ -369,22 +370,18 @@ class _AchievementRow extends StatelessWidget {
   }
 
   static String _iconFor(AchievementType type) => switch (type) {
-        AchievementType.star => '⭐',
-        AchievementType.badge => '🎖️',
-        AchievementType.certificate => '📜',
-      };
+    AchievementType.star => '⭐',
+    AchievementType.badge => '🎖️',
+    AchievementType.certificate => '📜',
+  };
 
   static String _typeLabel(AchievementType type) => switch (type) {
-        AchievementType.star => 'نجمة',
-        AchievementType.badge => 'شارة',
-        AchievementType.certificate => 'شهادة',
-      };
+    AchievementType.star => 'نجمة',
+    AchievementType.badge => 'شارة',
+    AchievementType.certificate => 'شهادة',
+  };
 
-  static String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d/$m/${date.year}';
-  }
+  static String _formatDate(DateTime date) => formatDateDmy(date);
 }
 
 class _HeaderButton extends StatelessWidget {

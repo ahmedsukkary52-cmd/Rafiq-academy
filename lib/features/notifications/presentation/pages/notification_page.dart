@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -78,9 +79,9 @@ class NotificationsPage extends StatelessWidget {
                       ],
                     ),
                     // Mark All as Read
-                    BlocBuilder<NotificationsBloc, NotificationsState>(
-                      builder: (context, state) {
-                        final hasUnread = state.unreadCount > 0;
+                    BlocSelector<NotificationsBloc, NotificationsState, bool>(
+                      selector: (state) => state.unreadCount > 0,
+                      builder: (context, hasUnread) {
                         return TextButton(
                           onPressed: hasUnread
                               ? () => context.read<NotificationsBloc>().add(
@@ -109,6 +110,10 @@ class NotificationsPage extends StatelessWidget {
               // Body
               Expanded(
                 child: BlocBuilder<NotificationsBloc, NotificationsState>(
+                  buildWhen: (previous, current) =>
+                      previous.status != current.status ||
+                      previous.notifications != current.notifications ||
+                      previous.error != current.error,
                   builder: (context, state) {
                     if (state.status == SectionStatus.loading) {
                       return const AppLoadingWidget();
@@ -192,9 +197,8 @@ class NotificationsPage extends StatelessWidget {
   }
 
   String _dateLabel(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(dt.year, dt.month, dt.day);
+    final today = AttendancePolicy.dayStart(DateTime.now());
+    final day = AttendancePolicy.dayStart(dt);
 
     if (day == today) return 'اليوم';
     if (day == today.subtract(const Duration(days: 1))) return 'أمس';
@@ -358,6 +362,10 @@ class _NotificationTile extends StatelessWidget {
     'assignment' => const _NotifTypeInfo(
       emoji: '📝',
       bgColor: Color(0xFFE3F2FD),
+    ),
+    'attendance' => const _NotifTypeInfo(
+      emoji: '📋',
+      bgColor: Color(0xFFE0F2F1),
     ),
     'message' => const _NotifTypeInfo(emoji: '💬', bgColor: Color(0xFFF3E5F5)),
     _ => const _NotifTypeInfo(emoji: '🔔', bgColor: Color(0xFFF5F5F5)),

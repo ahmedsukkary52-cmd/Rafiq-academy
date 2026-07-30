@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_classes_page.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_dashboard_tab.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_messages_tab.dart';
-import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_post_tab.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_profile_tab.dart';
 
 import '../../../../core/constants/app_constants.dart';
@@ -51,10 +50,10 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _currentTab,
+        // H6 / A-H17: posts placeholder tab removed (PostsListPage never wired).
         children: const [
           TeacherDashboardTab(),
           TeacherClassesPage(),
-          TeacherPostsTab(),
           TeacherMessagesTab(),
           TeacherProfileTab(),
         ],
@@ -77,10 +76,10 @@ class _TeacherBottomNav extends StatelessWidget {
 
   const _TeacherBottomNav({required this.selected, required this.onChanged});
 
-  static const _tabs = [
+  /// Labels freeze H6 teacher shell (no posts tab).
+  static const tabs = [
     (icon: Icons.home_rounded, label: 'الرئيسية'),
     (icon: Icons.groups_rounded, label: 'الحلقات'),
-    (icon: Icons.article_outlined, label: 'المنشورات'),
     (icon: Icons.chat_bubble_outline, label: 'الرسائل'),
     (icon: Icons.person_outline, label: 'حسابي'),
   ];
@@ -102,8 +101,8 @@ class _TeacherBottomNav extends StatelessWidget {
         child: SizedBox(
           height: AppSizes.bottomNavHeight,
           child: Row(
-            children: List.generate(_tabs.length, (i) {
-              final tab = _tabs[i];
+            children: List.generate(tabs.length, (i) {
+              final tab = tabs[i];
               final isSelected = i == selected;
 
               return Expanded(

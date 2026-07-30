@@ -6,12 +6,14 @@ import '../../features/chat/presentation/pages/chat_room.dart';
 import '../../features/chat/presentation/pages/student_chat_page.dart';
 import '../../features/content/presentation/pages/content_library_page.dart';
 import '../../features/notifications/presentation/pages/notification_page.dart';
+import '../../features/parent/presentation/pages/parent_absence_requests_page.dart';
 import '../../features/parent/presentation/pages/parent_home_page.dart';
 import '../../features/student/presentation/pages/student_evaluation_page.dart';
 import '../../features/student/presentation/pages/student_profile_page.dart';
 import '../../features/supervisor/presentation/pages/supervisor_home_page.dart';
 import '../../features/teacher/presentation/pages/teacher_evalutation_page.dart';
 import '../constants/app_constants.dart';
+import 'supervisor_escalation_paths.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
@@ -38,15 +40,8 @@ import '../../features/teacher/presentation/pages/teacher_home_page.dart';
 import '../../features/teacher/presentation/pages/teacher_class_detail_page.dart';
 import '../../features/teacher/presentation/pages/teacher_attendance_page.dart';
 
-// Analytics
-import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
-
 // Awards
 import '../../features/awards/presentation/pages/awards_page.dart';
-
-// Calendar
-import '../../features/calendar/presentation/pages/calendar_page.dart';
-
 
 class AppRoutes {
   AppRoutes._();
@@ -67,7 +62,7 @@ class AppRoutes {
   static const String studentAchieve = '/student/achievements';
   static const String studentMushaf = '/student/mushaf';
   static const String studentNotifs = '/student/notifications';
-  static const String studentHistory = '/student/history';
+  // H6 / A-H8: studentHistory placeholder route removed (was unreachable).
   static const String studentAvatar = '/student/avatar';
   static const String studentSettings = '/student/settings';
   static const String studentBadges = '/student/badges';
@@ -83,17 +78,53 @@ class AppRoutes {
   static const String teacherAttend = '/teacher/attendance/:halaqaId';
   static const String teacherEvals = '/teacher/halaqa/:halaqaId/evaluations';
   static const String teacherStudent = '/teacher/student/:studentId';
-  static const String teacherAnalytics = '/teacher/halaqa/:halaqaId/analytics';
+  // H6 / A-H8: teacherAnalytics / teacherCalendar / teacherContent routes removed
+  // (orphan deep-links; student content path kept).
   static const String teacherAwards = '/teacher/halaqa/:halaqaId/awards';
-  static const String teacherCalendar = '/teacher/calendar';
-  static const String teacherContent = '/teacher/content';
   static const String teacherChat = '/teacher/chat/:conversationId';
   static const String teacherNotifs = '/teacher/notifications';
 
   // Other roles
   static const String parent = '/parent';
+  static const String parentAbsence = '/parent/absence-requests';
+  static const String parentNotifs = '/parent/notifications';
   static const String supervisor = '/supervisor';
   static const String admin = '/admin';
+}
+
+/// Pure role → home route and path allowlist used by [AppRouter] (H8 / A-H11).
+///
+/// Extracted so regression tests can lock W1–W8 navigation contracts without
+/// spinning up GoRouter / AuthBloc.
+class AppRouteAccess {
+  const AppRouteAccess._();
+
+  /// Home path for an authenticated [role], or login for unknown roles.
+  static String homeForRole(String role) => switch (role) {
+    AppRoles.student => AppRoutes.student,
+    AppRoles.parent => AppRoutes.parent,
+    AppRoles.teacher => AppRoutes.teacher,
+    AppRoles.supervisor => AppRoutes.supervisor,
+    AppRoles.admin => AppRoutes.admin,
+    _ => AppRoutes.login,
+  };
+
+  /// Whether [path] is allowed for [role] (prefix home + splash/login +
+  /// supervisor escalation into teacher-owned operational routes).
+  static bool isAllowed({required String path, required String role}) {
+    final roleRoute = homeForRole(role);
+    if (path.startsWith(roleRoute) ||
+        path == AppRoutes.splash ||
+        path == AppRoutes.login) {
+      return true;
+    }
+    // W6 D-W6-1: supervisor may escalate into existing teacher-owned workflows.
+    if (role == AppRoles.supervisor &&
+        SupervisorEscalationPaths.isAllowed(path)) {
+      return true;
+    }
+    return false;
+  }
 }
 
 class AppRouter {
@@ -105,8 +136,10 @@ class AppRouter {
   late final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
-    refreshListenable: Listenable.merge(
-        [_BlocListenable(authBloc), onboardingSeen]),
+    refreshListenable: Listenable.merge([
+      _BlocListenable(authBloc),
+      onboardingSeen,
+    ]),
 
     redirect: (BuildContext context, GoRouterState state) {
       final authState = authBloc.state;
@@ -114,8 +147,9 @@ class AppRouter {
 
       // أول تشغيل للتطبيق → الأونبوردنج قبل أي حاجة تانية
       if (!onboardingSeen.value) {
-        return currentPath == AppRoutes.onboarding ? null : AppRoutes
-            .onboarding;
+        return currentPath == AppRoutes.onboarding
+            ? null
+            : AppRoutes.onboarding;
       }
       if (currentPath == AppRoutes.onboarding) {
         return AppRoutes.splash;
@@ -161,14 +195,8 @@ class AppRouter {
         path: AppRoutes.onboarding,
         builder: (_, __) => OnboardingPage(onboardingSeen: onboardingSeen),
       ),
-      GoRoute(
-        path: AppRoutes.splash,
-        builder: (_, __) => const SplashPage(),
-      ),
-      GoRoute(
-        path: AppRoutes.login,
-        builder: (_, __) => const LoginPage(),
-      ),
+      GoRoute(path: AppRoutes.splash, builder: (_, __) => const SplashPage()),
+      GoRoute(path: AppRoutes.login, builder: (_, __) => const LoginPage()),
       GoRoute(
         path: AppRoutes.register,
         builder: (_, __) => const RegisterPage(),
@@ -240,17 +268,11 @@ class AppRouter {
             },
           ),
           GoRoute(
-            path: 'history',
-            builder: (_, __) => const _PlaceholderPage(title: 'السجل'),
-          ),
-          GoRoute(
             path: 'avatar',
             builder: (_, __) => const AvatarSelectionPage(),
           ),
-          GoRoute(
-            path: 'settings',
-            builder: (_, __) => const SettingsPage(),
-          ),
+          GoRoute(path: 'settings', builder: (_, __) => const SettingsPage()),
+          // Live student content (not an H6 orphan — teacher content route removed).
           GoRoute(
             path: 'content',
             builder: (_, __) => const ContentLibraryPage(),
@@ -260,10 +282,7 @@ class AppRouter {
             builder: (_, __) => const StudentAudioLibraryPage(),
           ),
           // بوابة شات الطالب → تفتح محادثة المعلم تلقائياً
-          GoRoute(
-            path: 'chat',
-            builder: (_, __) => const StudentChatPage(),
-          ),
+          GoRoute(path: 'chat', builder: (_, __) => const StudentChatPage()),
           GoRoute(
             path: 'chat/:conversationId',
             builder: (_, state) {
@@ -286,59 +305,39 @@ class AppRouter {
           // تفاصيل حلقة
           GoRoute(
             path: 'halaqa/:halaqaId',
-            builder: (_, state) =>
-                TeacherClassDetailPage(
-                  halaqaId: state.pathParameters['halaqaId']!,
-                ),
+            builder: (_, state) => TeacherClassDetailPage(
+              halaqaId: state.pathParameters['halaqaId']!,
+              openAssignSheet:
+                  state.uri.queryParameters['assign'] == '1' ||
+                  state.uri.queryParameters['assign'] == 'true',
+            ),
             routes: [
               GoRoute(
                 path: 'evaluations',
-                builder: (_, state) =>
-                    TeacherEvaluationsPage(
-                      halaqaId: state.pathParameters['halaqaId']!,
-                    ),
-              ),
-              GoRoute(
-                path: 'analytics',
-                builder: (_, state) =>
-                    AnalyticsDashboardPage(
-                      halaqaId: state.pathParameters['halaqaId']!,
-                    ),
+                builder: (_, state) => TeacherEvaluationsPage(
+                  halaqaId: state.pathParameters['halaqaId']!,
+                ),
               ),
               GoRoute(
                 path: 'awards',
                 builder: (_, state) =>
-                    AwardsPage(
-                      halaqaId: state.pathParameters['halaqaId']!,
-                    ),
+                    AwardsPage(halaqaId: state.pathParameters['halaqaId']!),
               ),
             ],
           ),
           // الحضور
           GoRoute(
             path: 'attendance/:halaqaId',
-            builder: (_, state) =>
-                TeacherAttendancePage(
-                  halaqaId: state.pathParameters['halaqaId']!,
-                ),
+            builder: (_, state) => TeacherAttendancePage(
+              halaqaId: state.pathParameters['halaqaId']!,
+            ),
           ),
           // ملف طالب
           GoRoute(
             path: 'student/:studentId',
-            builder: (_, state) =>
-                StudentProfilePage(
-                  studentId: state.pathParameters['studentId']!,
-                ),
-          ),
-          // التقويم
-          GoRoute(
-            path: 'calendar',
-            builder: (_, __) => const CalendarPage(),
-          ),
-          // مكتبة المحتوى
-          GoRoute(
-            path: 'content',
-            builder: (_, __) => const ContentLibraryPage(),
+            builder: (_, state) => StudentProfilePage(
+              studentId: state.pathParameters['studentId']!,
+            ),
           ),
           // شاشة المحادثة
           GoRoute(
@@ -364,6 +363,16 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.parent,
         builder: (_, __) => const ParentHomePage(),
+        routes: [
+          GoRoute(
+            path: 'absence-requests',
+            builder: (_, __) => const ParentAbsenceRequestsPage(),
+          ),
+          GoRoute(
+            path: 'notifications',
+            builder: (_, __) => const NotificationsPage(),
+          ),
+        ],
       ),
 
       // ── Supervisor ────────────────────────────────────────────
@@ -373,61 +382,23 @@ class AppRouter {
       ),
 
       // ── Admin ─────────────────────────────────────────────────
-      GoRoute(
-        path: AppRoutes.admin,
-        builder: (_, __) => const AdminHomePage(),
-      ),
+      GoRoute(path: AppRoutes.admin, builder: (_, __) => const AdminHomePage()),
     ],
 
-    errorBuilder: (context, state) =>
-        Scaffold(
-          appBar: AppBar(title: const Text('خطأ')),
-          body: Center(
-            child: Text('الصفحة غير موجودة: ${state.error}'),
-          ),
-        ),
+    errorBuilder: (context, state) => Scaffold(
+      appBar: AppBar(title: const Text('خطأ')),
+      body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
+    ),
   );
 
-  static String _routeForRole(String role) =>
-      switch (role) {
-        AppRoles.student => AppRoutes.student,
-        AppRoles.parent => AppRoutes.parent,
-        AppRoles.teacher => AppRoutes.teacher,
-        AppRoles.supervisor => AppRoutes.supervisor,
-        AppRoles.admin => AppRoutes.admin,
-        _ => AppRoutes.login,
-      };
+  static String _routeForRole(String role) => AppRouteAccess.homeForRole(role);
 
-  static bool _isAllowedRoute(String path, String role) {
-    final roleRoute = _routeForRole(role);
-    // كل route بيبدأ بـ roleRoute مسموح، + Auth routes
-    return path.startsWith(roleRoute) ||
-        path == AppRoutes.splash ||
-        path == AppRoutes.login;
-  }
+  static bool _isAllowedRoute(String path, String role) =>
+      AppRouteAccess.isAllowed(path: path, role: role);
 }
 
 class _BlocListenable extends ChangeNotifier {
   _BlocListenable(AuthBloc bloc) {
     bloc.stream.listen((_) => notifyListeners());
-  }
-}
-
-// ── Placeholder ────────────────────────────────────────────────────────────
-
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text('$title — قريباً',
-            style: const TextStyle(fontFamily: 'NotoNaskhArabic')),
-      ),
-    );
   }
 }

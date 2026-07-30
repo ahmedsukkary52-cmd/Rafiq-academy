@@ -16,11 +16,12 @@ class AllRecitersPage extends StatefulWidget {
 
 class _AllRecitersPageState extends State<AllRecitersPage> {
   final _searchController = TextEditingController();
-  String _query = '';
+  final _query = ValueNotifier<String>('');
 
   @override
   void dispose() {
     _searchController.dispose();
+    _query.dispose();
     super.dispose();
   }
 
@@ -43,67 +44,77 @@ class _AllRecitersPageState extends State<AllRecitersPage> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _searchController,
-                textDirection: TextDirection.rtl,
-                decoration: InputDecoration(
-                  hintText: 'ابحث باسم القارئ',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (value) => setState(() => _query = value.trim()),
+              child: ValueListenableBuilder<String>(
+                valueListenable: _query,
+                builder: (context, query, _) {
+                  return TextField(
+                    controller: _searchController,
+                    textDirection: TextDirection.rtl,
+                    decoration: InputDecoration(
+                      hintText: 'ابحث باسم القارئ',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: query.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                _query.value = '';
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) => _query.value = value.trim(),
+                  );
+                },
               ),
             ),
             Expanded(
-              child: BlocBuilder<AudioLibraryBloc, AudioLibraryState>(
-                buildWhen: (previous, current) =>
-                    previous.allReciters != current.allReciters ||
-                    previous.favoriteReciters != current.favoriteReciters,
-                builder: (context, state) {
-                  final query = _normalizeArabic(_query);
-                  final reciters = state.allReciters.where((reciter) {
-                    if (query.isEmpty) return true;
-                    return _normalizeArabic(reciter.name).contains(query);
-                  }).toList();
+              child: ValueListenableBuilder<String>(
+                valueListenable: _query,
+                builder: (context, rawQuery, _) {
+                  return BlocBuilder<AudioLibraryBloc, AudioLibraryState>(
+                    buildWhen: (previous, current) =>
+                        previous.allReciters != current.allReciters ||
+                        previous.favoriteReciters != current.favoriteReciters,
+                    builder: (context, state) {
+                      final query = _normalizeArabic(rawQuery);
+                      final reciters = state.allReciters.where((reciter) {
+                        if (query.isEmpty) return true;
+                        return _normalizeArabic(reciter.name).contains(query);
+                      }).toList();
 
-                  if (reciters.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'لا يوجد قارئ بهذا الاسم',
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    );
-                  }
+                      if (reciters.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'لا يوجد قارئ بهذا الاسم',
+                            style: TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        );
+                      }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: reciters.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final reciter = reciters[index];
-                      return _ReciterTile(
-                        reciter: reciter,
-                        isAdded: state.favoriteReciters.any(
-                          (favorite) => favorite.id == reciter.id,
-                        ),
-                        onTap: () => _selectReciter(context, reciter),
+                      return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        itemCount: reciters.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final reciter = reciters[index];
+                          return _ReciterTile(
+                            reciter: reciter,
+                            isAdded: state.favoriteReciters.any(
+                              (favorite) => favorite.id == reciter.id,
+                            ),
+                            onTap: () => _selectReciter(context, reciter),
+                          );
+                        },
                       );
                     },
                   );

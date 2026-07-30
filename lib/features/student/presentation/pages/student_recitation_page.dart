@@ -10,7 +10,9 @@ import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../homework/domain/repositories/homework_repository.dart';
 import '../../../homework/domain/usecases/homework_usecases.dart';
@@ -106,8 +108,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   // Playback
   final AudioPlayer _recordingPlayer = AudioPlayer();
   bool _isPlayingRecording = false;
-  Duration _recordPosition = Duration.zero;
-  Duration _recordDuration = Duration.zero;
+  StreamSubscription<PlayerState>? _playerStateSub;
 
   // Saved recordings
   List<Recording> _savedRecordings = [];
@@ -147,13 +148,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   }
 
   void _setupAudioListeners() {
-    _recordingPlayer.positionStream.listen((pos) {
-      if (mounted) setState(() => _recordPosition = pos);
-    });
-    _recordingPlayer.durationStream.listen((dur) {
-      if (mounted) setState(() => _recordDuration = dur ?? Duration.zero);
-    });
-    _recordingPlayer.playerStateStream.listen((state) {
+    _playerStateSub = _recordingPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlayingRecording = state.playing);
     });
   }
@@ -161,17 +156,6 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
   String _toArabicDigits(int n) {
     const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return n.toString().split('').map((c) => digits[int.parse(c)]).join();
-  }
-
-  String _formatRecordTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
   }
 
   Future<void> _startRecording() async {
@@ -240,14 +224,40 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
   void _submitRecitation() {
     if (_recordedFilePath == null) return;
+    final isHomework = widget.homeworkContext != null;
+
+    if (isHomework && !AppCapabilities.audioUploadsEnabled) {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+          content: const Text(
+            'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+        title: Text(
+          isHomework ? 'إرسال التسميع' : 'حفظ التسجيل',
+          textAlign: TextAlign.right,
+        ),
         content: Text(
-          widget.homeworkContext != null
+          isHomework
               ? 'سيتم رفع التسجيل للمعلم عبر الإنترنت. هل تريد المتابعة؟'
-              : 'هل تريد إرسال التسجيل للمعلم؟',
+              : 'سيتم حفظ التسجيل على جهازك فقط. رفع التسجيل للمعلم غير متاح حالياً.',
           textAlign: TextAlign.right,
           style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
         ),
@@ -261,9 +271,9 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
               Navigator.pop(dialogContext);
               _performSubmit();
             },
-            child: const Text(
-              'إرسال',
-              style: TextStyle(
+            child: Text(
+              isHomework ? 'إرسال' : 'حفظ',
+              style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
               ),
@@ -287,6 +297,16 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
           _hasRecorded = false;
           _recordedFilePath = null;
         });
+      }
+      return;
+    }
+
+    if (!AppCapabilities.audioUploadsEnabled) {
+      if (mounted) {
+        AppSnackBar.showInfo(
+          context,
+          'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
+        );
       }
       return;
     }
@@ -384,6 +404,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
   @override
   void dispose() {
+    _playerStateSub?.cancel();
     _recordingPlayer.dispose();
     _recorder.dispose();
     _recordTimer?.cancel();
@@ -403,10 +424,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.more_horiz_rounded, size: 28),
-                    onPressed: () {},
-                  ),
+                  const SizedBox(width: 48),
                   Expanded(
                     child: Column(
                       children: [
@@ -555,7 +573,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
                     // Timer
                     Text(
-                      _formatRecordTime(_recordDurationSeconds),
+                      formatSecondsMmSs(_recordDurationSeconds),
                       style: GoogleFonts.amiri(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -565,30 +583,18 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
 
                     const SizedBox(height: 24),
 
-                    // Sound Waves (placeholder animation)
+                    // Recording indicator
                     if (_isRecording)
-                      SizedBox(
-                        height: 60,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(16, (index) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 3,
-                              ),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 100),
-                                width: 6,
-                                height:
-                                    (index % 3 + 1) * 12 +
-                                    (index % 2 == 0 ? 10 : 0),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00ACC1),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            );
-                          }),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'جاري التسجيل...',
+                          style: TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF00ACC1),
+                          ),
                         ),
                       ),
 
@@ -659,7 +665,9 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                           ),
                           onPressed: _submitRecitation,
                           child: Text(
-                            'إرسال التسميع للمعلمة 👆',
+                            widget.homeworkContext != null
+                                ? 'إرسال التسميع للمعلمة'
+                                : 'حفظ التسجيل محلياً',
                             style: GoogleFonts.amiri(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -730,7 +738,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    '${_formatDuration(Duration(seconds: rec.durationSeconds))} • ${rec.dateTime.day}/${rec.dateTime.month}',
+                                                    '${formatDurationMmSs(Duration(seconds: rec.durationSeconds))} • ${rec.dateTime.day}/${rec.dateTime.month}',
                                                     style: GoogleFonts.amiri(
                                                       fontSize: 12,
                                                       color: Colors.black

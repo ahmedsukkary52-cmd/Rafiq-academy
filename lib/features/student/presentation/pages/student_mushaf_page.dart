@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import 'student_recitation_page.dart';
 
@@ -956,8 +957,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     0x0650,
   ]);
 
-  static const String _lastFreeSurahKey = 'last_free_mushaf_surah';
-
   static const List<String> _allSurahNames = [
     'الفاتحة',
     'البقرة',
@@ -1090,18 +1089,22 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   bool _isLoadingData = true;
   String _errorLoading = '';
   final List<AyahModel> _ayahs = [];
+  final Map<int, int> _ayahIndexByNumber = {};
   List<List<AyahModel>> _groupedByPage =
       []; // Each element is ayahs for one Quran page
   int _selectedAyahIndex = 0;
   bool _audioPrepared = false;
 
   late AudioPlayer _audioPlayer;
-  bool _isPlayingAudio = false;
-  Duration _audioPosition = Duration.zero;
-  Duration _audioDuration = Duration.zero;
+  final ValueNotifier<bool> _isPlayingAudio = ValueNotifier(false);
+  final ValueNotifier<Duration> _audioPosition = ValueNotifier(Duration.zero);
+  final ValueNotifier<Duration> _audioDuration = ValueNotifier(Duration.zero);
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<PlayerState>? _playerStateSub;
+  StreamSubscription<Duration>? _recordPositionSub;
+  StreamSubscription<Duration?>? _recordDurationSub;
+  StreamSubscription<PlayerState>? _recordPlayerStateSub;
 
   late AudioRecorder _audioRecorder;
   bool _isRecording = false;
@@ -1109,15 +1112,14 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   int _recordDurationSeconds = 0;
   Timer? _recordTimer;
   bool _hasRecorded = false;
-  bool _isPlayingRecording = false;
+  final ValueNotifier<bool> _isPlayingRecording = ValueNotifier(false);
   late AudioPlayer _recordingPlayer;
-  Duration _recordPosition = Duration.zero;
-  Duration _recordDuration = Duration.zero;
+  final ValueNotifier<Duration> _recordPosition = ValueNotifier(Duration.zero);
+  final ValueNotifier<Duration> _recordDuration = ValueNotifier(Duration.zero);
 
   ReciterInfo _selectedReciter = _reciters.first;
 
   final List<TapGestureRecognizer> _ayahRecognizers = [];
-  SurahMeta? _dynamicMeta;
 
   SurahMeta get _meta {
     if (_groupedByPage.isEmpty) {
@@ -1159,27 +1161,27 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   void _setupAudioListeners() {
     _positionSub = _audioPlayer.positionStream.listen((pos) {
-      if (mounted) setState(() => _audioPosition = pos);
+      _audioPosition.value = pos;
     });
     _durationSub = _audioPlayer.durationStream.listen((dur) {
-      if (mounted) setState(() => _audioDuration = dur ?? Duration.zero);
+      _audioDuration.value = dur ?? Duration.zero;
     });
     _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
       if (!mounted) return;
-      setState(() => _isPlayingAudio = state.playing);
+      _isPlayingAudio.value = state.playing;
       if (state.processingState == ProcessingState.completed) {
         _onAyahCompleted();
       }
     });
 
-    _recordingPlayer.positionStream.listen((pos) {
-      if (mounted) setState(() => _recordPosition = pos);
+    _recordPositionSub = _recordingPlayer.positionStream.listen((pos) {
+      _recordPosition.value = pos;
     });
-    _recordingPlayer.durationStream.listen((dur) {
-      if (mounted) setState(() => _recordDuration = dur ?? Duration.zero);
+    _recordDurationSub = _recordingPlayer.durationStream.listen((dur) {
+      _recordDuration.value = dur ?? Duration.zero;
     });
-    _recordingPlayer.playerStateStream.listen((state) {
-      if (mounted) setState(() => _isPlayingRecording = state.playing);
+    _recordPlayerStateSub = _recordingPlayer.playerStateStream.listen((state) {
+      _isPlayingRecording.value = state.playing;
     });
   }
 
@@ -1261,6 +1263,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
     // Clear previous data
     _ayahs.clear();
+    _ayahIndexByNumber.clear();
     _surahStartPage.clear();
 
     // Iterate all surahs
@@ -1296,14 +1299,11 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     final sortedPages = pageMap.keys.toList()..sort();
     _groupedByPage = sortedPages.map((page) => pageMap[page]!).toList();
 
-    // Set initial meta to first surah
-    _dynamicMeta = SurahMeta(
-      number: 1,
-      name: _allSurahNames.first,
-      juz: '',
-      type: 'مكية',
-      versesCount: 7,
-    );
+    _ayahIndexByNumber
+      ..clear()
+      ..addEntries([
+        for (var i = 0; i < _ayahs.length; i++) MapEntry(_ayahs[i].number, i),
+      ]);
 
     _rebuildAyahRecognizers();
   }
@@ -1330,7 +1330,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       return ayah.text;
     }
     var text = ayah.text;
-    debugPrint('=== Original Ayah Text (length:${text.length}): "$text" ===');
 
     // Build Bismillah from the EXACT character codes from your log!
     final bismillah = String.fromCharCodes([
@@ -1374,21 +1373,13 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       0x0650,
     ]);
 
-    debugPrint(
-      '=== Built Bismillah (length:${bismillah.length}): "$bismillah" ===',
-    );
-
     // Try to remove it
     if (text.startsWith(bismillah)) {
       text = text.substring(bismillah.length).trim();
-      debugPrint('=== After Bismillah Removal: "$text" ===');
     } else {
       final trimmedText = text.trimLeft();
       if (trimmedText.startsWith(bismillah)) {
         text = trimmedText.substring(bismillah.length).trim();
-        debugPrint('=== After Bismillah Removal (trimmed): "$text" ===');
-      } else {
-        debugPrint('=== Still no match! ===');
       }
     }
     return text;
@@ -1533,44 +1524,50 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
             ListTile(
               leading: const Icon(
                 Icons.favorite_border,
-                color: AppColors.primary,
+                color: AppColors.textHint,
               ),
               title: const Text(
                 'إضافة للمفضلة',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                AppSnackBar.showInfo(context, 'تمت الإضافة للمفضلة');
-              },
+              trailing: Text(
+                'Coming Soon',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(
                 Icons.bookmark_border,
-                color: AppColors.primary,
+                color: AppColors.textHint,
               ),
               title: const Text(
                 'حفظ إشارة مرجعية',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                AppSnackBar.showInfo(context, 'تم حفظ علامة مرجعية');
-              },
+              trailing: Text(
+                'Coming Soon',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(
                 Icons.share_outlined,
-                color: AppColors.primary,
+                color: AppColors.textHint,
               ),
               title: const Text(
                 'مشاركة السورة',
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                AppSnackBar.showInfo(context, 'مشاركة السورة قريباً');
-              },
+              trailing: Text(
+                'Coming Soon',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(
@@ -1655,7 +1652,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       });
       _playCurrentAyah();
     } else {
-      setState(() => _isPlayingAudio = false);
+      _isPlayingAudio.value = false;
     }
   }
 
@@ -1669,7 +1666,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   }
 
   void _togglePlayPause() async {
-    if (_isPlayingAudio) {
+    if (_isPlayingAudio.value) {
       await _audioPlayer.pause();
       return;
     }
@@ -1719,7 +1716,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       _selectedReciter = reciter;
       _audioPrepared = false;
     });
-    if (_isPlayingAudio) {
+    if (_isPlayingAudio.value) {
       _playCurrentAyah();
     } else {
       _prepareAudioForCurrentAyah();
@@ -1774,7 +1771,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   }
 
   void _togglePlayRecording() {
-    if (_isPlayingRecording) {
+    if (_isPlayingRecording.value) {
       _recordingPlayer.pause();
     } else {
       _recordingPlayer.play();
@@ -1786,7 +1783,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+        title: const Text('رفع التسجيل', textAlign: TextAlign.right),
         content: const Text(
           'رفع التسجيل غير متاح حالياً حتى يتم تفعيل خدمة رفع الملفات.',
           textAlign: TextAlign.right,
@@ -1800,17 +1797,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         ],
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    return '${twoDigits(duration.inMinutes)}:${twoDigits(duration.inSeconds.remainder(60))}';
-  }
-
-  String _formatRecordTime(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${s.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
   }
 
   String _toArabicDigits(int n) {
@@ -1829,10 +1815,19 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playerStateSub?.cancel();
+    _recordPositionSub?.cancel();
+    _recordDurationSub?.cancel();
+    _recordPlayerStateSub?.cancel();
     _audioPlayer.dispose();
     _recordingPlayer.dispose();
     _audioRecorder.dispose();
     _recordTimer?.cancel();
+    _isPlayingAudio.dispose();
+    _audioPosition.dispose();
+    _audioDuration.dispose();
+    _isPlayingRecording.dispose();
+    _recordPosition.dispose();
+    _recordDuration.dispose();
     super.dispose();
   }
 
@@ -1890,7 +1885,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               isDarkMode: _isDarkMode,
               onReadingTap: () => setState(() => _mode = MushafMode.reading),
               onRecitationTap: () {
-                debugPrint('Recitation tapped! Navigating...');
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -1974,7 +1968,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       },
       itemBuilder: (context, pageIndex) {
         final pageAyahs = _groupedByPage[pageIndex];
-        final pageNumber = pageAyahs.first.page;
         return _MushafPageFrame(
           isDarkMode: _isDarkMode,
           child: Column(
@@ -2065,7 +2058,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       }
 
       // Build the ayah text
-      final originalIndex = _ayahs.indexWhere((a) => a.number == ayah.number);
+      final originalIndex = _ayahIndexByNumber[ayah.number] ?? -1;
       final isSelected = originalIndex == _selectedAyahIndex;
       final displayText = _getAyahDisplayText(ayah);
 
@@ -2182,39 +2175,48 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  _formatDuration(_audioPosition),
-                  style: TextStyle(fontSize: 11, color: iconColor),
-                ),
-                Expanded(
-                  child: Slider(
-                    activeColor: AppColors.primary,
-                    inactiveColor: _isDarkMode
-                        ? Colors.white10
-                        : Colors.black.withOpacity(0.06),
-                    value: _audioPosition.inMilliseconds
-                        .clamp(
-                          0,
-                          _audioDuration.inMilliseconds > 0
-                              ? _audioDuration.inMilliseconds
-                              : 1,
-                        )
-                        .toDouble(),
-                    max: _audioDuration.inMilliseconds > 0
-                        ? _audioDuration.inMilliseconds.toDouble()
-                        : 1,
-                    onChanged: (val) {
-                      _audioPlayer.seek(Duration(milliseconds: val.toInt()));
-                    },
-                  ),
-                ),
-                Text(
-                  _formatDuration(_audioDuration),
-                  style: TextStyle(fontSize: 11, color: iconColor),
-                ),
-              ],
+            AnimatedBuilder(
+              animation: Listenable.merge([_audioPosition, _audioDuration]),
+              builder: (context, _) {
+                final position = _audioPosition.value;
+                final duration = _audioDuration.value;
+                return Row(
+                  children: [
+                    Text(
+                      formatDurationMmSs(position),
+                      style: TextStyle(fontSize: 11, color: iconColor),
+                    ),
+                    Expanded(
+                      child: Slider(
+                        activeColor: AppColors.primary,
+                        inactiveColor: _isDarkMode
+                            ? Colors.white10
+                            : Colors.black.withOpacity(0.06),
+                        value: position.inMilliseconds
+                            .clamp(
+                              0,
+                              duration.inMilliseconds > 0
+                                  ? duration.inMilliseconds
+                                  : 1,
+                            )
+                            .toDouble(),
+                        max: duration.inMilliseconds > 0
+                            ? duration.inMilliseconds.toDouble()
+                            : 1,
+                        onChanged: (val) {
+                          _audioPlayer.seek(
+                            Duration(milliseconds: val.toInt()),
+                          );
+                        },
+                      ),
+                    ),
+                    Text(
+                      formatDurationMmSs(duration),
+                      style: TextStyle(fontSize: 11, color: iconColor),
+                    ),
+                  ],
+                );
+              },
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -2239,13 +2241,18 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isPlayingAudio ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                    iconSize: 32,
-                    onPressed: _togglePlayPause,
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _isPlayingAudio,
+                    builder: (context, playing, _) {
+                      return IconButton(
+                        icon: Icon(
+                          playing ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        iconSize: 32,
+                        onPressed: _togglePlayPause,
+                      );
+                    },
                   ),
                 ),
                 IconButton(
@@ -2380,7 +2387,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                _formatRecordTime(_recordDurationSeconds),
+                formatSecondsMmSs(_recordDurationSeconds),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -2409,36 +2416,54 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      _isPlayingRecording ? Icons.pause : Icons.play_arrow,
-                    ),
-                    onPressed: _togglePlayRecording,
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _isPlayingRecording,
+                    builder: (context, playing, _) {
+                      return IconButton(
+                        icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                        onPressed: _togglePlayRecording,
+                      );
+                    },
                   ),
                   Expanded(
-                    child: Slider(
-                      activeColor: AppColors.primary,
-                      value: _recordPosition.inMilliseconds
-                          .clamp(
-                            0,
-                            _recordDuration.inMilliseconds > 0
-                                ? _recordDuration.inMilliseconds
-                                : 1,
-                          )
-                          .toDouble(),
-                      max: _recordDuration.inMilliseconds > 0
-                          ? _recordDuration.inMilliseconds.toDouble()
-                          : 1,
-                      onChanged: (val) {
-                        _recordingPlayer.seek(
-                          Duration(milliseconds: val.toInt()),
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _recordPosition,
+                        _recordDuration,
+                      ]),
+                      builder: (context, _) {
+                        final position = _recordPosition.value;
+                        final duration = _recordDuration.value;
+                        return Slider(
+                          activeColor: AppColors.primary,
+                          value: position.inMilliseconds
+                              .clamp(
+                                0,
+                                duration.inMilliseconds > 0
+                                    ? duration.inMilliseconds
+                                    : 1,
+                              )
+                              .toDouble(),
+                          max: duration.inMilliseconds > 0
+                              ? duration.inMilliseconds.toDouble()
+                              : 1,
+                          onChanged: (val) {
+                            _recordingPlayer.seek(
+                              Duration(milliseconds: val.toInt()),
+                            );
+                          },
                         );
                       },
                     ),
                   ),
-                  Text(
-                    _formatDuration(_recordDuration),
-                    style: const TextStyle(fontSize: 11),
+                  ValueListenableBuilder<Duration>(
+                    valueListenable: _recordDuration,
+                    builder: (context, duration, _) {
+                      return Text(
+                        formatDurationMmSs(duration),
+                        style: const TextStyle(fontSize: 11),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -2447,7 +2472,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 children: [
                   Expanded(
                     child: AppButton(
-                      label: 'إرسال التسميع للمعلمة',
+                      label: 'رفع التسجيل — Coming Soon',
                       onPressed: _submitRecitation,
                     ),
                   ),
@@ -2594,147 +2619,6 @@ class _ModeTabButton extends StatelessWidget {
   }
 }
 
-class _SurahHeader extends StatelessWidget {
-  final SurahMeta meta;
-  final bool isDarkMode;
-  final String Function(int) toArabicDigits;
-  final VoidCallback onMoreTap;
-
-  const _SurahHeader({
-    required this.meta,
-    required this.isDarkMode,
-    required this.toArabicDigits,
-    required this.onMoreTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final headerBg = isDarkMode ? AppColors.darkCard : const Color(0xFFF2E8C9);
-    final primaryTextColor = isDarkMode ? Colors.white : AppColors.textPrimary;
-    final secondaryTextColor = isDarkMode
-        ? Colors.white60
-        : AppColors.textSecondary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: headerBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDarkMode ? Colors.white10 : const Color(0xFFE2D6AC),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (meta.juz.isNotEmpty)
-                  Text(
-                    meta.juz,
-                    style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  'سورة ${meta.name}',
-                  style: GoogleFonts.amiri(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: primaryTextColor,
-                  ),
-                ),
-                Text(
-                  meta.type.isNotEmpty
-                      ? '${meta.type} · ${toArabicDigits(meta.versesCount)} آية'
-                      : '${toArabicDigits(meta.versesCount)} آية',
-                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: onMoreTap,
-            icon: Icon(Icons.more_horiz_rounded, color: secondaryTextColor),
-            tooltip: 'المزيد',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FreeMushafSurahBar extends StatelessWidget {
-  final int selectedSurah;
-  final bool isDarkMode;
-  final ScrollController scrollController;
-  final ValueChanged<int> onSurahSelected;
-
-  const _FreeMushafSurahBar({
-    required this.selectedSurah,
-    required this.isDarkMode,
-    required this.scrollController,
-    required this.onSurahSelected,
-  });
-
-  static const List<String> _names = _StudentMushafPageState._allSurahNames;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDarkMode ? AppColors.darkCard : const Color(0xFF1A3D36);
-
-    return Container(
-      color: bg,
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
-      child: SizedBox(
-        height: 44,
-        child: ListView.separated(
-          controller: scrollController,
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: _names.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 6),
-          itemBuilder: (context, index) {
-            final number = index + 1;
-            final selected = number == selectedSurah;
-            return GestureDetector(
-              onTap: () => onSurahSelected(number),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.primary
-                      : Colors.white.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: selected
-                        ? AppColors.primary
-                        : Colors.white.withOpacity(0.2),
-                  ),
-                ),
-                child: Text(
-                  _names[index],
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
-                    color: Colors.white.withOpacity(selected ? 1 : 0.85),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
 class _MushafPageFrame extends StatelessWidget {
   final bool isDarkMode;
   final Widget child;
@@ -2766,111 +2650,6 @@ class _MushafPageFrame extends StatelessWidget {
         ],
       ),
       child: child,
-    );
-  }
-}
-
-class _OrnateSurahBanner extends StatelessWidget {
-  final String name;
-  final int verseCount;
-  final String Function(int) toArabicDigits;
-
-  const _OrnateSurahBanner({
-    required this.name,
-    required this.verseCount,
-    required this.toArabicDigits,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFFD4AF37), // Gold color
-            Color(0xFFB8954F),
-            Color(0xFFD4AF37),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF8B6914), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFB8954F).withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Decorative elements
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 6,
-            child: Container(height: 2, color: const Color(0xFF8B6914)),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 6,
-            child: Container(height: 2, color: const Color(0xFF8B6914)),
-          ),
-          // Surah name
-          Text(
-            '﷽ سورة $name ﷽',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.amiri(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF3D2E10),
-              height: 1.4,
-            ),
-          ),
-          // Side decorations
-          Positioned(
-            left: 12,
-            child: _BannerDot(label: toArabicDigits(verseCount)),
-          ),
-          Positioned(
-            right: 12,
-            child: _BannerDot(label: toArabicDigits(verseCount)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BannerDot extends StatelessWidget {
-  final String label;
-
-  const _BannerDot({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFFFAF6EB),
-        border: Border.all(color: const Color(0xFFB8954F)),
-      ),
-      child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF3D2E10),
-          ),
-        ),
-      ),
     );
   }
 }

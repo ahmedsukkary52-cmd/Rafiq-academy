@@ -12,6 +12,11 @@ abstract class ParentRepository {
   /// جلب معرّفات أبناء ولي الأمر
   Future<Either<Failure, List<String>>> getChildrenIds(String parentId);
 
+  /// Reverse lookup: student UIDs → linked parent profile IDs.
+  Future<Either<Failure, Map<String, List<String>>>> getParentIdsByStudentIds(
+    List<String> studentIds,
+  );
+
   /// التقرير الأسبوعي للطالب
   Future<Either<Failure, WeeklyReportEntity>> getWeeklyReport({
     required String studentId,
@@ -24,6 +29,15 @@ abstract class ParentRepository {
   /// تقديم طلب استئذان عن حصة
   Future<Either<Failure, Unit>> submitAbsenceRequest(
     AbsenceRequestEntity request,
+  );
+
+  /// List استئذان submitted by this parent (contextual docs only).
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForParent(String parentId);
+
+  /// Halaqat containing [studentId] for scoped request submit.
+  Future<Either<Failure, List<ParentHalaqaOption>>> getHalaqatForStudent(
+    String studentId,
   );
 
   /// Stream لمتابعة التكليفات الجديدة real-time
@@ -67,4 +81,15 @@ class WeeklyReportParams extends Equatable {
 
   @override
   List<Object?> get props => [studentId, weekStart];
+}
+
+/// Minimal halaqa choice for parent استئذان submit (W7).
+class ParentHalaqaOption extends Equatable {
+  final String id;
+  final String name;
+
+  const ParentHalaqaOption({required this.id, required this.name});
+
+  @override
+  List<Object?> get props => [id, name];
 }

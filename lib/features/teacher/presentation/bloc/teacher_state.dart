@@ -1,10 +1,12 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
+import '../../domain/read_models/teacher_day_agenda.dart';
 
 class _Unset {
   const _Unset();
@@ -19,10 +21,18 @@ class TeacherState extends Equatable {
   final String? halaqatError;
   final String? selectedHalaqaId;
 
+  // ── أجندة اليوم (W3 — مشتقّة وقت القراءة، بدون تخزين) ──────────────────
+  final SectionStatus todayAgendaStatus;
+  final TeacherDayAgenda todayAgenda;
+  final String? todayAgendaError;
+
   // ── طلاب الحلقة المختارة ──────────────────────────────────────────────
   final SectionStatus studentsStatus;
   final List<HalaqaStudentSummaryEntity> students;
   final String? studentsError;
+
+  /// Halaqa id for the in-flight / loaded students roster (guards stale opens).
+  final String? studentsHalaqaId;
 
   // ── تقييمات الحلقة ────────────────────────────────────────────────────
   final SectionStatus evaluationsStatus;
@@ -34,42 +44,80 @@ class TeacherState extends Equatable {
   final List<AttendanceRecordEntity> dayAttendance;
   final String? dayAttendanceError;
 
-  // ── تسجيل الحضور (Optimistic، عشان كده مفيهاش loading عام) ────────────
+  /// Calendar day currently requested/loaded (guards stale load responses).
+  final DateTime? dayAttendanceDate;
+
+  // ── طلبات الاستئذان المعلقة (W7 Slice 2 — contextual) ─────────────────
+  final SectionStatus pendingAbsenceRequestsStatus;
+  final List<AbsenceRequestEntity> pendingAbsenceRequests;
+  final String? pendingAbsenceRequestsError;
+  final String? pendingAbsenceRequestsHalaqaId;
+  final DateTime? pendingAbsenceRequestsDate;
+
+  // ── خطأ حضور قديم (غير مستخدم في مسار الحفظ الحالي) ───────────────────
   final String? attendanceError;
 
   // ── حفظ حضور اليوم ────────────────────────────────────────────────────
   final SubmissionStatus attendanceSubmissionStatus;
   final String? attendanceSubmissionError;
 
+  /// Register saved, but its academy events could not be published.
+  final bool attendanceEventsUnpublished;
+
   // ── تسجيل تقييم التسميع ───────────────────────────────────────────────
   final SubmissionStatus recitationSubmissionStatus;
   final String? recitationSubmissionError;
 
+  /// Review saved, but academy events could not be published.
+  final bool recitationEventsUnpublished;
+
   // ── إرسال تكليف ───────────────────────────────────────────────────────
   final SubmissionStatus assignmentSubmissionStatus;
   final String? assignmentSubmissionError;
+
+  /// Assignments saved, but academy events could not be published.
+  final bool assignmentEventsUnpublished;
+
+  // ── مراجعة طلب استئذان (status only) ──────────────────────────────────
+  final SubmissionStatus absenceReviewStatus;
+  final String? absenceReviewError;
 
   const TeacherState({
     this.halaqatStatus = SectionStatus.initial,
     this.halaqat = const [],
     this.halaqatError,
     this.selectedHalaqaId,
+    this.todayAgendaStatus = SectionStatus.initial,
+    this.todayAgenda = TeacherDayAgenda.empty,
+    this.todayAgendaError,
     this.studentsStatus = SectionStatus.initial,
     this.students = const [],
     this.studentsError,
+    this.studentsHalaqaId,
     this.evaluationsStatus = SectionStatus.initial,
     this.evaluations = const [],
     this.evaluationsError,
     this.dayAttendanceStatus = SectionStatus.initial,
     this.dayAttendance = const [],
     this.dayAttendanceError,
+    this.dayAttendanceDate,
+    this.pendingAbsenceRequestsStatus = SectionStatus.initial,
+    this.pendingAbsenceRequests = const [],
+    this.pendingAbsenceRequestsError,
+    this.pendingAbsenceRequestsHalaqaId,
+    this.pendingAbsenceRequestsDate,
     this.attendanceError,
     this.attendanceSubmissionStatus = SubmissionStatus.idle,
     this.attendanceSubmissionError,
+    this.attendanceEventsUnpublished = false,
     this.recitationSubmissionStatus = SubmissionStatus.idle,
     this.recitationSubmissionError,
+    this.recitationEventsUnpublished = false,
     this.assignmentSubmissionStatus = SubmissionStatus.idle,
     this.assignmentSubmissionError,
+    this.assignmentEventsUnpublished = false,
+    this.absenceReviewStatus = SubmissionStatus.idle,
+    this.absenceReviewError,
   });
 
   factory TeacherState.initial() => const TeacherState();
@@ -79,22 +127,37 @@ class TeacherState extends Equatable {
     List<HalaqaEntity>? halaqat,
     Object? halaqatError = _unset,
     Object? selectedHalaqaId = _unset,
+    SectionStatus? todayAgendaStatus,
+    TeacherDayAgenda? todayAgenda,
+    Object? todayAgendaError = _unset,
     SectionStatus? studentsStatus,
     List<HalaqaStudentSummaryEntity>? students,
     Object? studentsError = _unset,
+    Object? studentsHalaqaId = _unset,
     SectionStatus? evaluationsStatus,
     List<RecitationRecordEntity>? evaluations,
     Object? evaluationsError = _unset,
     SectionStatus? dayAttendanceStatus,
     List<AttendanceRecordEntity>? dayAttendance,
     Object? dayAttendanceError = _unset,
+    Object? dayAttendanceDate = _unset,
+    SectionStatus? pendingAbsenceRequestsStatus,
+    List<AbsenceRequestEntity>? pendingAbsenceRequests,
+    Object? pendingAbsenceRequestsError = _unset,
+    Object? pendingAbsenceRequestsHalaqaId = _unset,
+    Object? pendingAbsenceRequestsDate = _unset,
     Object? attendanceError = _unset,
     SubmissionStatus? attendanceSubmissionStatus,
     Object? attendanceSubmissionError = _unset,
+    bool? attendanceEventsUnpublished,
     SubmissionStatus? recitationSubmissionStatus,
     Object? recitationSubmissionError = _unset,
+    bool? recitationEventsUnpublished,
     SubmissionStatus? assignmentSubmissionStatus,
     Object? assignmentSubmissionError = _unset,
+    bool? assignmentEventsUnpublished,
+    SubmissionStatus? absenceReviewStatus,
+    Object? absenceReviewError = _unset,
   }) {
     return TeacherState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -105,11 +168,19 @@ class TeacherState extends Equatable {
       selectedHalaqaId: identical(selectedHalaqaId, _unset)
           ? this.selectedHalaqaId
           : selectedHalaqaId as String?,
+      todayAgendaStatus: todayAgendaStatus ?? this.todayAgendaStatus,
+      todayAgenda: todayAgenda ?? this.todayAgenda,
+      todayAgendaError: identical(todayAgendaError, _unset)
+          ? this.todayAgendaError
+          : todayAgendaError as String?,
       studentsStatus: studentsStatus ?? this.studentsStatus,
       students: students ?? this.students,
       studentsError: identical(studentsError, _unset)
           ? this.studentsError
           : studentsError as String?,
+      studentsHalaqaId: identical(studentsHalaqaId, _unset)
+          ? this.studentsHalaqaId
+          : studentsHalaqaId as String?,
       evaluationsStatus: evaluationsStatus ?? this.evaluationsStatus,
       evaluations: evaluations ?? this.evaluations,
       evaluationsError: identical(evaluationsError, _unset)
@@ -120,6 +191,24 @@ class TeacherState extends Equatable {
       dayAttendanceError: identical(dayAttendanceError, _unset)
           ? this.dayAttendanceError
           : dayAttendanceError as String?,
+      dayAttendanceDate: identical(dayAttendanceDate, _unset)
+          ? this.dayAttendanceDate
+          : dayAttendanceDate as DateTime?,
+      pendingAbsenceRequestsStatus:
+          pendingAbsenceRequestsStatus ?? this.pendingAbsenceRequestsStatus,
+      pendingAbsenceRequests:
+          pendingAbsenceRequests ?? this.pendingAbsenceRequests,
+      pendingAbsenceRequestsError:
+          identical(pendingAbsenceRequestsError, _unset)
+          ? this.pendingAbsenceRequestsError
+          : pendingAbsenceRequestsError as String?,
+      pendingAbsenceRequestsHalaqaId:
+          identical(pendingAbsenceRequestsHalaqaId, _unset)
+          ? this.pendingAbsenceRequestsHalaqaId
+          : pendingAbsenceRequestsHalaqaId as String?,
+      pendingAbsenceRequestsDate: identical(pendingAbsenceRequestsDate, _unset)
+          ? this.pendingAbsenceRequestsDate
+          : pendingAbsenceRequestsDate as DateTime?,
       attendanceError: identical(attendanceError, _unset)
           ? this.attendanceError
           : attendanceError as String?,
@@ -128,16 +217,26 @@ class TeacherState extends Equatable {
       attendanceSubmissionError: identical(attendanceSubmissionError, _unset)
           ? this.attendanceSubmissionError
           : attendanceSubmissionError as String?,
+      attendanceEventsUnpublished:
+          attendanceEventsUnpublished ?? this.attendanceEventsUnpublished,
       recitationSubmissionStatus:
           recitationSubmissionStatus ?? this.recitationSubmissionStatus,
       recitationSubmissionError: identical(recitationSubmissionError, _unset)
           ? this.recitationSubmissionError
           : recitationSubmissionError as String?,
+      recitationEventsUnpublished:
+          recitationEventsUnpublished ?? this.recitationEventsUnpublished,
       assignmentSubmissionStatus:
           assignmentSubmissionStatus ?? this.assignmentSubmissionStatus,
       assignmentSubmissionError: identical(assignmentSubmissionError, _unset)
           ? this.assignmentSubmissionError
           : assignmentSubmissionError as String?,
+      assignmentEventsUnpublished:
+          assignmentEventsUnpublished ?? this.assignmentEventsUnpublished,
+      absenceReviewStatus: absenceReviewStatus ?? this.absenceReviewStatus,
+      absenceReviewError: identical(absenceReviewError, _unset)
+          ? this.absenceReviewError
+          : absenceReviewError as String?,
     );
   }
 
@@ -147,21 +246,36 @@ class TeacherState extends Equatable {
     halaqat,
     halaqatError,
     selectedHalaqaId,
+    todayAgendaStatus,
+    todayAgenda,
+    todayAgendaError,
     studentsStatus,
     students,
     studentsError,
+    studentsHalaqaId,
     evaluationsStatus,
     evaluations,
     evaluationsError,
     dayAttendanceStatus,
     dayAttendance,
     dayAttendanceError,
+    dayAttendanceDate,
+    pendingAbsenceRequestsStatus,
+    pendingAbsenceRequests,
+    pendingAbsenceRequestsError,
+    pendingAbsenceRequestsHalaqaId,
+    pendingAbsenceRequestsDate,
     attendanceError,
     attendanceSubmissionStatus,
     attendanceSubmissionError,
+    attendanceEventsUnpublished,
     recitationSubmissionStatus,
     recitationSubmissionError,
+    recitationEventsUnpublished,
     assignmentSubmissionStatus,
     assignmentSubmissionError,
+    assignmentEventsUnpublished,
+    absenceReviewStatus,
+    absenceReviewError,
   ];
 }

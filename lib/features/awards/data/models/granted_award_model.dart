@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../domain/entities/award_entities.dart';
 
 class GrantedAwardModel extends GrantedAwardEntity {
@@ -17,27 +18,36 @@ class GrantedAwardModel extends GrantedAwardEntity {
 
   factory GrantedAwardModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final noteRaw = data[AchievementsFirestoreContract.noteField] as String?;
+    final titleRaw = data[AchievementsFirestoreContract.titleField] as String?;
+    final note = (noteRaw != null && noteRaw.trim().isNotEmpty)
+        ? noteRaw
+        : (titleRaw != null && titleRaw.trim().isNotEmpty ? titleRaw : null);
+
     return GrantedAwardModel(
       id: doc.id,
-      studentId: data['studentId'] ?? '',
-      studentName: data['studentName'] ?? '',
-      studentImageUrl: data['studentImageUrl'] as String?,
-      type: AwardTypeInfo.fromKey(data['type'] ?? ''),
-      note: data['note'] as String?,
-      grantedBy: data['grantedBy'] ?? '',
-      halaqaId: data['halaqaId'] ?? '',
-      grantedAt: (data['grantedAt'] as Timestamp).toDate(),
+      studentId: data[AchievementsFirestoreContract.studentIdField] ?? '',
+      studentName: data[AchievementsFirestoreContract.studentNameField] ?? '',
+      studentImageUrl:
+          data[AchievementsFirestoreContract.studentImageUrlField] as String?,
+      type: AwardTypeInfo.fromKey(
+        data[AchievementsFirestoreContract.typeField] ?? '',
+      ),
+      note: note,
+      grantedBy: AchievementsFirestoreContract.resolveActor(data),
+      halaqaId: data[AchievementsFirestoreContract.halaqaIdField] ?? '',
+      grantedAt: AchievementsFirestoreContract.resolveDate(data),
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
-    'studentId': studentId,
-    'studentName': studentName,
-    if (studentImageUrl != null) 'studentImageUrl': studentImageUrl,
-    'type': type.firestoreKey,
-    if (note != null) 'note': note,
-    'grantedBy': grantedBy,
-    'halaqaId': halaqaId,
-    'grantedAt': FieldValue.serverTimestamp(),
-  };
+  Map<String, dynamic> toFirestore() =>
+      AchievementsFirestoreContract.teacherGrantFields(
+        studentId: studentId,
+        studentName: studentName,
+        studentImageUrl: studentImageUrl,
+        type: type.firestoreKey,
+        note: note,
+        grantedBy: grantedBy,
+        halaqaId: halaqaId,
+      );
 }

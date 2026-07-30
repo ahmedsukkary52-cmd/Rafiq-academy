@@ -11,6 +11,8 @@ import '../bloc/analytics_bloc.dart';
 import '../bloc/analytics_event.dart';
 import '../bloc/analytics_state.dart';
 
+/// Quarantined (H6 / A-H8): teacher analytics route removed from [AppRouter].
+/// Page kept for possible future product; not reachable from live nav.
 class AnalyticsDashboardPage extends StatefulWidget {
   final String halaqaId;
 
@@ -51,6 +53,13 @@ class _AnalyticsDashboardPageState extends State<AnalyticsDashboardPage> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: BlocBuilder<AnalyticsBloc, AnalyticsState>(
+          buildWhen: (previous, current) =>
+              previous.analytics != current.analytics ||
+              previous.analyticsStatus != current.analyticsStatus ||
+              previous.atRiskStudents != current.atRiskStudents ||
+              previous.atRiskStatus != current.atRiskStatus ||
+              previous.topStudents != current.topStudents ||
+              previous.topStudentsStatus != current.topStudentsStatus,
           builder: (context, state) {
             return CustomScrollView(
               slivers: [
@@ -353,7 +362,7 @@ class _WeeklyAttendanceCard extends StatelessWidget {
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 400),
                       width: 20,
-                      height: barHeight.clamp(4, 90),
+                      height: value <= 0 ? 0 : barHeight.clamp(4, 90),
                       decoration: BoxDecoration(
                         color: isHigh ? AppColors.primary : AppColors.secondary,
                         borderRadius: BorderRadius.circular(6),
@@ -416,22 +425,12 @@ class _AtRiskCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  TextButton(
-                    onPressed: () {},
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                      ),
-                    ),
-                    child: const Text(
-                      'تواصل',
-                      style: TextStyle(fontFamily: 'NotoNaskhArabic'),
+                  Text(
+                    'Coming Soon',
+                    style: TextStyle(
+                      fontFamily: 'NotoNaskhArabic',
+                      fontSize: 13,
+                      color: AppColors.textHint,
                     ),
                   ),
                   const Spacer(),

@@ -18,6 +18,9 @@ class StudentMushafDashboard extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: BlocBuilder<StudentBloc, StudentState>(
+          buildWhen: (previous, current) =>
+              previous.profile != current.profile ||
+              previous.profileStatus != current.profileStatus,
           builder: (context, state) {
             final profile = state.profile;
             // قيم حقيقية من البروفايل فقط — بدون نسب افتراضية وهمية
@@ -64,7 +67,7 @@ class StudentMushafDashboard extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'تقدم حفظك ومراجعتك',
+                                  'تقدم حفظك',
                                   style: TextStyle(
                                     fontFamily: 'NotoNaskhArabic',
                                     fontSize: 12,
@@ -98,20 +101,10 @@ class StudentMushafDashboard extends StatelessWidget {
                         ),
                         const SizedBox(height: 32),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const _ProgressCircle(
-                              percent: null,
-                              label: 'الإتقان',
-                              color: Color(0xFF2DC4B2),
-                            ),
-                            const _ProgressCircle(
-                              percent: null,
-                              label: 'المراجعة',
-                              color: Color(0xFFF5A623),
-                            ),
                             _ProgressCircle(
-                              percent: overallProgress,
+                              percent: overallProgress ?? 0,
                               label: 'الحفظ',
                               color: Colors.white,
                             ),
@@ -310,8 +303,7 @@ class StudentMushafDashboard extends StatelessWidget {
 }
 
 class _ProgressCircle extends StatelessWidget {
-  /// null = غير متاح بعد (بدون اختراع نسبة)
-  final int? percent;
+  final int percent;
   final String label;
   final Color color;
 
@@ -324,7 +316,6 @@ class _ProgressCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isWhite = color == Colors.white;
-    final hasValue = percent != null;
     return Column(
       children: [
         Stack(
@@ -334,23 +325,21 @@ class _ProgressCircle extends StatelessWidget {
               width: 72,
               height: 72,
               child: CircularProgressIndicator(
-                value: hasValue ? percent! / 100 : 0,
+                value: percent / 100,
                 strokeWidth: 6,
                 backgroundColor: isWhite
                     ? Colors.white.withOpacity(0.2)
                     : Colors.white.withOpacity(0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  hasValue ? color : Colors.white.withOpacity(0.35),
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
             Text(
-              hasValue ? '$percent%' : '—',
-              style: TextStyle(
+              '$percent%',
+              style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: hasValue ? 15 : 18,
+                fontSize: 15,
                 fontWeight: FontWeight.w900,
-                color: Colors.white.withOpacity(hasValue ? 1 : 0.7),
+                color: Colors.white,
               ),
             ),
           ],
@@ -365,17 +354,6 @@ class _ProgressCircle extends StatelessWidget {
             color: Colors.white.withOpacity(0.9),
           ),
         ),
-        if (!hasValue) ...[
-          const SizedBox(height: 2),
-          Text(
-            'قريباً',
-            style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 10,
-              color: Colors.white.withOpacity(0.65),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -413,6 +391,15 @@ class _MemorizationPlanPlaceholder extends StatelessWidget {
             'خطة الحفظ',
             style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.w900,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Coming Soon',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
           ),

@@ -1,3 +1,4 @@
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
@@ -25,7 +26,7 @@ class HomeworkBloc extends Bloc<HomeworkEvent, HomeworkState> {
     required this.completeHomework,
     required this.submitHomeworkRecitation,
   }) : super(const HomeworkState()) {
-    on<LoadHomeworkEvent>(_onLoad);
+    on<LoadHomeworkEvent>(_onLoad, transformer: restartable());
     on<ToggleTaskEvent>(_onToggle);
     on<FinishHomeworkEvent>(_onFinish);
     on<ClearHomeworkMessageEvent>(_onClearMessage);

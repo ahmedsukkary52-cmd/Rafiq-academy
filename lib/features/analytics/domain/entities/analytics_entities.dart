@@ -54,7 +54,7 @@ enum RiskReason { repeatedAbsence, lowPerformance, noRecentEvaluation }
 
 extension RiskReasonLabel on RiskReason {
   String get label => switch (this) {
-    RiskReason.repeatedAbsence => 'غيابات متتالية',
+    RiskReason.repeatedAbsence => 'غيابات متكررة',
     RiskReason.lowPerformance => 'أداء منخفض',
     RiskReason.noRecentEvaluation => 'لم يُقيَّم مؤخراً',
   };
@@ -65,7 +65,7 @@ class AtRiskStudentEntity extends Equatable {
   final String studentName;
   final String? profileImageUrl;
   final RiskReason reason;
-  final String detail; // مثال: "٣ غيابات متتالية"
+  final String detail; // مثال: "٣ غيابات خلال آخر أسبوعين"
 
   const AtRiskStudentEntity({
     required this.studentId,

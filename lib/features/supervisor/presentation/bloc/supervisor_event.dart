@@ -20,6 +20,25 @@ class LoadSupervisedHalaqatEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId];
 }
 
+/// Derive today's oversight board from already-loaded supervised halaqat (W6).
+class LoadSupervisorDayBoardEvent extends SupervisorEvent {
+  const LoadSupervisorDayBoardEvent();
+}
+
+/// Read-only استئذان projection for today (W7 Slice 3).
+class LoadSupervisedAbsenceRequestsEvent extends SupervisorEvent {
+  final String supervisorId;
+  final DateTime date;
+
+  const LoadSupervisedAbsenceRequestsEvent({
+    required this.supervisorId,
+    required this.date,
+  });
+
+  @override
+  List<Object?> get props => [supervisorId, date];
+}
+
 /// إرسال تشجيع/وسام لطالب متميز
 class IssueAchievementEvent extends SupervisorEvent {
   final AchievementIssueEntity data;
@@ -64,4 +83,9 @@ class RegisterNewStudentEvent extends SupervisorEvent {
 
 class ResetRegisterStudentEvent extends SupervisorEvent {
   const ResetRegisterStudentEvent();
+}
+
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearSupervisorSessionEvent extends SupervisorEvent {
+  const ClearSupervisorSessionEvent();
 }

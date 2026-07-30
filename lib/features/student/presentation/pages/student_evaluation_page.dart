@@ -41,6 +41,10 @@ class _StudentEvaluationsPageState extends State<StudentEvaluationsPage> {
         backgroundColor: AppColors.background,
         body: SafeArea(
           child: BlocBuilder<StudentBloc, StudentState>(
+            buildWhen: (previous, current) =>
+                previous.recitationRecords != current.recitationRecords ||
+                previous.recitationStatus != current.recitationStatus ||
+                previous.recitationError != current.recitationError,
             builder: (context, state) {
               if (state.recitationStatus == SectionStatus.loading &&
                   state.recitationRecords.isEmpty) {
@@ -67,22 +71,43 @@ class _StudentEvaluationsPageState extends State<StudentEvaluationsPage> {
                   ),
                   _EvaluationMetrics(records: records),
                   Expanded(
-                    child: records.isEmpty
-                        ? const _EmptyEvaluations()
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-                            itemCount: records.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 22),
-                            itemBuilder: (context, index) {
-                              return _EvaluationTimelineItem(
-                                record: records[index],
-                                color: index.isEven
-                                    ? AppColors.secondary
-                                    : const Color(0xFF28C5CF),
-                              );
-                            },
-                          ),
+                    child: RefreshIndicator(
+                      color: AppColors.primary,
+                      onRefresh: () async {
+                        _reload();
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 600),
+                        );
+                      },
+                      child: records.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: const [
+                                SizedBox(height: 48),
+                                _EmptyEvaluations(),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                24,
+                                28,
+                                24,
+                                28,
+                              ),
+                              itemCount: records.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 22),
+                              itemBuilder: (context, index) {
+                                return _EvaluationTimelineItem(
+                                  record: records[index],
+                                  color: index.isEven
+                                      ? AppColors.secondary
+                                      : const Color(0xFF28C5CF),
+                                );
+                              },
+                            ),
+                    ),
                   ),
                 ],
               );
@@ -213,49 +238,35 @@ class _EvaluationMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final memorization = _averageFor(RecitationType.memorization);
-    final review = _averageFor(RecitationType.review);
-    final behavior = records.isEmpty
-        ? 0
-        : () {
-            final scored = records
-                .map((record) => record.behaviorGrade)
-                .whereType<RecitationGrade>()
-                .map(_gradePercent)
-                .toList();
-            if (scored.isEmpty) return 0;
-            return scored.reduce((a, b) => a + b) ~/ scored.length;
-          }();
-
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Row(
         children: [
           _MetricTile(
-            value: '$memorization%',
+            value: _averageLabelFor(RecitationType.memorization),
             label: 'الحفظ',
             color: const Color(0xFFCFF4DF),
             textColor: const Color(0xFF20AF68),
           ),
           const SizedBox(width: 10),
           _MetricTile(
-            value: '${((memorization + review) / 2).round()}%',
-            label: 'التجويد',
+            value: _averageLabelFor(RecitationType.review),
+            label: 'المراجعة',
             color: const Color(0xFFCFF4F6),
             textColor: const Color(0xFF14AEB8),
           ),
           const SizedBox(width: 10),
           _MetricTile(
-            value: '$behavior%',
-            label: 'الحضور',
+            value: _behaviorLabel(),
+            label: 'السلوك',
             color: const Color(0xFFFFF2BF),
             textColor: const Color(0xFFD9A409),
           ),
           const SizedBox(width: 10),
           _MetricTile(
             value: '${records.length}',
-            label: 'الواجبات',
+            label: 'التقييمات',
             color: const Color(0xFFE9E1FF),
             textColor: const Color(0xFF8858FF),
           ),
@@ -264,22 +275,37 @@ class _EvaluationMetrics extends StatelessWidget {
     );
   }
 
-  int _averageFor(RecitationType type) {
-    final typed = records
+  String _averageLabelFor(RecitationType type) {
+    final grades = records
         .where((record) => record.type == type && record.grade != null)
+        .map((record) => record.grade!)
         .toList();
-    if (typed.isEmpty) return 0;
-    final total = typed
-        .map((record) => _gradePercent(record.grade!))
-        .reduce((a, b) => a + b);
-    return total ~/ typed.length;
+    return _nearestGradeLabel(grades);
   }
 
-  int _gradePercent(RecitationGrade grade) => switch (grade) {
-    RecitationGrade.excellent => 96,
-    RecitationGrade.veryGood => 88,
-    RecitationGrade.good => 75,
-    RecitationGrade.needsRetry => 60,
+  String _behaviorLabel() {
+    final grades = records
+        .map((record) => record.behaviorGrade)
+        .whereType<RecitationGrade>()
+        .toList();
+    return _nearestGradeLabel(grades);
+  }
+
+  String _nearestGradeLabel(List<RecitationGrade> grades) {
+    if (grades.isEmpty) return '—';
+    final total = grades.map(_gradeRank).reduce((a, b) => a + b);
+    final avg = total / grades.length;
+    if (avg >= 3.5) return RecitationGrade.excellent.label;
+    if (avg >= 2.5) return RecitationGrade.veryGood.label;
+    if (avg >= 1.5) return RecitationGrade.good.label;
+    return RecitationGrade.needsRetry.label;
+  }
+
+  int _gradeRank(RecitationGrade grade) => switch (grade) {
+    RecitationGrade.excellent => 4,
+    RecitationGrade.veryGood => 3,
+    RecitationGrade.good => 2,
+    RecitationGrade.needsRetry => 1,
   };
 }
 
@@ -312,10 +338,13 @@ class _MetricTile extends StatelessWidget {
               value,
               style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 24,
+                fontSize: value.length > 3 ? 14 : 24,
                 fontWeight: FontWeight.w900,
                 color: textColor,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,
@@ -386,13 +415,13 @@ class _EvaluationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            '${_formatWeekday(record.date)} ${record.date.day} ذو القعدة 1446 📅',
+            '${_formatWeekday(record.date)} ${record.date.day}/${record.date.month}/${record.date.year}',
             textAlign: TextAlign.right,
             style: AppTextStyles.bodyMedium,
           ),
           const SizedBox(height: 12),
           Text(
-            'سورة الملك - الآيات ${record.versesRange}',
+            _titleFor(record),
             textAlign: TextAlign.right,
             style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.w900,
@@ -403,24 +432,15 @@ class _EvaluationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _GradeBox(
-                  label: 'الحفظ',
-                  grade: record.type == RecitationType.memorization
-                      ? record.grade
-                      : record.behaviorGrade,
+                  label: record.type == RecitationType.memorization
+                      ? 'الحفظ'
+                      : 'المراجعة',
+                  grade: record.grade,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _GradeBox(label: 'التجويد', grade: record.grade),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _GradeBox(
-                  label: 'المراجعة',
-                  grade: record.type == RecitationType.review
-                      ? record.grade
-                      : record.behaviorGrade,
-                ),
+                child: _GradeBox(label: 'السلوك', grade: record.behaviorGrade),
               ),
             ],
           ),
@@ -444,6 +464,15 @@ class _EvaluationCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _titleFor(RecitationRecordEntity record) {
+    final range = record.versesRange.trim();
+    final typeLabel = record.type == RecitationType.memorization
+        ? 'حفظ'
+        : 'مراجعة';
+    if (range.isEmpty) return typeLabel;
+    return '$typeLabel — الآيات $range';
   }
 
   String _formatWeekday(DateTime date) {
@@ -534,9 +563,11 @@ class _EmptyEvaluations extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24),
       child: Text(
-        'لا توجد تقييمات في هذه الفترة',
+        'لا توجد تقييمات معتمدة في هذه الفترة.\nالتسميعات بانتظار مراجعة المعلم لا تظهر هنا.',
+        textAlign: TextAlign.center,
         style: AppTextStyles.bodyLarge,
       ),
     );

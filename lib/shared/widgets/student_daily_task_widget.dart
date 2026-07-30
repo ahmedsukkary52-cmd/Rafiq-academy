@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../core/presentation/bloc_status.dart';
 import '../../features/student/domain/entities/assignment_entity.dart';
 
 /// كارت «حفظ اليوم» / درس اليوم.
@@ -7,32 +8,94 @@ import '../../features/student/domain/entities/assignment_entity.dart';
 /// يقرأ المهمة الحالية من [assignment] (Firestore `assignments` عبر الـ Bloc).
 class StudentDailyTaskWidget extends StatelessWidget {
   final AssignmentEntity? assignment;
+  final SectionStatus status;
+  final String? errorMessage;
   final VoidCallback onReadTap;
   final VoidCallback onListenTap;
   final VoidCallback? onCardTap;
+  final VoidCallback? onRetry;
 
   const StudentDailyTaskWidget({
     super.key,
     required this.assignment,
+    this.status = SectionStatus.loaded,
+    this.errorMessage,
     required this.onReadTap,
     required this.onListenTap,
     this.onCardTap,
+    this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isSubmitted = assignment?.isSubmitted == true;
-    final range = assignment?.displayTitle.isNotEmpty == true
+    if (status == SectionStatus.loading || status == SectionStatus.initial) {
+      return Container(
+        height: 160,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+        ),
+        child: const CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    if (status == SectionStatus.error) {
+      return Container(
+        padding: const EdgeInsets.all(AppSizes.paddingL),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              errorMessage ?? 'تعذر تحميل درس اليوم',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: onRetry,
+                child: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (assignment == null) {
+      return Container(
+        padding: const EdgeInsets.all(AppSizes.paddingL),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Text(
+          'لا يوجد تكليف حالياً\nسيظهر هنا درس اليوم عند إرساله من المعلم',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    final isSubmitted = assignment!.isSubmitted;
+    final range = assignment!.displayTitle.isNotEmpty
         ? assignment!.displayTitle
-        : (assignment?.newMemorizationRange ?? 'لا يوجد تكليف حالياً');
-    final suraName = assignment != null ? _extractSura(range) : 'الورد اليومي';
-    final versesRange = assignment != null
-        ? _extractVerses(
-            assignment!.newMemorizationRange.isNotEmpty
-                ? assignment!.newMemorizationRange
-                : range,
-          )
-        : '';
+        : assignment!.newMemorizationRange;
+    final suraName = _extractSura(range.isNotEmpty ? range : 'درس اليوم');
+    final versesRange = _extractVerses(
+      assignment!.newMemorizationRange.isNotEmpty
+          ? assignment!.newMemorizationRange
+          : range,
+    );
 
     return GestureDetector(
       onTap: onCardTap,

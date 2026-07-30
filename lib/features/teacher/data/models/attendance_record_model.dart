@@ -27,6 +27,10 @@ class AttendanceRecordModel extends AttendanceRecordEntity {
     );
   }
 
+  /// The exact status string this record persists — use it whenever a wire
+  /// value is needed instead of re-deriving one from the enum.
+  String get wireStatus => _statusToString(status);
+
   Map<String, dynamic> toFirestore() => {
     'studentId': studentId,
     'studentName': studentName,

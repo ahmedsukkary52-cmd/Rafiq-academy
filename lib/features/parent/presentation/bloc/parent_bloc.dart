@@ -2,8 +2,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/repositories/parent_repositories.dart';
+import '../../domain/usecases/get_absence_requests_usecase.dart';
 import '../../domain/usecases/get_children_ids_usecase.dart';
+import '../../domain/usecases/get_halaqat_for_student_usecase.dart';
 import '../../domain/usecases/get_payments_usecase.dart';
 import '../../domain/usecases/get_weekly_report_usecase.dart';
 import '../../domain/usecases/initiate_payment_usecase.dart';
@@ -19,6 +22,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   final GetChildrenIdsUseCase getChildrenIds;
   final GetWeeklyReportUseCase getWeeklyReport;
   final GetPaymentsUseCase getPayments;
+  final GetAbsenceRequestsUseCase getAbsenceRequests;
+  final GetHalaqatForStudentUseCase getHalaqatForStudent;
   final SubmitAbsenceRequestUseCase submitAbsenceRequest;
   final InitiatePaymentUseCase initiatePayment;
 
@@ -26,6 +31,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     required this.getChildrenIds,
     required this.getWeeklyReport,
     required this.getPayments,
+    required this.getAbsenceRequests,
+    required this.getHalaqatForStudent,
     required this.submitAbsenceRequest,
     required this.initiatePayment,
   }) : super(ParentState.initial()) {
@@ -33,80 +40,130 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<SelectChildEvent>(_onSelectChild);
     on<LoadWeeklyReportEvent>(_onLoadWeeklyReport);
     on<LoadPaymentsEvent>(_onLoadPayments);
+    on<LoadAbsenceRequestsEvent>(_onLoadAbsenceRequests);
+    on<LoadStudentHalaqatEvent>(_onLoadStudentHalaqat);
     on<SubmitAbsenceRequestEvent>(_onSubmitAbsenceRequest);
     on<ResetAbsenceSubmissionEvent>(_onResetAbsenceSubmission);
     on<InitiatePaymentEvent>(_onInitiatePayment);
     on<ResetPaymentInitiationEvent>(_onResetPaymentInitiation);
+    on<ClearParentSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearParentSessionEvent event,
+    Emitter<ParentState> emit,
+  ) {
+    emit(ParentState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // الأبناء
   // ══════════════════════════════════════════════════════════════════════
 
-  Future<void> _onLoadChildren(LoadChildrenEvent event,
-      Emitter<ParentState> emit,) async {
-    emit(state.copyWith(
-      childrenStatus: SectionStatus.loading,
-      childrenError: null,
-    ));
+  Future<void> _onLoadChildren(
+    LoadChildrenEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        childrenStatus: SectionStatus.loading,
+        childrenError: null,
+      ),
+    );
 
     final result = await getChildrenIds(ParentIdParams(event.parentId));
 
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            childrenStatus: SectionStatus.error,
-            childrenError: failure.message,
-          )),
-          (children) {
-        emit(state.copyWith(
-          childrenStatus: SectionStatus.loaded,
-          childrenIds: children,
-          // أول ابن في القائمة يتحدد تلقائياً كـ "محدد حالياً" لو مفيش
-          // اختيار سابق، عشان الشاشة متفضلش فاضية لحد ما المستخدم يختار.
-          selectedChildId: state.selectedChildId ??
-              (children.isEmpty ? null : children.first),
-        ));
+      (failure) => emit(
+        state.copyWith(
+          childrenStatus: SectionStatus.error,
+          childrenError: failure.message,
+        ),
+      ),
+      (children) {
+        emit(
+          state.copyWith(
+            childrenStatus: SectionStatus.loaded,
+            childrenIds: children,
+            // أول ابن في القائمة يتحدد تلقائياً كـ "محدد حالياً" لو مفيش
+            // اختيار سابق، عشان الشاشة متفضلش فاضية لحد ما المستخدم يختار.
+            selectedChildId:
+                state.selectedChildId ??
+                (children.isEmpty ? null : children.first),
+          ),
+        );
       },
     );
   }
 
   void _onSelectChild(SelectChildEvent event, Emitter<ParentState> emit) {
-    emit(state.copyWith(selectedChildId: event.studentId));
+    emit(
+      state.copyWith(
+        selectedChildId: event.studentId,
+        reportStatus: SectionStatus.initial,
+        weeklyReport: null,
+        reportError: null,
+      ),
+    );
 
-    add(LoadWeeklyReportEvent(
-      studentId: event.studentId,
-      weekStart: _startOfCurrentWeek(),
-    ));
+    add(
+      LoadWeeklyReportEvent(
+        studentId: event.studentId,
+        weekStart: _startOfCurrentWeek(),
+      ),
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // التقرير الأسبوعي
   // ══════════════════════════════════════════════════════════════════════
 
-  Future<void> _onLoadWeeklyReport(LoadWeeklyReportEvent event,
-      Emitter<ParentState> emit,) async {
-    emit(state.copyWith(
-      reportStatus: SectionStatus.loading,
-      reportError: null,
-    ));
+  Future<void> _onLoadWeeklyReport(
+    LoadWeeklyReportEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(reportStatus: SectionStatus.loading, reportError: null),
+    );
 
     final result = await getWeeklyReport(
       WeeklyReportParams(
-          studentId: event.studentId, weekStart: event.weekStart),
+        studentId: event.studentId,
+        weekStart: event.weekStart,
+      ),
     );
 
+    // Ignore stale responses after the parent switched children.
+    if (state.selectedChildId != null &&
+        state.selectedChildId != event.studentId) {
+      return;
+    }
+
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
+      (failure) {
+        if (state.selectedChildId != null &&
+            state.selectedChildId != event.studentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
             reportStatus: SectionStatus.error,
             reportError: failure.message,
-          )),
-          (report) =>
-          emit(state.copyWith(
+          ),
+        );
+      },
+      (report) {
+        if (state.selectedChildId != null &&
+            state.selectedChildId != event.studentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
             reportStatus: SectionStatus.loaded,
             weeklyReport: report,
-          )),
+          ),
+        );
+      },
     );
   }
 
@@ -114,26 +171,140 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   // المدفوعات
   // ══════════════════════════════════════════════════════════════════════
 
-  Future<void> _onLoadPayments(LoadPaymentsEvent event,
-      Emitter<ParentState> emit,) async {
-    emit(state.copyWith(
-      paymentsStatus: SectionStatus.loading,
-      paymentsError: null,
-    ));
+  Future<void> _onLoadPayments(
+    LoadPaymentsEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        paymentsStatus: SectionStatus.loading,
+        paymentsError: null,
+      ),
+    );
 
     final result = await getPayments(ParentIdParams(event.parentId));
 
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            paymentsStatus: SectionStatus.error,
-            paymentsError: failure.message,
-          )),
-          (payments) =>
-          emit(state.copyWith(
-            paymentsStatus: SectionStatus.loaded,
-            payments: payments,
-          )),
+      (failure) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.error,
+          paymentsError: failure.message,
+        ),
+      ),
+      (payments) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.loaded,
+          payments: payments,
+        ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // قائمة طلبات الاستئذان
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadAbsenceRequests(
+    LoadAbsenceRequestsEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        absenceRequestsStatus: SectionStatus.loading,
+        absenceRequestsError: null,
+        absenceRequestsParentId: event.parentId,
+      ),
+    );
+
+    final result = await getAbsenceRequests(ParentIdParams(event.parentId));
+
+    if (state.absenceRequestsParentId != null &&
+        state.absenceRequestsParentId != event.parentId) {
+      return;
+    }
+
+    result.fold(
+      (failure) {
+        if (state.absenceRequestsParentId != null &&
+            state.absenceRequestsParentId != event.parentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            absenceRequestsStatus: SectionStatus.error,
+            absenceRequestsError: failure.message,
+          ),
+        );
+      },
+      (requests) {
+        if (state.absenceRequestsParentId != null &&
+            state.absenceRequestsParentId != event.parentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            absenceRequestsStatus: SectionStatus.loaded,
+            absenceRequests: requests,
+          ),
+        );
+      },
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // حلقات الطالب (نموذج الاستئذان)
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadStudentHalaqat(
+    LoadStudentHalaqatEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        studentHalaqatStatus: SectionStatus.loading,
+        studentHalaqatError: null,
+        studentHalaqat: const [],
+        studentHalaqatStudentId: event.studentId,
+      ),
+    );
+
+    final result = await getHalaqatForStudent(
+      StudentHalaqatParams(
+        parentId: event.parentId,
+        studentId: event.studentId,
+      ),
+    );
+
+    if (state.studentHalaqatStudentId != null &&
+        state.studentHalaqatStudentId != event.studentId) {
+      return;
+    }
+
+    result.fold(
+      (failure) {
+        if (state.studentHalaqatStudentId != null &&
+            state.studentHalaqatStudentId != event.studentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            studentHalaqatStatus: SectionStatus.error,
+            studentHalaqatError: failure.message,
+          ),
+        );
+      },
+      (halaqat) {
+        if (state.studentHalaqatStudentId != null &&
+            state.studentHalaqatStudentId != event.studentId) {
+          return;
+        }
+        emit(
+          state.copyWith(
+            studentHalaqatStatus: SectionStatus.loaded,
+            studentHalaqat: halaqat,
+          ),
+        );
+      },
     );
   }
 
@@ -141,72 +312,95 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   // تقديم طلب استئذان
   // ══════════════════════════════════════════════════════════════════════
 
-  Future<void> _onSubmitAbsenceRequest(SubmitAbsenceRequestEvent event,
-      Emitter<ParentState> emit,) async {
-    emit(state.copyWith(
-      absenceSubmissionStatus: SubmissionStatus.submitting,
-      absenceSubmissionError: null,
-    ));
+  Future<void> _onSubmitAbsenceRequest(
+    SubmitAbsenceRequestEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        absenceSubmissionStatus: SubmissionStatus.submitting,
+        absenceSubmissionError: null,
+      ),
+    );
 
     final result = await submitAbsenceRequest(event.request);
 
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            absenceSubmissionStatus: SubmissionStatus.error,
-            absenceSubmissionError: failure.message,
-          )),
-          (_) =>
-          emit(state.copyWith(
-            absenceSubmissionStatus: SubmissionStatus.success,
-          )),
+      (failure) => emit(
+        state.copyWith(
+          absenceSubmissionStatus: SubmissionStatus.error,
+          absenceSubmissionError: failure.message,
+        ),
+      ),
+      (_) {
+        emit(state.copyWith(absenceSubmissionStatus: SubmissionStatus.success));
+        final parentId =
+            state.absenceRequestsParentId ?? event.request.requestedBy.trim();
+        if (parentId.isNotEmpty) {
+          add(LoadAbsenceRequestsEvent(parentId));
+        }
+      },
     );
   }
 
-  void _onResetAbsenceSubmission(ResetAbsenceSubmissionEvent event,
-      Emitter<ParentState> emit,) {
-    emit(state.copyWith(
-      absenceSubmissionStatus: SubmissionStatus.idle,
-      absenceSubmissionError: null,
-    ));
+  void _onResetAbsenceSubmission(
+    ResetAbsenceSubmissionEvent event,
+    Emitter<ParentState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        absenceSubmissionStatus: SubmissionStatus.idle,
+        absenceSubmissionError: null,
+      ),
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // بدء عملية دفع (Paymob عن طريق Cloud Function)
   // ══════════════════════════════════════════════════════════════════════
 
-  Future<void> _onInitiatePayment(InitiatePaymentEvent event,
-      Emitter<ParentState> emit,) async {
-    emit(state.copyWith(
-      paymentInitiationStatus: SubmissionStatus.submitting,
-      paymentInitiationError: null,
-    ));
+  Future<void> _onInitiatePayment(
+    InitiatePaymentEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        paymentInitiationStatus: SubmissionStatus.submitting,
+        paymentInitiationError: null,
+      ),
+    );
 
     final result = await initiatePayment(PaymentIdParams(event.paymentId));
 
     result.fold(
-          (failure) =>
-          emit(state.copyWith(
-            paymentInitiationStatus: SubmissionStatus.error,
-            paymentInitiationError: failure.message,
-          )),
+      (failure) => emit(
+        state.copyWith(
+          paymentInitiationStatus: SubmissionStatus.error,
+          paymentInitiationError: failure.message,
+        ),
+      ),
       // الـ UI هيستخدم paymentInitiation.checkoutUrl عشان يفتح صفحة
       // الدفع (WebView مثلاً) لما نبني الشاشات.
-          (initiation) =>
-          emit(state.copyWith(
-            paymentInitiationStatus: SubmissionStatus.success,
-            paymentInitiation: initiation,
-          )),
+      (initiation) => emit(
+        state.copyWith(
+          paymentInitiationStatus: SubmissionStatus.success,
+          paymentInitiation: initiation,
+        ),
+      ),
     );
   }
 
-  void _onResetPaymentInitiation(ResetPaymentInitiationEvent event,
-      Emitter<ParentState> emit,) {
-    emit(state.copyWith(
-      paymentInitiationStatus: SubmissionStatus.idle,
-      paymentInitiation: null,
-      paymentInitiationError: null,
-    ));
+  void _onResetPaymentInitiation(
+    ResetPaymentInitiationEvent event,
+    Emitter<ParentState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        paymentInitiationStatus: SubmissionStatus.idle,
+        paymentInitiation: null,
+        paymentInitiationError: null,
+      ),
+    );
   }
 
   /// بداية الأسبوع الحالي (السبت، حسب بداية الأسبوع الدراسي في مصر).
@@ -215,7 +409,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     final now = DateTime.now();
     // DateTime.weekday: 1=Monday ... 7=Sunday. السبت = 6.
     final daysSinceSaturday = (now.weekday - DateTime.saturday + 7) % 7;
-    final today = DateTime(now.year, now.month, now.day);
+    final today = AttendancePolicy.dayStart(now);
     return today.subtract(Duration(days: daysSinceSaturday));
   }
 }

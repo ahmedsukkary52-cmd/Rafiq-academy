@@ -5,6 +5,9 @@ import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../repositories/admin_repository.dart';
 
+/// Admin ops broadcast use case — quarantined outside academy events (H3 / A-H15).
+///
+/// Does **not** publish [AcademyEvent]s. Prefer [AdminOpsBroadcast] schema docs.
 @lazySingleton
 class SendBroadcastNotificationUseCase extends UseCase<Unit, BroadcastParams> {
   final AdminRepository repository;

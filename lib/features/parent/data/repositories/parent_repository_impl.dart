@@ -30,16 +30,30 @@ class ParentRepositoryImpl implements ParentRepository {
   }
 
   @override
+  Future<Either<Failure, Map<String, List<String>>>> getParentIdsByStudentIds(
+    List<String> studentIds,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getParentIdsByStudentIds(studentIds));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Future<Either<Failure, WeeklyReportEntity>> getWeeklyReport({
     required String studentId,
     required DateTime weekStart,
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      return Right(await remoteDatasource.getWeeklyReport(
-        studentId: studentId,
-        weekStart: weekStart,
-      ));
+      return Right(
+        await remoteDatasource.getWeeklyReport(
+          studentId: studentId,
+          weekStart: weekStart,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }
@@ -47,7 +61,8 @@ class ParentRepositoryImpl implements ParentRepository {
 
   @override
   Future<Either<Failure, List<PaymentEntity>>> getPayments(
-      String parentId,) async {
+    String parentId,
+  ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       return Right(await remoteDatasource.getPayments(parentId));
@@ -58,13 +73,15 @@ class ParentRepositoryImpl implements ParentRepository {
 
   @override
   Future<Either<Failure, Unit>> submitAbsenceRequest(
-      AbsenceRequestEntity request,) async {
+    AbsenceRequestEntity request,
+  ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.submitAbsenceRequest(
         AbsenceRequestModel(
           id: request.id,
           studentId: request.studentId,
+          halaqaId: request.halaqaId,
           requestedBy: request.requestedBy,
           date: request.date,
           reason: request.reason,
@@ -79,15 +96,45 @@ class ParentRepositoryImpl implements ParentRepository {
   }
 
   @override
+  Future<Either<Failure, List<AbsenceRequestEntity>>>
+  getAbsenceRequestsForParent(String parentId) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getAbsenceRequestsForParent(parentId),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<ParentHalaqaOption>>> getHalaqatForStudent(
+    String studentId,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      final rows = await remoteDatasource.getHalaqatForStudent(studentId);
+      return Right([
+        for (final row in rows) ParentHalaqaOption(id: row.id, name: row.name),
+      ]);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Stream<Either<Failure, List<String>>> watchChildrenAssignments(
-      String parentId,) {
+    String parentId,
+  ) {
     // TODO: implement real-time stream لما نحتاجه في الـ UI
     return const Stream.empty();
   }
 
   @override
   Future<Either<Failure, PaymentInitiationEntity>> initiatePayment(
-      String paymentId,) async {
+    String paymentId,
+  ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       final initiation = await remoteDatasource.initiatePayment(paymentId);

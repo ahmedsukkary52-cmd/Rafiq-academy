@@ -12,7 +12,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
 import 'package:cloud_functions/cloud_functions.dart' as _i809;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
-import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
 import 'package:firebase_storage/firebase_storage.dart' as _i457;
 import 'package:flutter/material.dart' as _i409;
 import 'package:get_it/get_it.dart' as _i174;
@@ -165,6 +164,8 @@ import 'package:rafiq_academy/features/notifications/data/datasources/notificati
     as _i676;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
     as _i579;
+import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_handler.dart'
+    as _i815;
 import 'package:rafiq_academy/features/notifications/domain/repositories/notifications_repository.dart'
     as _i587;
 import 'package:rafiq_academy/features/notifications/domain/usecases/notification_usecase.dart'
@@ -175,12 +176,18 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
     as _i892;
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource_impl.dart'
     as _i430;
+import 'package:rafiq_academy/features/parent/data/observers/default_academy_event_observer_resolver.dart'
+    as _i890;
 import 'package:rafiq_academy/features/parent/data/repositories/parent_repository_impl.dart'
     as _i964;
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart'
     as _i493;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_absence_requests_usecase.dart'
+    as _i1044;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_children_ids_usecase.dart'
     as _i379;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_halaqat_for_student_usecase.dart'
+    as _i242;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_payments_usecase.dart'
     as _i817;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_weekly_report_usecase.dart'
@@ -275,8 +282,12 @@ import 'package:rafiq_academy/features/supervisor/data/repositories/supervisor_r
     as _i582;
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart'
     as _i307;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart'
+    as _i904;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_halaqat_usecase.dart'
     as _i704;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor_day_board_usecase.dart'
+    as _i824;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/issue_achievement_usecase.dart'
     as _i13;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_student_usecase.dart'
@@ -301,14 +312,27 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_recita
     as _i998;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart'
     as _i440;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_pending_absence_requests_usecase.dart'
+    as _i775;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
     as _i626;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_today_agenda_usecase.dart'
+    as _i271;
 import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance_usecase.dart'
     as _i642;
+import 'package:rafiq_academy/features/teacher/domain/usecases/review_absence_request_usecase.dart'
+    as _i182;
+import 'package:rafiq_academy/features/teacher/domain/usecases/save_day_attendance_usecase.dart'
+    as _i343;
 import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart'
     as _i192;
+import 'package:rafiq_academy/features/teacher/domain/usecases/update_recitation_review_usecase.dart'
+    as _i1070;
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
     as _i933;
+import 'package:rafiq_academy/shared/domain/academy_event_observer_resolver.dart'
+    as _i937;
+import 'package:rafiq_academy/shared/domain/academy_event_sink.dart' as _i273;
 
 extension GetItInjectableX on _i174.GetIt {
   // initializes the registration of main-scope dependencies inside of GetIt
@@ -323,7 +347,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
-    gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
     gh.lazySingleton<_i457.FirebaseStorage>(() => diModule.firebaseStorage);
     gh.lazySingleton<_i809.FirebaseFunctions>(() => diModule.firebaseFunctions);
     gh.lazySingleton<_i161.InternetConnection>(
@@ -341,11 +364,6 @@ extension GetItInjectableX on _i174.GetIt {
         mp3QuranCatalog: gh<_i638.Mp3QuranCatalogService>(),
       ),
     );
-    gh.lazySingleton<_i333.ReviewScheduleRemoteDatasource>(
-      () => _i590.ReviewScheduleRemoteDatasourceImpl(
-        gh<_i974.FirebaseFirestore>(),
-      ),
-    );
     gh.lazySingleton<_i174.AudioLibraryRepository>(
       () => _i4.AudioLibraryRepositoryImpl(
         remoteDatasource: gh<_i1052.AudioLibraryRemoteDatasource>(),
@@ -360,11 +378,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i519.StudentAudioLibraryPage>(
       () => _i519.StudentAudioLibraryPage(key: gh<_i409.Key>()),
-    );
-    gh.lazySingleton<_i102.ProgressReportRemoteDatasource>(
-      () => _i1061.ProgressReportRemoteDatasourceImpl(
-        gh<_i974.FirebaseFirestore>(),
-      ),
     );
     gh.lazySingleton<_i892.ParentRemoteDatasource>(
       () => _i430.ParentRemoteDatasourceImpl(
@@ -386,6 +399,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i676.NotificationsRemoteDatasource>(
       () => _i676.NotificationsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i333.ReviewScheduleRemoteDatasource>(
+      () => _i590.ReviewScheduleRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.lazySingleton<_i696.NetworkInfo>(
@@ -429,12 +447,6 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
-    gh.lazySingleton<_i1050.TeacherRepository>(
-      () => _i63.TeacherRepositoryImpl(
-        remoteDatasource: gh<_i717.TeacherRemoteDatasource>(),
-        networkInfo: gh<_i696.NetworkInfo>(),
-      ),
-    );
     gh.lazySingleton<_i164.ChatRemoteDatasource>(
       () => _i164.ChatRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
@@ -460,6 +472,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i797.AnalyticsRemoteDatasource>(
       () => _i704.AnalyticsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i102.ProgressReportRemoteDatasource>(
+      () => _i1061.ProgressReportRemoteDatasourceImpl(
+        gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.lazySingleton<_i537.CalendarRemoteDatasource>(
@@ -576,31 +593,6 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
-    gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
-      () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
-    );
-    gh.lazySingleton<_i122.GetHalaqaAttendanceForDateUseCase>(
-      () => _i122.GetHalaqaAttendanceForDateUseCase(
-        gh<_i1050.TeacherRepository>(),
-      ),
-    );
-    gh.lazySingleton<_i998.GetHalaqaRecitationRecordsUseCase>(
-      () => _i998.GetHalaqaRecitationRecordsUseCase(
-        gh<_i1050.TeacherRepository>(),
-      ),
-    );
-    gh.lazySingleton<_i440.GetHalaqaStudentsUseCase>(
-      () => _i440.GetHalaqaStudentsUseCase(gh<_i1050.TeacherRepository>()),
-    );
-    gh.lazySingleton<_i626.GetTeacherHalaqatUseCase>(
-      () => _i626.GetTeacherHalaqatUseCase(gh<_i1050.TeacherRepository>()),
-    );
-    gh.lazySingleton<_i642.RecordAttendanceUseCase>(
-      () => _i642.RecordAttendanceUseCase(gh<_i1050.TeacherRepository>()),
-    );
-    gh.lazySingleton<_i192.SendAssignmentUseCase>(
-      () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
-    );
     gh.factory<_i235.GetProgressReportUseCase>(
       () =>
           _i235.GetProgressReportUseCase(gh<_i824.ProgressReportRepository>()),
@@ -681,31 +673,20 @@ extension GetItInjectableX on _i174.GetIt {
         firebaseAuth: gh<_i59.FirebaseAuth>(),
       ),
     );
+    gh.lazySingleton<_i904.GetSupervisedAbsenceRequestsUseCase>(
+      () => _i904.GetSupervisedAbsenceRequestsUseCase(
+        gh<_i307.SupervisorRepository>(),
+      ),
+    );
     gh.lazySingleton<_i704.GetSupervisedHalaqatUseCase>(
       () => _i704.GetSupervisedHalaqatUseCase(gh<_i307.SupervisorRepository>()),
     );
     gh.lazySingleton<_i13.IssueAchievementUseCase>(
       () => _i13.IssueAchievementUseCase(gh<_i307.SupervisorRepository>()),
     );
-    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
-      () => _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
-    );
     gh.lazySingleton<_i910.SubmitSupervisorReportUseCase>(
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
-    );
-    gh.singleton<_i933.TeacherBloc>(
-      () => _i933.TeacherBloc(
-        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
-        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
-        getHalaqaRecitationRecords:
-            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
-        getHalaqaAttendanceForDate:
-            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
-        recordAttendance: gh<_i642.RecordAttendanceUseCase>(),
-        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
-        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
-      ),
     );
     gh.lazySingleton<_i552.ScheduleRepository>(
       () => _i268.ScheduleRepositoryImpl(gh<_i756.ScheduleRemoteDatasource>()),
@@ -791,8 +772,14 @@ extension GetItInjectableX on _i174.GetIt {
         getTeacherActivityLog: gh<_i1063.GetTeacherActivityLogUseCase>(),
       ),
     );
+    gh.lazySingleton<_i1044.GetAbsenceRequestsUseCase>(
+      () => _i1044.GetAbsenceRequestsUseCase(gh<_i493.ParentRepository>()),
+    );
     gh.lazySingleton<_i379.GetChildrenIdsUseCase>(
       () => _i379.GetChildrenIdsUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i242.GetHalaqatForStudentUseCase>(
+      () => _i242.GetHalaqatForStudentUseCase(gh<_i493.ParentRepository>()),
     );
     gh.lazySingleton<_i817.GetPaymentsUseCase>(
       () => _i817.GetPaymentsUseCase(gh<_i493.ParentRepository>()),
@@ -805,6 +792,15 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i888.SubmitAbsenceRequestUseCase>(
       () => _i888.SubmitAbsenceRequestUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i937.AcademyEventObserverResolver>(
+      () => _i890.DefaultAcademyEventObserverResolver(
+        parentRepository: gh<_i493.ParentRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
+      () =>
+          _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
     );
     gh.lazySingleton<_i224.GetAchievementsUseCase>(
       () => _i224.GetAchievementsUseCase(gh<_i724.StudentRepository>()),
@@ -852,15 +848,6 @@ extension GetItInjectableX on _i174.GetIt {
         submitHomeworkRecitation: gh<_i81.SubmitHomeworkRecitationUseCase>(),
       ),
     );
-    gh.singleton<_i995.ParentBloc>(
-      () => _i995.ParentBloc(
-        getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
-        getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
-        getPayments: gh<_i817.GetPaymentsUseCase>(),
-        submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
-        initiatePayment: gh<_i693.InitiatePaymentUseCase>(),
-      ),
-    );
     gh.lazySingleton<_i152.WatchNotificationsUseCase>(
       () =>
           _i152.WatchNotificationsUseCase(gh<_i587.NotificationsRepository>()),
@@ -886,14 +873,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i186.GenerateCertificatePdfUseCase>(
       () => _i186.GenerateCertificatePdfUseCase(gh<_i888.AwardsRepository>()),
-    );
-    gh.singleton<_i149.SupervisorBloc>(
-      () => _i149.SupervisorBloc(
-        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
-        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
-        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
-        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
-      ),
     );
     gh.factoryParam<_i467.ChatRoomBloc, String, String>(
       (conversationId, currentUserId) => _i467.ChatRoomBloc(
@@ -944,6 +923,17 @@ extension GetItInjectableX on _i174.GetIt {
         generateCertificatePdf: gh<_i186.GenerateCertificatePdfUseCase>(),
       ),
     );
+    gh.singleton<_i995.ParentBloc>(
+      () => _i995.ParentBloc(
+        getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
+        getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
+        getPayments: gh<_i817.GetPaymentsUseCase>(),
+        getAbsenceRequests: gh<_i1044.GetAbsenceRequestsUseCase>(),
+        getHalaqatForStudent: gh<_i242.GetHalaqatForStudentUseCase>(),
+        submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
+        initiatePayment: gh<_i693.InitiatePaymentUseCase>(),
+      ),
+    );
     gh.singleton<_i164.NotificationsBloc>(
       () => _i164.NotificationsBloc(
         watchNotifications: gh<_i152.WatchNotificationsUseCase>(),
@@ -958,8 +948,102 @@ extension GetItInjectableX on _i174.GetIt {
         getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
       ),
     );
+    gh.lazySingleton<_i815.InAppAcademyEventHandler>(
+      () => _i815.InAppAcademyEventHandler(
+        observerResolver: gh<_i937.AcademyEventObserverResolver>(),
+        notificationsDatasource: gh<_i676.NotificationsRemoteDatasource>(),
+        firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
     gh.factory<_i951.ScheduleBloc>(
       () => _i951.ScheduleBloc(gh<_i891.GetWeeklySessionsUseCase>()),
+    );
+    gh.lazySingleton<_i273.AcademyEventSink>(
+      () => diModule.academyEventSink(gh<_i815.InAppAcademyEventHandler>()),
+    );
+    gh.lazySingleton<_i1050.TeacherRepository>(
+      () => _i63.TeacherRepositoryImpl(
+        remoteDatasource: gh<_i717.TeacherRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+        eventSink: gh<_i273.AcademyEventSink>(),
+      ),
+    );
+    gh.lazySingleton<_i824.GetSupervisorDayBoardUseCase>(
+      () => _i824.GetSupervisorDayBoardUseCase(
+        teacherRepository: gh<_i1050.TeacherRepository>(),
+        supervisorRepository: gh<_i307.SupervisorRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
+      () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i122.GetHalaqaAttendanceForDateUseCase>(
+      () => _i122.GetHalaqaAttendanceForDateUseCase(
+        gh<_i1050.TeacherRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i998.GetHalaqaRecitationRecordsUseCase>(
+      () => _i998.GetHalaqaRecitationRecordsUseCase(
+        gh<_i1050.TeacherRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i440.GetHalaqaStudentsUseCase>(
+      () => _i440.GetHalaqaStudentsUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i775.GetPendingAbsenceRequestsUseCase>(
+      () => _i775.GetPendingAbsenceRequestsUseCase(
+        gh<_i1050.TeacherRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i626.GetTeacherHalaqatUseCase>(
+      () => _i626.GetTeacherHalaqatUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i271.GetTodayAgendaUseCase>(
+      () => _i271.GetTodayAgendaUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i642.RecordAttendanceUseCase>(
+      () => _i642.RecordAttendanceUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i182.ReviewAbsenceRequestUseCase>(
+      () => _i182.ReviewAbsenceRequestUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i343.SaveDayAttendanceUseCase>(
+      () => _i343.SaveDayAttendanceUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i192.SendAssignmentUseCase>(
+      () => _i192.SendAssignmentUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i1070.UpdateRecitationReviewUseCase>(
+      () =>
+          _i1070.UpdateRecitationReviewUseCase(gh<_i1050.TeacherRepository>()),
+    );
+    gh.singleton<_i149.SupervisorBloc>(
+      () => _i149.SupervisorBloc(
+        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
+        getSupervisorDayBoard: gh<_i824.GetSupervisorDayBoardUseCase>(),
+        getSupervisedAbsenceRequests:
+            gh<_i904.GetSupervisedAbsenceRequestsUseCase>(),
+        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
+        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
+        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
+      ),
+    );
+    gh.singleton<_i933.TeacherBloc>(
+      () => _i933.TeacherBloc(
+        getTeacherHalaqat: gh<_i626.GetTeacherHalaqatUseCase>(),
+        getHalaqaStudents: gh<_i440.GetHalaqaStudentsUseCase>(),
+        getHalaqaRecitationRecords:
+            gh<_i998.GetHalaqaRecitationRecordsUseCase>(),
+        getHalaqaAttendanceForDate:
+            gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
+        saveDayAttendance: gh<_i343.SaveDayAttendanceUseCase>(),
+        addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
+        sendAssignment: gh<_i192.SendAssignmentUseCase>(),
+        getTodayAgenda: gh<_i271.GetTodayAgendaUseCase>(),
+        getPendingAbsenceRequests: gh<_i775.GetPendingAbsenceRequestsUseCase>(),
+        reviewAbsenceRequest: gh<_i182.ReviewAbsenceRequestUseCase>(),
+      ),
     );
     return this;
   }

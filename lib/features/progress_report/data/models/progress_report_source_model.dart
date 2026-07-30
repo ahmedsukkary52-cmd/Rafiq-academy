@@ -1,18 +1,22 @@
+import '../../../../shared/utils/attendance_policy.dart';
+
 /// Raw attendance row from `attendanceRecords` (read-only).
 class ProgressAttendanceDocModel {
   final String id;
+  final String halaqaId;
   final DateTime date;
   final String status;
 
   const ProgressAttendanceDocModel({
     required this.id,
+    required this.halaqaId,
     required this.date,
     required this.status,
   });
 
-  bool get isPresentLike => status == 'present' || status == 'late';
+  bool get isPresentLike => AttendancePolicy.isAttendedStatus(status);
 
-  bool get isAbsent => !isPresentLike;
+  bool get isAbsent => AttendancePolicy.isAbsentStatus(status);
 }
 
 /// Raw recitation row from `recitationRecords` (read-only).

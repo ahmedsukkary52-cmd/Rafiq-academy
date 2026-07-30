@@ -2,51 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/entities/parent_entities.dart';
 
-class AbsenceRequestModel extends AbsenceRequestEntity {
-  const AbsenceRequestModel({
-    required super.id,
-    required super.studentId,
-    required super.requestedBy,
-    required super.date,
-    required super.reason,
-    required super.status,
-    super.reviewedBy,
-  });
-
-  factory AbsenceRequestModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return AbsenceRequestModel(
-      id: doc.id,
-      studentId: data['studentId'] ?? '',
-      requestedBy: data['requestedBy'] ?? '',
-      date: (data['date'] as Timestamp).toDate(),
-      reason: data['reason'] ?? '',
-      status: _statusFromString(data['status'] ?? ''),
-      reviewedBy: data['reviewedBy'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toFirestore() => {
-    'studentId': studentId,
-    'requestedBy': requestedBy,
-    'date': Timestamp.fromDate(date),
-    'reason': reason,
-    'status': _statusToString(status),
-    if (reviewedBy != null) 'reviewedBy': reviewedBy,
-  };
-
-  static AbsenceRequestStatus _statusFromString(String v) => switch (v) {
-    'approved' => AbsenceRequestStatus.approved,
-    'rejected' => AbsenceRequestStatus.rejected,
-    _ => AbsenceRequestStatus.pending,
-  };
-
-  static String _statusToString(AbsenceRequestStatus s) => switch (s) {
-    AbsenceRequestStatus.pending => 'pending',
-    AbsenceRequestStatus.approved => 'approved',
-    AbsenceRequestStatus.rejected => 'rejected',
-  };
-}
+export '../../../../shared/data/absence_request_model.dart';
 
 class PaymentModel extends PaymentEntity {
   const PaymentModel({

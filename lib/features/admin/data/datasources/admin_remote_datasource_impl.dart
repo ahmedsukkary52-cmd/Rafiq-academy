@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../domain/admin_ops_broadcast.dart';
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
@@ -171,6 +172,10 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     }
   }
 
+  /// Admin ops broadcast — **not** [AcademyEventSink] (H3 / A-H15 quarantine).
+  ///
+  /// Role/`all` audience fan-out via `notifications.add`. Schema owned by
+  /// [AdminOpsBroadcast]; do not route through W4/W5 academy facts.
   @override
   Future<void> sendBroadcastNotification({
     required String title,
@@ -178,19 +183,13 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String targetRole,
   }) async {
     try {
-      // 'audience' بدل 'recipientId'/'recipientRole' المنفصلين، و
-      // 'readBy' فاضية بدل 'isRead' بول واحد - متوافق مع feature
-      // الإشعارات اللي بتقرأ بنفس الـ schema ده (راجع notifications
-      // feature لو حبيت تفهم السبب: bool واحد غلط لإشعار بيوصل لآلاف
-      // المستخدمين دفعة واحدة).
       await firestore.collection(FirestoreCollections.notifications).add({
-        'audience': targetRole, // 'all' أو اسم role زي 'student'
-        'title': title,
-        'body': body,
-        'type': NotificationTypes.general,
-        'readBy': <String>[],
-        'hasAudioAlert': false,
-        'createdAt': FieldValue.serverTimestamp(),
+        ...AdminOpsBroadcast.notificationFields(
+          title: title,
+          body: body,
+          targetRole: targetRole,
+        ),
+        AdminOpsBroadcast.createdAtField: FieldValue.serverTimestamp(),
       });
     } catch (e) {
       throw ServerException(e.toString());

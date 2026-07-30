@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
+import '../../../../shared/utils/halaqa_schedule_label.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -13,11 +15,21 @@ import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../utils/assign_sheet_deep_link_gate.dart';
+import '../utils/teacher_workflow_ownership.dart';
 
 class TeacherClassDetailPage extends StatefulWidget {
   final String halaqaId;
 
-  const TeacherClassDetailPage({super.key, required this.halaqaId});
+  /// When true (W3 Slice 3 deep-link), open the existing assign sheet once
+  /// students are loaded — no new UI, reuses `_openSendAssignmentSheet`.
+  final bool openAssignSheet;
+
+  const TeacherClassDetailPage({
+    super.key,
+    required this.halaqaId,
+    this.openAssignSheet = false,
+  });
 
   @override
   State<TeacherClassDetailPage> createState() => _TeacherClassDetailPageState();
@@ -26,21 +38,32 @@ class TeacherClassDetailPage extends StatefulWidget {
 class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final AssignSheetDeepLinkGate _assignGate;
   String _searchQuery = '';
+
+  /// Prevents stacking multiple assign sheets (deep-link + button / double-tap).
+  bool _assignSheetVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    final canWrite = TeacherWorkflowOwnership.canExecute(context);
+    _assignGate = AssignSheetDeepLinkGate(
+      expectedHalaqaId: widget.halaqaId,
+      // Rule 6: escalation may open this page; only the teacher executes assign.
+      armed: widget.openAssignSheet && canWrite,
+    );
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final state = context
-          .read<TeacherBloc>()
-          .state;
+      final state = context.read<TeacherBloc>().state;
       if (state.halaqatStatus == SectionStatus.initial) {
         _retryHalaqat();
       }
+      // Observe current status only — never open against a stale pre-load
+      // `loaded` roster (gate requires a fresh loading → loaded cycle).
+      _onStudentsStatus(state);
     });
   }
 
@@ -58,9 +81,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   }
 
   void _retryHalaqat() {
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
     context.read<TeacherBloc>().add(LoadTeacherHalaqatEvent(auth.user.uid));
   }
@@ -79,15 +100,65 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     }
     final launched =
         await canLaunchUrl(uri) &&
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       AppSnackBar.showError(context, 'تعذر فتح رابط الحصة');
     }
   }
 
+  void _openSendAssignmentSheet(
+    BuildContext context, {
+    required int studentCount,
+  }) {
+    if (_assignSheetVisible) return;
+    if (studentCount <= 0) {
+      AppSnackBar.showError(
+        context,
+        'لا يوجد طلاب في هذه الحلقة لإرسال التكليف',
+      );
+      return;
+    }
+    final teacherBloc = context.read<TeacherBloc>();
+    _assignSheetVisible = true;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: teacherBloc,
+        child: _SendAssignmentSheet(halaqaId: widget.halaqaId),
+      ),
+    ).whenComplete(() {
+      _assignSheetVisible = false;
+      teacherBloc.add(const ResetAssignmentSubmissionEvent());
+    });
+  }
+
+  void _onStudentsStatus(TeacherState state) {
+    final shouldOpen = _assignGate.onStudentsStatus(
+      isLoaded: state.studentsStatus == SectionStatus.loaded,
+      studentsHalaqaId: state.studentsHalaqaId,
+    );
+    if (!shouldOpen || !mounted) return;
+    _openSendAssignmentSheet(context, studentCount: state.students.length);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TeacherBloc, TeacherState>(
+    return BlocConsumer<TeacherBloc, TeacherState>(
+      listenWhen: (previous, current) =>
+          widget.openAssignSheet &&
+          !_assignGate.hasOpened &&
+          (previous.studentsStatus != current.studentsStatus ||
+              previous.studentsHalaqaId != current.studentsHalaqaId),
+      listener: (context, state) => _onStudentsStatus(state),
+      buildWhen: (previous, current) =>
+          previous.halaqatStatus != current.halaqatStatus ||
+          previous.halaqat != current.halaqat ||
+          previous.halaqatError != current.halaqatError ||
+          previous.studentsStatus != current.studentsStatus ||
+          previous.students != current.students ||
+          previous.studentsError != current.studentsError,
       builder: (context, state) {
         final halaqa = _findHalaqa(state);
 
@@ -112,18 +183,65 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
         }
 
         if (state.halaqatStatus == SectionStatus.loaded && halaqa == null) {
+          // W6 D-W6-1: cross-role escalation may open this page without the
+          // halaqa living in TeacherBloc.halaqat (supervisor uid ≠ teacherId).
+          // Students still load by halaqaId — keep an operational shell.
+          final studentsReady =
+              state.studentsStatus == SectionStatus.loaded &&
+              state.studentsHalaqaId == widget.halaqaId;
+          if (!studentsReady) {
+            if (state.studentsStatus == SectionStatus.loading ||
+                state.studentsStatus == SectionStatus.initial) {
+              return Scaffold(
+                backgroundColor: AppColors.background,
+                appBar: AppBar(title: const Text('الحلقة')),
+                body: const AppLoadingWidget(),
+              );
+            }
+            return Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: AppBar(title: const Text('الحلقة')),
+              body: AppErrorWidget(
+                message:
+                    state.studentsError ?? 'لم يتم العثور على بيانات الحلقة',
+                onRetry: () {
+                  context.read<TeacherBloc>().add(
+                    LoadHalaqaStudentsEvent(widget.halaqaId),
+                  );
+                },
+              ),
+            );
+          }
+
           return Scaffold(
             backgroundColor: AppColors.background,
             appBar: AppBar(title: const Text('الحلقة')),
-            body: AppErrorWidget(
-              message: 'لم يتم العثور على بيانات الحلقة',
-              onRetry: _retryHalaqat,
+            body: ListView(
+              padding: const EdgeInsets.all(AppSizes.paddingM),
+              children: [
+                Text(
+                  'طلاب الحلقة: ${state.students.length}',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'توجيه إشرافي — التنفيذ يبقى ملك معلم الحلقة (لا واجهة كتابة للمشرف)',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           );
         }
 
-        final scheduleLabel = halaqa == null ? null : _scheduleLabel(halaqa);
+        final scheduleLabel = halaqa == null
+            ? null
+            : halaqaScheduleLabel(halaqa.schedule);
         final meetingLink = halaqa?.meetingLink.trim() ?? '';
+        final canWrite = TeacherWorkflowOwnership.canExecute(context);
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -137,6 +255,25 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 title: Text(halaqa?.name ?? 'الحلقة'),
+                actions: [
+                  if (canWrite)
+                    TextButton(
+                      onPressed: halaqa == null
+                          ? null
+                          : () => _openSendAssignmentSheet(
+                              context,
+                              studentCount: halaqa.studentIds.length,
+                            ),
+                      child: const Text(
+                        'تكليف',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'NotoNaskhArabic',
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: _HalaqaStatsHeader(
                     studentCount: state.studentsStatus == SectionStatus.loaded
@@ -169,8 +306,6 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                       Tab(text: 'الطلاب'),
                       Tab(text: 'الحضور'),
                       Tab(text: 'التقييمات'),
-                      Tab(text: 'المهام'),
-                      Tab(text: 'المنشورات'),
                     ],
                   ),
                 ),
@@ -188,9 +323,8 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                 Center(
                   child: AppButton(
                     label: 'فتح سجل الحضور',
-                    onPressed: () => context.push(
-                      '/teacher/attendance/${widget.halaqaId}',
-                    ),
+                    onPressed: () =>
+                        context.push('/teacher/attendance/${widget.halaqaId}'),
                     width: 200,
                   ),
                 ),
@@ -203,40 +337,12 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                     width: 200,
                   ),
                 ),
-                Center(
-                  child: AppButton(
-                    label: 'المهام',
-                    onPressed: () =>
-                        AppSnackBar.showInfo(context, 'قريبًا'),
-                    width: 200,
-                  ),
-                ),
-                Center(
-                  child: AppButton(
-                    label: 'المنشورات',
-                    onPressed: () =>
-                        AppSnackBar.showInfo(context, 'قريبًا'),
-                    width: 200,
-                  ),
-                ),
               ],
             ),
           ),
         );
       },
     );
-  }
-
-  String? _scheduleLabel(HalaqaEntity halaqa) {
-    if (halaqa.schedule.isEmpty) return null;
-    final slot = halaqa.schedule.first;
-    final day = slot.day.trim();
-    final start = slot.startTime.trim();
-    final end = slot.endTime.trim();
-    if (day.isEmpty && start.isEmpty) return null;
-    if (start.isEmpty) return day.isEmpty ? null : day;
-    if (end.isEmpty) return day.isEmpty ? start : '$day — $start';
-    return day.isEmpty ? '$start–$end' : '$day — $start–$end';
   }
 }
 
@@ -352,8 +458,13 @@ class _StudentsTab extends StatelessWidget {
   });
 
   Future<void> _onRefresh(BuildContext context) async {
-    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(halaqaId));
-    await Future.delayed(const Duration(milliseconds: 800));
+    final bloc = context.read<TeacherBloc>();
+    bloc.add(LoadHalaqaStudentsEvent(halaqaId));
+    await bloc.stream.firstWhere(
+      (s) =>
+          s.studentsStatus == SectionStatus.loaded ||
+          s.studentsStatus == SectionStatus.error,
+    );
   }
 
   @override
@@ -366,9 +477,8 @@ class _StudentsTab extends StatelessWidget {
     if (state.studentsStatus == SectionStatus.error) {
       return AppErrorWidget(
         message: state.studentsError ?? 'حدث خطأ',
-        onRetry: () => context.read<TeacherBloc>().add(
-          LoadHalaqaStudentsEvent(halaqaId),
-        ),
+        onRetry: () =>
+            context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(halaqaId)),
       );
     }
 
@@ -377,21 +487,23 @@ class _StudentsTab extends StatelessWidget {
         : state.students.where((s) => s.name.contains(searchQuery)).toList();
 
     if (state.students.isEmpty) {
-      return Column(
-        children: [
-          const Expanded(
-            child: Center(
-              child: Text(
-                'لا يوجد طلاب في هذه الحلقة',
-                style: AppTextStyles.bodyMedium,
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => _onRefresh(context),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.4,
+              child: const Center(
+                child: Text(
+                  'لا يوجد طلاب في هذه الحلقة',
+                  style: AppTextStyles.bodyMedium,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSizes.paddingM),
-            child: _AddStudentButton(halaqaId: halaqaId),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
@@ -414,34 +526,31 @@ class _StudentsTab extends StatelessWidget {
           Expanded(
             child: students.isEmpty
                 ? ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: const [
-                SizedBox(height: 80),
-                Center(
-                  child: Text(
-                    'لا نتائج للبحث',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                ),
-              ],
-            )
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 80),
+                      Center(
+                        child: Text(
+                          'لا نتائج للبحث',
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  )
                 : ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.paddingM,
-              ),
-              itemCount: students.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                if (i == students.length) {
-                  return _AddStudentButton(halaqaId: halaqaId);
-                }
-                return _StudentCard(
-                  student: students[i],
-                  halaqaId: halaqaId,
-                );
-              },
-            ),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.paddingM,
+                    ),
+                    itemCount: students.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, i) {
+                      return _StudentCard(
+                        student: students[i],
+                        halaqaId: halaqaId,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -464,24 +573,20 @@ class _StudentCard extends StatelessWidget {
             children: [
               _OutlinedChip(
                 label: 'منح شارة',
-                onTap: () =>
-                    context.push('/teacher/halaqa/$halaqaId/awards'),
+                onTap: () => context.push('/teacher/halaqa/$halaqaId/awards'),
                 color: AppColors.secondary,
               ),
               const SizedBox(width: 8),
               _OutlinedChip(
                 label: 'تقييم',
                 onTap: () =>
-                    context.push(
-                      '/teacher/halaqa/$halaqaId/evaluations',
-                    ),
+                    context.push('/teacher/halaqa/$halaqaId/evaluations'),
                 color: AppColors.primary,
               ),
               const SizedBox(width: 8),
               _OutlinedChip(
                 label: 'الملف الشخصي',
-                onTap: () =>
-                    context.push('/teacher/student/${student.uid}'),
+                onTap: () => context.push('/teacher/student/${student.uid}'),
                 color: AppColors.textSecondary,
               ),
             ],
@@ -575,41 +680,6 @@ class _OutlinedChip extends StatelessWidget {
   }
 }
 
-class _AddStudentButton extends StatelessWidget {
-  final String halaqaId;
-
-  const _AddStudentButton({required this.halaqaId});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => AppSnackBar.showInfo(context, 'قريبًا'),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.4),
-          ),
-          borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_rounded, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              'إضافة طالب',
-              style: AppTextStyles.labelLarge.copyWith(
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
 
@@ -628,4 +698,239 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_TabBarDelegate old) => false;
+}
+
+/// إرسال تكليف يومي لكل طلاب الحلقة (Slice 1 — W1).
+/// dueDate = نهاية اليوم المختار حتى يصبح «التكليف الحالي» الأحدث بحسب D7.
+class _SendAssignmentSheet extends StatefulWidget {
+  final String halaqaId;
+
+  const _SendAssignmentSheet({required this.halaqaId});
+
+  @override
+  State<_SendAssignmentSheet> createState() => _SendAssignmentSheetState();
+}
+
+class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
+  final _memorizationCtrl = TextEditingController();
+  final _reviewCtrl = TextEditingController();
+  late DateTime _dueDay;
+
+  @override
+  void initState() {
+    super.initState();
+    _dueDay = AttendancePolicy.dayStart(DateTime.now());
+  }
+
+  @override
+  void dispose() {
+    _memorizationCtrl.dispose();
+    _reviewCtrl.dispose();
+    super.dispose();
+  }
+
+  DateTime get _dueDateEndOfDay =>
+      DateTime(_dueDay.year, _dueDay.month, _dueDay.day, 23, 59, 59);
+
+  String get _dueDayLabel {
+    final d = _dueDay;
+    final todayOnly = AttendancePolicy.dayStart(DateTime.now());
+    if (AttendancePolicy.isSameCalendarDay(d, todayOnly)) return 'اليوم';
+    final tomorrow = todayOnly.add(const Duration(days: 1));
+    if (AttendancePolicy.isSameCalendarDay(d, tomorrow)) return 'غداً';
+    return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _pickDueDay() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDay,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 60)),
+      helpText: 'موعد التسليم',
+      cancelText: 'إلغاء',
+      confirmText: 'اختيار',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _dueDay = AttendancePolicy.dayStart(picked);
+    });
+  }
+
+  void _submit() {
+    final bloc = context.read<TeacherBloc>();
+    // Guard rapid double-tap before the button rebuilds as loading.
+    if (bloc.state.assignmentSubmissionStatus == SubmissionStatus.submitting) {
+      return;
+    }
+
+    final memorization = _memorizationCtrl.text.trim();
+    final review = _reviewCtrl.text.trim();
+    if (memorization.isEmpty && review.isEmpty) {
+      AppSnackBar.showError(context, 'أدخل نطاق الحفظ أو المراجعة على الأقل');
+      return;
+    }
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) {
+      AppSnackBar.showError(context, 'يجب تسجيل الدخول لإرسال التكليف');
+      return;
+    }
+
+    bloc.add(
+      SendAssignmentEvent(
+        halaqaId: widget.halaqaId,
+        newMemorizationRange: memorization,
+        reviewRange: review,
+        dueDate: _dueDateEndOfDay,
+        teacherId: authState.user.uid,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<TeacherBloc, TeacherState>(
+      listenWhen: (prev, curr) =>
+          prev.assignmentSubmissionStatus != curr.assignmentSubmissionStatus,
+      listener: (context, state) {
+        if (state.assignmentSubmissionStatus == SubmissionStatus.success) {
+          Navigator.pop(context);
+          if (state.assignmentEventsUnpublished) {
+            AppSnackBar.showInfo(
+              context,
+              'تم حفظ التكليف، لكن تعذّر نشر التحديثات',
+            );
+          } else {
+            AppSnackBar.showSuccess(context, 'تم إرسال التكليف للطلاب');
+          }
+          context.read<TeacherBloc>().add(
+            const ResetAssignmentSubmissionEvent(),
+          );
+        } else if (state.assignmentSubmissionStatus == SubmissionStatus.error) {
+          AppSnackBar.showError(
+            context,
+            state.assignmentSubmissionError ?? 'فشل إرسال التكليف',
+          );
+          context.read<TeacherBloc>().add(
+            const ResetAssignmentSubmissionEvent(),
+          );
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusXL),
+          ),
+        ),
+        padding: EdgeInsets.only(
+          top: AppSizes.paddingL,
+          left: AppSizes.paddingM,
+          right: AppSizes.paddingM,
+          bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('تكليف جديد', style: AppTextStyles.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                'يُنشأ تكليف مستقل لكل طالب. يظهر للطالب الأحدث حسب موعد التسليم.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 20),
+              const _SheetLabel('نطاق الحفظ الجديد'),
+              AppTextField(
+                hint: 'مثال: سورة الملك ١-١٠',
+                controller: _memorizationCtrl,
+              ),
+              const SizedBox(height: 16),
+              const _SheetLabel('نطاق المراجعة'),
+              AppTextField(hint: 'مثال: سورة يس ١-٢٠', controller: _reviewCtrl),
+              const SizedBox(height: 16),
+              const _SheetLabel('موعد التسليم'),
+              GestureDetector(
+                onTap: _pickDueDay,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceGrey,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                      const Spacer(),
+                      Text(
+                        _dueDayLabel,
+                        style: AppTextStyles.bodyLarge,
+                        textDirection: TextDirection.rtl,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              BlocBuilder<TeacherBloc, TeacherState>(
+                buildWhen: (previous, current) =>
+                    previous.assignmentSubmissionStatus !=
+                    current.assignmentSubmissionStatus,
+                builder: (context, state) {
+                  final isLoading =
+                      state.assignmentSubmissionStatus ==
+                      SubmissionStatus.submitting;
+                  return AppButton(
+                    label: 'إرسال التكليف',
+                    isLoading: isLoading,
+                    onPressed: isLoading ? null : _submit,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetLabel extends StatelessWidget {
+  final String text;
+
+  const _SheetLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: AppTextStyles.labelLarge,
+      textAlign: TextAlign.right,
+    ),
+  );
 }

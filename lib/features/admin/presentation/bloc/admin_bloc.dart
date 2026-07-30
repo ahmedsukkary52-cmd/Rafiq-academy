@@ -20,6 +20,12 @@ import '../../domain/usecases/update_teacher_quota_usecase.dart';
 import 'admin_event.dart';
 import 'admin_state.dart';
 
+/// **Product UI:** non-admit AdminBloc writers (stats, finance, complaints,
+/// broadcast, teacher management) have **no** product UI — H6 / A-H9.
+/// Do not wire them without an explicit product decision (broadcast stays
+/// ops-only via AdminOpsBroadcast / A-H15).
+///
+/// **H1:** [ClearAdminSessionEvent] resets projections on logout.
 @singleton
 class AdminBloc extends Bloc<AdminEvent, AdminState> {
   final GetAcademyStatsUseCase getAcademyStats;
@@ -65,6 +71,14 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<UpdateTeacherQuotaEvent>(_onUpdateTeacherQuota);
     on<ResetUpdateTeacherQuotaEvent>(_onResetUpdateTeacherQuota);
     on<LoadTeacherActivityLogEvent>(_onLoadTeacherActivityLog);
+    on<ClearAdminSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearAdminSessionEvent event,
+    Emitter<AdminState> emit,
+  ) {
+    emit(AdminState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -286,7 +300,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // بث إشعار موحّد
+  // بث إشعار موحّد — admin ops only (H3 / A-H15); not AcademyEventSink
   // ══════════════════════════════════════════════════════════════════════
 
   Future<void> _onSendBroadcast(SendBroadcastNotificationEvent event,

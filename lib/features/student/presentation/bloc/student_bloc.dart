@@ -27,6 +27,10 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
   final WatchLatestAssignmentUseCase watchLatestAssignment;
   final UpdateAvatarSelectionUseCase updateAvatarSelection;
 
+  /// Bumped on logout so in-flight assignment snapshots cannot repopulate
+  /// cleared state (H1 / A-H1).
+  int _sessionGeneration = 0;
+
   StudentBloc({
     required this.getStudentProfile,
     required this.getMonthlyReviewSchedule,
@@ -50,6 +54,15 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
     );
     on<RefreshStudentDashboardEvent>(_onRefreshDashboard);
     on<UpdateAvatarSelectionEvent>(_onUpdateAvatarSelection);
+    on<ClearStudentSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearStudentSessionEvent event,
+    Emitter<StudentState> emit,
+  ) {
+    _sessionGeneration++;
+    emit(StudentState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -221,13 +234,29 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
     StartWatchingAssignmentEvent event,
     Emitter<StudentState> emit,
   ) async {
+    final generation = _sessionGeneration;
+    emit(
+      state.copyWith(
+        latestAssignmentStatus: SectionStatus.loading,
+        latestAssignmentError: null,
+      ),
+    );
     await emit.forEach(
       watchLatestAssignment(StudentUidParams(event.studentId)),
-      onData: (either) => either.fold(
-        (failure) => state,
-        // لو فشل الـ stream نتجاهل ونحافظ على آخر حالة معروفة
-        (assignment) => state.copyWith(latestAssignment: assignment),
-      ),
+      onData: (either) {
+        if (generation != _sessionGeneration) return state;
+        return either.fold(
+          (failure) => state.copyWith(
+            latestAssignmentStatus: SectionStatus.error,
+            latestAssignmentError: failure.message,
+          ),
+          (assignment) => state.copyWith(
+            latestAssignmentStatus: SectionStatus.loaded,
+            latestAssignment: assignment,
+            latestAssignmentError: null,
+          ),
+        );
+      },
     );
   }
 
@@ -256,6 +285,8 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
         emit,
       ),
     ]);
+    // Re-attach assignment watch so pull-to-refresh recovers from stream errors.
+    add(StartWatchingAssignmentEvent(event.studentId));
   }
 
   // ══════════════════════════════════════════════════════════════════════

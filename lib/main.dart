@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/di/injection_container.dart';
 import 'core/router/router_app.dart';
+import 'core/session/clear_session_projections.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/student/presentation/bloc/student_bloc.dart';
@@ -13,7 +14,6 @@ import 'features/parent/presentation/bloc/parent_bloc.dart';
 import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
-import 'features/notifications/presentation/bloc/notifications_event.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/analytics/presentation/bloc/analytics_bloc.dart';
 import 'features/awards/presentation/bloc/awards_bloc.dart';
@@ -74,10 +74,9 @@ class MyApp extends StatelessWidget {
         listenWhen: (previous, current) =>
             current is AuthUnauthenticated && previous is! AuthUnauthenticated,
         listener: (context, state) {
-          // Singleton inbox must not survive logout (W4 G6 / Slice 2).
-          context.read<NotificationsBloc>().add(
-            const StopWatchingNotificationsEvent(),
-          );
+          // H1 / A-H1: singleton role & capability projections must not
+          // survive logout on shared devices.
+          clearSessionProjections(context);
         },
         child: AppPreferencesScope(
           controller: appPreferences,

@@ -14,6 +14,7 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
+import '../../../../shared/widgets/confirm_logout.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
@@ -94,6 +95,11 @@ class _ParentHomePageState extends State<ParentHomePage> {
                 ),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'تسجيل الخروج',
+            onPressed: () => confirmAndLogout(context),
           ),
         ],
       ),

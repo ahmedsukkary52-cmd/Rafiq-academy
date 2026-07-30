@@ -40,6 +40,15 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<ResetSubmitReportEvent>(_onResetSubmitReport);
     on<RegisterNewStudentEvent>(_onRegisterStudent);
     on<ResetRegisterStudentEvent>(_onResetRegisterStudent);
+    on<ClearSupervisorSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearSupervisorSessionEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    _supervisorId = null;
+    emit(SupervisorState.initial());
   }
 
   Future<void> _onLoadHalaqat(

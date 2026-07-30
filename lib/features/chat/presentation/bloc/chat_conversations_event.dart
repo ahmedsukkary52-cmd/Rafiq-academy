@@ -38,3 +38,8 @@ class StartConversationEvent extends ChatConversationsEvent {
 class ResetStartConversationEvent extends ChatConversationsEvent {
   const ResetStartConversationEvent();
 }
+
+/// Clear inbox projection on logout (H1 / A-H1).
+class ClearChatConversationsSessionEvent extends ChatConversationsEvent {
+  const ClearChatConversationsSessionEvent();
+}

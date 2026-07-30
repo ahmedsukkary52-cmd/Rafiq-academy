@@ -20,6 +20,9 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   final TogglePinUseCase togglePin;
   final DeletePostUseCase deletePost;
 
+  /// Bumped on logout so in-flight post/comment snapshots are ignored (H1).
+  int _sessionGeneration = 0;
+
   PostsBloc({
     required this.watchPosts,
     required this.watchComments,
@@ -37,6 +40,15 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<AddCommentEvent>(_onAddComment);
     on<TogglePinEvent>(_onTogglePin);
     on<DeletePostEvent>(_onDeletePost);
+    on<ClearPostsSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearPostsSessionEvent event,
+    Emitter<PostsState> emit,
+  ) {
+    _sessionGeneration++;
+    emit(PostsState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -47,18 +59,22 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     WatchPostsEvent event,
     Emitter<PostsState> emit,
   ) async {
+    final generation = _sessionGeneration;
     emit(state.copyWith(postsStatus: SectionStatus.loading, postsError: null));
 
     await emit.forEach(
       watchPosts(WatchPostsParams(event.halaqaId)),
-      onData: (either) => either.fold(
-        (failure) => state.copyWith(
-          postsStatus: SectionStatus.error,
-          postsError: failure.message,
-        ),
-        (posts) =>
-            state.copyWith(postsStatus: SectionStatus.loaded, posts: posts),
-      ),
+      onData: (either) {
+        if (generation != _sessionGeneration) return state;
+        return either.fold(
+          (failure) => state.copyWith(
+            postsStatus: SectionStatus.error,
+            postsError: failure.message,
+          ),
+          (posts) =>
+              state.copyWith(postsStatus: SectionStatus.loaded, posts: posts),
+        );
+      },
     );
   }
 
@@ -70,6 +86,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     WatchCommentsEvent event,
     Emitter<PostsState> emit,
   ) async {
+    final generation = _sessionGeneration;
     emit(
       state.copyWith(
         commentsStatus: SectionStatus.loading,
@@ -81,16 +98,19 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
 
     await emit.forEach(
       watchComments(PostIdParams(event.postId)),
-      onData: (either) => either.fold(
-        (failure) => state.copyWith(
-          commentsStatus: SectionStatus.error,
-          commentsError: failure.message,
-        ),
-        (comments) => state.copyWith(
-          commentsStatus: SectionStatus.loaded,
-          comments: comments,
-        ),
-      ),
+      onData: (either) {
+        if (generation != _sessionGeneration) return state;
+        return either.fold(
+          (failure) => state.copyWith(
+            commentsStatus: SectionStatus.error,
+            commentsError: failure.message,
+          ),
+          (comments) => state.copyWith(
+            commentsStatus: SectionStatus.loaded,
+            comments: comments,
+          ),
+        );
+      },
     );
   }
 

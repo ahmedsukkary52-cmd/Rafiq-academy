@@ -185,3 +185,8 @@ class ReviewAbsenceRequestEvent extends TeacherEvent {
 class ResetAbsenceReviewEvent extends TeacherEvent {
   const ResetAbsenceReviewEvent();
 }
+
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearTeacherSessionEvent extends TeacherEvent {
+  const ClearTeacherSessionEvent();
+}

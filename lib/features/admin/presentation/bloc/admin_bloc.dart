@@ -65,6 +65,14 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<UpdateTeacherQuotaEvent>(_onUpdateTeacherQuota);
     on<ResetUpdateTeacherQuotaEvent>(_onResetUpdateTeacherQuota);
     on<LoadTeacherActivityLogEvent>(_onLoadTeacherActivityLog);
+    on<ClearAdminSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearAdminSessionEvent event,
+    Emitter<AdminState> emit,
+  ) {
+    emit(AdminState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════

@@ -62,6 +62,14 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     on<LoadPendingAbsenceRequestsEvent>(_onLoadPendingAbsenceRequests);
     on<ReviewAbsenceRequestEvent>(_onReviewAbsenceRequest);
     on<ResetAbsenceReviewEvent>(_onResetAbsenceReview);
+    on<ClearTeacherSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearTeacherSessionEvent event,
+    Emitter<TeacherState> emit,
+  ) {
+    emit(TeacherState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════

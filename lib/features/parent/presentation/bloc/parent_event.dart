@@ -102,3 +102,8 @@ class InitiatePaymentEvent extends ParentEvent {
 class ResetPaymentInitiationEvent extends ParentEvent {
   const ResetPaymentInitiationEvent();
 }
+
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearParentSessionEvent extends ParentEvent {
+  const ClearParentSessionEvent();
+}

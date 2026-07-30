@@ -84,3 +84,8 @@ class RegisterNewStudentEvent extends SupervisorEvent {
 class ResetRegisterStudentEvent extends SupervisorEvent {
   const ResetRegisterStudentEvent();
 }
+
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearSupervisorSessionEvent extends SupervisorEvent {
+  const ClearSupervisorSessionEvent();
+}

@@ -16,6 +16,10 @@ class ChatConversationsBloc
   final WatchConversationsUseCase watchConversations;
   final GetOrCreateConversationUseCase getOrCreateConversation;
 
+  /// Cleared on logout so stale conversation snapshots are ignored (H1).
+  String? _currentUid;
+  int _sessionGeneration = 0;
+
   ChatConversationsBloc({
     required this.watchConversations,
     required this.getOrCreateConversation,
@@ -26,29 +30,54 @@ class ChatConversationsBloc
     );
     on<StartConversationEvent>(_onStartConversation);
     on<ResetStartConversationEvent>(_onResetStartConversation);
+    on<ClearChatConversationsSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearChatConversationsSessionEvent event,
+    Emitter<ChatConversationsState> emit,
+  ) {
+    _currentUid = null;
+    _sessionGeneration++;
+    emit(ChatConversationsState.initial());
   }
 
   Future<void> _onStartWatching(
-      StartWatchingConversationsEvent event,
-      Emitter<ChatConversationsState> emit,
-      ) async {
-    emit(state.copyWith(
-      conversationsStatus: SectionStatus.loading,
-      conversationsError: null,
-    ));
+    StartWatchingConversationsEvent event,
+    Emitter<ChatConversationsState> emit,
+  ) async {
+    final identityChanged = _currentUid != null && _currentUid != event.uid;
+    _currentUid = event.uid;
+    final generation = _sessionGeneration;
+
+    emit(
+      identityChanged
+          ? ChatConversationsState.initial().copyWith(
+              conversationsStatus: SectionStatus.loading,
+            )
+          : state.copyWith(
+              conversationsStatus: SectionStatus.loading,
+              conversationsError: null,
+            ),
+    );
 
     await emit.forEach(
       watchConversations(ChatUidParams(event.uid)),
-      onData: (either) => either.fold(
-            (failure) => state.copyWith(
-          conversationsStatus: SectionStatus.error,
-          conversationsError: failure.message,
-        ),
-            (conversations) => state.copyWith(
-          conversationsStatus: SectionStatus.loaded,
-          conversations: conversations,
-        ),
-      ),
+      onData: (either) {
+        if (_currentUid != event.uid || generation != _sessionGeneration) {
+          return state;
+        }
+        return either.fold(
+          (failure) => state.copyWith(
+            conversationsStatus: SectionStatus.error,
+            conversationsError: failure.message,
+          ),
+          (conversations) => state.copyWith(
+            conversationsStatus: SectionStatus.loaded,
+            conversations: conversations,
+          ),
+        );
+      },
     );
   }
 

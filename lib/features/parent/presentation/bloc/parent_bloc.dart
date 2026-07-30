@@ -45,6 +45,14 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<ResetAbsenceSubmissionEvent>(_onResetAbsenceSubmission);
     on<InitiatePaymentEvent>(_onInitiatePayment);
     on<ResetPaymentInitiationEvent>(_onResetPaymentInitiation);
+    on<ClearParentSessionEvent>(_onClearSession);
+  }
+
+  void _onClearSession(
+    ClearParentSessionEvent event,
+    Emitter<ParentState> emit,
+  ) {
+    emit(ParentState.initial());
   }
 
   // ══════════════════════════════════════════════════════════════════════

@@ -82,6 +82,11 @@ class RefreshStudentDashboardEvent extends StudentEvent {
   List<Object?> get props => [studentId];
 }
 
+/// Clear projection on logout so the next identity cannot inherit state (H1).
+class ClearStudentSessionEvent extends StudentEvent {
+  const ClearStudentSessionEvent();
+}
+
 /// اختيار/فتح شخصية (avatar) جديدة من متجر الشخصيات
 class UpdateAvatarSelectionEvent extends StudentEvent {
   final String studentId;

@@ -113,3 +113,8 @@ class DeletePostEvent extends PostsEvent {
   @override
   List<Object?> get props => [postId];
 }
+
+/// Clear posts projection on logout (H1 / A-H1).
+class ClearPostsSessionEvent extends PostsEvent {
+  const ClearPostsSessionEvent();
+}

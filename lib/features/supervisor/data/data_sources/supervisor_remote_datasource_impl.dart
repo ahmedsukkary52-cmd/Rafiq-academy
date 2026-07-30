@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
+import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
@@ -33,13 +34,15 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   @override
   Future<void> issueAchievement(AchievementIssueEntity data) async {
     try {
-      await firestore.collection(FirestoreCollections.achievements).add({
-        'studentId': data.studentId,
-        'type': data.type,
-        'title': data.title,
-        'issuedBy': data.issuedBy,
-        'date': Timestamp.now(),
-      });
+      await firestore.collection(FirestoreCollections.achievements).add(
+        AchievementsFirestoreContract.supervisorIssueFields(
+          studentId: data.studentId,
+          type: data.type,
+          title: data.title,
+          issuedBy: data.issuedBy,
+          halaqaId: data.halaqaId,
+        ),
+      );
     } catch (e) {
       throw ServerException(e.toString());
     }

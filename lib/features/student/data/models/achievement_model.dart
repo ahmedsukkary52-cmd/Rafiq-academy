@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../domain/entities/achievement_entity.dart';
 
 class AchievementModel extends AchievementEntity {
@@ -14,37 +15,25 @@ class AchievementModel extends AchievementEntity {
 
   factory AchievementModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    // Tolerate teacher Awards docs in the same collection
-    // (grantedBy / grantedAt / note) without changing that write path.
-    final title = (data['title'] as String?)?.trim().isNotEmpty == true
-        ? data['title'] as String
-        : (data['note'] as String?)?.trim().isNotEmpty == true
-            ? data['note'] as String
-            : (data['type'] as String?) ?? '';
-    final issuedBy = (data['issuedBy'] as String?)?.trim().isNotEmpty == true
-        ? data['issuedBy'] as String
-        : (data['grantedBy'] as String?) ?? '';
-    final rawDate = data['date'] ?? data['grantedAt'];
-    final date = rawDate is Timestamp
-        ? rawDate.toDate()
-        : DateTime.fromMillisecondsSinceEpoch(0);
-
     return AchievementModel(
       id: doc.id,
-      studentId: data['studentId'] ?? '',
-      type: _typeFromString(data['type'] ?? ''),
-      title: title,
-      issuedBy: issuedBy,
-      date: date,
+      studentId: data[AchievementsFirestoreContract.studentIdField] ?? '',
+      type: _typeFromString(
+        data[AchievementsFirestoreContract.typeField] ?? '',
+      ),
+      title: AchievementsFirestoreContract.resolveTitle(data),
+      issuedBy: AchievementsFirestoreContract.resolveActor(data),
+      date: AchievementsFirestoreContract.resolveDate(data),
     );
   }
 
+  /// Legacy supervisor-shaped map (unused as a live writer after H7 dual-write).
   Map<String, dynamic> toFirestore() => {
-    'studentId': studentId,
-    'type': _typeToString(type),
-    'title': title,
-    'issuedBy': issuedBy,
-    'date': Timestamp.fromDate(date),
+    AchievementsFirestoreContract.studentIdField: studentId,
+    AchievementsFirestoreContract.typeField: _typeToString(type),
+    AchievementsFirestoreContract.titleField: title,
+    AchievementsFirestoreContract.issuedByField: issuedBy,
+    AchievementsFirestoreContract.dateField: Timestamp.fromDate(date),
   };
 
   static AchievementType _typeFromString(String value) => switch (value) {

@@ -1,6 +1,6 @@
 # Production Hardening Sprint — Phase 0 Design
 
-**Status:** Approved · H1–H5 approved · H6 implemented (awaiting H6 sign-off before H7)  
+**Status:** Approved · H1–H6 approved · H7 implemented (awaiting H7 sign-off before H8)  
 **Date:** 2026-07-31  
 **Context:** W1–W8 workflow family **complete and approved**. **No W9.**  
 **Method:** Phase 0 design approved; execution proceeds slice-by-slice.  
@@ -10,6 +10,7 @@
 **H4 deliverable:** `docs/H4_ABSENCE_REQUEST_READ_HYGIENE_VALIDATION.md`  
 **H5 deliverable:** `docs/H5_ROSTER_WHEREIN_CHUNKING_VALIDATION.md`  
 **H6 deliverable:** `docs/H6_SURFACE_CLEANUP_VALIDATION.md`  
+**H7 deliverable:** `docs/H7_AWARDS_SCHEMA_COHERENCE_VALIDATION.md`  
 **Predecessors:** `docs/W8_COMPLETION_PRODUCTION_VALIDATION.md`, `docs/POST_W8_PRODUCT_AUDIT.md`, `docs/POST_W7_PRODUCT_AUDIT.md`, `docs/POST_W6_PRODUCT_AUDIT.md`
 
 ### Standing rule
@@ -84,7 +85,7 @@ Hardening must **preserve behavior**. Prefer extract/share/test/delete-dead over
 | **A-H4** | Legacy notification composers / dual sink story | **Resolved in W5:** sole live path is `FanOutAcademyEventSink` + `InAppAcademyEventHandler`. `AbsenceSignalComposer` / `InAppAcademyEventSink` **deleted** (not in tree). H3 froze docs + DI comments. | W4/W5 delivery clarity | — | Done | Was Ex-A-W6-4 |
 | **A-H5** | استئذان reads unbounded then client-filter | **H4:** shared `AbsenceRequestFirestoreReads` (same client filters; query shape unchanged pending B-R4 indexes) | W7 scale + drift | — | Consolidated | Was Ex-A-W7-2 |
 | **A-H6** | `AbsenceRequest*` lives under parent; teacher/supervisor import it | **H4:** types in `lib/shared/`; parent re-exports | W7 maintainability | — | Done | Was Ex-A-W7-1 |
-| **A-H7** | Dual awards schemas (`grantedBy`/`grantedAt` vs `issuedBy`/`date`) | Teacher awards vs supervisor issue; student reader tolerates both; stats query may miss supervisor docs | Encouragement surfaces (not Wn core) | M | Med | Coherence |
+| **A-H7** | Dual awards schemas (`grantedBy`/`grantedAt` vs `issuedBy`/`date`) | Teacher awards vs supervisor issue; student reader tolerates both; stats query may miss supervisor docs | Encouragement surfaces (not Wn core) | M | Med | **H7:** dual-write contract + dual-read; supervisor issues include `halaqaId` |
 | **A-H8** | Orphan routes / unused pages | Analytics, calendar, content, student history routes; `ChatConversationsPage` unregistered; posts tab placeholder vs `PostsListPage` | Ops confusion; wrong wiring risk | S | Low | **H6:** orphan routes removed; `ChatConversationsPage` deleted; student content kept |
 | **A-H9** | AdminBloc writers without UI (except W8 admit) | Stats/finance/complaints/broadcast/teachers wired; home only admit | Accidental parallel delivery (broadcast) | S | Low–Med | **H6:** documented quarantine; admit-only UI unchanged |
 | **A-H10** | Heavy / unpaginated / unchunked queries | Admin full `payments`/`complaints`; chat streams unbounded; **roster `whereIn` unchunked** (fails >30); استئذان as A-H5 | W2/W3 hard-fail; W7/admin cost | M–L | **High** (roster) | **H5:** roster `whereIn` chunked via `FirestoreInQuery`; rest deferred |
@@ -219,7 +220,8 @@ Hardening sprint passes when:
 | **H3 Event delivery hygiene** | **Approved (product)** |
 | **H4 استئذان read hygiene** | **Approved (product)** |
 | **H5 Roster whereIn chunking** | **Approved (product)** |
-| **H6 Surface cleanup** | **Implemented** — see `docs/H6_SURFACE_CLEANUP_VALIDATION.md` · awaiting sign-off |
-| H7+ | **Blocked** until H6 approved |
+| **H6 Surface cleanup** | **Approved (product)** |
+| **H7 Awards schema coherence** | **Implemented** — see `docs/H7_AWARDS_SCHEMA_COHERENCE_VALIDATION.md` · awaiting sign-off |
+| H8+ | **Blocked** until H7 approved |
 
-**Stop after each slice. Do not begin H7 until H6 is approved.**
+**Stop after each slice. Do not begin H8 until H7 is approved.**

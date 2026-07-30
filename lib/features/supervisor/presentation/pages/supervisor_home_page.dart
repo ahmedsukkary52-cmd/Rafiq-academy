@@ -84,6 +84,7 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
       barrierDismissible: false,
       builder: (dialogContext) => _IssueAchievementDialog(
         studentIds: halaqa.studentIds,
+        halaqaId: halaqa.id,
         issuedBy: authState.user.uid,
         achievementTypes: _achievementTypes,
         onSubmit: (data) {
@@ -322,12 +323,14 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
 
 class _IssueAchievementDialog extends StatefulWidget {
   final List<String> studentIds;
+  final String halaqaId;
   final String issuedBy;
   final List<String> achievementTypes;
   final ValueChanged<AchievementIssueEntity> onSubmit;
 
   const _IssueAchievementDialog({
     required this.studentIds,
+    required this.halaqaId,
     required this.issuedBy,
     required this.achievementTypes,
     required this.onSubmit,
@@ -377,6 +380,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
         type: _type,
         title: title,
         issuedBy: widget.issuedBy,
+        halaqaId: widget.halaqaId,
       ),
     );
   }

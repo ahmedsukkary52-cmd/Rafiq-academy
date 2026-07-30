@@ -1,6 +1,6 @@
 # H6 — Surface Cleanup Validation
 
-**Status:** Implemented · awaiting product approval before H7  
+**Status:** Approved (product)  
 **Date:** 2026-07-31  
 **Scope:** Slice H6 only (`docs/PRODUCTION_HARDENING_PHASE0.md`) — **A-H8**, **A-H9**, **A-H16**, **A-H17**  
 **Out of scope:** H7 awards schema, wiring posts/analytics/calendar as product features, admin console UI, supervisor report inbox, Category B
@@ -60,4 +60,4 @@ Delete or quarantine orphan / misleading presentation surfaces without changing 
 
 ## Stop gate
 
-**H6 complete for review.** Do **not** start H7 until product approves.
+**H6 approved.** H7 (awards schema coherence) may proceed.

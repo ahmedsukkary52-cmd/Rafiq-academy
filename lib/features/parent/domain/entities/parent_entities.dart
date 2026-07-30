@@ -2,45 +2,8 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../shared/utils/attendance_policy.dart';
 
-// ══════════════════════════════════════════════════════════════════════════════
-// AbsenceRequestEntity - طلب استئذان من ولي الأمر
-// ══════════════════════════════════════════════════════════════════════════════
-
-enum AbsenceRequestStatus { pending, approved, rejected }
-
-class AbsenceRequestEntity extends Equatable {
-  final String id;
-  final String studentId;
-  final String halaqaId;
-  final String requestedBy;
-  final DateTime date;
-  final String reason;
-  final AbsenceRequestStatus status;
-  final String? reviewedBy;
-
-  const AbsenceRequestEntity({
-    required this.id,
-    required this.studentId,
-    required this.halaqaId,
-    required this.requestedBy,
-    required this.date,
-    required this.reason,
-    required this.status,
-    this.reviewedBy,
-  });
-
-  @override
-  List<Object?> get props => [
-    id,
-    studentId,
-    halaqaId,
-    requestedBy,
-    date,
-    reason,
-    status,
-    reviewedBy,
-  ];
-}
+// AbsenceRequest* types live in shared (H4 / A-H6).
+export '../../../../shared/domain/absence_request.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PaymentEntity - الرسوم والاشتراكات

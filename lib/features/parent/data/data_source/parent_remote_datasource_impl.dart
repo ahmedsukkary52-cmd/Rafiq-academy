@@ -5,6 +5,7 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/services/parent_recipient_resolver.dart';
@@ -218,17 +219,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     String parentId,
   ) async {
     try {
-      final uid = parentId.trim();
-      if (uid.isEmpty) return const [];
-
-      final snap = await firestore
-          .collection(FirestoreCollections.absenceRequests)
-          .where('requestedBy', isEqualTo: uid)
-          .get();
-
-      final items = snap.docs.map(AbsenceRequestModel.fromFirestore).toList()
-        ..sort((a, b) => b.date.compareTo(a.date));
-      return items;
+      return await AbsenceRequestFirestoreReads.forParent(
+        firestore: firestore,
+        parentId: parentId,
+      );
     } catch (e) {
       throw ServerException(e.toString());
     }

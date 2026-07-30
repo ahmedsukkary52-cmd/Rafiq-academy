@@ -1,12 +1,13 @@
 # Production Hardening Sprint — Phase 0 Design
 
-**Status:** Approved · H1–H2 approved · H3 implemented (awaiting H3 sign-off before H4)  
+**Status:** Approved · H1–H3 approved · H4 implemented (awaiting H4 sign-off before H5)  
 **Date:** 2026-07-31  
 **Context:** W1–W8 workflow family **complete and approved**. **No W9.**  
 **Method:** Phase 0 design approved; execution proceeds slice-by-slice.  
 **H1 deliverable:** `docs/H1_IDENTITY_VALIDATION.md`  
 **H2 deliverable:** `docs/H2_DAY_HOMEWORK_SSOT_VALIDATION.md`  
 **H3 deliverable:** `docs/H3_EVENT_DELIVERY_HYGIENE_VALIDATION.md`  
+**H4 deliverable:** `docs/H4_ABSENCE_REQUEST_READ_HYGIENE_VALIDATION.md`  
 **Predecessors:** `docs/W8_COMPLETION_PRODUCTION_VALIDATION.md`, `docs/POST_W8_PRODUCT_AUDIT.md`, `docs/POST_W7_PRODUCT_AUDIT.md`, `docs/POST_W6_PRODUCT_AUDIT.md`
 
 ### Standing rule
@@ -79,8 +80,8 @@ Hardening must **preserve behavior**. Prefer extract/share/test/delete-dead over
 | **A-H2** | No `AssignmentPolicy` — latest-due duplicated ×4+ | `orderBy('dueDate', desc).limit(1)` in student / homework / teacher / parent datasources | W1, W3 readiness, W5 | M | **High** | Ex-A-W6-2 |
 | **A-H3** | Calendar-day bypasses of `AttendancePolicy` | Hand-rolled `DateTime(y,m,d)` still in teacher UI, parent bloc, notifications, calendar, progress/review mappers, admin, student schedule | W2, W3, W4, W7 day keys | M | **High** | Ex-A-W6-3 |
 | **A-H4** | Legacy notification composers / dual sink story | **Resolved in W5:** sole live path is `FanOutAcademyEventSink` + `InAppAcademyEventHandler`. `AbsenceSignalComposer` / `InAppAcademyEventSink` **deleted** (not in tree). H3 froze docs + DI comments. | W4/W5 delivery clarity | — | Done | Was Ex-A-W6-4 |
-| **A-H5** | استئذان reads unbounded then client-filter | Teacher/supervisor `where('halaqaId')` then filter day; parent `requestedBy` full history | W7 scale + drift | M | **High** | Ex-A-W7-2 |
-| **A-H6** | `AbsenceRequest*` lives under parent; teacher/supervisor import it | Feature-layering inversion | W7 maintainability | S | Med | Ex-A-W7-1 |
+| **A-H5** | استئذان reads unbounded then client-filter | **H4:** shared `AbsenceRequestFirestoreReads` (same client filters; query shape unchanged pending B-R4 indexes) | W7 scale + drift | — | Consolidated | Was Ex-A-W7-2 |
+| **A-H6** | `AbsenceRequest*` lives under parent; teacher/supervisor import it | **H4:** types in `lib/shared/`; parent re-exports | W7 maintainability | — | Done | Was Ex-A-W7-1 |
 | **A-H7** | Dual awards schemas (`grantedBy`/`grantedAt` vs `issuedBy`/`date`) | Teacher awards vs supervisor issue; student reader tolerates both; stats query may miss supervisor docs | Encouragement surfaces (not Wn core) | M | Med | Coherence |
 | **A-H8** | Orphan routes / unused pages | Analytics, calendar, content, student history routes; `ChatConversationsPage` unregistered; posts tab placeholder vs `PostsListPage` | Ops confusion; wrong wiring risk | S | Low | Cleanup |
 | **A-H9** | AdminBloc writers without UI (except W8 admit) | Stats/finance/complaints/broadcast/teachers wired; home only admit | Accidental parallel delivery (broadcast) | S | Low–Med | Quarantine / document |
@@ -213,7 +214,8 @@ Hardening sprint passes when:
 | Phase 0 design | **Approved** |
 | **H1 Identity (P-E1 + A-H1)** | **Approved (product)** |
 | **H2 Day & homework SSOT** | **Approved (product)** |
-| **H3 Event delivery hygiene** | **Implemented** — see `docs/H3_EVENT_DELIVERY_HYGIENE_VALIDATION.md` · awaiting sign-off |
-| H4+ | **Blocked** until H3 approved |
+| **H3 Event delivery hygiene** | **Approved (product)** |
+| **H4 استئذان read hygiene** | **Implemented** — see `docs/H4_ABSENCE_REQUEST_READ_HYGIENE_VALIDATION.md` · awaiting sign-off |
+| H5+ | **Blocked** until H4 approved |
 
-**Stop after each slice. Do not begin H4 until H3 is approved.**
+**Stop after each slice. Do not begin H5 until H4 is approved.**

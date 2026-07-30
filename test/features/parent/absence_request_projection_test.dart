@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/parent/domain/absence_request_projection.dart';
-import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
+import 'package:rafiq_academy/shared/domain/absence_request.dart';
+import 'package:rafiq_academy/shared/domain/absence_request_projection.dart';
 
 AbsenceRequestEntity _request(AbsenceRequestStatus status) =>
     AbsenceRequestEntity(
@@ -15,7 +15,7 @@ AbsenceRequestEntity _request(AbsenceRequestStatus status) =>
     );
 
 void main() {
-  group('AbsenceRequestProjection (W7 Rule 2)', () {
+  group('AbsenceRequestProjection (W7 Rule 2 / H4 shared)', () {
     test('status labels map existing enum only', () {
       expect(
         AbsenceRequestProjection.statusLabel(AbsenceRequestStatus.pending),

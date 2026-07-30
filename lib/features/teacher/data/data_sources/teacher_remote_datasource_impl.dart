@@ -4,12 +4,13 @@ import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/absence_request_firestore_reads.dart';
+import '../../../../shared/data/absence_request_model.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/assignment_policy.dart';
 import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../../parent/data/models/parent_model.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
@@ -411,20 +412,13 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     required DateTime date,
   }) async {
     try {
-      final day = AttendancePolicy.dayStart(date);
-      final snap = await firestore
-          .collection(FirestoreCollections.absenceRequests)
-          .where('halaqaId', isEqualTo: halaqaId.trim())
-          .get();
-
-      final items = <AbsenceRequestModel>[];
-      for (final doc in snap.docs) {
-        final model = AbsenceRequestModel.fromFirestore(doc);
-        if (model.status != AbsenceRequestStatus.pending) continue;
-        if (!AttendancePolicy.isSameCalendarDay(model.date, day)) continue;
-        items.add(model);
-      }
-      items.sort((a, b) => a.studentId.compareTo(b.studentId));
+      final items = await AbsenceRequestFirestoreReads.forHalaqaOnDate(
+        firestore: firestore,
+        halaqaId: halaqaId,
+        date: date,
+        pendingOnly: true,
+      );
+      AbsenceRequestFirestoreReads.sortTeacherPending(items);
       return items;
     } catch (e) {
       throw ServerException(e.toString());

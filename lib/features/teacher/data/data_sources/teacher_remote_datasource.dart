@@ -1,6 +1,6 @@
+import '../../../../shared/data/absence_request_model.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../../../../shared/domain/academy_event.dart';
-import '../../../parent/data/models/parent_model.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';

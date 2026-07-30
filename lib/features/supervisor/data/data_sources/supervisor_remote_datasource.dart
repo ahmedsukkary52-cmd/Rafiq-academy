@@ -1,4 +1,4 @@
-import '../../../parent/data/models/parent_model.dart';
+import '../../../../shared/data/absence_request_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/entities/supervisor_report_entity.dart';

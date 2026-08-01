@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
@@ -65,6 +66,7 @@ class TeacherDashboardTab extends StatelessWidget {
                 child: _TeacherHeader(
                   name: teacherName,
                   halaqaName: nextHalaqa?.name ?? '',
+                  imageUrl: auth?.user.profileImageUrl,
                 ),
               ),
               ..._bodySlivers(context, state),
@@ -470,138 +472,252 @@ class _AgendaCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _TeacherHeader
+// _TeacherHeader — Figma 1:432 (Commit 1)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _TeacherHeader extends StatelessWidget {
   final String name;
   final String halaqaName;
+  final String? imageUrl;
 
-  const _TeacherHeader({required this.name, required this.halaqaName});
+  const _TeacherHeader({
+    required this.name,
+    required this.halaqaName,
+    this.imageUrl,
+  });
+
+  static const _weekdays = [
+    '',
+    'الاثنين',
+    'الثلاثاء',
+    'الأربعاء',
+    'الخميس',
+    'الجمعة',
+    'السبت',
+    'الأحد',
+  ];
+
+  String _hijriChipLabel() {
+    HijriCalendar.setLocal('ar');
+    final h = HijriCalendar.now();
+    return h.toFormat('dd MMMM yyyy');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final weekdays = [
-      '',
-      'الاثنين',
-      'الثلاثاء',
-      'الأربعاء',
-      'الخميس',
-      'الجمعة',
-      'السبت',
-      'الأحد',
-    ];
-    final dayName = weekdays[now.weekday];
+    final dayName = _weekdays[DateTime.now().weekday];
+    final displayName = name.trim().isEmpty ? 'المعلم' : name.trim();
+    final subtitle = halaqaName.trim().isEmpty
+        ? 'معلم تحفيظ'
+        : 'معلم تحفيظ · $halaqaName';
 
-    return Container(
-      color: AppColors.primary,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF3DD4C2),
+            AppColors.primary,
+            AppColors.primaryDark,
+          ],
+          stops: [0.0, 0.55, 1.0],
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+      ),
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 12,
+        top: MediaQuery.of(context).padding.top + 14,
         left: AppSizes.paddingM,
         right: AppSizes.paddingM,
-        bottom: AppSizes.paddingXL,
+        bottom: 28,
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // شريط أيقونات علوي
+          // Top row (RTL): identity on the right, actions on the left
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(width: 48),
-              Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'الأستاذ $name',
-                        style: const TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      if (halaqaName.isNotEmpty)
-                        Text(
-                          'معلم تحفيظ · $halaqaName',
-                          style: TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.8),
+              Expanded(
+                child: Row(
+                  children: [
+                    UserAvatar(
+                      name: displayName,
+                      imageUrl: imageUrl,
+                      size: 44,
+                      backgroundColor: Colors.white.withValues(alpha: 0.22),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'الأستاذ $displayName',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.3,
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        name.isNotEmpty ? name[0] : 'م',
-                        style: const TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.white.withValues(alpha: 0.85),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               BlocSelector<NotificationsBloc, NotificationsState, int>(
                 bloc: sl<NotificationsBloc>(),
                 selector: (state) => state.unreadCount,
                 builder: (context, unreadCount) {
-                  return NotificationBadge(
-                    count: unreadCount,
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.white,
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    // RTL: first = right → notif near center, search at far left
+                    children: [
+                      _HeaderCircleButton(
+                        icon: Icons.notifications_outlined,
+                        showDot: unreadCount > 0,
+                        onTap: () => context.push(AppRoutes.teacherNotifs),
                       ),
-                      onPressed: () => context.push(AppRoutes.teacherNotifs),
-                    ),
+                      const SizedBox(width: 8),
+                      _HeaderCircleButton(
+                        icon: Icons.search_rounded,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('قريباً')),
+                          );
+                        },
+                      ),
+                    ],
                   );
                 },
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 22),
 
-          // التحية
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                'يوم $dayName مبارك!',
+          const Text(
+            'السلام عليكم 🌿',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontFamily: 'NotoNaskhArabic',
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: Colors.white,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'يوم $dayName مبارك!',
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontFamily: 'NotoNaskhArabic',
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+              ),
+              child: Text(
+                _hijriChipLabel(),
                 style: const TextStyle(
                   fontFamily: 'NotoNaskhArabic',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                   color: Colors.white,
+                  height: 1.2,
                 ),
               ),
-              const SizedBox(width: 6),
-              const Text(
-                'السلام عليكم',
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 14,
-                  color: Colors.white70,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
+      ),
+    ),
+    );
+  }
+}
+
+class _HeaderCircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool showDot;
+
+  const _HeaderCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.showDot = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            if (showDot)
+              Positioned(
+                top: 5,
+                right: 5,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.2),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

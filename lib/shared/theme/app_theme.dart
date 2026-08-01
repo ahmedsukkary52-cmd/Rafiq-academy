@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// الألوان المستخرجة مباشرة من التصميم
 class AppColors {
@@ -8,6 +9,23 @@ class AppColors {
   static const Color primary = Color(0xFF2DC4B2);
   static const Color primaryDark = Color(0xFF1FA99A);
   static const Color primaryLight = Color(0xFFE8F9F7);
+
+  /// Header / CTA gradient stops (additive tokens; does not replace [primary]).
+  static const Color primaryGradientStart = Color(0xFF0A8A94);
+  static const Color primaryGradientMid = Color(0xFF19C6D1);
+  static const Color primaryGradientEnd = Color(0xFF1BD8E5);
+
+  static const Gradient primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    stops: [0.0, 0.55, 1.0],
+    colors: [primaryGradientStart, primaryGradientMid, primaryGradientEnd],
+  );
+
+  /// Soft overlays drawn on primary / gradient headers.
+  static const Color onPrimary = Color(0xFFFFFFFF);
+  static const Color onPrimaryOverlay = Color(0x38FFFFFF); // ~22% white
+  static const Color onPrimaryMuted = Color(0xE0FFFFFF); // ~88% white
 
   // Secondary — الذهبي للنقاط والـ streak والأيقونات المميزة
   static const Color secondary = Color(0xFFF5A623);
@@ -22,6 +40,11 @@ class AppColors {
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceGrey = Color(0xFFF0F1F6);
   static const Color border = Color(0xFFE8E9F0);
+  static const Color softShadow = Color(0x0A000000);
+
+  // Soft icon chip backgrounds (stats / badges)
+  static const Color successBg = Color(0xFFE8F5E9);
+  static const Color messagesBg = Color(0xFFF3E5F5);
 
   // Text
   static const Color textPrimary = Color(0xFF1A1A2E);
@@ -89,93 +112,82 @@ class AppSizes {
   static const double headerMinHeight = 200.0;
 }
 
-/// Text Styles مبنية على خط Noto Naskh Arabic
+/// Text Styles — Cairo (global app typography via Theme + these helpers)
 class AppTextStyles {
   AppTextStyles._();
 
-  static const String _fontFamily = 'NotoNaskhArabic';
+  static String get fontFamily => GoogleFonts.cairo().fontFamily!;
 
-  static const TextStyle displayLarge = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get displayLarge => GoogleFonts.cairo(
     fontSize: 28,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.3,
   );
 
-  static const TextStyle displayMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get displayMedium => GoogleFonts.cairo(
     fontSize: 22,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.3,
   );
 
-  static const TextStyle headlineLarge = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get headlineLarge => GoogleFonts.cairo(
     fontSize: 20,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
   );
 
-  static const TextStyle headlineMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get headlineMedium => GoogleFonts.cairo(
     fontSize: 18,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
   );
 
-  static const TextStyle titleLarge = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get titleLarge => GoogleFonts.cairo(
     fontSize: 16,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static const TextStyle titleMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get titleMedium => GoogleFonts.cairo(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static const TextStyle bodyLarge = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get bodyLarge => GoogleFonts.cairo(
     fontSize: 15,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.6,
   );
 
-  static const TextStyle bodyMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get bodyMedium => GoogleFonts.cairo(
     fontSize: 13,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
     height: 1.6,
   );
 
-  static const TextStyle labelLarge = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get labelLarge => GoogleFonts.cairo(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     letterSpacing: 0.2,
   );
 
-  static const TextStyle labelMedium = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get labelMedium => GoogleFonts.cairo(
     fontSize: 12,
     fontWeight: FontWeight.w500,
     color: AppColors.textSecondary,
   );
 
-  static const TextStyle labelSmall = TextStyle(
-    fontFamily: _fontFamily,
+  static TextStyle get labelSmall => GoogleFonts.cairo(
     fontSize: 11,
     fontWeight: FontWeight.w400,
     color: AppColors.textHint,
@@ -186,10 +198,13 @@ class AppTextStyles {
 class AppTheme {
   AppTheme._();
 
+  static TextTheme _cairoTextTheme(TextTheme base) =>
+      GoogleFonts.cairoTextTheme(base);
+
   static ThemeData get theme {
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
-      fontFamily: 'NotoNaskhArabic',
+      fontFamily: AppTextStyles.fontFamily,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
@@ -198,22 +213,22 @@ class AppTheme {
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.background,
+    );
 
-      // AppBar
-      appBarTheme: const AppBarTheme(
+    final textTheme = _cairoTextTheme(base.textTheme);
+
+    return base.copyWith(
+      textTheme: textTheme,
+      primaryTextTheme: _cairoTextTheme(base.primaryTextTheme),
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.onPrimary,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+        titleTextStyle: AppTextStyles.headlineMedium.copyWith(
+          color: AppColors.onPrimary,
         ),
       ),
-
-      // Card
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
@@ -223,26 +238,20 @@ class AppTheme {
         ),
         margin: const EdgeInsets.symmetric(vertical: 6),
       ),
-
-      // ElevatedButton
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.onPrimary,
           elevation: 0,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSizes.radiusL),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'NotoNaskhArabic',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          textStyle: AppTextStyles.titleLarge.copyWith(
+            color: AppColors.onPrimary,
           ),
         ),
       ),
-
-      // InputDecoration
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceGrey,
@@ -268,26 +277,18 @@ class AppTheme {
         ),
         hintStyle: AppTextStyles.bodyMedium,
       ),
-
-      // BottomNavigationBar
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textSecondary,
         elevation: 8,
         type: BottomNavigationBarType.fixed,
-        selectedLabelStyle: TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 11,
+        selectedLabelStyle: AppTextStyles.labelSmall.copyWith(
           fontWeight: FontWeight.w600,
+          color: AppColors.primary,
         ),
-        unselectedLabelStyle: TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 11,
-        ),
+        unselectedLabelStyle: AppTextStyles.labelSmall,
       ),
-
-      // Chip
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surfaceGrey,
         selectedColor: AppColors.primaryLight,
@@ -307,10 +308,10 @@ class AppTheme {
     const darkSurface = AppColors.darkCard;
     const darkBorder = Color(0xFF3A3A50);
 
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      fontFamily: 'NotoNaskhArabic',
+      fontFamily: AppTextStyles.fontFamily,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         brightness: Brightness.dark,
@@ -320,20 +321,20 @@ class AppTheme {
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: darkBackground,
+    );
 
-      appBarTheme: const AppBarTheme(
+    return base.copyWith(
+      textTheme: _cairoTextTheme(base.textTheme),
+      primaryTextTheme: _cairoTextTheme(base.primaryTextTheme),
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.dark,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.onPrimary,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+        titleTextStyle: AppTextStyles.headlineMedium.copyWith(
+          color: AppColors.onPrimary,
         ),
       ),
-
       cardTheme: CardThemeData(
         color: darkSurface,
         elevation: 0,
@@ -343,24 +344,20 @@ class AppTheme {
         ),
         margin: const EdgeInsets.symmetric(vertical: 6),
       ),
-
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.onPrimary,
           elevation: 0,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSizes.radiusL),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'NotoNaskhArabic',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          textStyle: AppTextStyles.titleLarge.copyWith(
+            color: AppColors.onPrimary,
           ),
         ),
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: darkSurface,
@@ -384,30 +381,30 @@ class AppTheme {
           horizontal: AppSizes.paddingM,
           vertical: 14,
         ),
-        hintStyle: AppTextStyles.bodyMedium.copyWith(color: Colors.white38),
+        hintStyle: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.onPrimary.withValues(alpha: 0.38),
+        ),
       ),
-
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: darkSurface,
         selectedItemColor: AppColors.primary,
-        unselectedItemColor: Colors.white54,
+        unselectedItemColor: AppColors.onPrimary.withValues(alpha: 0.54),
         elevation: 8,
         type: BottomNavigationBarType.fixed,
-        selectedLabelStyle: TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 11,
+        selectedLabelStyle: AppTextStyles.labelSmall.copyWith(
           fontWeight: FontWeight.w600,
+          color: AppColors.primary,
         ),
-        unselectedLabelStyle: TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 11,
+        unselectedLabelStyle: AppTextStyles.labelSmall.copyWith(
+          color: AppColors.onPrimary.withValues(alpha: 0.54),
         ),
       ),
-
       chipTheme: ChipThemeData(
         backgroundColor: darkSurface,
-        selectedColor: AppColors.primary.withOpacity(0.25),
-        labelStyle: AppTextStyles.labelMedium.copyWith(color: Colors.white70),
+        selectedColor: AppColors.primary.withValues(alpha: 0.25),
+        labelStyle: AppTextStyles.labelMedium.copyWith(
+          color: AppColors.onPrimary.withValues(alpha: 0.7),
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusFull),
         ),

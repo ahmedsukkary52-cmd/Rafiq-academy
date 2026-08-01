@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../core/di/injection_container.dart';
@@ -20,23 +19,6 @@ import '../../domain/read_models/teacher_day_agenda.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
-
-/// Cairo text styles for Teacher Home (Figma 1:432).
-TextStyle _cairo({
-  double fontSize = 14,
-  FontWeight fontWeight = FontWeight.w400,
-  Color color = Colors.white,
-  double height = 1.3,
-  double? letterSpacing,
-}) {
-  return GoogleFonts.cairo(
-    fontSize: fontSize,
-    fontWeight: fontWeight,
-    color: color,
-    height: height,
-    letterSpacing: letterSpacing,
-  );
-}
 
 class TeacherDashboardTab extends StatelessWidget {
   const TeacherDashboardTab({super.key});
@@ -299,7 +281,7 @@ class _AgendaHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Text('عمل اليوم', style: AppTextStyles.titleLarge),
+        Text('عمل اليوم', style: AppTextStyles.titleLarge),
         const SizedBox(height: 2),
         Text(
           'ما الذي يحتاج إلى إجراء منك اليوم',
@@ -584,7 +566,7 @@ class _TeacherHeader extends StatelessWidget {
                         name: displayName,
                         imageUrl: imageUrl,
                         size: 44,
-                        backgroundColor: Colors.white.withValues(alpha: 0.22),
+                        backgroundColor: AppColors.onPrimaryOverlay,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -595,10 +577,9 @@ class _TeacherHeader extends StatelessWidget {
                               'الأستاذ $displayName',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: _cairo(
-                                fontSize: 16,
+                              style: AppTextStyles.titleLarge.copyWith(
+                                color: AppColors.onPrimary,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
                                 height: 1.25,
                               ),
                             ),
@@ -607,10 +588,8 @@ class _TeacherHeader extends StatelessWidget {
                               subtitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: _cairo(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.white.withValues(alpha: 0.88),
+                              style: AppTextStyles.labelMedium.copyWith(
+                                color: AppColors.onPrimaryMuted,
                                 height: 1.3,
                               ),
                             ),
@@ -657,10 +636,8 @@ class _TeacherHeader extends StatelessWidget {
             Text(
               'السلام عليكم 🌿',
               textAlign: TextAlign.right,
-              style: _cairo(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Colors.white,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.onPrimary,
                 height: 1.4,
               ),
             ),
@@ -668,10 +645,10 @@ class _TeacherHeader extends StatelessWidget {
             Text(
               'يوم $dayName مبارك!',
               textAlign: TextAlign.right,
-              style: _cairo(
-                fontSize: 26,
+              style: AppTextStyles.displayMedium.copyWith(
+                color: AppColors.onPrimary,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                fontSize: 26,
                 height: 1.2,
               ),
             ),
@@ -682,15 +659,13 @@ class _TeacherHeader extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
+                  color: AppColors.onPrimaryOverlay,
                   borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                 ),
                 child: Text(
                   _hijriChipLabel(),
-                  style: _cairo(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.onPrimary,
                     height: 1.2,
                   ),
                 ),
@@ -727,11 +702,11 @@ class _HeaderCircleButton extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+              decoration: const BoxDecoration(
+                color: AppColors.onPrimaryOverlay,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
+              child: Icon(icon, color: AppColors.onPrimary, size: 22),
             ),
             if (showDot)
               Positioned(
@@ -743,7 +718,7 @@ class _HeaderCircleButton extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.secondary,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.2),
+                    border: Border.all(color: AppColors.onPrimary, width: 1.2),
                   ),
                 ),
               ),
@@ -794,7 +769,7 @@ class _TeacherStatsGrid extends StatelessWidget {
                   value: studentsCount,
                   label: 'إجمالي الطلاب',
                   icon: Icons.person_outline_rounded,
-                  iconBg: const Color(0xFFE8F5E9),
+                  iconBg: AppColors.successBg,
                   iconColor: AppColors.success,
                 ),
               ),
@@ -818,7 +793,7 @@ class _TeacherStatsGrid extends StatelessWidget {
                   value: newMessages,
                   label: 'رسائل جديدة',
                   icon: Icons.chat_bubble_outline_rounded,
-                  iconBg: const Color(0xFFF3E5F5),
+                  iconBg: AppColors.messagesBg,
                   iconColor: AppColors.awardWeekly,
                 ),
               ),
@@ -853,11 +828,11 @@ class _StatTile extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: AppColors.softShadow,
             blurRadius: 10,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -880,10 +855,8 @@ class _StatTile extends StatelessWidget {
           Text(
             '$value',
             textAlign: TextAlign.right,
-            style: _cairo(
-              fontSize: 22,
+            style: AppTextStyles.displayMedium.copyWith(
               fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
               height: 1.15,
             ),
           ),
@@ -891,12 +864,7 @@ class _StatTile extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.right,
-            style: _cairo(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
-              height: 1.3,
-            ),
+            style: AppTextStyles.labelMedium.copyWith(height: 1.3),
           ),
         ],
       ),
@@ -920,10 +888,9 @@ class _EmptyHalaqatCard extends StatelessWidget {
       child: Text(
         'لا توجد حلقات مسندة إليك حالياً',
         textAlign: TextAlign.center,
-        style: _cairo(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+        style: AppTextStyles.titleMedium.copyWith(
           color: AppColors.textSecondary,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

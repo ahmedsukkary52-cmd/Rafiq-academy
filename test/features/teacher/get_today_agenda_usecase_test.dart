@@ -177,6 +177,7 @@ void main() {
 
       expect(agenda.items, isEmpty);
       expect(agenda.sessionsTodayCount, 0);
+      expect(agenda.featuredSession, isNull);
     });
 
     test('halaqa not scheduled today is excluded', () async {
@@ -193,6 +194,7 @@ void main() {
 
       expect(agenda.sessionsTodayCount, 0);
       expect(agenda.items, isEmpty);
+      expect(agenda.featuredSession, isNull);
     });
 
     test('attendance incomplete surfaces takeAttendance action', () async {
@@ -212,6 +214,9 @@ void main() {
       );
 
       expect(agenda.sessionsTodayCount, 1);
+      expect(agenda.featuredSession, isNotNull);
+      expect(agenda.featuredSession!.halaqaId, 'h1');
+      expect(agenda.featuredSession!.studentCount, 2);
       expect(agenda.items.single.pendingActions, [
         TeacherAgendaAction.takeAttendance,
       ]);
@@ -329,6 +334,8 @@ void main() {
 
       expect(agenda.sessionsTodayCount, 1);
       expect(agenda.items, isEmpty, reason: 'nothing left to do → removed');
+      expect(agenda.featuredSession, isNotNull);
+      expect(agenda.featuredSession!.halaqaId, 'h1');
     });
 
     test('empty roster is never an attendance or homework action', () async {
@@ -346,6 +353,7 @@ void main() {
 
       expect(agenda.sessionsTodayCount, 1);
       expect(agenda.items, isEmpty);
+      expect(agenda.featuredSession!.studentCount, 0);
     });
 
     test(
@@ -367,6 +375,8 @@ void main() {
         );
 
         expect(agenda.items.map((i) => i.halaqaId).toList(), ['a', 'c', 'b']);
+        // At 09:00 Monday fixture clock: 09:00 slots are live, 10:00 upcoming.
+        expect(agenda.featuredSession!.halaqaId, 'a');
       },
     );
 

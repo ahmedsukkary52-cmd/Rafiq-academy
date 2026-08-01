@@ -67,6 +67,28 @@ class TeacherDayCloseout extends Equatable {
   List<Object?> get props => [status, totalHalaqat, completedHalaqat];
 }
 
+/// Today's featured session for Teacher Home (presentation projection).
+///
+/// Selected live → upcoming → first among today's D7-ordered operational days
+/// (same rule already used for schedule "featured" session). Room is omitted
+/// until the halaqa model exposes it.
+class TeacherTodaySession extends Equatable {
+  final String halaqaId;
+  final String halaqaName;
+  final DateTime startAt;
+  final int studentCount;
+
+  const TeacherTodaySession({
+    required this.halaqaId,
+    required this.halaqaName,
+    required this.startAt,
+    required this.studentCount,
+  });
+
+  @override
+  List<Object?> get props => [halaqaId, halaqaName, startAt, studentCount];
+}
+
 /// Presentation-facing **read projection** of "what should I do today?".
 ///
 /// Not a domain entity and not persisted. Derived at read time from the
@@ -80,9 +102,13 @@ class TeacherDayAgenda extends Equatable {
   /// Lets the UI distinguish "no session today" from "all work done".
   final int sessionsTodayCount;
 
+  /// Current/next session for Home (null when [sessionsTodayCount] is 0).
+  final TeacherTodaySession? featuredSession;
+
   const TeacherDayAgenda({
     required this.items,
     required this.sessionsTodayCount,
+    this.featuredSession,
   });
 
   static const empty = TeacherDayAgenda(items: [], sessionsTodayCount: 0);
@@ -115,5 +141,5 @@ class TeacherDayAgenda extends Equatable {
   }
 
   @override
-  List<Object?> get props => [items, sessionsTodayCount];
+  List<Object?> get props => [items, sessionsTodayCount, featuredSession];
 }

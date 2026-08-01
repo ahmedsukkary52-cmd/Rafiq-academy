@@ -6,6 +6,7 @@ import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/halaqa_day_readiness.dart';
 import '../../../../shared/domain/load_halaqa_day_readiness.dart';
+import '../../../schedule/domain/entities/class_session_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
@@ -87,7 +88,39 @@ class GetTodayAgendaUseCase
     }
 
     return Right(
-      TeacherDayAgenda(items: items, sessionsTodayCount: days.length),
+      TeacherDayAgenda(
+        items: items,
+        sessionsTodayCount: days.length,
+        featuredSession: _featuredSession(days, byId),
+      ),
+    );
+  }
+
+  /// Same selection rule as schedule featured session: live → upcoming →
+  /// first of today's D7-ordered operational days.
+  TeacherTodaySession? _featuredSession(
+    List<TodayOperationalDay> days,
+    Map<String, HalaqaEntity> byId,
+  ) {
+    if (days.isEmpty) return null;
+
+    final TodayOperationalDay day;
+    final live = days.where((d) => d.session.status == ClassSessionStatus.live);
+    if (live.isNotEmpty) {
+      day = live.first;
+    } else {
+      final upcoming = days.where(
+        (d) => d.session.status == ClassSessionStatus.upcoming,
+      );
+      day = upcoming.isNotEmpty ? upcoming.first : days.first;
+    }
+
+    final halaqa = byId[day.halaqaId];
+    return TeacherTodaySession(
+      halaqaId: day.halaqaId,
+      halaqaName: halaqa?.name ?? day.session.title,
+      startAt: day.session.startAt,
+      studentCount: halaqa?.studentIds.length ?? 0,
     );
   }
 

@@ -152,50 +152,39 @@ class TeacherDashboardTab extends StatelessWidget {
           },
         ),
       ),
-      if (state.halaqat.isEmpty)
-        const Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSizes.paddingM,
-            16,
-            AppSizes.paddingM,
-            24,
-          ),
-          child: _EmptyHalaqatCard(),
-        )
-      else
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSizes.paddingM,
-            16,
-            AppSizes.paddingM,
-            AppSizes.paddingM,
-          ),
-          child: _TodayAgendaSection(
-            status: state.todayAgendaStatus,
-            agenda: state.todayAgenda,
-            error: state.todayAgendaError,
-            onRetry: () =>
-                context.read<TeacherBloc>().add(const LoadTodayAgendaEvent()),
-          ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSizes.paddingM,
+          16,
+          AppSizes.paddingM,
+          AppSizes.paddingM,
         ),
+        child: _TodaySessionSection(
+          status: state.todayAgendaStatus,
+          agenda: state.todayAgenda,
+          error: state.todayAgendaError,
+          onRetry: () =>
+              context.read<TeacherBloc>().add(const LoadTodayAgendaEvent()),
+        ),
+      ),
     ];
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _TodayAgendaSection — "ماذا عليّ فعله اليوم؟" (W3 Slice 1)
+// _TodaySessionSection — Figma 1:432 Today's Session card
 //
-// Composition only: renders the already-derived TeacherDayAgenda view model.
-// No computation here; every row deep-links into an existing W1/W2 workflow.
+// Presentation only: uses TeacherDayAgenda.featuredSession from GetTodayAgendaUseCase.
+// Room omitted until HalaqaEntity exposes it. No agenda-list UI.
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _TodayAgendaSection extends StatelessWidget {
+class _TodaySessionSection extends StatelessWidget {
   final SectionStatus status;
   final TeacherDayAgenda agenda;
   final String? error;
   final VoidCallback onRetry;
 
-  const _TodayAgendaSection({
+  const _TodaySessionSection({
     required this.status,
     required this.agenda,
     required this.error,
@@ -204,285 +193,155 @@ class _TodayAgendaSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const _AgendaHeader(),
-        const SizedBox(height: 12),
-        _buildBody(context),
-      ],
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
     switch (status) {
       case SectionStatus.initial:
       case SectionStatus.loading:
-        return const _AgendaCard(
+        return const _SessionCardShell(
           child: Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(vertical: 28),
               child: SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: AppColors.onPrimaryMuted,
+                ),
               ),
             ),
           ),
         );
       case SectionStatus.error:
-        return _AgendaCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                error ?? 'تعذر تحديد عمل اليوم',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Align(
-                child: TextButton(
-                  onPressed: onRetry,
-                  child: const Text('إعادة المحاولة'),
-                ),
-              ),
-            ],
-          ),
+        return _EmptySessionCard(
+          message: error ?? 'تعذر تحميل جلسة اليوم',
+          onRetry: onRetry,
         );
       case SectionStatus.loaded:
-        final closeout = agenda.closeout;
-        if (!agenda.hasActionableItems) {
-          // NoSession or Complete — honest idle/done card (D-C1/D-C5).
-          return _CloseoutCard(closeout: closeout);
+        final session = agenda.featuredSession;
+        if (session == null) {
+          return const _EmptySessionCard(
+            message: 'لا توجد حصص مجدوَلة اليوم',
+          );
         }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _CloseoutSummary(closeout: closeout),
-            const SizedBox(height: 12),
-            for (final item in agenda.items) ...[
-              _AgendaItemCard(item: item),
-              const SizedBox(height: 12),
-            ],
-          ],
-        );
+        return _TodaySessionCard(session: session);
     }
   }
 }
 
-class _AgendaHeader extends StatelessWidget {
-  const _AgendaHeader();
+class _TodaySessionCard extends StatelessWidget {
+  final TeacherTodaySession session;
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Text('عمل اليوم', style: AppTextStyles.titleLarge),
-        const SizedBox(height: 2),
-        Text(
-          'ما الذي يحتاج إلى إجراء منك اليوم',
-          style: AppTextStyles.labelSmall.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
+  const _TodaySessionCard({required this.session});
+
+  void _startSession(BuildContext context) {
+    context.read<TeacherBloc>().add(SelectHalaqaEvent(session.halaqaId));
+    context.push('/teacher/halaqa/${session.halaqaId}');
   }
-}
-
-class _AgendaItemCard extends StatelessWidget {
-  final TeacherAgendaItem item;
-
-  const _AgendaItemCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    return _AgendaCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.access_time_rounded,
-                    size: 14,
-                    color: AppColors.textSecondary,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: _SessionCardShell(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.access_time_rounded,
+                  size: 14,
+                  color: AppColors.onPrimaryMuted,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'اليوم — ${formatTimeHm12Ar(session.startAt)}',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.onPrimaryMuted,
+                    height: 1.3,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    formatTimeHm12Ar(item.startAt),
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.textSecondary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              session.halaqaName,
+              textAlign: TextAlign.right,
+              style: AppTextStyles.headlineMedium.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline_rounded,
+                  size: 16,
+                  color: AppColors.onPrimaryMuted,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${session.studentCount} طالباً',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.onPrimaryMuted,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Material(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                child: InkWell(
+                  onTap: () => _startSession(context),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.play_arrow_rounded,
+                          size: 20,
+                          color: AppColors.onPrimary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'ابدأ الجلسة',
+                          style: AppTextStyles.titleMedium.copyWith(
+                            color: AppColors.onPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              Flexible(
-                child: Text(
-                  item.halaqaName,
-                  textAlign: TextAlign.end,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.titleMedium,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          for (final action in item.pendingActions)
-            _AgendaActionRow(halaqaId: item.halaqaId, action: action),
-        ],
-      ),
-    );
-  }
-}
-
-class _AgendaActionRow extends StatelessWidget {
-  final String halaqaId;
-  final TeacherAgendaAction action;
-
-  const _AgendaActionRow({required this.halaqaId, required this.action});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => context.push(_routeFor(action)),
-      borderRadius: BorderRadius.circular(AppSizes.radiusM),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.chevron_left_rounded,
-              color: AppColors.textSecondary,
             ),
-            const Spacer(),
-            Text(
-              _labelFor(action),
-              textAlign: TextAlign.end,
-              style: AppTextStyles.bodyMedium,
-            ),
-            const SizedBox(width: 8),
-            Icon(_iconFor(action), size: 18, color: AppColors.primary),
           ],
         ),
       ),
     );
   }
-
-  String _labelFor(TeacherAgendaAction action) => switch (action) {
-    TeacherAgendaAction.takeAttendance => 'لم يتم تسجيل الحضور بعد',
-    TeacherAgendaAction.sendHomework => 'لم يتم إرسال واجب اليوم',
-    TeacherAgendaAction.reviewRecitations => 'توجد تسميعات بانتظار المراجعة',
-  };
-
-  IconData _iconFor(TeacherAgendaAction action) => switch (action) {
-    TeacherAgendaAction.takeAttendance => Icons.how_to_reg_outlined,
-    TeacherAgendaAction.sendHomework => Icons.assignment_outlined,
-    TeacherAgendaAction.reviewRecitations => Icons.rate_review_outlined,
-  };
-
-  String _routeFor(TeacherAgendaAction action) => switch (action) {
-    TeacherAgendaAction.takeAttendance => '/teacher/attendance/$halaqaId',
-    // Assign sheet lives on class detail — open via existing query deep-link.
-    TeacherAgendaAction.sendHomework => '/teacher/halaqa/$halaqaId?assign=1',
-    TeacherAgendaAction.reviewRecitations =>
-      '/teacher/halaqa/$halaqaId/evaluations',
-  };
 }
 
-// ── Day closeout (W3 Slice 4) ────────────────────────────────────────────────
-// Pure presentation of TeacherDayAgenda.closeout. No computation, no I/O.
-// Neutral, assistive wording only (D9): never blames the teacher.
+class _EmptySessionCard extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
 
-/// Idle / done state when there are no actionable items.
-class _CloseoutCard extends StatelessWidget {
-  final TeacherDayCloseout closeout;
-
-  const _CloseoutCard({required this.closeout});
-
-  @override
-  Widget build(BuildContext context) {
-    final isComplete = closeout.status == DayCloseoutStatus.complete;
-    final message = switch (closeout.status) {
-      DayCloseoutStatus.noSession => 'لا توجد حصص مجدوَلة اليوم',
-      DayCloseoutStatus.complete => 'اكتمل عمل اليوم',
-      // Defensive: incomplete never reaches this card.
-      DayCloseoutStatus.incomplete => 'لا يوجد عمل متبقٍّ اليوم',
-    };
-
-    return _AgendaCard(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Flexible(
-            child: Text(
-              message,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          if (isComplete) ...[
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.check_circle_outline_rounded,
-              size: 18,
-              color: AppColors.success,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Calm day-level "incomplete" line shown above the remaining agenda cards.
-class _CloseoutSummary extends StatelessWidget {
-  final TeacherDayCloseout closeout;
-
-  const _CloseoutSummary({required this.closeout});
-
-  @override
-  Widget build(BuildContext context) {
-    // Fraction only adds signal for multi-halaqa days (D-C2-A).
-    final showFraction = closeout.totalHalaqat > 1;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        if (showFraction) ...[
-          Text(
-            'مكتمل ${closeout.completedHalaqat} من ${closeout.totalHalaqat} حلقات',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Text(
-          'لم يكتمل عمل اليوم',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AgendaCard extends StatelessWidget {
-  final Widget child;
-
-  const _AgendaCard({required this.child});
+  const _EmptySessionCard({
+    required this.message,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -491,8 +350,51 @@ class _AgendaCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSizes.paddingL),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
         border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionCardShell extends StatelessWidget {
+  final Widget child;
+
+  const _SessionCardShell({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.paddingL),
+      decoration: BoxDecoration(
+        color: AppColors.dark,
+        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );
@@ -867,31 +769,6 @@ class _StatTile extends StatelessWidget {
             style: AppTextStyles.labelMedium.copyWith(height: 1.3),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyHalaqatCard extends StatelessWidget {
-  const _EmptyHalaqatCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSizes.paddingL),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        'لا توجد حلقات مسندة إليك حالياً',
-        textAlign: TextAlign.center,
-        style: AppTextStyles.titleMedium.copyWith(
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w500,
-        ),
       ),
     );
   }

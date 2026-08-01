@@ -250,7 +250,7 @@ class _TodaySessionCard extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.access_time_rounded,
-                  size: 14,
+                  size: 16,
                   color: AppColors.onPrimaryMuted,
                 ),
                 const SizedBox(width: 6),
@@ -263,17 +263,17 @@ class _TodaySessionCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               session.halaqaName,
               textAlign: TextAlign.right,
-              style: AppTextStyles.headlineMedium.copyWith(
+              style: AppTextStyles.headlineLarge.copyWith(
                 color: AppColors.onPrimary,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
                 const Icon(
@@ -291,43 +291,63 @@ class _TodaySessionCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             Align(
-              alignment: Alignment.centerRight,
-              child: Material(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                child: InkWell(
-                  onTap: () => _startSession(context),
-                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.play_arrow_rounded,
-                          size: 20,
-                          color: AppColors.onPrimary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'ابدأ الجلسة',
-                          style: AppTextStyles.titleMedium.copyWith(
-                            color: AppColors.onPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              alignment: AlignmentDirectional.centerStart,
+              child: _StartSessionButton(onTap: () => _startSession(context)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StartSessionButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _StartSessionButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.play_arrow_rounded,
+                  size: 22,
+                  color: AppColors.onPrimary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'ابدأ الجلسة',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    color: AppColors.onPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -345,31 +365,61 @@ class _EmptySessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSizes.paddingL),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: _SessionCardShell(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.access_time_rounded,
+                  size: 16,
+                  color: AppColors.onPrimaryMuted,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'اليوم',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.onPrimaryMuted,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
-          ),
-          if (onRetry != null) ...[
             const SizedBox(height: 12),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('إعادة المحاولة'),
+            Text(
+              message,
+              textAlign: TextAlign.right,
+              style: AppTextStyles.headlineLarge.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 20),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  onPressed: onRetry,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
+                  child: Text(
+                    'إعادة المحاولة',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ] else
+              const SizedBox(height: 72),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -380,14 +430,17 @@ class _SessionCardShell extends StatelessWidget {
 
   const _SessionCardShell({required this.child});
 
+  /// Matches Figma featured-card radius (~28) used by the Home sheet overlap.
+  static const double _radius = 28;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSizes.paddingL),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.dark,
-        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+        borderRadius: BorderRadius.circular(_radius),
         boxShadow: const [
           BoxShadow(
             color: AppColors.softShadow,
@@ -725,7 +778,7 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
@@ -744,16 +797,16 @@ class _StatTile extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: iconBg,
                 borderRadius: BorderRadius.circular(AppSizes.radiusM),
               ),
-              child: Icon(icon, color: iconColor, size: 18),
+              child: Icon(icon, color: iconColor, size: 20),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
             '$value',
             textAlign: TextAlign.right,

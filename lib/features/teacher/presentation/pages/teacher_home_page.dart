@@ -10,6 +10,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
+import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
@@ -42,6 +44,9 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     sl<NotificationsBloc>().add(
       StartWatchingNotificationsEvent(uid: uid, role: AppRoles.teacher),
     );
+
+    // Needed for Home «رسائل جديدة» stat (Commit 2); same watch as Messages tab.
+    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
   }
 
   @override

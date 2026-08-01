@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../core/di/injection_container.dart';
@@ -11,12 +12,31 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
+import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../domain/read_models/teacher_day_agenda.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
+
+/// Cairo text styles for Teacher Home (Figma 1:432).
+TextStyle _cairo({
+  double fontSize = 14,
+  FontWeight fontWeight = FontWeight.w400,
+  Color color = Colors.white,
+  double height = 1.3,
+  double? letterSpacing,
+}) {
+  return GoogleFonts.cairo(
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    height: height,
+    letterSpacing: letterSpacing,
+  );
+}
 
 class TeacherDashboardTab extends StatelessWidget {
   const TeacherDashboardTab({super.key});
@@ -51,7 +71,6 @@ class TeacherDashboardTab extends StatelessWidget {
             if (auth == null) return;
             final bloc = context.read<TeacherBloc>();
             bloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
-            // Wait for halaqat AND agenda — agenda derives after halaqat load.
             await bloc.stream.firstWhere((s) {
               if (s.halaqatStatus == SectionStatus.error) return true;
               if (s.halaqatStatus != SectionStatus.loaded) return false;
@@ -69,7 +88,27 @@ class TeacherDashboardTab extends StatelessWidget {
                   imageUrl: auth?.user.profileImageUrl,
                 ),
               ),
-              ..._bodySlivers(context, state),
+              // Figma: white sheet with convex top corners overlapping the header
+              // (not a rounded bottom on the teal block).
+              SliverToBoxAdapter(
+                child: Transform.translate(
+                  offset: const Offset(0, -28),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(28),
+                        topRight: Radius.circular(28),
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _bodyChildren(context, state),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -77,12 +116,12 @@ class TeacherDashboardTab extends StatelessWidget {
     );
   }
 
-  List<Widget> _bodySlivers(BuildContext context, TeacherState state) {
+  List<Widget> _bodyChildren(BuildContext context, TeacherState state) {
     if (state.halaqatStatus == SectionStatus.initial ||
         state.halaqatStatus == SectionStatus.loading) {
       return [
-        const SliverFillRemaining(
-          hasScrollBody: false,
+        const SizedBox(
+          height: 220,
           child: AppLoadingWidget(),
         ),
       ];
@@ -90,8 +129,8 @@ class TeacherDashboardTab extends StatelessWidget {
 
     if (state.halaqatStatus == SectionStatus.error) {
       return [
-        SliverFillRemaining(
-          hasScrollBody: false,
+        SizedBox(
+          height: 220,
           child: AppErrorWidget(
             message: state.halaqatError ?? 'تعذر تحميل الحلقات',
             onRetry: () => _retryHalaqat(context),
@@ -104,50 +143,57 @@ class TeacherDashboardTab extends StatelessWidget {
       0,
       (sum, h) => sum + h.studentIds.length,
     );
+    final sessionsToday = state.todayAgenda.sessionsTodayCount;
+    final pendingTasks = state.todayAgenda.items.fold<int>(
+      0,
+      (sum, item) => sum + item.pendingActions.length,
+    );
 
     return [
-      SliverToBoxAdapter(
-        child: Padding(
+      Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSizes.paddingM,
+          20,
+          AppSizes.paddingM,
+          0,
+        ),
+        child: BlocSelector<ChatConversationsBloc, ChatConversationsState, int>(
+          bloc: sl<ChatConversationsBloc>(),
+          selector: (s) => s.totalUnreadCount,
+          builder: (context, unreadMessages) {
+            return _TeacherStatsGrid(
+              studentsCount: totalStudents,
+              sessionsToday: sessionsToday,
+              pendingTasks: pendingTasks,
+              newMessages: unreadMessages,
+            );
+          },
+        ),
+      ),
+      if (state.halaqat.isEmpty)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            16,
+            AppSizes.paddingM,
+            24,
+          ),
+          child: _EmptyHalaqatCard(),
+        )
+      else
+        Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSizes.paddingM,
             16,
             AppSizes.paddingM,
-            0,
+            AppSizes.paddingM,
           ),
-          child: _TeacherStatsRow(
-            studentsCount: totalStudents,
-            halaqatCount: state.halaqat.length,
-          ),
-        ),
-      ),
-      if (state.halaqat.isEmpty)
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSizes.paddingM,
-              16,
-              AppSizes.paddingM,
-              0,
-            ),
-            child: _EmptyHalaqatCard(),
-          ),
-        )
-      else
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSizes.paddingM,
-              16,
-              AppSizes.paddingM,
-              AppSizes.paddingM,
-            ),
-            child: _TodayAgendaSection(
-              status: state.todayAgendaStatus,
-              agenda: state.todayAgenda,
-              error: state.todayAgendaError,
-              onRetry: () =>
-                  context.read<TeacherBloc>().add(const LoadTodayAgendaEvent()),
-            ),
+          child: _TodayAgendaSection(
+            status: state.todayAgendaStatus,
+            agenda: state.todayAgenda,
+            error: state.todayAgendaError,
+            onRetry: () =>
+                context.read<TeacherBloc>().add(const LoadTodayAgendaEvent()),
           ),
         ),
     ];
@@ -472,7 +518,7 @@ class _AgendaCard extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _TeacherHeader — Figma 1:432 (Commit 1)
+// _TeacherHeader — Figma 1:432 (Commit 1 polish)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _TeacherHeader extends StatelessWidget {
@@ -499,8 +545,7 @@ class _TeacherHeader extends StatelessWidget {
 
   String _hijriChipLabel() {
     HijriCalendar.setLocal('ar');
-    final h = HijriCalendar.now();
-    return h.toFormat('dd MMMM yyyy');
+    return HijriCalendar.now().toFormat('dd MMMM yyyy');
   }
 
   @override
@@ -511,163 +556,149 @@ class _TeacherHeader extends StatelessWidget {
         ? 'معلم تحفيظ'
         : 'معلم تحفيظ · $halaqaName';
 
+    // Extra bottom padding so the overlapping white sheet (radius 28) sits
+    // correctly over the teal without clipping header content.
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF3DD4C2),
-            AppColors.primary,
-            AppColors.primaryDark,
-          ],
-          stops: [0.0, 0.55, 1.0],
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: AppColors.primaryGradient,
         ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + 14,
+          left: AppSizes.paddingM,
+          right: AppSizes.paddingM,
+          bottom: 44,
         ),
-      ),
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 14,
-        left: AppSizes.paddingM,
-        right: AppSizes.paddingM,
-        bottom: 28,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Top row (RTL): identity on the right, actions on the left
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    UserAvatar(
-                      name: displayName,
-                      imageUrl: imageUrl,
-                      size: 44,
-                      backgroundColor: Colors.white.withValues(alpha: 0.22),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      UserAvatar(
+                        name: displayName,
+                        imageUrl: imageUrl,
+                        size: 44,
+                        backgroundColor: Colors.white.withValues(alpha: 0.22),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'الأستاذ $displayName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _cairo(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _cairo(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white.withValues(alpha: 0.88),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                BlocSelector<NotificationsBloc, NotificationsState, int>(
+                  bloc: sl<NotificationsBloc>(),
+                  selector: (state) => state.unreadCount,
+                  builder: (context, unreadCount) {
+                    // Force LTR icon order: Search → Notifications (Figma).
+                    return Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'الأستاذ $displayName',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.3,
-                            ),
+                          _HeaderCircleButton(
+                            icon: Icons.search_rounded,
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('قريباً')),
+                              );
+                            },
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white.withValues(alpha: 0.85),
-                              height: 1.3,
-                            ),
+                          const SizedBox(width: 8),
+                          _HeaderCircleButton(
+                            icon: Icons.notifications_outlined,
+                            showDot: unreadCount > 0,
+                            onTap: () =>
+                                context.push(AppRoutes.teacherNotifs),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              ),
-              const SizedBox(width: 8),
-              BlocSelector<NotificationsBloc, NotificationsState, int>(
-                bloc: sl<NotificationsBloc>(),
-                selector: (state) => state.unreadCount,
-                builder: (context, unreadCount) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    // RTL: first = right → notif near center, search at far left
-                    children: [
-                      _HeaderCircleButton(
-                        icon: Icons.notifications_outlined,
-                        showDot: unreadCount > 0,
-                        onTap: () => context.push(AppRoutes.teacherNotifs),
-                      ),
-                      const SizedBox(width: 8),
-                      _HeaderCircleButton(
-                        icon: Icons.search_rounded,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('قريباً')),
-                          );
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 22),
-
-          const Text(
-            'السلام عليكم 🌿',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: Colors.white,
-              height: 1.4,
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'يوم $dayName مبارك!',
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+            const SizedBox(height: 22),
+            Text(
+              'السلام عليكم 🌿',
+              textAlign: TextAlign.right,
+              style: _cairo(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: Colors.white,
+                height: 1.4,
               ),
-              child: Text(
-                _hijriChipLabel(),
-                style: const TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white,
-                  height: 1.2,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'يوم $dayName مبارك!',
+              textAlign: TextAlign.right,
+              style: _cairo(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                ),
+                child: Text(
+                  _hijriChipLabel(),
+                  style: _cairo(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    height: 1.2,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -724,42 +755,151 @@ class _HeaderCircleButton extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _TeacherStatsRow - إحصاءات حقيقية فقط
+// _TeacherStatsGrid — Figma 1:432 (Commit 2)
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _TeacherStatsRow extends StatelessWidget {
+class _TeacherStatsGrid extends StatelessWidget {
   final int studentsCount;
-  final int halaqatCount;
+  final int sessionsToday;
+  final int pendingTasks;
+  final int newMessages;
 
-  const _TeacherStatsRow({
+  const _TeacherStatsGrid({
     required this.studentsCount,
-    required this.halaqatCount,
+    required this.sessionsToday,
+    required this.pendingTasks,
+    required this.newMessages,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            value: '$studentsCount',
-            label: 'إجمالي الطلاب',
-            icon: Icons.person_outline_rounded,
-            color: AppColors.primaryLight,
-            iconColor: AppColors.primary,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  value: sessionsToday,
+                  label: 'حصص اليوم',
+                  icon: Icons.calendar_today_outlined,
+                  iconBg: AppColors.primaryLight,
+                  iconColor: AppColors.primaryDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatTile(
+                  value: studentsCount,
+                  label: 'إجمالي الطلاب',
+                  icon: Icons.person_outline_rounded,
+                  iconBg: const Color(0xFFE8F5E9),
+                  iconColor: AppColors.success,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            value: '$halaqatCount',
-            label: 'الحلقات',
-            icon: Icons.calendar_today_outlined,
-            color: const Color(0xFFE8F5E9),
-            iconColor: AppColors.success,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  value: pendingTasks,
+                  label: 'مهام معلقة',
+                  icon: Icons.checklist_rtl_rounded,
+                  iconBg: AppColors.secondaryBg,
+                  iconColor: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatTile(
+                  value: newMessages,
+                  label: 'رسائل جديدة',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  iconBg: const Color(0xFFF3E5F5),
+                  iconColor: AppColors.awardWeekly,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final int value;
+  final String label;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+
+  const _StatTile({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(AppSizes.radiusM),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '$value',
+            textAlign: TextAlign.right,
+            style: _cairo(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.right,
+            style: _cairo(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -780,65 +920,11 @@ class _EmptyHalaqatCard extends StatelessWidget {
       child: Text(
         'لا توجد حلقات مسندة إليك حالياً',
         textAlign: TextAlign.center,
-        style: AppTextStyles.bodyMedium.copyWith(
+        style: _cairo(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String value;
-  final String label;
-  final IconData icon;
-  final Color color;
-  final Color iconColor;
-
-  const _StatCard({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.border),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                value,
-                style: AppTextStyles.headlineMedium.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Text(label, style: AppTextStyles.labelSmall),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(AppSizes.radiusM),
-            ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-        ],
       ),
     );
   }

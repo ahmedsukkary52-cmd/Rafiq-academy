@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -16,8 +17,7 @@ import '../bloc/posts_bloc.dart';
 import '../bloc/posts_event.dart';
 import '../bloc/posts_state.dart';
 
-/// Quarantined (H6 / A-H17): full posts UI exists but was never routed.
-/// Teacher home no longer shows a posts tab. Do not wire without product decision.
+/// Teacher Home «المنشورات» tab — uses app-scoped [PostsBloc] (do not close it).
 class PostsListPage extends StatefulWidget {
   final String? halaqaId;
 
@@ -31,6 +31,8 @@ class _PostsListPageState extends State<PostsListPage> {
   late final PostsBloc _bloc;
   String _currentUid = '';
   String _currentUserName = '';
+  Timer? _loadingFallback;
+  bool _allowEmptyWhileLoading = false;
 
   @override
   void initState() {
@@ -42,11 +44,19 @@ class _PostsListPageState extends State<PostsListPage> {
     }
     _bloc = sl<PostsBloc>();
     _bloc.add(WatchPostsEvent(widget.halaqaId ?? 'general'));
+    // If Firestore never emits, fall back to empty state instead of spinning forever.
+    _loadingFallback = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      final s = _bloc.state;
+      if (s.postsStatus == SectionStatus.loading && s.posts.isEmpty) {
+        setState(() => _allowEmptyWhileLoading = true);
+      }
+    });
   }
 
   @override
   void dispose() {
-    _bloc.close();
+    _loadingFallback?.cancel();
     super.dispose();
   }
 
@@ -90,9 +100,6 @@ class _PostsListPageState extends State<PostsListPage> {
               previous.posts != current.posts ||
               previous.postsError != current.postsError,
           builder: (context, state) {
-            if (state.postsStatus == SectionStatus.loading) {
-              return const AppLoadingWidget();
-            }
             if (state.postsStatus == SectionStatus.error) {
               return Center(
                 child: Column(
@@ -101,6 +108,7 @@ class _PostsListPageState extends State<PostsListPage> {
                     Text(
                       state.postsError ?? 'حدث خطأ',
                       style: AppTextStyles.bodyMedium,
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -113,7 +121,12 @@ class _PostsListPageState extends State<PostsListPage> {
                 ),
               );
             }
+            // Avoid endless spinner: show empty when nothing to show yet.
             if (state.posts.isEmpty) {
+              if (state.postsStatus == SectionStatus.loading &&
+                  !_allowEmptyWhileLoading) {
+                return const AppLoadingWidget();
+              }
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -121,10 +134,10 @@ class _PostsListPageState extends State<PostsListPage> {
                     Icon(
                       Icons.post_add_outlined,
                       size: 64,
-                      color: AppColors.textHint.withOpacity(0.4),
+                      color: AppColors.textHint.withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'لا توجد منشورات بعد',
                       style: AppTextStyles.bodyMedium,
                     ),
@@ -592,7 +605,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   @override
   void dispose() {
     _commentController.dispose();
-    _bloc.close();
+    // PostsBloc is a GetIt singleton — never close it from a page.
     super.dispose();
   }
 
@@ -654,7 +667,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           );
                         }
                         if (state.comments.isEmpty) {
-                          return const Center(
+                          return Center(
                             child: Text(
                               'لا توجد تعليقات',
                               style: AppTextStyles.bodyMedium,

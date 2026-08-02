@@ -349,7 +349,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                 ),
                 Expanded(
                   child: students.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'لا يوجد طلاب في هذه الحلقة',
                             style: AppTextStyles.bodyMedium,
@@ -780,7 +780,7 @@ class _PendingAbsenceRequestsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'طلبات استئذان لهذا اليوم',
             style: AppTextStyles.titleMedium,
             textAlign: TextAlign.right,

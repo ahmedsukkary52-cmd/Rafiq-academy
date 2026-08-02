@@ -170,11 +170,11 @@ class _StudentChatPageState extends State<StudentChatPage> {
                     ],
                   ),
                 )
-              : const Column(
+              : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    AppLoadingWidget(),
-                    SizedBox(height: 16),
+                    const AppLoadingWidget(),
+                    const SizedBox(height: 16),
                     Text(
                       'جاري فتح محادثة معلمك...',
                       style: AppTextStyles.bodyMedium,

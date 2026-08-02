@@ -303,7 +303,7 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                                 color: AppColors.textHint.withOpacity(0.4),
                               ),
                               const SizedBox(height: 16),
-                              const Text(
+                              Text(
                                 'لا يوجد محتوى متاح حالياً',
                                 style: AppTextStyles.bodyMedium,
                                 textAlign: TextAlign.center,

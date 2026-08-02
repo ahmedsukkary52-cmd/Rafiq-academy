@@ -270,7 +270,7 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
                   },
                 ),
                 const SizedBox(height: AppSizes.paddingL),
-                const Text(
+                Text(
                   'الحلقات والأدوات',
                   style: AppTextStyles.titleMedium,
                   textAlign: TextAlign.right,
@@ -397,7 +397,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
             _resolvedStudentId != null && _titleCtrl.text.trim().isNotEmpty;
 
         return AlertDialog(
-          title: const Text(
+          title: Text(
             'منح إنجاز',
             textAlign: TextAlign.right,
             style: AppTextStyles.headlineMedium,
@@ -409,7 +409,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('الطالب', style: AppTextStyles.labelLarge),
+                  Text('الطالب', style: AppTextStyles.labelLarge),
                   const SizedBox(height: 6),
                   if (widget.studentIds.isEmpty) ...[
                     Text(
@@ -441,7 +441,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
                               ? _studentId
                               : null,
                           isExpanded: true,
-                          hint: const Text(
+                          hint: Text(
                             'اختر الطالب',
                             style: AppTextStyles.bodyMedium,
                           ),
@@ -464,7 +464,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
                       ),
                     ),
                   const SizedBox(height: 16),
-                  const Text('النوع', style: AppTextStyles.labelLarge),
+                  Text('النوع', style: AppTextStyles.labelLarge),
                   const SizedBox(height: 6),
                   Container(
                     width: double.infinity,
@@ -498,7 +498,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('العنوان', style: AppTextStyles.labelLarge),
+                  Text('العنوان', style: AppTextStyles.labelLarge),
                   const SizedBox(height: 6),
                   AppTextField(
                     hint: 'مثال: ختم جزء عمّ',
@@ -584,7 +584,7 @@ class _RegisterStudentDialogState extends State<_RegisterStudentDialog> {
         final canSubmit = _studentIdCtrl.text.trim().isNotEmpty;
 
         return AlertDialog(
-          title: const Text(
+          title: Text(
             'تسجيل طالب',
             textAlign: TextAlign.right,
             style: AppTextStyles.headlineMedium,
@@ -610,7 +610,7 @@ class _RegisterStudentDialogState extends State<_RegisterStudentDialog> {
                     textAlign: TextAlign.right,
                   ),
                   const SizedBox(height: 16),
-                  const Text('معرّف الطالب', style: AppTextStyles.labelLarge),
+                  Text('معرّف الطالب', style: AppTextStyles.labelLarge),
                   const SizedBox(height: 6),
                   AppTextField(
                     hint: 'أدخل studentId الموجود',
@@ -752,7 +752,7 @@ class _HalaqaDetailSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'تفاصيل الحلقة',
           style: AppTextStyles.headlineMedium,
           textAlign: TextAlign.right,
@@ -785,7 +785,7 @@ class _HalaqaDetailSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSizes.paddingM),
-        const Text(
+        Text(
           'إجراءات',
           style: AppTextStyles.titleLarge,
           textAlign: TextAlign.right,
@@ -899,7 +899,7 @@ class _EmptyHalaqat extends StatelessWidget {
               color: AppColors.textHint.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'لا توجد حلقات مسندة إليك',
               style: AppTextStyles.titleLarge,
               textAlign: TextAlign.center,

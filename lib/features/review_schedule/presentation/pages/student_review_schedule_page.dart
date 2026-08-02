@@ -125,7 +125,7 @@ class _ReviewScheduleView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Align(
+              Align(
                 alignment: Alignment.centerRight,
                 child: Text('هذا الأسبوع', style: AppTextStyles.labelMedium),
               ),

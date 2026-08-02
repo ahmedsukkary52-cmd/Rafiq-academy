@@ -495,7 +495,7 @@ class _StudentsTab extends StatelessWidget {
           children: [
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.4,
-              child: const Center(
+              child: Center(
                 child: Text(
                   'لا يوجد طلاب في هذه الحلقة',
                   style: AppTextStyles.bodyMedium,
@@ -527,8 +527,8 @@ class _StudentsTab extends StatelessWidget {
             child: students.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 80),
+                    children: [
+                      const SizedBox(height: 80),
                       Center(
                         child: Text(
                           'لا نتائج للبحث',
@@ -846,7 +846,7 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('تكليف جديد', style: AppTextStyles.headlineMedium),
+              Text('تكليف جديد', style: AppTextStyles.headlineMedium),
               const SizedBox(height: 8),
               Text(
                 'يُنشأ تكليف مستقل لكل طالب. يظهر للطالب الأحدث حسب موعد التسليم.',

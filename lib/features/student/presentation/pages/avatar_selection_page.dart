@@ -239,7 +239,7 @@ class _AvatarSelectionPageState extends State<AvatarSelectionPage> {
                                   '$coins نقطة متاحة',
                                   style: AppTextStyles.titleMedium,
                                 ),
-                                const Text(
+                                Text(
                                   'يمكنك فتح المزيد من الشخصيات',
                                   style: AppTextStyles.labelSmall,
                                 ),

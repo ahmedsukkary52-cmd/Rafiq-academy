@@ -138,7 +138,7 @@ class TeacherProfileTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('أكاديمية رفيق', style: AppTextStyles.labelSmall),
+            Text('أكاديمية رفيق', style: AppTextStyles.labelSmall),
             const SizedBox(height: 24),
           ],
         ),

@@ -376,7 +376,7 @@ class _CertificateCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'إنشاء وطباعة شهادات PDF لطلابك',
                 style: AppTextStyles.labelSmall,
               ),
@@ -424,7 +424,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // نوع الجائزة
-          const Text('نوع الجائزة', style: AppTextStyles.labelLarge),
+          Text('نوع الجائزة', style: AppTextStyles.labelLarge),
           const SizedBox(height: 8),
           GridView.count(
             shrinkWrap: true,
@@ -463,7 +463,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
 
           const SizedBox(height: 16),
 
-          const Text('الطالب', style: AppTextStyles.labelLarge),
+          Text('الطالب', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           if (students.isEmpty)
             Text(
@@ -488,7 +488,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
                       ? _studentId
                       : null,
                   isExpanded: true,
-                  hint: const Text(
+                  hint: Text(
                     'اختر الطالب',
                     style: AppTextStyles.bodyMedium,
                   ),
@@ -507,7 +507,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
 
           const SizedBox(height: 16),
 
-          const Text('ملاحظة (اختياري)', style: AppTextStyles.labelLarge),
+          Text('ملاحظة (اختياري)', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           AppTextField(hint: 'مثال: ختم جزء تبارك', controller: _noteCtrl),
 
@@ -582,13 +582,13 @@ class _CertificateSheetState extends State<_CertificateSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Text('اسم الطالب', style: AppTextStyles.labelLarge),
+          Text('اسم الطالب', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           AppTextField(hint: 'أحمد محمد العلي', controller: _nameCtrl),
 
           const SizedBox(height: 16),
 
-          const Text('الإنجاز', style: AppTextStyles.labelLarge),
+          Text('الإنجاز', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           AppTextField(
             hint: 'مثال: إتمام حفظ جزء تبارك كاملاً',

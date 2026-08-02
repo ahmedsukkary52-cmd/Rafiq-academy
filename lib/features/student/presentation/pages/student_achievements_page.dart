@@ -134,7 +134,7 @@ class _EmptyAchievements extends StatelessWidget {
               color: AppColors.textHint.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'لا توجد إنجازات بعد',
               style: AppTextStyles.titleLarge,
               textAlign: TextAlign.center,

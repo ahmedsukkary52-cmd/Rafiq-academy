@@ -158,7 +158,7 @@ class _ProgressReportView extends StatelessWidget {
           _SummaryRow(report: report),
           const SizedBox(height: 12),
           if (!hasAttendanceActivity)
-            const AppCard(
+            AppCard(
               child: Text(
                 'لا توجد سجلات حضور في آخر ٣٠ يوماً',
                 textAlign: TextAlign.center,
@@ -169,7 +169,7 @@ class _ProgressReportView extends StatelessWidget {
             _AttendanceCard(report: report),
           const SizedBox(height: 12),
           if (!hasWeeklyActivity)
-            const AppCard(
+            AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -180,7 +180,7 @@ class _ProgressReportView extends StatelessWidget {
                       style: AppTextStyles.titleMedium,
                     ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
                     'لا توجد تسميعات مسجّلة هذا الأسبوع',
                     textAlign: TextAlign.center,
@@ -223,7 +223,7 @@ class _SummaryRow extends StatelessWidget {
                   '${report.memorizationAccuracyPercent.toStringAsFixed(0)}٪',
                   style: AppTextStyles.headlineMedium,
                 ),
-                const Text('دقة الحفظ', style: AppTextStyles.labelSmall),
+                Text('دقة الحفظ', style: AppTextStyles.labelSmall),
               ],
             ),
           ),
@@ -240,7 +240,7 @@ class _SummaryRow extends StatelessWidget {
                   '${report.attendedSessions}',
                   style: AppTextStyles.headlineMedium,
                 ),
-                const Text('حصة محضورة', style: AppTextStyles.labelSmall),
+                Text('حصة محضورة', style: AppTextStyles.labelSmall),
               ],
             ),
           ),
@@ -261,7 +261,7 @@ class _AttendanceCard extends StatelessWidget {
     return AppCard(
       child: Column(
         children: [
-          const Align(
+          Align(
             alignment: Alignment.centerRight,
             child: Text('معدل الحضور الشهري', style: AppTextStyles.titleMedium),
           ),
@@ -281,7 +281,7 @@ class _AttendanceCard extends StatelessWidget {
                         color: AppColors.primary,
                       ),
                     ),
-                    const Text('معدل الحضور', style: AppTextStyles.labelSmall),
+                    Text('معدل الحضور', style: AppTextStyles.labelSmall),
                   ],
                 ),
               ),
@@ -397,7 +397,7 @@ class _WeeklyChartCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Text('الحفظ الأسبوعي', style: AppTextStyles.titleMedium),
+              Text('الحفظ الأسبوعي', style: AppTextStyles.titleMedium),
             ],
           ),
           const SizedBox(height: 16),
@@ -468,12 +468,13 @@ class _TeacherNotesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text('ملاحظات المعلم', style: AppTextStyles.titleMedium),
-              SizedBox(width: 8),
-              Icon(Icons.chat_bubble_outline, color: AppColors.textSecondary),
+              const SizedBox(width: 8),
+              const Icon(
+                  Icons.chat_bubble_outline, color: AppColors.textSecondary),
             ],
           ),
           const SizedBox(height: 10),

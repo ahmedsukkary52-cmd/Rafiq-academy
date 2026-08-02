@@ -220,12 +220,12 @@ class _PerformanceDistributionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Text('توزيع مستويات الأداء', style: AppTextStyles.titleLarge),
+          Text('توزيع مستويات الأداء', style: AppTextStyles.titleLarge),
           const SizedBox(height: 16),
 
           if (total == 0)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(
                 'لا توجد بيانات كافية بعد',
                 style: AppTextStyles.bodyMedium,
@@ -344,7 +344,7 @@ class _WeeklyAttendanceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Text('الحضور الأسبوعي', style: AppTextStyles.titleLarge),
+          Text('الحضور الأسبوعي', style: AppTextStyles.titleLarge),
           const SizedBox(height: 20),
           SizedBox(
             height: 120,
@@ -473,18 +473,20 @@ class _TopStudentsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text('المتفوقون', style: AppTextStyles.titleLarge),
-              SizedBox(width: 6),
-              Icon(Icons.star_rounded, color: AppColors.secondary, size: 18),
-            ],
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.star_rounded,
+                color: AppColors.secondary,
+                size: 18,
+              )],
           ),
           const SizedBox(height: 12),
-          if (students.isEmpty)
-            const Text(
-              'لا توجد بيانات كافية بعد',
+          if (students.isEmpty))
+            Text'لا توجد بيانات كافية بعد',
               style: AppTextStyles.bodyMedium,
             )
           else

@@ -35,11 +35,11 @@ class StudentLastEvaluationWidget extends StatelessWidget {
                   ),
                 ),
               ),
-              const Row(
+              Row(
                 children: [
                   Text('آخر تقييم', style: AppTextStyles.titleMedium),
-                  SizedBox(width: 6),
-                  Icon(
+                  const SizedBox(width: 6),
+                  const Icon(
                     Icons.star_outline_rounded,
                     color: AppColors.secondary,
                     size: 18,

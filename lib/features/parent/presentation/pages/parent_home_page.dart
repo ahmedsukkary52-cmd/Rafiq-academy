@@ -180,7 +180,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text(
+                        Text(
                           'طلبات الاستئذان',
                           style: AppTextStyles.titleLarge,
                         ),
@@ -208,7 +208,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
                 ),
               ),
               const SizedBox(height: AppSizes.paddingM),
-              const Text(
+              Text(
                 'التقرير الأسبوعي',
                 style: AppTextStyles.headlineMedium,
                 textAlign: TextAlign.right,
@@ -375,7 +375,7 @@ class _WeeklyReportCard extends StatelessWidget {
           ],
           if (report.teacherNotes.trim().isNotEmpty) ...[
             const SizedBox(height: AppSizes.paddingM),
-            const Text(
+            Text(
               'ملاحظات المعلم',
               style: AppTextStyles.titleMedium,
               textAlign: TextAlign.right,
@@ -438,7 +438,7 @@ class _EmptyWeeklyReport extends StatelessWidget {
             color: AppColors.textHint.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'لا توجد بيانات لهذا الأسبوع بعد',
             style: AppTextStyles.titleMedium,
             textAlign: TextAlign.center,
@@ -472,7 +472,7 @@ class _EmptyChildren extends StatelessWidget {
               color: AppColors.textHint.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'لا يوجد طلاب مرتبطون بهذا الحساب بعد',
               style: AppTextStyles.titleLarge,
               textAlign: TextAlign.center,

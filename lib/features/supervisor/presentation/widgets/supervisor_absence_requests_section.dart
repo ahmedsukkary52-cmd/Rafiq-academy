@@ -33,7 +33,7 @@ class SupervisorAbsenceRequestsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'استئذان اليوم (عرض فقط)',
           style: AppTextStyles.headlineMedium,
           textAlign: TextAlign.right,

@@ -104,7 +104,7 @@ class _BoardHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const Text('متابعة يوم الحلقات', style: AppTextStyles.titleLarge),
+        Text('متابعة يوم الحلقات', style: AppTextStyles.titleLarge),
         const SizedBox(height: 2),
         Text(
           'تحديد الحلقات المحجوبة وتوجيه الانتباه لمالك سير العمل',

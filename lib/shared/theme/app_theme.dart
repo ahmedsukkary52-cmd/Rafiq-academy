@@ -29,7 +29,15 @@ class AppColors {
 
   // Secondary — الذهبي للنقاط والـ streak والأيقونات المميزة
   static const Color secondary = Color(0xFFF5A623);
+  static const Color secondaryDeep = Color(0xFFE8910F);
   static const Color secondaryBg = Color(0xFFFFF8EC);
+
+  /// Admin announcement banner (Figma 1:432).
+  static const Gradient announcementGradient = LinearGradient(
+    begin: Alignment.centerRight,
+    end: Alignment.centerLeft,
+    colors: [secondary, secondaryDeep],
+  );
 
   // Dark — خلفية كروت الجلسة والليلية
   static const Color dark = Color(0xFF1C1C2E);

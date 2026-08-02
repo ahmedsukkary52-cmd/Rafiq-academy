@@ -79,7 +79,7 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                     color: AppColors.textHint.withOpacity(0.4),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'لا توجد رسائل بعد',
                     style: AppTextStyles.bodyMedium,
                   ),

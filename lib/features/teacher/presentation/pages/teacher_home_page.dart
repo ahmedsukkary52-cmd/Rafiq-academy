@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rafiq_academy/features/post/presentation/pages/posts_list_page.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_classes_page.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_dashboard_tab.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_messages_tab.dart';
@@ -17,6 +18,7 @@ import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 
+/// Figma 1:432 shell — 5 tabs: الرئيسية · الطلاب · المنشورات · الرسائل · حسابي
 class TeacherHomePage extends StatefulWidget {
   const TeacherHomePage({super.key});
 
@@ -26,6 +28,10 @@ class TeacherHomePage extends StatefulWidget {
 
 class _TeacherHomePageState extends State<TeacherHomePage> {
   int _currentTab = 0;
+
+  static const _tabStudents = 1;
+  static const _tabMessages = 3;
+  static const _tabProfile = 4;
 
   @override
   void initState() {
@@ -45,8 +51,12 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       StartWatchingNotificationsEvent(uid: uid, role: AppRoles.teacher),
     );
 
-    // Needed for Home «رسائل جديدة» stat (Commit 2); same watch as Messages tab.
     sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
+  }
+
+  void _switchTab(int index) {
+    if (index < 0 || index > _tabProfile) return;
+    setState(() => _currentTab = index);
   }
 
   @override
@@ -55,25 +65,26 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _currentTab,
-        // H6 / A-H17: posts placeholder tab removed (PostsListPage never wired).
-        children: const [
-          TeacherDashboardTab(),
-          TeacherClassesPage(),
-          TeacherMessagesTab(),
-          TeacherProfileTab(),
+        children: [
+          TeacherDashboardTab(
+            onSwitchTab: _switchTab,
+            tabStudents: _tabStudents,
+            tabMessages: _tabMessages,
+            tabProfile: _tabProfile,
+          ),
+          const TeacherClassesPage(),
+          const PostsListPage(halaqaId: 'general'),
+          const TeacherMessagesTab(),
+          const TeacherProfileTab(),
         ],
       ),
       bottomNavigationBar: _TeacherBottomNav(
         selected: _currentTab,
-        onChanged: (i) => setState(() => _currentTab = i),
+        onChanged: _switchTab,
       ),
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Bottom Navigation
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _TeacherBottomNav extends StatelessWidget {
   final int selected;
@@ -81,10 +92,10 @@ class _TeacherBottomNav extends StatelessWidget {
 
   const _TeacherBottomNav({required this.selected, required this.onChanged});
 
-  /// Labels freeze H6 teacher shell (no posts tab).
   static const tabs = [
     (icon: Icons.home_rounded, label: 'الرئيسية'),
-    (icon: Icons.groups_rounded, label: 'الحلقات'),
+    (icon: Icons.groups_rounded, label: 'الطلاب'),
+    (icon: Icons.article_outlined, label: 'المنشورات'),
     (icon: Icons.chat_bubble_outline, label: 'الرسائل'),
     (icon: Icons.person_outline, label: 'حسابي'),
   ];
@@ -92,13 +103,13 @@ class _TeacherBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: AppColors.softShadow,
             blurRadius: 12,
-            offset: const Offset(0, -2),
+            offset: Offset(0, -2),
           ),
         ],
       ),
@@ -127,8 +138,9 @@ class _TeacherBottomNav extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         tab.label,
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.labelSmall.copyWith(
                           fontSize: 10,
                           fontWeight: isSelected
                               ? FontWeight.w600
@@ -138,6 +150,17 @@ class _TeacherBottomNav extends StatelessWidget {
                               : AppColors.textSecondary,
                         ),
                       ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

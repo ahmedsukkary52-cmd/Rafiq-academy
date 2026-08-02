@@ -58,7 +58,7 @@ class _HomeworkView extends StatelessWidget {
                   children: [
                     const Text('🎉', style: TextStyle(fontSize: 40)),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'أحسنت! تم إنهاء الواجب',
                       style: AppTextStyles.titleLarge,
                     ),
@@ -217,7 +217,7 @@ class _HomeworkView extends StatelessWidget {
                       children: [
                         _HomeworkHeroCard(homework: hw),
                         const SizedBox(height: 20),
-                        const Align(
+                        Align(
                           alignment: Alignment.centerRight,
                           child: Text(
                             'المهام',
@@ -254,7 +254,7 @@ class _HomeworkView extends StatelessWidget {
                         ),
                         if (hw.teacherVoiceNote != null) ...[
                           const SizedBox(height: 12),
-                          const Align(
+                          Align(
                             alignment: Alignment.centerRight,
                             child: Text(
                               'ملاحظة صوتية من المعلم',
@@ -266,7 +266,7 @@ class _HomeworkView extends StatelessWidget {
                         ],
                         if (hw.attachments.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          const Align(
+                          Align(
                             alignment: Alignment.centerRight,
                             child: Text(
                               'مرفقات',

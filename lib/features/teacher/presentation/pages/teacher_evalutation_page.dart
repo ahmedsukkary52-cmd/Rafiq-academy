@@ -205,8 +205,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
         },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 120),
+          children: [
+            const SizedBox(height: 120),
             Center(
               child: Text(
                 'لا توجد تقييمات بعد',
@@ -563,7 +563,7 @@ class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('مراجعة التسميع', style: AppTextStyles.headlineMedium),
+              Text('مراجعة التسميع', style: AppTextStyles.headlineMedium),
               const SizedBox(height: 12),
               Text(
                 record.studentName.isNotEmpty ? record.studentName : 'طالب',
@@ -728,7 +728,7 @@ class _AddEvaluationSheetState extends State<_AddEvaluationSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('تقييم جديد', style: AppTextStyles.headlineMedium),
+              Text('تقييم جديد', style: AppTextStyles.headlineMedium),
               const SizedBox(height: 20),
               const _Label('الطالب'),
               BlocBuilder<TeacherBloc, TeacherState>(

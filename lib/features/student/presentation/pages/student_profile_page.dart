@@ -191,14 +191,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.person_outline_rounded,
                             color: AppColors.textSecondary,
                             size: 16,
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
                             'معلومات الطالب',
                             style: AppTextStyles.titleMedium,

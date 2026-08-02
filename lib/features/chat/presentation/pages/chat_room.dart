@@ -134,7 +134,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                             color: AppColors.textHint.withOpacity(0.4),
                           ),
                           const SizedBox(height: 12),
-                          const Text(
+                          Text(
                             'ابدأ المحادثة',
                             style: AppTextStyles.bodyMedium,
                           ),

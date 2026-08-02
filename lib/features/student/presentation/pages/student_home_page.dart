@@ -401,7 +401,7 @@ class _StudentHomeTab extends StatelessWidget {
               children: [
                 const Icon(Icons.chevron_left, color: AppColors.textHint),
                 const Spacer(),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text('حصة الحفظ اليومية', style: AppTextStyles.titleMedium),
@@ -482,7 +482,7 @@ class _StudentMapTab extends StatelessWidget {
                 color: AppColors.textHint,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'خريطة المغامرة',
                 style: AppTextStyles.headlineMedium,
                 textAlign: TextAlign.center,
@@ -496,7 +496,7 @@ class _StudentMapTab extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'ستظهر خريطة التقدم عند تفعيل خطة الحفظ',
                 style: AppTextStyles.bodyMedium,
                 textAlign: TextAlign.center,
@@ -662,7 +662,7 @@ class _StudentProfileTab extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'السورة الحالية',
                                     style: AppTextStyles.labelSmall,
                                   ),

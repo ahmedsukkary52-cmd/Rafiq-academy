@@ -228,7 +228,7 @@ class _EmptyHalaqat extends StatelessWidget {
             color: AppColors.textHint.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'لا توجد حلقات مسندة إليك',
             style: AppTextStyles.bodyMedium,
           ),

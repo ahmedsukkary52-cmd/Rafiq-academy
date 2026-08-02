@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
@@ -24,18 +25,36 @@ class PostsRepositoryImpl implements PostsRepository {
   Stream<Either<Failure, List<PostEntity>>> watchPosts({
     required String halaqaId,
   }) {
-    return remoteDatasource
-        .watchPosts(halaqaId: halaqaId)
-        .map<Either<Failure, List<PostEntity>>>((list) => Right(list))
-        .handleError((e) => Left(ServerFailure(e.toString())));
+    // Convert Firestore errors into Left events — handleError alone swallows
+    // them without emitting, which left the UI stuck on loading forever.
+    return remoteDatasource.watchPosts(halaqaId: halaqaId).transform(
+      StreamTransformer.fromHandlers(
+        handleData: (list, sink) =>
+            sink.add(
+                Right<Failure, List<PostEntity>>(List<PostEntity>.from(list))),
+        handleError: (error, stackTrace, sink) =>
+            sink.add(Left<Failure, List<PostEntity>>(
+                ServerFailure(error.toString()))),
+      ),
+    );
   }
 
   @override
   Stream<Either<Failure, List<CommentEntity>>> watchComments(String postId) {
-    return remoteDatasource
-        .watchComments(postId)
-        .map<Either<Failure, List<CommentEntity>>>((list) => Right(list))
-        .handleError((e) => Left(ServerFailure(e.toString())));
+    return remoteDatasource.watchComments(postId).transform(
+      StreamTransformer.fromHandlers(
+        handleData: (list, sink) =>
+            sink.add(
+              Right<Failure, List<CommentEntity>>(
+                  List<CommentEntity>.from(list)),
+            ),
+        handleError: (error, stackTrace, sink) =>
+            sink.add(
+              Left<Failure, List<CommentEntity>>(
+                  ServerFailure(error.toString())),
+            ),
+      ),
+    );
   }
 
   @override

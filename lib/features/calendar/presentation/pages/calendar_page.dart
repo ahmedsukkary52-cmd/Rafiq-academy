@@ -168,14 +168,15 @@ class _CalendarPageState extends State<CalendarPage> {
                         outsideDaysVisible: false,
                       ),
 
-                      headerStyle: const HeaderStyle(
+                      headerStyle: HeaderStyle(
                         formatButtonVisible: false,
                         titleCentered: true,
                         titleTextStyle: AppTextStyles.titleLarge,
-                        leftChevronPadding: EdgeInsets.all(4),
-                        rightChevronPadding: EdgeInsets.all(4),
-                        rightChevronIcon: Icon(Icons.chevron_right_rounded),
-                        leftChevronIcon: Icon(Icons.chevron_left_rounded),
+                        leftChevronPadding: const EdgeInsets.all(4),
+                        rightChevronPadding: const EdgeInsets.all(4),
+                        rightChevronIcon: const Icon(Icons
+                            .chevron_right_rounded),
+                        leftChevronIcon: const Icon(Icons.chevron_left_rounded),
                       ),
                     ),
                   ),
@@ -213,7 +214,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   // ── أحداث اليوم المختار ─────────────────────────
                   Expanded(
                     child: dayEvents.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               'لا توجد أحداث في هذا اليوم',
                               style: AppTextStyles.bodyMedium,
@@ -425,11 +426,11 @@ class _AddEventSheetState extends State<_AddEventSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('إضافة حدث جديد', style: AppTextStyles.headlineMedium),
+            Text('إضافة حدث جديد', style: AppTextStyles.headlineMedium),
             const SizedBox(height: 20),
 
             // اسم الحدث
-            const Text('اسم الحدث', style: AppTextStyles.labelLarge),
+            Text('اسم الحدث', style: AppTextStyles.labelLarge),
             const SizedBox(height: 6),
             AppTextField(
               hint: 'مثال: اختبار الحفظ الشهري',
@@ -439,7 +440,7 @@ class _AddEventSheetState extends State<_AddEventSheet> {
             const SizedBox(height: 16),
 
             // نوع الحدث
-            const Text('نوع الحدث', style: AppTextStyles.labelLarge),
+            Text('نوع الحدث', style: AppTextStyles.labelLarge),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -477,7 +478,7 @@ class _AddEventSheetState extends State<_AddEventSheet> {
             const SizedBox(height: 16),
 
             // التاريخ
-            const Text('التاريخ', style: AppTextStyles.labelLarge),
+            Text('التاريخ', style: AppTextStyles.labelLarge),
             const SizedBox(height: 6),
             GestureDetector(
               onTap: () async {
@@ -518,7 +519,7 @@ class _AddEventSheetState extends State<_AddEventSheet> {
             const SizedBox(height: 16),
 
             // ملاحظة اختيارية
-            const Text('وصف (اختياري)', style: AppTextStyles.labelLarge),
+            Text('وصف (اختياري)', style: AppTextStyles.labelLarge),
             const SizedBox(height: 6),
             AppTextField(hint: 'تفاصيل إضافية...', controller: _descCtrl),
 

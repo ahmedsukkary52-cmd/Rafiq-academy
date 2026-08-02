@@ -563,8 +563,8 @@ class _EmptyEvaluations extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Text(
         'لا توجد تقييمات معتمدة في هذه الفترة.\nالتسميعات بانتظار مراجعة المعلم لا تظهر هنا.',
         textAlign: TextAlign.center,

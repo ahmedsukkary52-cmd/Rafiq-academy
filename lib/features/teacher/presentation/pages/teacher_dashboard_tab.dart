@@ -18,9 +18,27 @@ import '../../domain/read_models/teacher_day_agenda.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
+import '../widgets/teacher_home_figma_cards.dart';
 
+/// Figma 1:432 Teacher Home body (full screen composition).
 class TeacherDashboardTab extends StatelessWidget {
-  const TeacherDashboardTab({super.key});
+  final ValueChanged<int>? onSwitchTab;
+  final int tabStudents;
+  final int tabMessages;
+  final int tabProfile;
+
+  /// Temporary preview copy until admin announcements are wired to Firestore.
+  final String adminAnnouncement;
+
+  const TeacherDashboardTab({
+    super.key,
+    this.onSwitchTab,
+    this.tabStudents = 1,
+    this.tabMessages = 3,
+    this.tabProfile = 4,
+    this.adminAnnouncement =
+        'تذكير: موعد رفع التقييمات الشهرية غداً قبل الساعة 12 ظهراً',
+  });
 
   void _retryHalaqat(BuildContext context) {
     final auth = context.read<AuthBloc>().state;
@@ -67,10 +85,11 @@ class TeacherDashboardTab extends StatelessWidget {
                   name: teacherName,
                   halaqaName: nextHalaqa?.name ?? '',
                   imageUrl: auth?.user.profileImageUrl,
+                  onProfileTap: onSwitchTab == null
+                      ? null
+                      : () => onSwitchTab!(tabProfile),
                 ),
               ),
-              // Figma: white sheet with convex top corners overlapping the header
-              // (not a rounded bottom on the teal block).
               SliverToBoxAdapter(
                 child: Transform.translate(
                   offset: const Offset(0, -24),
@@ -100,10 +119,10 @@ class TeacherDashboardTab extends StatelessWidget {
   List<Widget> _bodyChildren(BuildContext context, TeacherState state) {
     if (state.halaqatStatus == SectionStatus.initial ||
         state.halaqatStatus == SectionStatus.loading) {
-      return [
-        const SizedBox(
-          height: 220,
-          child: AppLoadingWidget(),
+      return const [
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: _HomeBodySkeleton(),
         ),
       ];
     }
@@ -111,7 +130,7 @@ class TeacherDashboardTab extends StatelessWidget {
     if (state.halaqatStatus == SectionStatus.error) {
       return [
         SizedBox(
-          height: 220,
+          height: 240,
           child: AppErrorWidget(
             message: state.halaqatError ?? 'تعذر تحميل الحلقات',
             onRetry: () => _retryHalaqat(context),
@@ -120,17 +139,17 @@ class TeacherDashboardTab extends StatelessWidget {
       ];
     }
 
-    final totalStudents = state.halaqat.fold<int>(
-      0,
-      (sum, h) => sum + h.studentIds.length,
-    );
+    final totalStudents = state.halaqat
+        .expand((h) => h.studentIds)
+        .toSet()
+        .length;
     final sessionsToday = state.todayAgenda.sessionsTodayCount;
     final pendingTasks = state.todayAgenda.items.fold<int>(
       0,
       (sum, item) => sum + item.pendingActions.length,
     );
+    final agenda = state.todayAgenda;
 
-    // Figma 1:432: ~20px horizontal page margin; ~16px section gap.
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -138,35 +157,97 @@ class TeacherDashboardTab extends StatelessWidget {
           bloc: sl<ChatConversationsBloc>(),
           selector: (s) => s.totalUnreadCount,
           builder: (context, unreadMessages) {
-            return _TeacherStatsGrid(
+            return TeacherHomeStatsGrid(
               studentsCount: totalStudents,
               sessionsToday: sessionsToday,
               pendingTasks: pendingTasks,
               newMessages: unreadMessages,
+              onSessionsTap: onSwitchTab == null
+                  ? null
+                  : () => onSwitchTab!(tabStudents),
+              onStudentsTap: onSwitchTab == null
+                  ? null
+                  : () => onSwitchTab!(tabStudents),
+              onPendingTap: () => _openFirstPendingAction(context, agenda),
+              onMessagesTap: onSwitchTab == null
+                  ? null
+                  : () => onSwitchTab!(tabMessages),
             );
           },
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
         child: _TodaySessionSection(
           status: state.todayAgendaStatus,
-          agenda: state.todayAgenda,
+          agenda: agenda,
           error: state.todayAgendaError,
           onRetry: () =>
               context.read<TeacherBloc>().add(const LoadTodayAgendaEvent()),
         ),
       ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        child: TeacherHomeAnnouncementBanner(message: adminAnnouncement),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        child: TeacherHomeRecentActivities(
+          items: _previewActivities,
+          onSeeAll: onSwitchTab == null
+              ? null
+              : () => onSwitchTab!(tabStudents),
+        ),
+      ),
     ];
   }
-}
 
-// ══════════════════════════════════════════════════════════════════════════════
-// _TodaySessionSection — Figma 1:432 Today's Session card
-//
-// Presentation only: uses TeacherDayAgenda.featuredSession from GetTodayAgendaUseCase.
-// Room omitted until HalaqaEntity exposes it. No agenda-list UI.
-// ══════════════════════════════════════════════════════════════════════════════
+  /// Temporary Figma preview rows — replace with Firestore feed later.
+  static const _previewActivities = <TeacherHomeActivityVm>[
+    TeacherHomeActivityVm(
+      title: 'تقييم أحمد محمد',
+      subtitle: 'ممتاز',
+      icon: Icons.star_rounded,
+      iconBg: AppColors.successBg,
+      iconColor: AppColors.success,
+      timeLabel: 'منذ ساعة',
+    ),
+    TeacherHomeActivityVm(
+      title: 'تسجيل حضور',
+      subtitle: 'حلقة الفجر',
+      icon: Icons.how_to_reg_outlined,
+      iconBg: AppColors.primaryLight,
+      iconColor: AppColors.primaryDark,
+      timeLabel: 'منذ ساعتين',
+    ),
+    TeacherHomeActivityVm(
+      title: 'منح شارة "المتفوق"',
+      subtitle: 'سارة علي',
+      icon: Icons.military_tech_outlined,
+      iconBg: AppColors.secondaryBg,
+      iconColor: AppColors.secondary,
+      timeLabel: 'أمس',
+    ),
+  ];
+
+  void _openFirstPendingAction(BuildContext context, TeacherDayAgenda agenda) {
+    for (final item in agenda.items) {
+      if (item.pendingActions.isEmpty) continue;
+      context.push(_routeFor(item.pendingActions.first, item.halaqaId));
+      return;
+    }
+    onSwitchTab?.call(tabStudents);
+  }
+
+  String _routeFor(TeacherAgendaAction action, String halaqaId) =>
+      switch (action) {
+        TeacherAgendaAction.takeAttendance => '/teacher/attendance/$halaqaId',
+        TeacherAgendaAction.sendHomework =>
+          '/teacher/halaqa/$halaqaId?assign=1',
+        TeacherAgendaAction.reviewRecitations =>
+          '/teacher/halaqa/$halaqaId/evaluations',
+      };
+}
 
 class _TodaySessionSection extends StatelessWidget {
   final SectionStatus status;
@@ -181,309 +262,93 @@ class _TodaySessionSection extends StatelessWidget {
     required this.onRetry,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    switch (status) {
-      case SectionStatus.initial:
-      case SectionStatus.loading:
-        return const _SessionCardShell(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 28),
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: AppColors.onPrimaryMuted,
-                ),
-              ),
-            ),
-          ),
-        );
-      case SectionStatus.error:
-        return _EmptySessionCard(
-          message: error ?? 'تعذر تحميل جلسة اليوم',
-          onRetry: onRetry,
-        );
-      case SectionStatus.loaded:
-        final session = agenda.featuredSession;
-        if (session == null) {
-          return const _EmptySessionCard(
-            message: 'لا توجد حصص مجدوَلة اليوم',
-          );
-        }
-        return _TodaySessionCard(session: session);
-    }
-  }
-}
-
-/// Figma session time: Eastern digits + صباحاً/مساءً (e.g. ٧:٠٠ مساءً).
-String _figmaSessionTime(DateTime dt) {
-  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-  final minute = dt.minute.toString().padLeft(2, '0');
-  final period = dt.hour < 12 ? 'صباحاً' : 'مساءً';
-  return _toEasternDigits('$hour12:$minute $period');
-}
-
-String _toEasternDigits(String input) {
-  const western = '0123456789';
-  const eastern = '٠١٢٣٤٥٦٧٨٩';
-  final buffer = StringBuffer();
-  for (final code in input.runes) {
-    final ch = String.fromCharCode(code);
-    final i = western.indexOf(ch);
-    buffer.write(i >= 0 ? eastern[i] : ch);
-  }
-  return buffer.toString();
-}
-
-class _TodaySessionCard extends StatelessWidget {
-  final TeacherTodaySession session;
-
-  const _TodaySessionCard({required this.session});
-
-  void _startSession(BuildContext context) {
+  void _startSession(BuildContext context, TeacherTodaySession session) {
     context.read<TeacherBloc>().add(SelectHalaqaEvent(session.halaqaId));
     context.push('/teacher/halaqa/${session.halaqaId}');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: _SessionCardShell(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.access_time_rounded,
-                  size: 14,
-                  color: AppColors.onPrimaryMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'اليوم — ${_figmaSessionTime(session.startAt)}',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.onPrimaryMuted,
-                    fontWeight: FontWeight.w400,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              session.halaqaName,
-              textAlign: TextAlign.right,
-              style: AppTextStyles.headlineLarge.copyWith(
-                color: AppColors.onPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(
-                  Icons.person_outline_rounded,
-                  size: 14,
-                  color: AppColors.onPrimaryMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${_toEasternDigits('${session.studentCount}')} طالباً',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.onPrimaryMuted,
-                    fontWeight: FontWeight.w400,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: _StartSessionButton(onTap: () => _startSession(context)),
-            ),
-          ],
-        ),
-      ),
-    );
+    switch (status) {
+      case SectionStatus.initial:
+      case SectionStatus.loading:
+        return TeacherHomeSessionCard.empty();
+      case SectionStatus.error:
+        return TeacherHomeSessionCard.error(
+          message: error ?? 'تعذر تحميل جلسة اليوم',
+          onRetry: onRetry,
+        );
+      case SectionStatus.loaded:
+        final session = agenda.featuredSession;
+        if (session == null) {
+          return TeacherHomeSessionCard.empty();
+        }
+        return TeacherHomeSessionCard.filled(
+          halaqaName: session.halaqaName,
+          startAt: session.startAt,
+          studentCount: session.studentCount,
+          onStart: () => _startSession(context, session),
+        );
+    }
   }
 }
 
-class _StartSessionButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _StartSessionButton({required this.onTap});
+class _HomeBodySkeleton extends StatelessWidget {
+  const _HomeBodySkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    Widget box({double height = 100}) => Container(
+      height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppSizes.radiusM),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Material(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(AppSizes.radiusM),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSizes.radiusM),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.play_arrow_rounded,
-                  size: 20,
-                  color: AppColors.onPrimary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'ابدأ الجلسة',
-                  style: AppTextStyles.titleMedium.copyWith(
-                    color: AppColors.onPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptySessionCard extends StatelessWidget {
-  final String message;
-  final VoidCallback? onRetry;
-
-  const _EmptySessionCard({
-    required this.message,
-    this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Same dark Figma session shell as the filled card — never a white box.
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: _SessionCardShell(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.access_time_rounded,
-                  size: 14,
-                  color: AppColors.onPrimaryMuted,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'اليوم',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.onPrimaryMuted,
-                    fontWeight: FontWeight.w400,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              message,
-              textAlign: TextAlign.right,
-              style: AppTextStyles.headlineLarge.copyWith(
-                color: AppColors.onPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 18),
-            if (onRetry != null)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  onPressed: onRetry,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: Text(
-                    'إعادة المحاولة',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              )
-            else
-              // Reserve meta + CTA band so empty height matches filled card.
-              const SizedBox(height: 64),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SessionCardShell extends StatelessWidget {
-  final Widget child;
-
-  const _SessionCardShell({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        color: AppColors.dark,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.dark.withValues(alpha: 0.18),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
-      child: child,
+    );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: box(height: 120)),
+            const SizedBox(width: 12),
+            Expanded(child: box(height: 120)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: box(height: 120)),
+            const SizedBox(width: 12),
+            Expanded(child: box(height: 120)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        box(height: 160),
+        const SizedBox(height: 16),
+        box(height: 140),
+        const SizedBox(height: 16),
+        box(height: 160),
+      ],
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _TeacherHeader — Figma 1:432 (Commit 1 polish)
+// Header
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _TeacherHeader extends StatelessWidget {
   final String name;
   final String halaqaName;
   final String? imageUrl;
+  final VoidCallback? onProfileTap;
 
   const _TeacherHeader({
     required this.name,
     required this.halaqaName,
     this.imageUrl,
+    this.onProfileTap,
   });
 
   static const _weekdays = [
@@ -510,8 +375,6 @@ class _TeacherHeader extends StatelessWidget {
         ? 'معلم تحفيظ'
         : 'معلم تحفيظ · $halaqaName';
 
-    // Extra bottom padding so the overlapping white sheet (radius 28) sits
-    // correctly over the teal without clipping header content.
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
@@ -531,55 +394,57 @@ class _TeacherHeader extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      UserAvatar(
-                        name: displayName,
-                        imageUrl: imageUrl,
-                        size: 44,
-                        backgroundColor: AppColors.onPrimaryOverlay,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'الأستاذ $displayName',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.titleLarge.copyWith(
-                                color: AppColors.onPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                                height: 1.25,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.labelMedium.copyWith(
-                                color: AppColors.onPrimaryMuted,
-                                fontWeight: FontWeight.w400,
-                                fontSize: 12,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
+                Expanded(hild: InkWell(
+                    onTap: onProfileTap,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                    child: Row(
+                      children: [
+                        UserAvatar(
+                          name: displayName,
+                          imageUrl: imageUrl,
+                          size: 44,
+                          backgroundColor: AppColors.onPrimaryOverlay,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'الأستاذ $displayName',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  color: AppColors.onPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  color: AppColors.onPrimaryMuted,
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 12,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
                 ),
                 const SizedBox(width: 8),
                 BlocSelector<NotificationsBloc, NotificationsState, int>(
                   bloc: sl<NotificationsBloc>(),
                   selector: (state) => state.unreadCount,
                   builder: (context, unreadCount) {
-                    // Force LTR icon order: Search → Notifications (Figma).
                     return Directionality(
                       textDirection: TextDirection.ltr,
                       child: Row(
@@ -640,7 +505,7 @@ class _TeacherHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                 ),
                 child: Text(
-                  _toEasternDigits(_hijriChipLabel()),
+                  teacherHomeEasternDigits(_hijriChipLabel()),
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.onPrimary,
                     fontWeight: FontWeight.w500,
@@ -703,157 +568,6 @@ class _HeaderCircleButton extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _TeacherStatsGrid — Figma 1:432 (Commit 2)
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _TeacherStatsGrid extends StatelessWidget {
-  final int studentsCount;
-  final int sessionsToday;
-  final int pendingTasks;
-  final int newMessages;
-
-  const _TeacherStatsGrid({
-    required this.studentsCount,
-    required this.sessionsToday,
-    required this.pendingTasks,
-    required this.newMessages,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  value: sessionsToday,
-                  label: 'حصص اليوم',
-                  icon: Icons.calendar_today_outlined,
-                  iconBg: AppColors.primaryLight,
-                  iconColor: AppColors.primaryDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatTile(
-                  value: studentsCount,
-                  label: 'إجمالي الطلاب',
-                  icon: Icons.person_outline_rounded,
-                  iconBg: AppColors.successBg,
-                  iconColor: AppColors.success,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  value: pendingTasks,
-                  label: 'مهام معلقة',
-                  icon: Icons.checklist_rtl_rounded,
-                  iconBg: AppColors.secondaryBg,
-                  iconColor: AppColors.secondary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatTile(
-                  value: newMessages,
-                  label: 'رسائل جديدة',
-                  icon: Icons.chat_bubble_outline_rounded,
-                  iconBg: AppColors.messagesBg,
-                  iconColor: AppColors.awardWeekly,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  final int value;
-  final String label;
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-
-  const _StatTile({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Figma: white card, radius 24, soft shadow (no hard border),
-    // icon chip top-start, large number, muted label.
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 18),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _toEasternDigits('$value'),
-            textAlign: TextAlign.right,
-            style: AppTextStyles.displayLarge.copyWith(
-              fontWeight: FontWeight.w800,
-              fontSize: 28,
-              height: 1.1,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.right,
-            style: AppTextStyles.labelMedium.copyWith(
-              fontWeight: FontWeight.w500,
-              fontSize: 12,
-              height: 1.3,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }

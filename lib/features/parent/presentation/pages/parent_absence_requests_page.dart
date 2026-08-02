@@ -202,7 +202,7 @@ class _ParentAbsenceRequestsPageState extends State<ParentAbsenceRequestsPage> {
                   },
                 ),
                 const SizedBox(height: AppSizes.paddingL),
-                const Text(
+                Text(
                   'نتائج طلباتي',
                   style: AppTextStyles.headlineMedium,
                   textAlign: TextAlign.right,
@@ -265,7 +265,7 @@ class _SubmitFormCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'تقديم استئذان',
             style: AppTextStyles.titleLarge,
             textAlign: TextAlign.right,
@@ -277,7 +277,7 @@ class _SubmitFormCard extends StatelessWidget {
             textAlign: TextAlign.right,
           ),
           const SizedBox(height: AppSizes.paddingM),
-          const Text('الابن', style: AppTextStyles.labelLarge),
+          Text('الابن', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           _PickerShell(
             child: DropdownButtonHideUnderline(
@@ -300,7 +300,7 @@ class _SubmitFormCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.paddingM),
-          const Text('الحلقة', style: AppTextStyles.labelLarge),
+          Text('الحلقة', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           _HalaqaField(
             state: state,
@@ -310,7 +310,7 @@ class _SubmitFormCard extends StatelessWidget {
             onRetry: onRetryHalaqat,
           ),
           const SizedBox(height: AppSizes.paddingM),
-          const Text('اليوم', style: AppTextStyles.labelLarge),
+          Text('اليوم', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           GestureDetector(
             onTap: submitting ? null : onDateTap,
@@ -334,7 +334,7 @@ class _SubmitFormCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.paddingM),
-          const Text('السبب', style: AppTextStyles.labelLarge),
+          Text('السبب', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           TextField(
             controller: reasonController,
@@ -586,7 +586,7 @@ class _EmptyRequests extends StatelessWidget {
             color: AppColors.textHint.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'لا توجد طلبات استئذان بعد',
             style: AppTextStyles.titleMedium,
             textAlign: TextAlign.center,
@@ -620,7 +620,7 @@ class _EmptyChildrenForAbsence extends StatelessWidget {
               color: AppColors.textHint.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'لا يوجد طلاب مرتبطون بهذا الحساب بعد',
               style: AppTextStyles.titleLarge,
               textAlign: TextAlign.center,

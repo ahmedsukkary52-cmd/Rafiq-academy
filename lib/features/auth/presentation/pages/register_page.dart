@@ -241,7 +241,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'لديك حساب بالفعل؟',
                                     style: AppTextStyles.labelSmall,
                                   ),

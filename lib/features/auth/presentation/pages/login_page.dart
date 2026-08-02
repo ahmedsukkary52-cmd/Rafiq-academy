@@ -224,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             'ليس لديك حساب؟',
                             style: AppTextStyles.labelSmall,
                           ),
@@ -246,9 +246,9 @@ class _LoginPageState extends State<LoginPage> {
 
                       Center(
                         child: RichText(
-                          text: const TextSpan(
+                          text: TextSpan(
                             style: AppTextStyles.labelSmall,
-                            children: [
+                            children: const [
                               TextSpan(text: 'بتسجيل الدخول أنت توافق على '),
                               TextSpan(
                                 text: 'سياسة الخصوصية',

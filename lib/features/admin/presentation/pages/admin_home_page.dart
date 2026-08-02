@@ -14,24 +14,24 @@ class AdminHomePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('نافذة المدير')),
-      body: const Center(
+      body: Center(
         child: Padding(
-          padding: EdgeInsets.all(AppSizes.paddingL),
+          padding: const EdgeInsets.all(AppSizes.paddingL),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.admin_panel_settings_outlined,
                 size: 48,
                 color: AppColors.textHint,
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'نافذة المدير',
                 style: AppTextStyles.headlineMedium,
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'Coming Soon',
                 style: AppTextStyles.bodyMedium,

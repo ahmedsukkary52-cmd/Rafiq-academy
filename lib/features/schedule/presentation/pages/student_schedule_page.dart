@@ -158,7 +158,7 @@ class _ScheduleView extends StatelessWidget {
                     ),
                   ),
               ],
-              const Align(
+              Align(
                 alignment: Alignment.centerRight,
                 child: Text('جدول الأسبوع', style: AppTextStyles.labelMedium),
               ),

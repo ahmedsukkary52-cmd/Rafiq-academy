@@ -7,7 +7,6 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -74,13 +73,13 @@ class TeacherDashboardTab extends StatelessWidget {
               // (not a rounded bottom on the teal block).
               SliverToBoxAdapter(
                 child: Transform.translate(
-                  offset: const Offset(0, -28),
+                  offset: const Offset(0, -24),
                   child: Container(
                     decoration: const BoxDecoration(
                       color: AppColors.background,
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(28),
-                        topRight: Radius.circular(28),
+                        topLeft: Radius.circular(AppSizes.radiusXL),
+                        topRight: Radius.circular(AppSizes.radiusXL),
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -131,14 +130,10 @@ class TeacherDashboardTab extends StatelessWidget {
       (sum, item) => sum + item.pendingActions.length,
     );
 
+    // Figma 1:432: ~20px horizontal page margin; ~16px section gap.
     return [
       Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSizes.paddingM,
-          20,
-          AppSizes.paddingM,
-          0,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         child: BlocSelector<ChatConversationsBloc, ChatConversationsState, int>(
           bloc: sl<ChatConversationsBloc>(),
           selector: (s) => s.totalUnreadCount,
@@ -153,12 +148,7 @@ class TeacherDashboardTab extends StatelessWidget {
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSizes.paddingM,
-          16,
-          AppSizes.paddingM,
-          AppSizes.paddingM,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: _TodaySessionSection(
           status: state.todayAgendaStatus,
           agenda: state.todayAgenda,
@@ -228,6 +218,26 @@ class _TodaySessionSection extends StatelessWidget {
   }
 }
 
+/// Figma session time: Eastern digits + صباحاً/مساءً (e.g. ٧:٠٠ مساءً).
+String _figmaSessionTime(DateTime dt) {
+  final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final minute = dt.minute.toString().padLeft(2, '0');
+  final period = dt.hour < 12 ? 'صباحاً' : 'مساءً';
+  return _toEasternDigits('$hour12:$minute $period');
+}
+
+String _toEasternDigits(String input) {
+  const western = '0123456789';
+  const eastern = '٠١٢٣٤٥٦٧٨٩';
+  final buffer = StringBuffer();
+  for (final code in input.runes) {
+    final ch = String.fromCharCode(code);
+    final i = western.indexOf(ch);
+    buffer.write(i >= 0 ? eastern[i] : ch);
+  }
+  return buffer.toString();
+}
+
 class _TodaySessionCard extends StatelessWidget {
   final TeacherTodaySession session;
 
@@ -250,48 +260,51 @@ class _TodaySessionCard extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.access_time_rounded,
-                  size: 16,
+                  size: 14,
                   color: AppColors.onPrimaryMuted,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'اليوم — ${formatTimeHm12Ar(session.startAt)}',
+                  'اليوم — ${_figmaSessionTime(session.startAt)}',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.onPrimaryMuted,
+                    fontWeight: FontWeight.w400,
                     height: 1.3,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               session.halaqaName,
               textAlign: TextAlign.right,
               style: AppTextStyles.headlineLarge.copyWith(
                 color: AppColors.onPrimary,
                 fontWeight: FontWeight.w700,
+                fontSize: 18,
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Row(
               children: [
                 const Icon(
                   Icons.person_outline_rounded,
-                  size: 16,
+                  size: 14,
                   color: AppColors.onPrimaryMuted,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${session.studentCount} طالباً',
+                  '${_toEasternDigits('${session.studentCount}')} طالباً',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.onPrimaryMuted,
+                    fontWeight: FontWeight.w400,
                     height: 1.3,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: _StartSessionButton(onTap: () => _startSession(context)),
@@ -312,37 +325,38 @@ class _StartSessionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        borderRadius: BorderRadius.circular(AppSizes.radiusM),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: AppColors.primary.withValues(alpha: 0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Material(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        borderRadius: BorderRadius.circular(AppSizes.radiusM),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+          borderRadius: BorderRadius.circular(AppSizes.radiusM),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.play_arrow_rounded,
-                  size: 22,
+                  size: 20,
                   color: AppColors.onPrimary,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Text(
                   'ابدأ الجلسة',
                   style: AppTextStyles.titleMedium.copyWith(
                     color: AppColors.onPrimary,
                     fontWeight: FontWeight.w700,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -365,6 +379,7 @@ class _EmptySessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Same dark Figma session shell as the filled card — never a white box.
     return Directionality(
       textDirection: TextDirection.rtl,
       child: _SessionCardShell(
@@ -375,7 +390,7 @@ class _EmptySessionCard extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.access_time_rounded,
-                  size: 16,
+                  size: 14,
                   color: AppColors.onPrimaryMuted,
                 ),
                 const SizedBox(width: 6),
@@ -383,41 +398,46 @@ class _EmptySessionCard extends StatelessWidget {
                   'اليوم',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.onPrimaryMuted,
+                    fontWeight: FontWeight.w400,
                     height: 1.3,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               message,
               textAlign: TextAlign.right,
               style: AppTextStyles.headlineLarge.copyWith(
                 color: AppColors.onPrimary,
                 fontWeight: FontWeight.w700,
+                fontSize: 18,
                 height: 1.35,
               ),
             ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 20),
+            const SizedBox(height: 18),
+            if (onRetry != null)
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: TextButton(
                   onPressed: onRetry,
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary,
+                    padding: EdgeInsets.zero,
                   ),
                   child: Text(
                     'إعادة المحاولة',
                     style: AppTextStyles.titleMedium.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w700,
+                      fontSize: 14,
                     ),
                   ),
                 ),
-              ),
-            ] else
-              const SizedBox(height: 72),
+              )
+            else
+              // Reserve meta + CTA band so empty height matches filled card.
+              const SizedBox(height: 64),
           ],
         ),
       ),
@@ -430,22 +450,19 @@ class _SessionCardShell extends StatelessWidget {
 
   const _SessionCardShell({required this.child});
 
-  /// Matches Figma featured-card radius (~28) used by the Home sheet overlap.
-  static const double _radius = 28;
-
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: BoxDecoration(
         color: AppColors.dark,
-        borderRadius: BorderRadius.circular(_radius),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: AppColors.dark.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -503,10 +520,10 @@ class _TeacherHeader extends StatelessWidget {
           gradient: AppColors.primaryGradient,
         ),
         padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 14,
-          left: AppSizes.paddingM,
-          right: AppSizes.paddingM,
-          bottom: 44,
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 20,
+          right: 20,
+          bottom: 40,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -535,6 +552,7 @@ class _TeacherHeader extends StatelessWidget {
                               style: AppTextStyles.titleLarge.copyWith(
                                 color: AppColors.onPrimary,
                                 fontWeight: FontWeight.w700,
+                                fontSize: 16,
                                 height: 1.25,
                               ),
                             ),
@@ -545,6 +563,8 @@ class _TeacherHeader extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.labelMedium.copyWith(
                                 color: AppColors.onPrimaryMuted,
+                                fontWeight: FontWeight.w400,
+                                fontSize: 12,
                                 height: 1.3,
                               ),
                             ),
@@ -587,40 +607,44 @@ class _TeacherHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 20),
             Text(
               'السلام عليكم 🌿',
               textAlign: TextAlign.right,
               style: AppTextStyles.bodyLarge.copyWith(
                 color: AppColors.onPrimary,
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               'يوم $dayName مبارك!',
               textAlign: TextAlign.right,
-              style: AppTextStyles.displayMedium.copyWith(
+              style: AppTextStyles.displayLarge.copyWith(
                 color: AppColors.onPrimary,
                 fontWeight: FontWeight.w800,
-                fontSize: 26,
+                fontSize: 28,
                 height: 1.2,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppColors.onPrimaryOverlay,
                   borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                 ),
                 child: Text(
-                  _hijriChipLabel(),
+                  _toEasternDigits(_hijriChipLabel()),
                   style: AppTextStyles.labelMedium.copyWith(
                     color: AppColors.onPrimary,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
                     height: 1.2,
                   ),
                 ),
@@ -655,13 +679,13 @@ class _HeaderCircleButton extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 38,
+              height: 38,
               decoration: const BoxDecoration(
                 color: AppColors.onPrimaryOverlay,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: AppColors.onPrimary, size: 22),
+              child: Icon(icon, color: AppColors.onPrimary, size: 20),
             ),
             if (showDot)
               Positioned(
@@ -777,17 +801,18 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Figma: white card, radius 24, soft shadow (no hard border),
+    // icon chip top-start, large number, muted label.
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
         boxShadow: const [
           BoxShadow(
             color: AppColors.softShadow,
-            blurRadius: 10,
-            offset: Offset(0, 3),
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -795,31 +820,38 @@ class _StatTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerStart,
             child: Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: iconBg,
-                borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: iconColor, size: 20),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
-            '$value',
+            _toEasternDigits('$value'),
             textAlign: TextAlign.right,
-            style: AppTextStyles.displayMedium.copyWith(
+            style: AppTextStyles.displayLarge.copyWith(
               fontWeight: FontWeight.w800,
-              height: 1.15,
+              fontSize: 28,
+              height: 1.1,
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             label,
             textAlign: TextAlign.right,
-            style: AppTextStyles.labelMedium.copyWith(height: 1.3),
+            style: AppTextStyles.labelMedium.copyWith(
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
+              height: 1.3,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),

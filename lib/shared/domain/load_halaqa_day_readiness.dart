@@ -3,6 +3,7 @@ import 'package:fpdart/fpdart.dart';
 import '../../../core/error/failure.dart';
 import '../../../features/student/domain/entities/halaqa_entity.dart';
 import '../../../features/teacher/domain/repositories/teacher_repository.dart';
+import 'halaqa_day_facts.dart';
 import 'halaqa_day_readiness.dart';
 
 /// Shared W3/W6 readiness I/O — teacher agenda and supervisor board (H2 / A-H14).
@@ -10,6 +11,21 @@ import 'halaqa_day_readiness.dart';
 /// Owns **no** readiness rules; only loads facts then calls
 /// [HalaqaDayReadinessProjector.project].
 Future<Either<Failure, HalaqaDayReadiness>> loadHalaqaDayReadiness({
+  required TeacherRepository teacherRepository,
+  required HalaqaEntity halaqa,
+  required DateTime now,
+}) async {
+  final factsEither = await loadHalaqaDayFacts(
+    teacherRepository: teacherRepository,
+    halaqa: halaqa,
+    now: now,
+  );
+  return factsEither.map((facts) => facts.readiness);
+}
+
+/// Same Firestore reads as readiness, but keeps attendance + recitation rows
+/// so Teacher Home can project recent activities without a second pass.
+Future<Either<Failure, HalaqaDayFacts>> loadHalaqaDayFacts({
   required TeacherRepository teacherRepository,
   required HalaqaEntity halaqa,
   required DateTime now,
@@ -46,13 +62,19 @@ Future<Either<Failure, HalaqaDayReadiness>> loadHalaqaDayReadiness({
   final recitations = reviewsEither.getOrElse((_) => const []);
   final pendingReviewCount = recitations.where((r) => r.isPendingReview).length;
 
+  final readiness = HalaqaDayReadinessProjector.project(
+    rosterStudentIds: halaqa.studentIds,
+    markedStudentIds: records.map((r) => r.studentId),
+    now: now,
+    latestAssignmentDueDate: latestDue,
+    pendingReviewCount: pendingReviewCount,
+  );
+
   return Right(
-    HalaqaDayReadinessProjector.project(
-      rosterStudentIds: halaqa.studentIds,
-      markedStudentIds: records.map((r) => r.studentId),
-      now: now,
-      latestAssignmentDueDate: latestDue,
-      pendingReviewCount: pendingReviewCount,
+    HalaqaDayFacts(
+      readiness: readiness,
+      attendance: records,
+      recitations: recitations,
     ),
   );
 }

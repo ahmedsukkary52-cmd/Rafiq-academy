@@ -7,6 +7,7 @@ import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/read_models/teacher_day_agenda.dart';
+import '../../domain/read_models/teacher_recent_activity.dart';
 
 class _Unset {
   const _Unset();
@@ -25,6 +26,11 @@ class TeacherState extends Equatable {
   final SectionStatus todayAgendaStatus;
   final TeacherDayAgenda todayAgenda;
   final String? todayAgendaError;
+
+  // ── النشاطات الأخيرة (Home feed — نفس تمريرة اشتقاق الأجندة) ───────────
+  final SectionStatus recentActivitiesStatus;
+  final List<TeacherRecentActivity> recentActivities;
+  final String? recentActivitiesError;
 
   // ── طلاب الحلقة المختارة ──────────────────────────────────────────────
   final SectionStatus studentsStatus;
@@ -90,6 +96,9 @@ class TeacherState extends Equatable {
     this.todayAgendaStatus = SectionStatus.initial,
     this.todayAgenda = TeacherDayAgenda.empty,
     this.todayAgendaError,
+    this.recentActivitiesStatus = SectionStatus.initial,
+    this.recentActivities = const [],
+    this.recentActivitiesError,
     this.studentsStatus = SectionStatus.initial,
     this.students = const [],
     this.studentsError,
@@ -130,6 +139,9 @@ class TeacherState extends Equatable {
     SectionStatus? todayAgendaStatus,
     TeacherDayAgenda? todayAgenda,
     Object? todayAgendaError = _unset,
+    SectionStatus? recentActivitiesStatus,
+    List<TeacherRecentActivity>? recentActivities,
+    Object? recentActivitiesError = _unset,
     SectionStatus? studentsStatus,
     List<HalaqaStudentSummaryEntity>? students,
     Object? studentsError = _unset,
@@ -173,6 +185,12 @@ class TeacherState extends Equatable {
       todayAgendaError: identical(todayAgendaError, _unset)
           ? this.todayAgendaError
           : todayAgendaError as String?,
+      recentActivitiesStatus:
+          recentActivitiesStatus ?? this.recentActivitiesStatus,
+      recentActivities: recentActivities ?? this.recentActivities,
+      recentActivitiesError: identical(recentActivitiesError, _unset)
+          ? this.recentActivitiesError
+          : recentActivitiesError as String?,
       studentsStatus: studentsStatus ?? this.studentsStatus,
       students: students ?? this.students,
       studentsError: identical(studentsError, _unset)
@@ -249,6 +267,9 @@ class TeacherState extends Equatable {
     todayAgendaStatus,
     todayAgenda,
     todayAgendaError,
+    recentActivitiesStatus,
+    recentActivities,
+    recentActivitiesError,
     studentsStatus,
     students,
     studentsError,

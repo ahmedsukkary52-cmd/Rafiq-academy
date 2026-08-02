@@ -3,13 +3,13 @@ import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_state.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../domain/repositories/teacher_repository.dart';
 import '../../domain/usecases/add_recitation_record_usecase.dart';
 import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
 import '../../domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/usecases/get_pending_absence_requests_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
+import '../../domain/usecases/get_teacher_home_feed_usecase.dart';
 import '../../domain/usecases/get_today_agenda_usecase.dart';
 import '../../domain/usecases/review_absence_request_usecase.dart';
 import '../../domain/usecases/save_day_attendance_usecase.dart';
@@ -29,7 +29,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
   final AddRecitationRecordUseCase addRecitationRecord;
   final UpdateRecitationReviewUseCase updateRecitationReview;
   final SendAssignmentUseCase sendAssignment;
-  final GetTodayAgendaUseCase getTodayAgenda;
+  final GetTeacherHomeFeedUseCase getTeacherHomeFeed;
   final GetPendingAbsenceRequestsUseCase getPendingAbsenceRequests;
   final ReviewAbsenceRequestUseCase reviewAbsenceRequest;
 
@@ -42,7 +42,7 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
     required this.addRecitationRecord,
     required this.updateRecitationReview,
     required this.sendAssignment,
-    required this.getTodayAgenda,
+    required this.getTeacherHomeFeed,
     required this.getPendingAbsenceRequests,
     required this.reviewAbsenceRequest,
   }) : super(TeacherState.initial()) {
@@ -115,10 +115,12 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
       state.copyWith(
         todayAgendaStatus: SectionStatus.loading,
         todayAgendaError: null,
+        recentActivitiesStatus: SectionStatus.loading,
+        recentActivitiesError: null,
       ),
     );
 
-    final result = await getTodayAgenda(
+    final result = await getTeacherHomeFeed(
       TodayAgendaParams(halaqat: state.halaqat),
     );
 
@@ -127,12 +129,16 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
         state.copyWith(
           todayAgendaStatus: SectionStatus.error,
           todayAgendaError: failure.message,
+          recentActivitiesStatus: SectionStatus.error,
+          recentActivitiesError: failure.message,
         ),
       ),
-      (agenda) => emit(
+      (feed) => emit(
         state.copyWith(
           todayAgendaStatus: SectionStatus.loaded,
-          todayAgenda: agenda,
+          todayAgenda: feed.agenda,
+          recentActivitiesStatus: SectionStatus.loaded,
+          recentActivities: feed.recentActivities,
         ),
       ),
     );

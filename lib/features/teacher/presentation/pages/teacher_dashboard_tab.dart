@@ -15,20 +15,21 @@ import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../domain/read_models/teacher_day_agenda.dart';
+import '../../domain/read_models/teacher_recent_activity.dart';
+import '../../domain/services/teacher_admin_announcement_resolver.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
 import '../../presentation/bloc/teacher_state.dart';
 import '../widgets/teacher_home_figma_cards.dart';
 
 /// Figma 1:432 Teacher Home body (full screen composition).
+///
+/// Visual layout is locked — this file only binds real business data.
 class TeacherDashboardTab extends StatelessWidget {
   final ValueChanged<int>? onSwitchTab;
   final int tabStudents;
   final int tabMessages;
   final int tabProfile;
-
-  /// Temporary preview copy until admin announcements are wired to Firestore.
-  final String adminAnnouncement;
 
   const TeacherDashboardTab({
     super.key,
@@ -36,9 +37,9 @@ class TeacherDashboardTab extends StatelessWidget {
     this.tabStudents = 1,
     this.tabMessages = 3,
     this.tabProfile = 4,
-    this.adminAnnouncement =
-        'تذكير: موعد رفع التقييمات الشهرية غداً قبل الساعة 12 ظهراً',
   });
+
+  static const _announcementResolver = TeacherAdminAnnouncementResolver();
 
   void _retryHalaqat(BuildContext context) {
     final auth = context.read<AuthBloc>().state;
@@ -59,7 +60,9 @@ class TeacherDashboardTab extends StatelessWidget {
           previous.halaqatError != current.halaqatError ||
           previous.todayAgenda != current.todayAgenda ||
           previous.todayAgendaStatus != current.todayAgendaStatus ||
-          previous.todayAgendaError != current.todayAgendaError,
+          previous.todayAgendaError != current.todayAgendaError ||
+          previous.recentActivities != current.recentActivities ||
+          previous.recentActivitiesStatus != current.recentActivitiesStatus,
       builder: (context, state) {
         final halaqat = state.halaqat;
         final nextHalaqa = halaqat.isNotEmpty ? halaqat.first : null;
@@ -205,12 +208,21 @@ class TeacherDashboardTab extends StatelessWidget {
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-        child: TeacherHomeAnnouncementBanner(message: adminAnnouncement),
+        child: BlocSelector<NotificationsBloc, NotificationsState, String>(
+          bloc: sl<NotificationsBloc>(),
+          selector: (s) =>
+              _announcementResolver.resolve(s.notifications)?.message ?? '',
+          builder: (context, message) {
+            return TeacherHomeAnnouncementBanner(message: message);
+          },
+        ),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         child: TeacherHomeRecentActivities(
-          items: _previewActivities,
+          items: state.recentActivities
+              .map((a) => _activityVm(context, a))
+              .toList(),
           onSeeAll: onSwitchTab == null
               ? null
               : () => onSwitchTab!(tabStudents),
@@ -219,33 +231,67 @@ class TeacherDashboardTab extends StatelessWidget {
     ];
   }
 
-  /// Temporary Figma preview rows — replace with Firestore feed later.
-  static const _previewActivities = <TeacherHomeActivityVm>[
-    TeacherHomeActivityVm(
-      title: 'تقييم أحمد محمد',
-      subtitle: 'ممتاز',
-      icon: Icons.star_rounded,
-      iconBg: AppColors.successBg,
-      iconColor: AppColors.success,
-      timeLabel: 'منذ ساعة',
-    ),
-    TeacherHomeActivityVm(
-      title: 'تسجيل حضور',
-      subtitle: 'حلقة الفجر',
-      icon: Icons.how_to_reg_outlined,
-      iconBg: AppColors.primaryLight,
-      iconColor: AppColors.primaryDark,
-      timeLabel: 'منذ ساعتين',
-    ),
-    TeacherHomeActivityVm(
-      title: 'منح شارة "المتفوق"',
-      subtitle: 'سارة علي',
-      icon: Icons.military_tech_outlined,
-      iconBg: AppColors.secondaryBg,
-      iconColor: AppColors.secondary,
-      timeLabel: 'أمس',
-    ),
-  ];
+  TeacherHomeActivityVm _activityVm(
+    BuildContext context,
+    TeacherRecentActivity activity,
+  ) {
+    final (icon, iconBg, iconColor) = switch (activity.kind) {
+      TeacherRecentActivityKind.evaluation => (
+        Icons.star_rounded,
+        AppColors.successBg,
+        AppColors.success,
+      ),
+      TeacherRecentActivityKind.attendance => (
+        Icons.how_to_reg_outlined,
+        AppColors.primaryLight,
+        AppColors.primaryDark,
+      ),
+      TeacherRecentActivityKind.award => (
+        Icons.military_tech_outlined,
+        AppColors.secondaryBg,
+        AppColors.secondary,
+      ),
+    };
+
+    return TeacherHomeActivityVm(
+      title: activity.title,
+      subtitle: activity.subtitle,
+      icon: icon,
+      iconBg: iconBg,
+      iconColor: iconColor,
+      timeLabel: _relativeTimeLabel(activity.occurredAt),
+      onTap: activity.halaqaId == null
+          ? null
+          : () => context.push(_activityRoute(activity)),
+    );
+  }
+
+  String _activityRoute(TeacherRecentActivity activity) {
+    final id = activity.halaqaId!;
+    return switch (activity.kind) {
+      TeacherRecentActivityKind.evaluation =>
+        '/teacher/halaqa/$id/evaluations',
+      TeacherRecentActivityKind.attendance => '/teacher/attendance/$id',
+      TeacherRecentActivityKind.award => '/teacher/halaqa/$id',
+    };
+  }
+
+  String _relativeTimeLabel(DateTime at) {
+    final now = DateTime.now();
+    final diff = now.difference(at);
+    if (diff.inMinutes < 1) return 'الآن';
+    if (diff.inMinutes < 60) {
+      return 'منذ ${teacherHomeEasternDigits('${diff.inMinutes}')} د';
+    }
+    if (diff.inHours < 24) {
+      return 'منذ ${teacherHomeEasternDigits('${diff.inHours}')} س';
+    }
+    if (diff.inDays == 1) return 'أمس';
+    if (diff.inDays < 7) {
+      return 'منذ ${teacherHomeEasternDigits('${diff.inDays}')} يوم';
+    }
+    return teacherHomeSessionTime(at);
+  }
 
   void _openFirstPendingAction(BuildContext context, TeacherDayAgenda agenda) {
     for (final item in agenda.items) {

@@ -316,6 +316,8 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/get_pending_absen
     as _i775;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
     as _i626;
+import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_home_feed_usecase.dart'
+    as _i407;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_today_agenda_usecase.dart'
     as _i271;
 import 'package:rafiq_academy/features/teacher/domain/usecases/record_attendance_usecase.dart'
@@ -684,6 +686,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i13.IssueAchievementUseCase>(
       () => _i13.IssueAchievementUseCase(gh<_i307.SupervisorRepository>()),
     );
+    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
+      () => _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
+    );
     gh.lazySingleton<_i910.SubmitSupervisorReportUseCase>(
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
@@ -797,10 +802,6 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i890.DefaultAcademyEventObserverResolver(
         parentRepository: gh<_i493.ParentRepository>(),
       ),
-    );
-    gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
-      () =>
-          _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
     );
     gh.lazySingleton<_i224.GetAchievementsUseCase>(
       () => _i224.GetAchievementsUseCase(gh<_i724.StudentRepository>()),
@@ -974,6 +975,12 @@ extension GetItInjectableX on _i174.GetIt {
         supervisorRepository: gh<_i307.SupervisorRepository>(),
       ),
     );
+    gh.lazySingleton<_i407.GetTeacherHomeFeedUseCase>(
+      () => _i407.GetTeacherHomeFeedUseCase(
+        teacherRepository: gh<_i1050.TeacherRepository>(),
+        awardsRepository: gh<_i888.AwardsRepository>(),
+      ),
+    );
     gh.lazySingleton<_i877.AddRecitationRecordUseCase>(
       () => _i877.AddRecitationRecordUseCase(gh<_i1050.TeacherRepository>()),
     );
@@ -1040,7 +1047,7 @@ extension GetItInjectableX on _i174.GetIt {
         addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
         updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
         sendAssignment: gh<_i192.SendAssignmentUseCase>(),
-        getTodayAgenda: gh<_i271.GetTodayAgendaUseCase>(),
+        getTeacherHomeFeed: gh<_i407.GetTeacherHomeFeedUseCase>(),
         getPendingAbsenceRequests: gh<_i775.GetPendingAbsenceRequestsUseCase>(),
         reviewAbsenceRequest: gh<_i182.ReviewAbsenceRequestUseCase>(),
       ),

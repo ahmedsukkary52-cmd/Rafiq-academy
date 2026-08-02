@@ -482,12 +482,11 @@ class _TopStudentsCard extends StatelessWidget {
                 Icons.star_rounded,
                 color: AppColors.secondary,
                 size: 18,
-              )],
-          ),
-          const SizedBox(height: 12),
-          if (students.isEmpty))
-            Text'لا توجد بيانات كافية بعد',
-              style: AppTextStyles.bodyMedium,
+              ),
+            ]),
+          const SizedBox(height: 12),,
+          if (students.isEmpty)
+            Text('لا توجد بيانات كافية بعد'style: AppTextStyles.bodyMedium,
             )
           else
             ...students.map(

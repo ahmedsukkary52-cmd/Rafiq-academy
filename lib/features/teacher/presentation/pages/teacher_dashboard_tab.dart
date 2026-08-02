@@ -81,32 +81,49 @@ class TeacherDashboardTab extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
-                child: _TeacherHeader(
-                  name: teacherName,
-                  halaqaName: nextHalaqa?.name ?? '',
-                  imageUrl: auth?.user.profileImageUrl,
-                  onProfileTap: onSwitchTab == null
-                      ? null
-                      : () => onSwitchTab!(tabProfile),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Transform.translate(
-                  offset: const Offset(0, -24),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(AppSizes.radiusXL),
-                        topRight: Radius.circular(AppSizes.radiusXL),
+                child: Stack(
+                  children: [
+                    // 1. Background Gradient for the header area
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 340,
+                        decoration: const BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                        ),
                       ),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _bodyChildren(context, state),
+                    // 2. Main Content
+                    Column(
+                      children: [
+                        _TeacherHeader(
+                          name: teacherName,
+                          halaqaName: nextHalaqa?.name ?? '',
+                          imageUrl: auth?.user.profileImageUrl,
+                          onProfileTap: onSwitchTab == null
+                              ? null
+                              : () => onSwitchTab!(tabProfile),
+                        ),
+                        // Overlapping Body
+                        Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(AppSizes.radiusXL),
+                              topRight: Radius.circular(AppSizes.radiusXL),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _bodyChildren(context, state),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -379,14 +396,12 @@ class _TeacherHeader extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient,
-        ),
+        // Gradient is now handled by the Stack background in the parent
         padding: EdgeInsets.only(
           top: MediaQuery.of(context).padding.top + 12,
           left: 20,
           right: 20,
-          bottom: 40,
+          bottom: 40, // Keeps some space for the overlap look
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -394,7 +409,8 @@ class _TeacherHeader extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(hild: InkWell(
+                Expanded(
+                  child: InkWell(
                     onTap: onProfileTap,
                     borderRadius: BorderRadius.circular(AppSizes.radiusM),
                     child: Row(
@@ -438,7 +454,7 @@ class _TeacherHeader extends StatelessWidget {
                         ),
                       ],
                     ),
-                  )),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 BlocSelector<NotificationsBloc, NotificationsState, int>(

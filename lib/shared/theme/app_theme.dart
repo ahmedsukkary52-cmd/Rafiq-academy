@@ -220,7 +220,6 @@ class AppTheme {
         surface: AppColors.surface,
         error: AppColors.error,
       ),
-      scaffoldBackgroundColor: AppColors.background,
     );
 
     final textTheme = _cairoTextTheme(base.textTheme);

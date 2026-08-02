@@ -130,7 +130,7 @@ class TeacherHomeStatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 1.12,
+      aspectRatio: 1.3,
       child: Material(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusXL),
@@ -159,13 +159,13 @@ class TeacherHomeStatTile extends StatelessWidget {
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: Container(
-                      width: 34,
-                      height: 34,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: iconBg,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(icon, color: iconColor, size: 17),
+                      child: Icon(icon, color: iconColor, size: 20),
                     ),
                   ),
                   const Spacer(),
@@ -173,18 +173,18 @@ class TeacherHomeStatTile extends StatelessWidget {
                     teacherHomeEasternDigits('$value'),
                     textAlign: TextAlign.right,
                     style: AppTextStyles.displayLarge.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       fontSize: 26,
                       height: 1.05,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const Spacer(),
                   Text(
                     label,
                     textAlign: TextAlign.right,
                     style: AppTextStyles.labelMedium.copyWith(
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       fontSize: 12,
                       height: 1.25,
                       color: AppColors.textSecondary,

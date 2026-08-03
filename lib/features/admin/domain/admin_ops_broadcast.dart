@@ -11,9 +11,11 @@ import '../../../core/constants/app_constants.dart';
 class AdminOpsBroadcast {
   const AdminOpsBroadcast._();
 
-  /// Stable channel label for docs / observability — not stored on the doc.
+  /// Stable channel label written on every admin broadcast doc so Home can
+  /// distinguish ops announcements from other `general` inbox noise.
   static const String channel = 'admin_ops_broadcast';
 
+  static const String channelField = 'channel';
   static const String audienceField = 'audience';
   static const String titleField = 'title';
   static const String bodyField = 'body';
@@ -31,6 +33,7 @@ class AdminOpsBroadcast {
     required String targetRole,
   }) {
     return {
+      channelField: channel,
       audienceField: targetRole,
       titleField: title,
       bodyField: body,

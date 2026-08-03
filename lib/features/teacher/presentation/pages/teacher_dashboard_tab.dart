@@ -213,6 +213,7 @@ class TeacherDashboardTab extends StatelessWidget {
           selector: (s) =>
               _announcementResolver.resolve(s.notifications)?.message ?? '',
           builder: (context, message) {
+            if (message.trim().isEmpty) return const SizedBox.shrink();
             return TeacherHomeAnnouncementBanner(message: message);
           },
         ),

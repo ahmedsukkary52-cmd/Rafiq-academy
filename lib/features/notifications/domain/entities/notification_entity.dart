@@ -14,6 +14,10 @@ class NotificationEntity extends Equatable {
   /// في ميزة الشات.
   final bool isRead;
 
+  /// Optional ops channel (e.g. [AdminOpsBroadcast.channel]). Empty for
+  /// ordinary inbox signals.
+  final String channel;
+
   const NotificationEntity({
     required this.id,
     required this.title,
@@ -22,6 +26,7 @@ class NotificationEntity extends Equatable {
     required this.hasAudioAlert,
     required this.createdAt,
     required this.isRead,
+    this.channel = '',
   });
 
   @override
@@ -33,5 +38,6 @@ class NotificationEntity extends Equatable {
     hasAudioAlert,
     createdAt,
     isRead,
+    channel,
   ];
 }

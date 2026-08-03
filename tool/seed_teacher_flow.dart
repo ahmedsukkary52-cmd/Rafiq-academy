@@ -297,7 +297,7 @@ Future<_SeedResult> _seedTeacherFlow(
         'audience': teacherUid,
         'title': 'مرحباً بك في حلقتك التجريبية',
         'body': 'بيانات البذرة جاهزة — يمكنك تجربة الحضور والتقييمات والجوائز.',
-        'type': NotificationTypes.general,
+        'type': NotificationTypes.sessionReminder,
         'hasAudioAlert': false,
         'createdAt': Timestamp.fromDate(now),
         'readBy': <String>[],

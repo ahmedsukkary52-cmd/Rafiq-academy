@@ -11,6 +11,7 @@ class NotificationModel extends NotificationEntity {
     required super.hasAudioAlert,
     required super.createdAt,
     required super.isRead,
+    super.channel,
   });
 
   /// محتاجين [currentUid] هنا عشان نحسب isRead بمقارنته مع مصفوفة
@@ -32,6 +33,7 @@ class NotificationModel extends NotificationEntity {
       // Null while a server timestamp is still pending on the writing client.
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: readBy.contains(currentUid),
+      channel: (data['channel'] as String?)?.trim() ?? '',
     );
   }
 }

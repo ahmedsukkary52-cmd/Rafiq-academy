@@ -12,6 +12,7 @@ void main() {
       );
 
       expect(fields, {
+        'channel': AdminOpsBroadcast.channel,
         'audience': 'all',
         'title': 'عنوان',
         'body': 'محتوى',

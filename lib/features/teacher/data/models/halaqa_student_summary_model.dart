@@ -12,6 +12,7 @@ class HalaqaStudentSummaryModel extends HalaqaStudentSummaryEntity {
     super.attendancePercent,
     super.lastGradeLabel,
     super.isAtRisk,
+    super.overallProgressPercent,
   });
 
   factory HalaqaStudentSummaryModel.fromFirestore(DocumentSnapshot doc) {
@@ -21,6 +22,22 @@ class HalaqaStudentSummaryModel extends HalaqaStudentSummaryEntity {
       name: data['name'] ?? '',
       profileImageUrl: data['profileImageUrl'] as String?,
       level: (data['level'] ?? 1) as int,
+    );
+  }
+
+  factory HalaqaStudentSummaryModel.fromEntity(
+    HalaqaStudentSummaryEntity entity,
+  ) {
+    return HalaqaStudentSummaryModel(
+      uid: entity.uid,
+      name: entity.name,
+      profileImageUrl: entity.profileImageUrl,
+      todayAttendance: entity.todayAttendance,
+      level: entity.level,
+      attendancePercent: entity.attendancePercent,
+      lastGradeLabel: entity.lastGradeLabel,
+      isAtRisk: entity.isAtRisk,
+      overallProgressPercent: entity.overallProgressPercent,
     );
   }
 }

@@ -16,7 +16,14 @@ import '../utils/teacher_workflow_ownership.dart';
 class TeacherEvaluationsPage extends StatefulWidget {
   final String halaqaId;
 
-  const TeacherEvaluationsPage({super.key, required this.halaqaId});
+  /// When true, render body only (no route AppBar) for Class Details tabs.
+  final bool embedded;
+
+  const TeacherEvaluationsPage({
+    super.key,
+    required this.halaqaId,
+    this.embedded = false,
+  });
 
   @override
   State<TeacherEvaluationsPage> createState() => _TeacherEvaluationsPageState();
@@ -76,29 +83,58 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('التقييمات'),
-          actions: [
-            if (TeacherWorkflowOwnership.canExecute(context))
-              TextButton.icon(
-                onPressed: () => _showAddEvaluationSheet(context),
-                icon: const Icon(
-                  Icons.add_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                label: const Text(
-                  '+ تقييم جديد',
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    color: Colors.white,
-                    fontSize: 13,
+        appBar: widget.embedded
+            ? null
+            : AppBar(
+                title: const Text('التقييمات'),
+                actions: [
+                  if (TeacherWorkflowOwnership.canExecute(context))
+                    TextButton.icon(
+                      onPressed: () => _showAddEvaluationSheet(context),
+                      icon: const Icon(
+                        Icons.add_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        '+ تقييم جديد',
+                        style: TextStyle(
+                          fontFamily: 'NotoNaskhArabic',
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+        body: Column(
+          children: [
+            if (widget.embedded)
+              Material(
+                color: AppColors.surface,
+                child: ListTile(
+                  title: Text(
+                    'التقييمات',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
+                  trailing: TeacherWorkflowOwnership.canExecute(context)
+                      ? TextButton(
+                          onPressed: () => _showAddEvaluationSheet(context),
+                          child: Text(
+                            '+ تقييم جديد',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
-          ],
-        ),
-        body: BlocBuilder<TeacherBloc, TeacherState>(
+            Expanded(
+              child: BlocBuilder<TeacherBloc, TeacherState>(
           buildWhen: (previous, current) =>
               previous.evaluationsStatus != current.evaluationsStatus ||
               previous.evaluations != current.evaluations ||
@@ -169,6 +205,9 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
               ],
             );
           },
+              ),
+            ),
+          ],
         ),
       ),
     );

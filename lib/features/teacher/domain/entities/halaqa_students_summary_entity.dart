@@ -18,7 +18,11 @@ class HalaqaStudentSummaryEntity extends Equatable {
   final String? lastGradeLabel;
 
   /// طالب في خطر (غيابات متكررة أو أداء ضعيف) - ظهر في التصميم ببادج "في خطر"
+  /// Derived at read time — never a stored Firestore field.
   final bool isAtRisk;
+
+  /// تقدم الحفظ من `studentProfiles.overallProgressPercent` (0–100).
+  final double overallProgressPercent;
 
   const HalaqaStudentSummaryEntity({
     required this.uid,
@@ -29,7 +33,33 @@ class HalaqaStudentSummaryEntity extends Equatable {
     this.attendancePercent = 0,
     this.lastGradeLabel,
     this.isAtRisk = false,
+    this.overallProgressPercent = 0,
   });
+
+  HalaqaStudentSummaryEntity copyWith({
+    String? uid,
+    String? name,
+    String? profileImageUrl,
+    AttendanceStatus? todayAttendance,
+    int? level,
+    double? attendancePercent,
+    String? lastGradeLabel,
+    bool? isAtRisk,
+    double? overallProgressPercent,
+  }) {
+    return HalaqaStudentSummaryEntity(
+      uid: uid ?? this.uid,
+      name: name ?? this.name,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      todayAttendance: todayAttendance ?? this.todayAttendance,
+      level: level ?? this.level,
+      attendancePercent: attendancePercent ?? this.attendancePercent,
+      lastGradeLabel: lastGradeLabel ?? this.lastGradeLabel,
+      isAtRisk: isAtRisk ?? this.isAtRisk,
+      overallProgressPercent:
+          overallProgressPercent ?? this.overallProgressPercent,
+    );
+  }
 
   @override
   List<Object?> get props => [
@@ -41,5 +71,6 @@ class HalaqaStudentSummaryEntity extends Equatable {
     attendancePercent,
     lastGradeLabel,
     isAtRisk,
+    overallProgressPercent,
   ];
 }

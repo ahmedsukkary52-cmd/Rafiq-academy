@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_state.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../domain/repositories/teacher_repository.dart';
 import '../../domain/usecases/add_recitation_record_usecase.dart';
 import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';

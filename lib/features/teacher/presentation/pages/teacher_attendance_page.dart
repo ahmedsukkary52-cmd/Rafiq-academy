@@ -19,7 +19,14 @@ import '../utils/teacher_workflow_ownership.dart';
 class TeacherAttendancePage extends StatefulWidget {
   final String halaqaId;
 
-  const TeacherAttendancePage({super.key, required this.halaqaId});
+  /// When true, render body only (no route AppBar) for Class Details tabs.
+  final bool embedded;
+
+  const TeacherAttendancePage({
+    super.key,
+    required this.halaqaId,
+    this.embedded = false,
+  });
 
   @override
   State<TeacherAttendancePage> createState() => _TeacherAttendancePageState();
@@ -190,23 +197,51 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       ],
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('الحضور والغياب'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.calendar_today_outlined),
-              onPressed:
-                  context
-                          .watch<TeacherBloc>()
-                          .state
-                          .attendanceSubmissionStatus ==
-                      SubmissionStatus.submitting
-                  ? null
-                  : _pickDate,
-            ),
-          ],
-        ),
-        body: BlocBuilder<TeacherBloc, TeacherState>(
+        appBar: widget.embedded
+            ? null
+            : AppBar(
+                title: const Text('الحضور والغياب'),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    onPressed:
+                        context
+                                .watch<TeacherBloc>()
+                                .state
+                                .attendanceSubmissionStatus ==
+                            SubmissionStatus.submitting
+                        ? null
+                        : _pickDate,
+                  ),
+                ],
+              ),
+        body: Column(
+          children: [
+            if (widget.embedded)
+              Material(
+                color: AppColors.surface,
+                child: ListTile(
+                  title: Text(
+                    'الحضور والغياب',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    onPressed:
+                        context
+                                .watch<TeacherBloc>()
+                                .state
+                                .attendanceSubmissionStatus ==
+                            SubmissionStatus.submitting
+                        ? null
+                        : _pickDate,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: BlocBuilder<TeacherBloc, TeacherState>(
           buildWhen: (previous, current) =>
               previous.studentsStatus != current.studentsStatus ||
               previous.students != current.students ||
@@ -402,6 +437,9 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               ],
             );
           },
+              ),
+            ),
+          ],
         ),
       ),
     );

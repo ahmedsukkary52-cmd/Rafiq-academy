@@ -16,6 +16,7 @@ import '../../../student/data/models/assignment_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
+import '../../domain/services/halaqa_student_summary_projector.dart';
 import '../models/attendance_record_model.dart';
 import '../models/halaqa_student_summary_model.dart';
 
@@ -66,12 +67,86 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         docs.addAll(usersSnap.docs);
       }
 
-      return docs.map(HalaqaStudentSummaryModel.fromFirestore).toList();
+      final bases =
+          docs.map(HalaqaStudentSummaryModel.fromFirestore).toList();
+
+      final now = DateTime.now();
+      final from = now.subtract(
+        const Duration(days: HalaqaStudentSummaryProjector.attendanceWindowDays),
+      );
+
+      final parallel = await Future.wait([
+        firestore
+            .collection(FirestoreCollections.attendanceRecords)
+            .where('halaqaId', isEqualTo: halaqaId)
+            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
+            .get(),
+        firestore
+            .collection(FirestoreCollections.recitationRecords)
+            .where('halaqaId', isEqualTo: halaqaId)
+            .get(),
+        _loadProgressByStudentId(studentIds),
+      ]);
+
+      final attendanceSnap =
+          parallel[0] as QuerySnapshot<Map<String, dynamic>>;
+      final recitationSnap =
+          parallel[1] as QuerySnapshot<Map<String, dynamic>>;
+      final progressById = parallel[2] as Map<String, double>;
+
+      final marks = attendanceSnap.docs.map((doc) {
+        final d = doc.data();
+        final rawDate = d['date'];
+        final date = rawDate is Timestamp ? rawDate.toDate() : now;
+        return AttendanceMarkRef(
+          id: doc.id,
+          halaqaId: halaqaId,
+          studentId: (d['studentId'] as String?) ?? '',
+          date: date,
+          status: d['status'] as String?,
+        );
+      });
+
+      final recitations = recitationSnap.docs
+          .map(RecitationRecordModel.fromFirestore)
+          .toList();
+
+      return bases
+          .map(
+            (base) => HalaqaStudentSummaryModel.fromEntity(
+              HalaqaStudentSummaryProjector.enrich(
+                base: base,
+                attendanceMarks: marks,
+                recitations: recitations,
+                now: now,
+                overallProgressPercent: progressById[base.uid],
+              ),
+            ),
+          )
+          .toList();
     } on ServerException {
       rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }
+  }
+
+  Future<Map<String, double>> _loadProgressByStudentId(
+    List<String> studentIds,
+  ) async {
+    final out = <String, double>{};
+    for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
+      final snap = await firestore
+          .collection(FirestoreCollections.studentProfiles)
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        final raw = doc.data()['overallProgressPercent'];
+        final value = raw is num ? raw.toDouble() : 0.0;
+        out[doc.id] = value;
+      }
+    }
+    return out;
   }
 
   @override

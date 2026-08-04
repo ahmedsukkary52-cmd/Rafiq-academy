@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/analytics_entities.dart';
 import 'analytics_remote_datasource.dart';
@@ -134,20 +135,28 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
   Future<List<AtRiskStudentEntity>> getAtRiskStudents(String halaqaId) async {
     try {
       final now = DateTime.now();
-      final twoWeeks = now.subtract(const Duration(days: 14));
+      final windowStart = now.subtract(
+        const Duration(days: StudentAtRiskPolicy.windowDays),
+      );
 
       final results = await Future.wait([
         // كل علامات الحضور لآخر أسبوعين (ثم نفلتر الغياب بعد إزالة التكرار)
         firestore
             .collection(FirestoreCollections.attendanceRecords)
             .where('halaqaId', isEqualTo: halaqaId)
-            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(twoWeeks))
+            .where(
+              'date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart),
+            )
             .get(),
         // طلاب مش اتقيّموا من أسبوعين
         firestore
             .collection(FirestoreCollections.recitationRecords)
             .where('halaqaId', isEqualTo: halaqaId)
-            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(twoWeeks))
+            .where(
+              'date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart),
+            )
             .get(),
       ]);
 
@@ -176,29 +185,9 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
             );
       }
 
-      for (final entry in marksByStudent.entries) {
-        final absences = AttendancePolicy.countAbsent(
-          AttendancePolicy.uniqueDayStatuses(entry.value),
-        );
-        if (absences >= 2) {
-          final userDoc = await firestore
-              .collection(FirestoreCollections.users)
-              .doc(entry.key)
-              .get();
-          final userData = userDoc.data() ?? {};
-          atRiskMap[entry.key] = AtRiskStudentEntity(
-            studentId: entry.key,
-            studentName: userData['name'] as String? ?? '',
-            profileImageUrl: userData['profileImageUrl'] as String?,
-            reason: RiskReason.repeatedAbsence,
-            detail: '$absences غيابات خلال آخر أسبوعين',
-          );
-        }
-      }
-
-      // طلاب مش اتقيّموا من أسبوعين
       final evaluatedStudentIds = recitationDocs
           .map((d) => (d.data())['studentId'] as String? ?? '')
+          .where((id) => id.isNotEmpty)
           .toSet();
 
       final halaqaDoc = await firestore
@@ -210,21 +199,39 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       );
 
       for (final studentId in studentIds) {
-        if (!evaluatedStudentIds.contains(studentId) &&
-            !atRiskMap.containsKey(studentId)) {
-          final userDoc = await firestore
-              .collection(FirestoreCollections.users)
-              .doc(studentId)
-              .get();
-          final userData = userDoc.data() ?? {};
-          atRiskMap[studentId] = AtRiskStudentEntity(
-            studentId: studentId,
-            studentName: userData['name'] as String? ?? '',
-            profileImageUrl: userData['profileImageUrl'] as String?,
-            reason: RiskReason.noRecentEvaluation,
-            detail: 'لم يُقيَّم منذ أسبوعين',
-          );
-        }
+        final signal = StudentAtRiskPolicy.evaluate(
+          marksInWindow: marksByStudent[studentId] ?? const [],
+          hasEvaluationInWindow: evaluatedStudentIds.contains(studentId),
+        );
+        if (signal == null) continue;
+
+        final userDoc = await firestore
+            .collection(FirestoreCollections.users)
+            .doc(studentId)
+            .get();
+        final userData = userDoc.data() ?? {};
+        final absences = AttendancePolicy.countAbsent(
+          AttendancePolicy.uniqueDayStatuses(
+            marksByStudent[studentId] ?? const [],
+          ),
+        );
+
+        atRiskMap[studentId] = AtRiskStudentEntity(
+          studentId: studentId,
+          studentName: userData['name'] as String? ?? '',
+          profileImageUrl: userData['profileImageUrl'] as String?,
+          reason: switch (signal) {
+            RiskSignal.repeatedAbsence => RiskReason.repeatedAbsence,
+            RiskSignal.noRecentEvaluation => RiskReason.noRecentEvaluation,
+            RiskSignal.lowPerformance => RiskReason.lowPerformance,
+          },
+          detail: switch (signal) {
+            RiskSignal.repeatedAbsence =>
+              '$absences غيابات خلال آخر أسبوعين',
+            RiskSignal.noRecentEvaluation => 'لم يُقيَّم منذ أسبوعين',
+            RiskSignal.lowPerformance => 'أداء منخفض',
+          },
+        );
       }
 
       return atRiskMap.values.toList();

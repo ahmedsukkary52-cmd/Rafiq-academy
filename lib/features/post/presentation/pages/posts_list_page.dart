@@ -21,7 +21,14 @@ import '../bloc/posts_state.dart';
 class PostsListPage extends StatefulWidget {
   final String? halaqaId;
 
-  const PostsListPage({super.key, this.halaqaId});
+  /// When true, render body only (no route AppBar) for Class Details tabs.
+  final bool embedded;
+
+  const PostsListPage({
+    super.key,
+    this.halaqaId,
+    this.embedded = false,
+  });
 
   @override
   State<PostsListPage> createState() => _PostsListPageState();
@@ -85,16 +92,38 @@ class _PostsListPageState extends State<PostsListPage> {
       value: _bloc,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('المنشورات'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add_rounded),
-              onPressed: _navigateToCreatePost,
-            ),
-          ],
-        ),
-        body: BlocBuilder<PostsBloc, PostsState>(
+        appBar: widget.embedded
+            ? null
+            : AppBar(
+                title: const Text('المنشورات'),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.add_rounded),
+                    onPressed: _navigateToCreatePost,
+                  ),
+                ],
+              ),
+        body: Column(
+          children: [
+            if (widget.embedded)
+              Material(
+                color: AppColors.surface,
+                child: ListTile(
+                  title: Text(
+                    'المنشورات',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add_rounded),
+                    color: AppColors.primary,
+                    onPressed: _navigateToCreatePost,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: BlocBuilder<PostsBloc, PostsState>(
           buildWhen: (previous, current) =>
               previous.postsStatus != current.postsStatus ||
               previous.posts != current.posts ||
@@ -175,6 +204,9 @@ class _PostsListPageState extends State<PostsListPage> {
               },
             );
           },
+              ),
+            ),
+          ],
         ),
       ),
     );

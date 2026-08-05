@@ -121,6 +121,12 @@ class _FakeTeacherRepository implements TeacherRepository {
   Future<Either<Failure, Unit>> addRecitationRecord(RecitationRecordEntity r) =>
       throw UnimplementedError();
   @override
+  Future<Either<Failure, Unit>> upsertTeacherEvaluation({
+    required RecitationRecordEntity record,
+    required List<String> retireDocumentIds,
+  }) =>
+      throw UnimplementedError();
+  @override
   Future<Either<Failure, AcademyEventPublication>> updateRecitationReview(
     UpdateRecitationReviewParams p,
   ) => throw UnimplementedError();

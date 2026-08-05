@@ -12,6 +12,7 @@ class RecitationRecordModel extends RecitationRecordEntity {
     required super.date,
     required super.type,
     required super.versesRange,
+    super.sessionId,
     super.grade,
     super.behaviorGrade,
     super.notes,
@@ -37,6 +38,7 @@ class RecitationRecordModel extends RecitationRecordEntity {
           ? RecitationType.memorization
           : RecitationType.review,
       versesRange: data['versesRange'] ?? '',
+      sessionId: data['sessionId'] as String?,
       grade: _gradeFromString(data['grade']),
       behaviorGrade: _gradeFromString(data['behaviorGrade']),
       notes: data['notes'] as String?,
@@ -59,6 +61,8 @@ class RecitationRecordModel extends RecitationRecordEntity {
     'date': Timestamp.fromDate(date),
     'type': type == RecitationType.memorization ? 'memorization' : 'review',
     'versesRange': versesRange,
+    if (sessionId != null && sessionId!.trim().isNotEmpty)
+      'sessionId': sessionId!.trim(),
     // متكتبش الدرجات إلا لو المعلم قيّم فعلاً
     if (grade != null) 'grade': grade!.label,
     if (behaviorGrade != null) 'behaviorGrade': behaviorGrade!.label,

@@ -307,6 +307,35 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   }
 
   @override
+  Future<void> upsertTeacherEvaluation({
+    required RecitationRecordModel record,
+    required List<String> retireDocumentIds,
+  }) async {
+    try {
+      final id = record.id.trim();
+      if (id.isEmpty) {
+        throw const ServerException('معرّف التقييم مطلوب');
+      }
+
+      final batch = firestore.batch();
+      final col = firestore.collection(FirestoreCollections.recitationRecords);
+      batch.set(col.doc(id), record.toFirestore(), SetOptions(merge: true));
+
+      for (final raw in retireDocumentIds) {
+        final retireId = raw.trim();
+        if (retireId.isEmpty || retireId == id) continue;
+        batch.delete(col.doc(retireId));
+      }
+
+      await batch.commit();
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
   Future<List<AcademyEvent>> updateRecitationReview({
     required String recordId,
     required RecitationGrade grade,

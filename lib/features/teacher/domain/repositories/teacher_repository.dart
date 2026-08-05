@@ -40,10 +40,16 @@ abstract class TeacherRepository {
     required DateTime date,
   });
 
-  /// تسجيل تقييم التسميع لطالب
+  /// تسجيل تقييم التسميع لطالب (auto-id — legacy / non-session paths)
   Future<Either<Failure, Unit>> addRecitationRecord(
     RecitationRecordEntity record,
   );
+
+  /// Upsert teacher live evaluation at deterministic id; retire legacy duplicates.
+  Future<Either<Failure, Unit>> upsertTeacherEvaluation({
+    required RecitationRecordEntity record,
+    required List<String> retireDocumentIds,
+  });
 
   /// مراجعة تسميع معلّق (نفس المستند — لا إنشاء جديد).
   ///

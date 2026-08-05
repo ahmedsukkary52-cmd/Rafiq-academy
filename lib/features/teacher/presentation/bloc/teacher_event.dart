@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../shared/domain/evaluation_policy.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/attendance_record_entity.dart';
@@ -90,6 +91,38 @@ class AddRecitationRecordEvent extends TeacherEvent {
 
   @override
   List<Object?> get props => [record];
+}
+
+/// Create-or-edit teacher live evaluation (session identity — no duplicates).
+class UpsertTeacherEvaluationEvent extends TeacherEvent {
+  final EvaluationIdentity identity;
+  final DateTime sessionDate;
+  final String teacherId;
+  final String studentName;
+  final RecitationGrade grade;
+  final RecitationGrade behaviorGrade;
+  final String? notes;
+
+  const UpsertTeacherEvaluationEvent({
+    required this.identity,
+    required this.sessionDate,
+    required this.teacherId,
+    required this.studentName,
+    required this.grade,
+    required this.behaviorGrade,
+    this.notes,
+  });
+
+  @override
+  List<Object?> get props => [
+    identity,
+    sessionDate,
+    teacherId,
+    studentName,
+    grade,
+    behaviorGrade,
+    notes,
+  ];
 }
 
 /// مراجعة تسميع معلّق (تحديث نفس السجل)

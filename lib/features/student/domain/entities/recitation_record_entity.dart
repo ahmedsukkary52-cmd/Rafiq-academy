@@ -32,12 +32,16 @@ class RecitationRecordEntity extends Equatable {
   final RecitationType type;
   final String versesRange;
 
+  /// Teaching session this evaluation belongs to (SSOT for uniqueness).
+  /// Null on legacy / homework-submission rows.
+  final String? sessionId;
+
   /// null حتى يقيّم المعلم فعلياً (مثلاً تسميع الطالب بـ reviewStatus=pending)
   final RecitationGrade? grade;
   final RecitationGrade? behaviorGrade;
   final String? notes;
 
-  /// رفع الطالب للتسميع (اختياري — تقييم المعلم القديم بدونها)
+  /// رفع الطالب للتسميع (اختياري — تقييم المعلم المباشر بدونها)
   final String? audioUrl;
   final String? storagePath;
   final String? assignmentId;
@@ -57,6 +61,7 @@ class RecitationRecordEntity extends Equatable {
     required this.date,
     required this.type,
     required this.versesRange,
+    this.sessionId,
     this.grade,
     this.behaviorGrade,
     this.notes,
@@ -81,6 +86,7 @@ class RecitationRecordEntity extends Equatable {
     date,
     type,
     versesRange,
+    sessionId,
     grade,
     behaviorGrade,
     notes,

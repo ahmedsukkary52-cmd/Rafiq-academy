@@ -25,6 +25,12 @@ abstract class TeacherRemoteDatasource {
   });
   Future<void> addRecitationRecord(RecitationRecordModel record);
 
+  /// Deterministic-id upsert for teacher live evaluations; deletes [retireDocumentIds].
+  Future<void> upsertTeacherEvaluation({
+    required RecitationRecordModel record,
+    required List<String> retireDocumentIds,
+  });
+
   /// Pending → reviewed transition. Returns [HomeworkReviewed] for the
   /// committed fact — no notification writes.
   Future<List<AcademyEvent>> updateRecitationReview({

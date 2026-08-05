@@ -316,6 +316,7 @@ class AppRouter {
                 path: 'evaluations',
                 builder: (_, state) => TeacherEvaluationsPage(
                   halaqaId: state.pathParameters['halaqaId']!,
+                  initialStudentId: state.uri.queryParameters['studentId'],
                 ),
               ),
               GoRoute(

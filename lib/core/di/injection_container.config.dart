@@ -330,11 +330,14 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_u
     as _i192;
 import 'package:rafiq_academy/features/teacher/domain/usecases/update_recitation_review_usecase.dart'
     as _i1070;
+import 'package:rafiq_academy/features/teacher/domain/usecases/upsert_teacher_evaluation_usecase.dart'
+    as _i1064;
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
     as _i933;
 import 'package:rafiq_academy/shared/domain/academy_event_observer_resolver.dart'
     as _i937;
 import 'package:rafiq_academy/shared/domain/academy_event_sink.dart' as _i273;
+import 'package:rafiq_academy/shared/domain/evaluation_service.dart' as _i81;
 
 extension GetItInjectableX on _i174.GetIt {
   // initializes the registration of main-scope dependencies inside of GetIt
@@ -359,6 +362,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i649.CertificatePdfGenerator>(
       () => _i649.CertificatePdfGenerator(),
+    );
+    gh.lazySingleton<_i81.EvaluationService>(
+      () => const _i81.EvaluationService(),
     );
     gh.lazySingleton<_i1052.AudioLibraryRemoteDatasource>(
       () => _i694.AudioLibraryRemoteDatasourceImpl(
@@ -1024,6 +1030,12 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i1070.UpdateRecitationReviewUseCase(gh<_i1050.TeacherRepository>()),
     );
+    gh.lazySingleton<_i1064.UpsertTeacherEvaluationUseCase>(
+      () => _i1064.UpsertTeacherEvaluationUseCase(
+        gh<_i1050.TeacherRepository>(),
+        gh<_i81.EvaluationService>(),
+      ),
+    );
     gh.singleton<_i149.SupervisorBloc>(
       () => _i149.SupervisorBloc(
         getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
@@ -1045,6 +1057,7 @@ extension GetItInjectableX on _i174.GetIt {
             gh<_i122.GetHalaqaAttendanceForDateUseCase>(),
         saveDayAttendance: gh<_i343.SaveDayAttendanceUseCase>(),
         addRecitationRecord: gh<_i877.AddRecitationRecordUseCase>(),
+        upsertTeacherEvaluation: gh<_i1064.UpsertTeacherEvaluationUseCase>(),
         updateRecitationReview: gh<_i1070.UpdateRecitationReviewUseCase>(),
         sendAssignment: gh<_i192.SendAssignmentUseCase>(),
         getTeacherHomeFeed: gh<_i407.GetTeacherHomeFeedUseCase>(),

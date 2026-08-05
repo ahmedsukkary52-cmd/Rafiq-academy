@@ -1036,7 +1036,7 @@ class _StudentCard extends StatelessWidget {
                     label: 'تقييم',
                     color: AppColors.secondary,
                     onTap: () => context.push(
-                      '/teacher/halaqa/$halaqaId/evaluations',
+                      '/teacher/halaqa/$halaqaId/evaluations?studentId=${student.uid}',
                     ),
                   ),
                 ),
@@ -1067,7 +1067,7 @@ class _StudentCard extends StatelessWidget {
                     label: 'تقييم',
                     color: AppColors.secondary,
                     onTap: () => context.push(
-                      '/teacher/halaqa/$halaqaId/evaluations',
+                      '/teacher/halaqa/$halaqaId/evaluations?studentId=${student.uid}',
                     ),
                   ),
                 ),

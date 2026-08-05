@@ -260,6 +260,12 @@ class _FakeTeacherDatasource implements TeacherRemoteDatasource {
   Future<void> addRecitationRecord(RecitationRecordModel record) =>
       throw UnimplementedError();
   @override
+  Future<void> upsertTeacherEvaluation({
+    required RecitationRecordModel record,
+    required List<String> retireDocumentIds,
+  }) =>
+      throw UnimplementedError();
+  @override
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
     String halaqaId,
   ) => throw UnimplementedError();

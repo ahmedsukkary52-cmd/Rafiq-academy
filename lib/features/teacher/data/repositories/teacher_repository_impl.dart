@@ -157,11 +157,43 @@ class TeacherRepositoryImpl implements TeacherRepository {
           date: record.date,
           type: record.type,
           versesRange: record.versesRange,
+          sessionId: record.sessionId,
           grade: record.grade,
           notes: record.notes,
           studentName: record.studentName,
           behaviorGrade: record.behaviorGrade,
         ),
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> upsertTeacherEvaluation({
+    required RecitationRecordEntity record,
+    required List<String> retireDocumentIds,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.upsertTeacherEvaluation(
+        record: RecitationRecordModel(
+          id: record.id,
+          studentId: record.studentId,
+          teacherId: record.teacherId,
+          halaqaId: record.halaqaId,
+          date: record.date,
+          type: record.type,
+          versesRange: record.versesRange,
+          sessionId: record.sessionId,
+          grade: record.grade,
+          notes: record.notes,
+          studentName: record.studentName,
+          behaviorGrade: record.behaviorGrade,
+          reviewStatus: record.reviewStatus,
+        ),
+        retireDocumentIds: retireDocumentIds,
       );
       return const Right(unit);
     } on ServerException catch (e) {

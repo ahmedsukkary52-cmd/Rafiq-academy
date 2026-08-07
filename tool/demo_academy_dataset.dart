@@ -658,10 +658,13 @@ Future<void> _seedAttendanceHistory(
       if (day == dayStart && i == 0) status = AttendanceStatus.present;
       if (day == dayStart && i == 1) status = AttendanceStatus.late;
 
-      final docId = AttendancePolicy.documentId(
+      final sessionId = AttendancePolicy.sessionIdForDay(
         halaqaId: halaqaId,
+        day: day,
+      );
+      final docId = AttendancePolicy.documentId(
+        sessionId: sessionId,
         studentId: s.id,
-        date: day,
       );
       final record = AttendanceRecordModel(
         id: docId,
@@ -671,6 +674,7 @@ Future<void> _seedAttendanceHistory(
         date: day,
         status: status,
         recordedBy: teacherId,
+        sessionId: sessionId,
       );
       await db
           .collection(FirestoreCollections.attendanceRecords)

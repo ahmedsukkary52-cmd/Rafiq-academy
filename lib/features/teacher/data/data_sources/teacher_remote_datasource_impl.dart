@@ -104,6 +104,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           studentId: (d['studentId'] as String?) ?? '',
           date: date,
           status: d['status'] as String?,
+          sessionId: d['sessionId'] as String?,
         );
       });
 
@@ -184,6 +185,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
                 studentId: (data['studentId'] as String?) ?? '',
                 date: dayStart,
                 status: data['status'] as String?,
+                sessionId: data['sessionId'] as String?,
               );
             }),
           );
@@ -198,13 +200,19 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
 
       final batch = firestore.batch();
       final savedStudentIds = <String>{};
+      final preferredIds = <String>{};
 
       for (final record in records) {
         final normalizedDay = AttendancePolicy.dayStart(record.date);
+        final sessionId = record.sessionId.trim();
+        if (sessionId.isEmpty) {
+          throw const ServerException(
+            'sessionId مطلوب لكل سجل حضور جديد',
+          );
+        }
         final docId = AttendancePolicy.documentId(
-          halaqaId: record.halaqaId,
+          sessionId: sessionId,
           studentId: record.studentId,
-          date: normalizedDay,
         );
         final normalized = AttendanceRecordModel(
           id: docId,
@@ -214,27 +222,23 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           date: normalizedDay,
           status: record.status,
           recordedBy: record.recordedBy,
+          sessionId: sessionId,
         );
         final ref = firestore
             .collection(FirestoreCollections.attendanceRecords)
             .doc(docId);
         batch.set(ref, normalized.toFirestore(), SetOptions(merge: true));
         savedStudentIds.add(record.studentId);
+        preferredIds.add(docId);
       }
 
-      // Remove legacy auto-id duplicates for the same students/day.
+      // Remove legacy / colliding docs for the same students/session.
       for (final doc in existingSnap.docs) {
         final data = doc.data();
         final studentId = data['studentId'] as String? ?? '';
         if (!savedStudentIds.contains(studentId)) continue;
-        final expectedId = AttendancePolicy.documentId(
-          halaqaId: halaqaId,
-          studentId: studentId,
-          date: dayStart,
-        );
-        if (doc.id != expectedId) {
-          batch.delete(doc.reference);
-        }
+        if (preferredIds.contains(doc.id)) continue;
+        batch.delete(doc.reference);
       }
 
       await batch.commit();
@@ -249,6 +253,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
             halaqaId: record.halaqaId,
             date: record.date,
             status: record.wireStatus,
+            sessionId: record.sessionId,
           ),
         ),
       );
@@ -275,14 +280,15 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           .where('date', isLessThan: Timestamp.fromDate(dayEnd))
           .get();
 
-      // One record per student — prefer deterministic doc id when duplicates exist.
+      // One record per student — prefer session-scoped deterministic id.
       final byStudent = <String, AttendanceRecordModel>{};
       for (final doc in snapshot.docs) {
         final model = AttendanceRecordModel.fromFirestore(doc);
-        final preferredId = AttendancePolicy.documentId(
+        final preferredId = AttendancePolicy.preferredDocumentId(
           halaqaId: halaqaId,
           studentId: model.studentId,
           date: dayStart,
+          sessionId: model.sessionId,
         );
         final existing = byStudent[model.studentId];
         if (existing == null || model.id == preferredId) {

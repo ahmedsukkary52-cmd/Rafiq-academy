@@ -9,7 +9,7 @@ import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../entities/attendance_record_entity.dart';
 import '../entities/halaqa_students_summary_entity.dart';
 
-enum AttendanceStatus { present, absent, late }
+enum AttendanceStatus { present, absent, late, excused }
 
 abstract class TeacherRepository {
   /// الحلقات المسندة للمعلم

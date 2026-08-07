@@ -26,6 +26,7 @@ void main() {
     date: date,
     status: AttendanceStatus.absent,
     recordedBy: 't1',
+    sessionId: 'h1_20240603',
   );
 
   final event = StudentAbsentRecorded(

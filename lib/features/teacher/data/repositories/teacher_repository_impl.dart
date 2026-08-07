@@ -112,6 +112,7 @@ class TeacherRepositoryImpl implements TeacherRepository {
                 date: record.date,
                 status: record.status,
                 recordedBy: record.recordedBy,
+                sessionId: record.sessionId,
               ),
             )
             .toList(),

@@ -8,8 +8,11 @@ class AttendanceMarkInput {
   final String halaqaId;
   final DateTime date;
 
-  /// Raw Firestore status string (`present` / `absent` / `late`).
+  /// Raw Firestore status string (`present` / `absent` / `late` / `excused`).
   final String status;
+
+  /// Operational session id when known.
+  final String? sessionId;
 
   const AttendanceMarkInput({
     required this.studentId,
@@ -17,6 +20,7 @@ class AttendanceMarkInput {
     required this.halaqaId,
     required this.date,
     required this.status,
+    this.sessionId,
   });
 }
 
@@ -47,10 +51,11 @@ class AttendanceAbsenceTransitions {
       final studentId = mark.studentId.trim();
       if (studentId.isEmpty) continue;
 
-      final preferredId = AttendancePolicy.documentId(
+      final preferredId = AttendancePolicy.preferredDocumentId(
         halaqaId: mark.halaqaId,
         studentId: studentId,
         date: mark.date,
+        sessionId: mark.sessionId,
       );
       final isCanonical = mark.id == preferredId;
       if (canonical.contains(studentId) && !isCanonical) continue;
@@ -82,10 +87,11 @@ class AttendanceAbsenceTransitions {
       final currAbsent = isExplicitAbsent(current);
 
       final day = AttendancePolicy.dayStart(mark.date);
-      final attendanceDocumentId = AttendancePolicy.documentId(
+      final attendanceDocumentId = AttendancePolicy.preferredDocumentId(
         halaqaId: mark.halaqaId,
         studentId: studentId,
         date: day,
+        sessionId: mark.sessionId,
       );
 
       if (!prevAbsent && currAbsent) {
@@ -102,9 +108,11 @@ class AttendanceAbsenceTransitions {
       }
 
       if (prevAbsent && !currAbsent) {
-        // Only emit correction when landing on an attended status.
+        // Correction when leaving absent for any non-absent status
+        // (present / late / excused).
         if (current != AttendancePolicy.statusPresent &&
-            current != AttendancePolicy.statusLate) {
+            current != AttendancePolicy.statusLate &&
+            current != AttendancePolicy.statusExcused) {
           continue;
         }
         events.add(

@@ -36,9 +36,8 @@ void main() {
       expect(
         e.attendanceDocumentId,
         AttendancePolicy.documentId(
-          halaqaId: 'h1',
+          sessionId: 'h1_20240603',
           studentId: 's1',
-          date: dayStart,
         ),
       );
       expect(
@@ -95,9 +94,10 @@ void main() {
     });
 
     test('unknown / null previous is NOT treated as absent', () {
-      // Contrast with AttendancePolicy.isAbsentStatus which would say true.
-      expect(AttendancePolicy.isAbsentStatus(null), isTrue);
-      expect(AttendancePolicy.isAbsentStatus('weird'), isTrue);
+      // Policy and projector agree: only the explicit wire value `absent`.
+      expect(AttendancePolicy.isAbsentStatus(null), isFalse);
+      expect(AttendancePolicy.isAbsentStatus('weird'), isFalse);
+      expect(AttendancePolicy.isAbsentStatus('excused'), isFalse);
       expect(AttendanceAbsenceTransitions.isExplicitAbsent(null), isFalse);
       expect(AttendanceAbsenceTransitions.isExplicitAbsent('weird'), isFalse);
 
@@ -112,6 +112,16 @@ void main() {
         currentMarks: [mark(id: 's1', status: 'present')],
       );
       expect(fromUnknown, isEmpty);
+    });
+
+    test('absent → excused → StudentAbsenceCorrected', () {
+      final events = AttendanceAbsenceTransitions.project(
+        previousStatusByStudentId: const {'s1': 'absent'},
+        currentMarks: [mark(id: 's1', status: 'excused')],
+      );
+      expect(events, hasLength(1));
+      final e = events.single as StudentAbsenceCorrected;
+      expect(e.correctedToStatus, AttendancePolicy.statusExcused);
     });
 
     test('unknown current status never emits correction/absence', () {
@@ -160,9 +170,8 @@ void main() {
     );
 
     String canonicalId(String studentId) => AttendancePolicy.documentId(
-      halaqaId: 'h1',
+      sessionId: 'h1_20240603',
       studentId: studentId,
-      date: day,
     );
 
     test('reads raw stored statuses without absent coercion', () {

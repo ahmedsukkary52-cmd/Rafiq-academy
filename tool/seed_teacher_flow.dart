@@ -37,14 +37,13 @@ import 'package:rafiq_academy/features/student/domain/entities/recitation_record
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/firebase_options.dart';
+import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 
 // ── Stable seed IDs (idempotent re-runs) ─────────────────────────────────────
 
 const _student1Id = 'seed_student_1';
 const _student2Id = 'seed_student_2';
 const _halaqaId = 'seed_teacher_halaqa';
-const _attendancePresentId = 'seed_att_present_today';
-const _attendanceLateId = 'seed_att_late_today';
 const _recitationReviewedId = 'seed_rec_reviewed';
 const _recitationPendingId = 'seed_rec_pending';
 const _achievementId = 'seed_achievement_1';
@@ -204,32 +203,46 @@ Future<_SeedResult> _seedTeacherFlow(
     'status': 'active',
   }, SetOptions(merge: true));
 
-  // 5) Attendance today — present + late (AttendanceRecordModel.toFirestore)
+  // 5) Attendance today — present + late (session-scoped ids)
+  final sessionId = AttendancePolicy.sessionIdForDay(
+    halaqaId: _halaqaId,
+    day: dayStart,
+  );
+  final presentId = AttendancePolicy.documentId(
+    sessionId: sessionId,
+    studentId: _student1Id,
+  );
+  final lateId = AttendancePolicy.documentId(
+    sessionId: sessionId,
+    studentId: _student2Id,
+  );
   final present = AttendanceRecordModel(
-    id: _attendancePresentId,
+    id: presentId,
     studentId: _student1Id,
     studentName: _student1Name,
     halaqaId: _halaqaId,
     date: dayStart,
     status: AttendanceStatus.present,
     recordedBy: teacherUid,
+    sessionId: sessionId,
   );
   final late = AttendanceRecordModel(
-    id: _attendanceLateId,
+    id: lateId,
     studentId: _student2Id,
     studentName: _student2Name,
     halaqaId: _halaqaId,
     date: dayStart,
     status: AttendanceStatus.late,
     recordedBy: teacherUid,
+    sessionId: sessionId,
   );
   await db
       .collection(FirestoreCollections.attendanceRecords)
-      .doc(_attendancePresentId)
+      .doc(presentId)
       .set(present.toFirestore());
   await db
       .collection(FirestoreCollections.attendanceRecords)
-      .doc(_attendanceLateId)
+      .doc(lateId)
       .set(late.toFirestore());
 
   // 6) Recitation — reviewed + pending (RecitationRecordModel.toFirestore)

@@ -44,6 +44,7 @@ AttendanceRecordEntity _attendance(String halaqaId, String studentId) {
     date: _monday,
     status: AttendanceStatus.present,
     recordedBy: 't1',
+    sessionId: '${halaqaId}_20240603',
   );
 }
 

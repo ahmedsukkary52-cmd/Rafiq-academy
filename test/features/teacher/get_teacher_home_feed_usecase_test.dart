@@ -127,6 +127,7 @@ void main() {
             date: DateTime(2024, 6, 3, 9, 5),
             status: AttendanceStatus.present,
             recordedBy: 't1',
+            sessionId: 'h1_20240603',
           ),
         ],
         recitations: [olderEval, newerEval],

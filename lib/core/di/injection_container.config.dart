@@ -337,6 +337,7 @@ import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.da
 import 'package:rafiq_academy/shared/domain/academy_event_observer_resolver.dart'
     as _i937;
 import 'package:rafiq_academy/shared/domain/academy_event_sink.dart' as _i273;
+import 'package:rafiq_academy/shared/domain/attendance_service.dart' as _i295;
 import 'package:rafiq_academy/shared/domain/evaluation_service.dart' as _i81;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -362,6 +363,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i649.CertificatePdfGenerator>(
       () => _i649.CertificatePdfGenerator(),
+    );
+    gh.lazySingleton<_i295.AttendanceService>(
+      () => const _i295.AttendanceService(),
     );
     gh.lazySingleton<_i81.EvaluationService>(
       () => const _i81.EvaluationService(),

@@ -311,12 +311,15 @@ class TeacherBloc extends Bloc<TeacherEvent, TeacherState> {
           ),
         );
         if (event.records.isNotEmpty) {
+          final halaqaId = event.records.first.halaqaId;
           add(
             LoadHalaqaAttendanceEvent(
-              halaqaId: event.records.first.halaqaId,
+              halaqaId: halaqaId,
               date: event.records.first.date,
             ),
           );
+          // Roster % / at-risk are derived from attendanceRecords at read time.
+          add(LoadHalaqaStudentsEvent(halaqaId));
         }
         // W3: remaining-work agenda must refresh after register write.
         add(const LoadTodayAgendaEvent());

@@ -335,11 +335,22 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       textDirection: TextDirection.rtl,
       child: BlocConsumer<TeacherBloc, TeacherState>(
         listenWhen: (previous, current) =>
-            widget.openAssignSheet &&
-            !_assignGate.hasOpened &&
-            (previous.studentsStatus != current.studentsStatus ||
-                previous.studentsHalaqaId != current.studentsHalaqaId),
-        listener: (context, state) => _onStudentsStatus(state),
+            (widget.openAssignSheet &&
+                !_assignGate.hasOpened &&
+                (previous.studentsStatus != current.studentsStatus ||
+                    previous.studentsHalaqaId != current.studentsHalaqaId)) ||
+            (previous.attendanceSubmissionStatus !=
+                    current.attendanceSubmissionStatus &&
+                current.attendanceSubmissionStatus ==
+                    SubmissionStatus.success),
+        listener: (context, state) {
+          if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
+            _loadHeaderStats();
+          }
+          if (widget.openAssignSheet && !_assignGate.hasOpened) {
+            _onStudentsStatus(state);
+          }
+        },
         buildWhen: (previous, current) =>
             previous.halaqatStatus != current.halaqatStatus ||
             previous.halaqat != current.halaqat ||

@@ -11,6 +11,9 @@ class AttendanceRecordEntity extends Equatable {
   final AttendanceStatus status;
   final String recordedBy;
 
+  /// Operational session id (`{halaqaId}_yyyyMMdd`) — required on every write.
+  final String sessionId;
+
   const AttendanceRecordEntity({
     required this.id,
     required this.studentId,
@@ -19,6 +22,7 @@ class AttendanceRecordEntity extends Equatable {
     required this.date,
     required this.status,
     required this.recordedBy,
+    required this.sessionId,
   });
 
   @override
@@ -30,5 +34,6 @@ class AttendanceRecordEntity extends Equatable {
     date,
     status,
     recordedBy,
+    sessionId,
   ];
 }

@@ -34,6 +34,7 @@ void main() {
         date: DateTime(2026, 7, 31),
         status: AttendanceStatus.present,
         recordedBy: 't1',
+        sessionId: 'h1_20260731',
       ),
     ];
 

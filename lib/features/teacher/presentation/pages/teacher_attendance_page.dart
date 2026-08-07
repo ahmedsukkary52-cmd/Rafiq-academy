@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hijri/hijri_calendar.dart';
 
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/attendance_service.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../domain/entities/attendance_record_entity.dart';
+import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../utils/teacher_workflow_ownership.dart';
+import '../widgets/teacher_home_figma_cards.dart';
 
+/// Teacher Attendance — Figma 1:914 + session-scoped Firestore via [TeacherBloc].
 class TeacherAttendancePage extends StatefulWidget {
   final String halaqaId;
 
@@ -33,538 +38,651 @@ class TeacherAttendancePage extends StatefulWidget {
 }
 
 class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
-  DateTime _selectedDate = DateTime.now();
+  final _attendanceService = sl<AttendanceService>();
 
-  /// Explicit selections only. Missing key / null = not selected (never default present).
-  final Map<String, AttendanceStatus> _attendanceMap = {};
+  late DateTime _selectedDate;
 
-  /// After first successful students + day-attendance load, keep the shell visible
-  /// during save/reload instead of flashing a full-page loader.
-  bool _shellReady = false;
+  /// Local draft statuses keyed by student uid (null = unmarked).
+  final Map<String, AttendanceStatus?> _draft = {};
+
+  /// Tracks which attendance load we last hydrated from.
+  DateTime? _hydratedAttendanceDate;
+  int _hydratedAttendanceHash = 0;
 
   @override
   void initState() {
     super.initState();
+    _selectedDate = AttendancePolicy.dayStart(DateTime.now());
     final bloc = context.read<TeacherBloc>();
     bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
-    _loadAttendance();
-    _loadPendingRequests();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _bootstrapSessionDate(bloc);
+    });
   }
 
-  void _loadAttendance() {
-    context.read<TeacherBloc>().add(
-      LoadHalaqaAttendanceEvent(halaqaId: widget.halaqaId, date: _selectedDate),
+  void _bootstrapSessionDate(TeacherBloc bloc) {
+    final halaqa = _halaqaFromState(bloc.state);
+    final open = _attendanceService.openRegister(
+      halaqaId: widget.halaqaId,
+      halaqa: halaqa,
+      existingRecords: const [],
     );
-  }
-
-  void _loadPendingRequests() {
-    final auth = context.read<AuthBloc>().state;
-    if (auth is! AuthAuthenticated) return;
-    context.read<TeacherBloc>().add(
-      LoadPendingAbsenceRequestsEvent(
-        teacherId: auth.user.uid,
+    setState(() => _selectedDate = open.sessionDate);
+    bloc.add(
+      LoadHalaqaAttendanceEvent(
         halaqaId: widget.halaqaId,
-        date: _selectedDate,
+        date: open.sessionDate,
       ),
     );
   }
 
-  void _retryAll() {
-    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
-    _loadAttendance();
-    _loadPendingRequests();
+  HalaqaEntity? _halaqaFromState(TeacherState state) {
+    for (final h in state.halaqat) {
+      if (h.id == widget.halaqaId) return h;
+    }
+    return null;
   }
 
-  static DateTime get _today => AttendancePolicy.dayStart(DateTime.now());
+  AttendanceOpenModel _openModel(TeacherState state) {
+    return _attendanceService.openRegister(
+      halaqaId: widget.halaqaId,
+      halaqa: _halaqaFromState(state),
+      existingRecords: state.dayAttendance,
+      sessionDate: _selectedDate,
+    );
+  }
 
-  static DateTime get _minDate => _today.subtract(const Duration(days: 30));
+  bool _hydrateDraftIfNeeded(TeacherState state, AttendanceOpenModel open) {
+    final loaded =
+        state.dayAttendanceStatus == SectionStatus.loaded &&
+        state.dayAttendanceDate != null &&
+        AttendancePolicy.isSameCalendarDay(
+          state.dayAttendanceDate!,
+          open.sessionDate,
+        );
+    if (!loaded) return false;
 
-  DateTime _normalize(DateTime date) => AttendancePolicy.dayStart(date);
+    final hash = Object.hashAll(
+      state.dayAttendance.map(
+        (r) => Object.hash(r.id, r.studentId, r.status, r.sessionId),
+      ),
+    );
+    final studentsHash = Object.hashAll(
+      state.students.map((s) => s.uid),
+    );
+    final combined = Object.hash(hash, studentsHash);
+    if (_hydratedAttendanceDate != null &&
+        AttendancePolicy.isSameCalendarDay(
+          _hydratedAttendanceDate!,
+          open.sessionDate,
+        ) &&
+        _hydratedAttendanceHash == combined) {
+      return false;
+    }
 
-  void _changeDate(DateTime date) {
-    final bloc = context.read<TeacherBloc>();
-    if (bloc.state.attendanceSubmissionStatus == SubmissionStatus.submitting) {
+    _hydratedAttendanceDate = open.sessionDate;
+    _hydratedAttendanceHash = combined;
+    _draft
+      ..clear()
+      ..addAll({
+        for (final s in state.students)
+          if (s.uid.trim().isNotEmpty) s.uid: open.existingByStudentId[s.uid],
+      });
+    return true;
+  }
+
+  void _loadDate(DateTime date) {
+    final day = AttendancePolicy.dayStart(date);
+    setState(() {
+      _selectedDate = day;
+      _draft.clear();
+      _hydratedAttendanceDate = null;
+      _hydratedAttendanceHash = 0;
+    });
+    context.read<TeacherBloc>().add(
+      LoadHalaqaAttendanceEvent(halaqaId: widget.halaqaId, date: day),
+    );
+  }
+
+  void _shiftDate(int days, {required bool locked}) {
+    if (locked) return;
+    _loadDate(_selectedDate.add(Duration(days: days)));
+  }
+
+  Future<void> _pickDate({required bool locked}) async {
+    if (locked) return;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (picked == null || !mounted) return;
+    _loadDate(picked);
+  }
+
+  void _setStatus(String id, AttendanceStatus status, {required bool canEdit}) {
+    if (!canEdit) return;
+    setState(() => _draft[id] = status);
+  }
+
+  bool _isRegisterComplete(List<HalaqaStudentSummaryEntity> students) {
+    if (students.isEmpty) return false;
+    return _attendanceService.isRegisterComplete(
+      rosterStudentIds: students.map((s) => s.uid),
+      markedStudentIds: _draft.entries
+          .where((e) => e.value != null)
+          .map((e) => e.key),
+    );
+  }
+
+  String? _teacherUid() {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is AuthAuthenticated) return auth.user.uid;
+    return null;
+  }
+
+  void _onSave(TeacherState state, AttendanceOpenModel open) {
+    if (!TeacherWorkflowOwnership.canExecute(context)) return;
+    if (state.attendanceSubmissionStatus == SubmissionStatus.submitting) {
       return;
     }
-    final next = _normalize(date);
-    if (next.isBefore(_minDate) || next.isAfter(_today)) return;
-    setState(() {
-      _selectedDate = next;
-      _attendanceMap.clear();
-    });
-    _loadAttendance();
-    _loadPendingRequests();
-  }
-
-  void _syncMapFromRecords(List<AttendanceRecordEntity> records) {
-    _attendanceMap.clear();
-    for (final record in records) {
-      _attendanceMap[record.studentId] = record.status;
+    final teacherId = _teacherUid();
+    if (teacherId == null || teacherId.isEmpty) {
+      AppSnackBar.showError(context, 'تعذر تحديد هوية المعلم');
+      return;
     }
+
+    final marks = <AttendanceDraftMark>[];
+    for (final s in state.students) {
+      final status = _draft[s.uid];
+      if (status == null) continue;
+      marks.add(
+        AttendanceDraftMark(
+          studentId: s.uid,
+          studentName: s.name,
+          status: status,
+        ),
+      );
+    }
+
+    final result = _attendanceService.planSessionSave(
+      open: open,
+      recordedBy: teacherId,
+      rosterStudentIds: state.students.map((s) => s.uid),
+      marks: marks,
+      existingRecords: state.dayAttendance,
+    );
+    if (!result.isReady) {
+      final message = switch (result.blockReason) {
+        AttendanceSaveBlockReason.sessionClosed =>
+          'انتهت جلسة هذا اليوم — التعديل غير متاح',
+        AttendanceSaveBlockReason.registerIncomplete =>
+          'سجّل حضور جميع الطلاب قبل الحفظ',
+        AttendanceSaveBlockReason.nothingToSave =>
+          'سجّل حضور جميع الطلاب قبل الحفظ',
+        AttendanceSaveBlockReason.missingSessionId =>
+          'تعذر تحديد جلسة الحضور',
+        null => 'تعذر حفظ الحضور',
+      };
+      AppSnackBar.showError(context, message);
+      return;
+    }
+
+    context.read<TeacherBloc>().add(
+      SaveDayAttendanceEvent(result.plan!.records),
+    );
   }
 
-  bool _allStudentsSelected(List<HalaqaStudentSummaryEntity> students) {
-    if (students.isEmpty) return false;
-    return students.every((s) => _attendanceMap.containsKey(s.uid));
-  }
-
-  bool _isSameDay(DateTime? a, DateTime b) {
-    if (a == null) return false;
-    return AttendancePolicy.isSameCalendarDay(a, b);
-  }
+  int _count(AttendanceStatus status) =>
+      _draft.values.where((s) => s == status).length;
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocListener(
-      listeners: [
-        BlocListener<TeacherBloc, TeacherState>(
-          listenWhen: (prev, curr) =>
-              prev.attendanceSubmissionStatus !=
-              curr.attendanceSubmissionStatus,
-          listener: (context, state) {
-            if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
-              if (state.attendanceEventsUnpublished) {
-                AppSnackBar.showInfo(
-                  context,
-                  'تم حفظ الحضور، لكن تعذّر نشر تحديثات الغياب',
-                );
-              } else {
-                AppSnackBar.showSuccess(context, 'تم حفظ الحضور بنجاح');
-              }
-              context.read<TeacherBloc>().add(
-                const ResetAttendanceSubmissionEvent(),
-              );
-            } else if (state.attendanceSubmissionStatus ==
-                SubmissionStatus.error) {
-              AppSnackBar.showError(
+    final canWrite = TeacherWorkflowOwnership.canExecute(context);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: BlocConsumer<TeacherBloc, TeacherState>(
+        listenWhen: (prev, curr) =>
+            prev.attendanceSubmissionStatus !=
+                curr.attendanceSubmissionStatus ||
+            prev.dayAttendance != curr.dayAttendance ||
+            prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
+            prev.students != curr.students ||
+            prev.studentsStatus != curr.studentsStatus,
+        listener: (context, state) {
+          final open = _openModel(state);
+          if (_hydrateDraftIfNeeded(state, open)) {
+            setState(() {});
+          }
+
+          if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
+            AppSnackBar.showSuccess(context, 'تم حفظ الحضور');
+            if (state.attendanceEventsUnpublished) {
+              AppSnackBar.showInfo(
                 context,
-                state.attendanceSubmissionError ?? 'فشل حفظ الحضور',
-              );
-              context.read<TeacherBloc>().add(
-                const ResetAttendanceSubmissionEvent(),
+                'الحضور محفوظ — تعذر إرسال إشعار الغياب',
               );
             }
-          },
-        ),
-        BlocListener<TeacherBloc, TeacherState>(
-          listenWhen: (prev, curr) =>
-              curr.dayAttendanceStatus == SectionStatus.loaded &&
-              (prev.dayAttendanceStatus != SectionStatus.loaded ||
-                  prev.dayAttendance != curr.dayAttendance ||
-                  prev.dayAttendanceDate != curr.dayAttendanceDate),
-          listener: (context, state) {
-            final loadedDay = state.dayAttendanceDate;
-            if (loadedDay == null ||
-                !AttendancePolicy.isSameCalendarDay(loadedDay, _selectedDate)) {
-              return;
-            }
-            setState(() {
-              _syncMapFromRecords(state.dayAttendance);
-              if (state.studentsStatus == SectionStatus.loaded) {
-                _shellReady = true;
-              }
-            });
-          },
-        ),
-        BlocListener<TeacherBloc, TeacherState>(
-          listenWhen: (prev, curr) =>
-              curr.studentsStatus == SectionStatus.loaded &&
-              curr.dayAttendanceStatus == SectionStatus.loaded &&
-              prev.studentsStatus != SectionStatus.loaded,
-          listener: (context, state) {
-            setState(() => _shellReady = true);
-          },
-        ),
-        BlocListener<TeacherBloc, TeacherState>(
-          listenWhen: (prev, curr) =>
-              prev.absenceReviewStatus != curr.absenceReviewStatus,
-          listener: (context, state) {
-            if (state.absenceReviewStatus == SubmissionStatus.success) {
-              AppSnackBar.showSuccess(
-                context,
-                'تم تسجيل قرار الاستئذان — الحضور يُحدَّد من سجل الحضور فقط',
-              );
-              context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
-            } else if (state.absenceReviewStatus == SubmissionStatus.error) {
-              AppSnackBar.showError(
-                context,
-                state.absenceReviewError ?? 'تعذر تسجيل القرار',
-              );
-              context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
-            }
-          },
-        ),
-      ],
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: widget.embedded
-            ? null
-            : AppBar(
-                title: const Text('الحضور والغياب'),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    onPressed:
-                        context
-                                .watch<TeacherBloc>()
-                                .state
-                                .attendanceSubmissionStatus ==
-                            SubmissionStatus.submitting
-                        ? null
-                        : _pickDate,
-                  ),
-                ],
-              ),
-        body: Column(
-          children: [
-            if (widget.embedded)
-              Material(
-                color: AppColors.surface,
-                child: ListTile(
-                  title: Text(
-                    'الحضور والغياب',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    onPressed:
-                        context
-                                .watch<TeacherBloc>()
-                                .state
-                                .attendanceSubmissionStatus ==
-                            SubmissionStatus.submitting
-                        ? null
-                        : _pickDate,
-                  ),
-                ),
-              ),
-            Expanded(
-              child: BlocBuilder<TeacherBloc, TeacherState>(
-          buildWhen: (previous, current) =>
-              previous.studentsStatus != current.studentsStatus ||
-              previous.students != current.students ||
-              previous.studentsError != current.studentsError ||
-              previous.dayAttendanceStatus != current.dayAttendanceStatus ||
-              previous.dayAttendance != current.dayAttendance ||
-              previous.dayAttendanceDate != current.dayAttendanceDate ||
-              previous.dayAttendanceError != current.dayAttendanceError ||
-              previous.attendanceSubmissionStatus !=
-                  current.attendanceSubmissionStatus ||
-              previous.pendingAbsenceRequestsStatus !=
-                  current.pendingAbsenceRequestsStatus ||
-              previous.pendingAbsenceRequests !=
-                  current.pendingAbsenceRequests ||
-              previous.pendingAbsenceRequestsError !=
-                  current.pendingAbsenceRequestsError ||
-              previous.absenceReviewStatus != current.absenceReviewStatus,
-          builder: (context, state) {
-            final studentsLoading =
-                state.studentsStatus == SectionStatus.loading ||
-                state.studentsStatus == SectionStatus.initial;
-            final attendanceLoading =
-                state.dayAttendanceStatus == SectionStatus.loading ||
-                state.dayAttendanceStatus == SectionStatus.initial;
-
-            if (!_shellReady && (studentsLoading || attendanceLoading)) {
-              return const AppLoadingWidget();
-            }
-
-            if (state.studentsStatus == SectionStatus.error) {
-              return AppErrorWidget(
-                message: state.studentsError ?? 'حدث خطأ',
-                onRetry: _retryAll,
-              );
-            }
-
-            if (state.dayAttendanceStatus == SectionStatus.error) {
-              return AppErrorWidget(
-                message: state.dayAttendanceError ?? 'حدث خطأ',
-                onRetry: _loadAttendance,
-              );
-            }
-
-            final students = state.students;
-            final isRefreshingAttendance = _shellReady && attendanceLoading;
-            final isSaving =
-                state.attendanceSubmissionStatus == SubmissionStatus.submitting;
-            final dayMatchesSelection = _isSameDay(
-              state.dayAttendanceDate,
-              _selectedDate,
+            context.read<TeacherBloc>().add(
+              const ResetAttendanceSubmissionEvent(),
             );
-            final canSave =
-                students.isNotEmpty &&
-                _allStudentsSelected(students) &&
-                !isSaving &&
-                !isRefreshingAttendance &&
-                dayMatchesSelection &&
-                state.dayAttendanceStatus == SectionStatus.loaded;
+          } else if (state.attendanceSubmissionStatus ==
+                  SubmissionStatus.error &&
+              state.attendanceSubmissionError != null) {
+            AppSnackBar.showError(context, state.attendanceSubmissionError!);
+            context.read<TeacherBloc>().add(
+              const ResetAttendanceSubmissionEvent(),
+            );
+          }
+        },
+        builder: (context, state) {
+          final open = _openModel(state);
 
-            final presentCount = students
-                .where((s) => _attendanceMap[s.uid] == AttendanceStatus.present)
-                .length;
-            final absentCount = students
-                .where((s) => _attendanceMap[s.uid] == AttendanceStatus.absent)
-                .length;
-            final lateCount = students
-                .where((s) => _attendanceMap[s.uid] == AttendanceStatus.late)
-                .length;
-            final canWrite = TeacherWorkflowOwnership.canExecute(context);
+          final submitting =
+              state.attendanceSubmissionStatus == SubmissionStatus.submitting;
+          final dateLocked = submitting;
+          final canEdit = canWrite && open.canEdit && !submitting;
+          final studentsForHalaqa =
+              state.studentsHalaqaId == widget.halaqaId
+              ? state.students
+              : const <HalaqaStudentSummaryEntity>[];
 
-            return Column(
-              children: [
-                if (!canWrite)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSizes.paddingM,
-                      AppSizes.paddingS,
-                      AppSizes.paddingM,
-                      0,
-                    ),
-                    child: Text(
-                      'عرض إشرافي — التنفيذ ملك معلم الحلقة فقط',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
+          final body = _buildBody(
+            context: context,
+            state: state,
+            open: open,
+            students: studentsForHalaqa,
+            canEdit: canEdit,
+            dateLocked: dateLocked,
+            submitting: submitting,
+            canWrite: canWrite,
+          );
+
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: widget.embedded
+                ? Column(
+                    children: [
+                      _EmbeddedHeader(
+                        onCalendar: () => _pickDate(locked: dateLocked),
+                        canEdit: canEdit,
                       ),
-                    ),
-                  ),
-                _DateNavigator(
-                  date: _selectedDate,
-                  onPrev:
-                      !isSaving && _normalize(_selectedDate).isAfter(_minDate)
-                      ? () => _changeDate(
-                          _selectedDate.subtract(const Duration(days: 1)),
-                        )
-                      : null,
-                  onNext:
-                      !isSaving && _normalize(_selectedDate).isBefore(_today)
-                      ? () => _changeDate(
-                          _selectedDate.add(const Duration(days: 1)),
-                        )
-                      : null,
-                ),
-                if (isRefreshingAttendance)
-                  const LinearProgressIndicator(
-                    minHeight: 2,
-                    color: AppColors.primary,
-                  ),
-                _AttendanceSummaryRow(
-                  present: presentCount,
-                  absent: absentCount,
-                  late: lateCount,
-                ),
-                _PendingAbsenceRequestsSection(
-                  state: state,
-                  students: students,
-                  canWrite: canWrite,
-                  reviewing:
-                      state.absenceReviewStatus == SubmissionStatus.submitting,
-                  onRetry: _loadPendingRequests,
-                  onDecide: (request, decision) {
-                    final auth = context.read<AuthBloc>().state;
-                    if (auth is! AuthAuthenticated) return;
-                    if (!canWrite) {
-                      AppSnackBar.showInfo(
-                        context,
-                        'مراجعة الاستئذان ملك معلم الحلقة',
-                      );
-                      return;
-                    }
-                    context.read<TeacherBloc>().add(
-                      ReviewAbsenceRequestEvent(
-                        requestId: request.id,
-                        halaqaId: widget.halaqaId,
-                        teacherId: auth.user.uid,
-                        decision: decision,
-                      ),
-                    );
-                  },
-                ),
-                Expanded(
-                  child: students.isEmpty
-                      ? Center(
-                          child: Text(
-                            'لا يوجد طلاب في هذه الحلقة',
-                            style: AppTextStyles.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSizes.paddingM,
-                          ),
-                          itemCount: students.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1, color: AppColors.border),
-                          itemBuilder: (context, i) {
-                            final student = students[i];
-                            return _StudentAttendanceRow(
-                              student: student,
-                              status: _attendanceMap[student.uid],
-                              onChanged: canWrite
-                                  ? (status) => setState(
-                                      () =>
-                                          _attendanceMap[student.uid] = status,
-                                    )
-                                  : null,
-                            );
-                          },
-                        ),
-                ),
-                if (canWrite)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      AppSizes.paddingM,
-                      AppSizes.paddingM,
-                      AppSizes.paddingM,
-                      MediaQuery.of(context).padding.bottom + AppSizes.paddingM,
-                    ),
-                    child: AppButton(
-                      label: 'حفظ الحضور',
-                      leading: const Icon(Icons.check_rounded, size: 20),
-                      isLoading: isSaving,
-                      onPressed: canSave ? _saveAttendance : null,
-                    ),
+                      Expanded(child: body),
+                    ],
                   )
-                else
-                  SizedBox(
-                    height:
-                        MediaQuery.of(context).padding.bottom +
-                        AppSizes.paddingM,
+                : Stack(
+                    children: [
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          height: 340,
+                          decoration: const BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                          ),
+                        ),
+                      ),
+                      Column(
+                        children: [
+                          _AttendanceHeader(
+                            onBack: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/teacher');
+                              }
+                            },
+                            onCalendar: () => _pickDate(locked: dateLocked),
+                          ),
+                          Expanded(
+                            child: Container(
+                              width: double.infinity,
+                              decoration: const BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(AppSizes.radiusXL),
+                                  topRight: Radius.circular(AppSizes.radiusXL),
+                                ),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: body,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-              ],
-            );
-          },
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  void _saveAttendance() {
-    if (!TeacherWorkflowOwnership.canExecute(context)) {
-      AppSnackBar.showInfo(
-        context,
-        'حفظ الحضور ملك معلم الحلقة — الإشراف للتوجيه فقط',
+  Widget _buildBody({
+    required BuildContext context,
+    required TeacherState state,
+    required AttendanceOpenModel open,
+    required List<HalaqaStudentSummaryEntity> students,
+    required bool canEdit,
+    required bool dateLocked,
+    required bool submitting,
+    required bool canWrite,
+  }) {
+    final studentsLoading =
+        (state.studentsStatus == SectionStatus.loading ||
+            state.studentsStatus == SectionStatus.initial) &&
+        students.isEmpty;
+    final attendanceLoading =
+        state.dayAttendanceStatus == SectionStatus.loading;
+    final studentsError = state.studentsStatus == SectionStatus.error
+        ? state.studentsError
+        : null;
+    final attendanceError = state.dayAttendanceStatus == SectionStatus.error
+        ? state.dayAttendanceError
+        : null;
+
+    if (studentsError != null) {
+      return AppErrorWidget(
+        message: studentsError,
+        onRetry: () => context.read<TeacherBloc>().add(
+          LoadHalaqaStudentsEvent(widget.halaqaId),
+        ),
       );
-      return;
     }
-    final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) {
-      AppSnackBar.showError(context, 'يجب تسجيل الدخول لحفظ الحضور');
-      return;
-    }
-
-    final bloc = context.read<TeacherBloc>();
-    final students = bloc.state.students;
-
-    if (students.isEmpty) {
-      AppSnackBar.showInfo(context, 'لا يوجد طلاب لحفظ الحضور');
-      return;
-    }
-
-    if (!_allStudentsSelected(students)) {
-      AppSnackBar.showInfo(
-        context,
-        'يرجى تحديد حالة الحضور لجميع الطلاب قبل الحفظ',
-      );
-      return;
-    }
-
-    final records = students
-        .map(
-          (s) => AttendanceRecordEntity(
-            id: '',
-            studentId: s.uid,
-            studentName: s.name,
+    if (attendanceError != null) {
+      return AppErrorWidget(
+        message: attendanceError,
+        onRetry: () => context.read<TeacherBloc>().add(
+          LoadHalaqaAttendanceEvent(
             halaqaId: widget.halaqaId,
-            date: _selectedDate,
-            status: _attendanceMap[s.uid]!,
-            recordedBy: authState.user.uid,
+            date: open.sessionDate,
           ),
-        )
-        .toList();
-
-    bloc.add(SaveDayAttendanceEvent(records));
-  }
-
-  Future<void> _pickDate() async {
-    if (context.read<TeacherBloc>().state.attendanceSubmissionStatus ==
-        SubmissionStatus.submitting) {
-      return;
+        ),
+      );
     }
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _normalize(_selectedDate),
-      firstDate: _minDate,
-      lastDate: _today,
+    if (studentsLoading || (attendanceLoading && students.isEmpty)) {
+      return const AppLoadingWidget();
+    }
+    if (students.isEmpty) {
+      return Center(
+        child: Text(
+          'لا يوجد طلاب في هذه الحلقة',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    final complete = _isRegisterComplete(students);
+    final saveEnabled = canEdit && complete && !submitting;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: _DateCard(
+            date: open.sessionDate,
+            onPrev: () => _shiftDate(-1, locked: dateLocked),
+            onNext: () => _shiftDate(1, locked: dateLocked),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _SummaryRow(
+            present: _count(AttendanceStatus.present),
+            absent: _count(AttendanceStatus.absent),
+            late: _count(AttendanceStatus.late),
+            excused: _count(AttendanceStatus.excused),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: attendanceLoading
+                ? const AppLoadingWidget()
+                : _RegisterCard(
+                    students: [
+                      for (final s in students)
+                        _RegisterStudent(
+                          id: s.uid,
+                          name: s.name,
+                          status: _draft[s.uid],
+                        ),
+                    ],
+                    onStatusChanged: (id, status) =>
+                        _setStatus(id, status, canEdit: canEdit),
+                  ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.paddingOf(context).bottom + 20,
+          ),
+          child: AppButton(
+            label: submitting ? 'جارٍ الحفظ...' : 'حفظ الحضور',
+            isLoading: submitting,
+            leading: submitting
+                ? null
+                : const Icon(
+                    Icons.check_rounded,
+                    size: AppSizes.iconM,
+                    color: AppColors.onPrimary,
+                  ),
+            onPressed: !canWrite
+                ? null
+                : saveEnabled
+                ? () => _onSave(state, open)
+                : null,
+          ),
+        ),
+      ],
     );
-    if (picked != null) _changeDate(picked);
   }
 }
 
-class _DateNavigator extends StatelessWidget {
-  final DateTime date;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
+class _RegisterStudent {
+  final String id;
+  final String name;
+  final AttendanceStatus? status;
 
-  const _DateNavigator({
+  const _RegisterStudent({
+    required this.id,
+    required this.name,
+    required this.status,
+  });
+}
+
+// ── Headers ───────────────────────────────────────────────────────────────────
+
+class _AttendanceHeader extends StatelessWidget {
+  final VoidCallback onBack;
+  final VoidCallback onCalendar;
+
+  const _AttendanceHeader({
+    required this.onBack,
+    required this.onCalendar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, top + 8, 16, 40),
+      child: Row(
+        children: [
+          _HeaderCircleButton(
+            icon: Icons.chevron_right_rounded,
+            onTap: onBack,
+          ),
+          Expanded(
+            child: Text(
+              'الحضور والغياب',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.headlineMedium.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          _HeaderCircleButton(
+            icon: Icons.calendar_today_outlined,
+            onTap: onCalendar,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmbeddedHeader extends StatelessWidget {
+  final VoidCallback onCalendar;
+  final bool canEdit;
+
+  const _EmbeddedHeader({
+    required this.onCalendar,
+    required this.canEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'الحضور والغياب',
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Material(
+            color: AppColors.primaryLight,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onCalendar,
+              child: const SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(
+                  Icons.calendar_today_outlined,
+                  color: AppColors.primaryDark,
+                  size: AppSizes.iconL,
+                ),
+              ),
+            ),
+          ),
+          if (!canEdit) ...[
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.lock_outline,
+              size: AppSizes.iconM,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderCircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _HeaderCircleButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.onPrimaryOverlay,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(icon, color: AppColors.onPrimary, size: AppSizes.iconL),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Date card ─────────────────────────────────────────────────────────────────
+
+class _DateCard extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+
+  const _DateCard({
     required this.date,
     required this.onPrev,
     required this.onNext,
   });
 
+  static const _weekdays = [
+    '',
+    'الاثنين',
+    'الثلاثاء',
+    'الأربعاء',
+    'الخميس',
+    'الجمعة',
+    'السبت',
+    'الأحد',
+  ];
+
   @override
   Widget build(BuildContext context) {
-    const weekdays = [
-      '',
-      'الاثنين',
-      'الثلاثاء',
-      'الأربعاء',
-      'الخميس',
-      'الجمعة',
-      'السبت',
-      'الأحد',
-    ];
-    const months = [
-      '',
-      'يناير',
-      'فبراير',
-      'مارس',
-      'أبريل',
-      'مايو',
-      'يونيو',
-      'يوليو',
-      'أغسطس',
-      'سبتمبر',
-      'أكتوبر',
-      'نوفمبر',
-      'ديسمبر',
-    ];
+    final hijri = HijriCalendar.fromDate(date);
+    final dayNum = teacherHomeEasternDigits('${hijri.hDay}');
+    final label =
+        '${_weekdays[date.weekday]} $dayNum ${hijri.getLongMonthName()}';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.paddingM,
-        vertical: AppSizes.paddingS,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey,
+        borderRadius: BorderRadius.circular(AppSizes.radiusM),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left_rounded),
             onPressed: onNext,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_left_rounded),
+            color: AppColors.textSecondary,
+            iconSize: AppSizes.iconL,
           ),
-          Text(
-            '${weekdays[date.weekday]} ${date.day} ${months[date.month]} ${date.year}',
-            style: AppTextStyles.titleMedium,
+          Expanded(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right_rounded),
             onPressed: onPrev,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_right_rounded),
+            color: AppColors.textSecondary,
+            iconSize: AppSizes.iconL,
           ),
         ],
       ),
@@ -572,81 +690,99 @@ class _DateNavigator extends StatelessWidget {
   }
 }
 
-class _AttendanceSummaryRow extends StatelessWidget {
+// ── Summary chips (W2 D6: present / absent / late only) ───────────────────────
+
+class _SummaryRow extends StatelessWidget {
   final int present;
   final int absent;
   final int late;
+  final int excused;
 
-  const _AttendanceSummaryRow({
+  const _SummaryRow({
     required this.present,
     required this.absent,
     required this.late,
+    required this.excused,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.paddingM,
-        vertical: 8,
-      ),
-      child: Row(
-        children: [
-          _CounterBadge(
-            value: late,
-            label: 'متأخر',
-            color: AppColors.secondaryBg,
-            textColor: AppColors.secondary,
-          ),
-          const SizedBox(width: 8),
-          _CounterBadge(
-            value: absent,
-            label: 'غائب',
-            color: const Color(0xFFFFEBEE),
-            textColor: AppColors.error,
-          ),
-          const SizedBox(width: 8),
-          _CounterBadge(
-            value: present,
-            label: 'حاضر',
-            color: const Color(0xFFE8F5E9),
-            textColor: AppColors.success,
-          ),
-        ],
-      ),
+    // Class Details stats gap = 10; RTL: Present rightmost.
+    return Row(
+      children: [
+        _SummaryChip(
+          count: present,
+          label: 'حاضر',
+          background: AppColors.successBg,
+          foreground: AppColors.success,
+        ),
+        const SizedBox(width: 10),
+        _SummaryChip(
+          count: absent,
+          label: 'غائب',
+          background: AppColors.error.withValues(alpha: 0.12),
+          foreground: AppColors.error,
+        ),
+        const SizedBox(width: 10),
+        _SummaryChip(
+          count: late,
+          label: 'متأخر',
+          background: AppColors.secondaryBg,
+          foreground: AppColors.secondary,
+        ),
+        const SizedBox(width: 10),
+        _SummaryChip(
+          count: excused,
+          label: 'معذور',
+          background: AppColors.primaryLight,
+          foreground: AppColors.primaryDark,
+        ),
+      ],
     );
   }
 }
 
-class _CounterBadge extends StatelessWidget {
-  final int value;
+class _SummaryChip extends StatelessWidget {
+  final int count;
   final String label;
-  final Color color;
-  final Color textColor;
+  final Color background;
+  final Color foreground;
 
-  const _CounterBadge({
-    required this.value,
+  const _SummaryChip({
+    required this.count,
     required this.label,
-    required this.color,
-    required this.textColor,
+    required this.background,
+    required this.foreground,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
-          color: color,
+          color: background,
           borderRadius: BorderRadius.circular(AppSizes.radiusM),
         ),
         child: Column(
           children: [
             Text(
-              '$value',
-              style: AppTextStyles.headlineMedium.copyWith(color: textColor),
+              teacherHomeEasternDigits('$count'),
+              style: AppTextStyles.headlineMedium.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            Text(label, style: AppTextStyles.labelSmall),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),
@@ -654,243 +790,255 @@ class _CounterBadge extends StatelessWidget {
   }
 }
 
-class _StudentAttendanceRow extends StatelessWidget {
-  final HalaqaStudentSummaryEntity student;
-  final AttendanceStatus? status;
-  final void Function(AttendanceStatus)? onChanged;
+// ── Register table ────────────────────────────────────────────────────────────
 
-  const _StudentAttendanceRow({
-    required this.student,
-    required this.status,
-    required this.onChanged,
+class _RegisterCard extends StatelessWidget {
+  final List<_RegisterStudent> students;
+  final void Function(String id, AttendanceStatus status) onStatusChanged;
+
+  const _RegisterCard({
+    required this.students,
+    required this.onStatusChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          const _RegisterHeader(),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: students.length,
+              separatorBuilder: (_, __) => const Divider(
+                height: 1,
+                thickness: 1,
+                color: AppColors.border,
+              ),
+              itemBuilder: (context, i) {
+                final student = students[i];
+                return _StudentRow(
+                  student: student,
+                  avatarColor: _avatarColor(i),
+                  onStatusChanged: (status) =>
+                      onStatusChanged(student.id, status),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _avatarColor(int index) {
+    const palette = [
+      AppColors.primaryLight,
+      AppColors.secondaryBg,
+      AppColors.successBg,
+      AppColors.messagesBg,
+      AppColors.info,
+    ];
+    final base = palette[index % palette.length];
+    if (base == AppColors.info) {
+      return AppColors.info.withValues(alpha: 0.18);
+    }
+    return base;
+  }
+}
+
+class _RegisterHeader extends StatelessWidget {
+  const _RegisterHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.primary,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Row(
-            children: [
-              _AttendanceButton(
-                label: '!',
-                isActive: status == AttendanceStatus.late,
-                activeColor: AppColors.secondary,
-                onTap: onChanged == null
-                    ? null
-                    : () => onChanged!(AttendanceStatus.late),
+          Expanded(
+            child: Text(
+              'الطالب',
+              style: AppTextStyles.labelLarge.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: 6),
-              _AttendanceButton(
-                label: '✗',
-                isActive: status == AttendanceStatus.absent,
-                activeColor: AppColors.error,
-                onTap: onChanged == null
-                    ? null
-                    : () => onChanged!(AttendanceStatus.absent),
-              ),
-              const SizedBox(width: 6),
-              _AttendanceButton(
-                label: '✓',
-                isActive: status == AttendanceStatus.present,
-                activeColor: AppColors.success,
-                onTap: onChanged == null
-                    ? null
-                    : () => onChanged!(AttendanceStatus.present),
-              ),
-            ],
+            ),
           ),
-          const Spacer(),
-          Text(student.name, style: AppTextStyles.titleMedium),
-          const SizedBox(width: 12),
-          UserAvatar(name: student.name, size: AppSizes.avatarS),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Text(
+              'متأخر',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Text(
+              'غائب',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Text(
+              'حاضر',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _AttendanceButton extends StatelessWidget {
-  final String label;
-  final bool isActive;
-  final Color activeColor;
-  final VoidCallback? onTap;
+const double _statusColumnWidth = 48;
 
-  const _AttendanceButton({
-    required this.label,
-    required this.isActive,
-    required this.activeColor,
+class _StudentRow extends StatelessWidget {
+  final _RegisterStudent student;
+  final Color avatarColor;
+  final ValueChanged<AttendanceStatus> onStatusChanged;
+
+  const _StudentRow({
+    required this.student,
+    required this.avatarColor,
+    required this.onStatusChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = student.name.trim();
+    final initial = trimmed.isEmpty
+        ? '?'
+        : String.fromCharCodes(trimmed.runes.take(1));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: avatarColor,
+                  child: Text(
+                    initial,
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    student.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Center(
+              child: _StatusToggle(
+                selected: student.status == AttendanceStatus.late,
+                color: AppColors.secondary,
+                icon: Icons.priority_high_rounded,
+                onTap: () => onStatusChanged(AttendanceStatus.late),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Center(
+              child: _StatusToggle(
+                selected: student.status == AttendanceStatus.absent,
+                color: AppColors.error,
+                icon: Icons.close_rounded,
+                onTap: () => onStatusChanged(AttendanceStatus.absent),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Center(
+              child: _StatusToggle(
+                selected: student.status == AttendanceStatus.present,
+                color: AppColors.success,
+                icon: Icons.check_rounded,
+                onTap: () => onStatusChanged(AttendanceStatus.present),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusToggle extends StatelessWidget {
+  final bool selected;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _StatusToggle({
+    required this.selected,
+    required this.color,
+    required this.icon,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: isActive ? activeColor : activeColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(AppSizes.radiusM),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isActive ? Colors.white : activeColor,
-            ),
+    return Material(
+      color: selected ? color : color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(AppSizes.radiusS),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSizes.radiusS),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(
+            icon,
+            size: AppSizes.iconM,
+            color: selected ? AppColors.onPrimary : color,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Contextual استئذان queue for the selected attendance day (W7 Slice 2).
-///
-/// Decisions classify the request only — they never rewrite attendance.
-class _PendingAbsenceRequestsSection extends StatelessWidget {
-  final TeacherState state;
-  final List<HalaqaStudentSummaryEntity> students;
-  final bool canWrite;
-  final bool reviewing;
-  final VoidCallback onRetry;
-  final void Function(
-    AbsenceRequestEntity request,
-    AbsenceRequestStatus decision,
-  )
-  onDecide;
-
-  const _PendingAbsenceRequestsSection({
-    required this.state,
-    required this.students,
-    required this.canWrite,
-    required this.reviewing,
-    required this.onRetry,
-    required this.onDecide,
-  });
-
-  String _studentName(String studentId) {
-    for (final s in students) {
-      if (s.uid == studentId) return s.name.trim().isEmpty ? 'طالب' : s.name;
-    }
-    return 'طالب';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (state.pendingAbsenceRequestsStatus == SectionStatus.initial ||
-        state.pendingAbsenceRequestsStatus == SectionStatus.loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-        child: SizedBox(height: 40, child: AppLoadingWidget()),
-      );
-    }
-
-    if (state.pendingAbsenceRequestsStatus == SectionStatus.error) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-        child: AppErrorWidget(
-          message:
-              state.pendingAbsenceRequestsError ?? 'تعذر تحميل طلبات الاستئذان',
-          onRetry: onRetry,
-        ),
-      );
-    }
-
-    final requests = state.pendingAbsenceRequests;
-    if (requests.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSizes.paddingM,
-        0,
-        AppSizes.paddingM,
-        AppSizes.paddingS,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'طلبات استئذان لهذا اليوم',
-            style: AppTextStyles.titleMedium,
-            textAlign: TextAlign.right,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'القبول/الرفض يصنّف الطلب فقط — سجل الحضور يُحدَّد بشكل مستقل.',
-            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.right,
-          ),
-          const SizedBox(height: 8),
-          for (final request in requests)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _studentName(request.studentId),
-                      style: AppTextStyles.titleMedium,
-                      textAlign: TextAlign.right,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      request.reason,
-                      style: AppTextStyles.bodyMedium,
-                      textAlign: TextAlign.right,
-                    ),
-                    if (canWrite) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: reviewing
-                                  ? null
-                                  : () => onDecide(
-                                      request,
-                                      AbsenceRequestStatus.rejected,
-                                    ),
-                              child: const Text('رفض'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: reviewing
-                                  ? null
-                                  : () => onDecide(
-                                      request,
-                                      AbsenceRequestStatus.approved,
-                                    ),
-                              child: reviewing
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('قبول'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

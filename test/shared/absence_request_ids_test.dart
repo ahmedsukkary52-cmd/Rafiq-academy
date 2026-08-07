@@ -4,7 +4,7 @@ import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 
 void main() {
   group('AbsenceRequestIds', () {
-    test('matches attendance calendar-day encoding for the same inputs', () {
+    test('matches legacy attendance calendar-day encoding for the same inputs', () {
       final day = DateTime(2024, 6, 3, 15, 30);
       expect(
         AbsenceRequestIds.documentId(
@@ -12,7 +12,11 @@ void main() {
           studentId: 's1',
           date: day,
         ),
-        AttendancePolicy.documentId(halaqaId: 'h1', studentId: 's1', date: day),
+        AttendancePolicy.legacyDocumentId(
+          halaqaId: 'h1',
+          studentId: 's1',
+          date: day,
+        ),
       );
       expect(
         AbsenceRequestIds.documentId(

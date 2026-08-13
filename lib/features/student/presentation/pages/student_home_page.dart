@@ -15,6 +15,7 @@ import '../../../../shared/widgets/student_last_evaluation_widget.dart';
 import '../../../../shared/widgets/student_progress_widget.dart';
 import '../../../../shared/widgets/student_quick_action_widget.dart';
 import '../../../../shared/widgets/student_session_card_widget.dart';
+import '../../../homework/presentation/pages/student_activities_page.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -268,6 +269,18 @@ class _StudentHomeTab extends StatelessWidget {
                       }
                     },
                   ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              // ── أنشطة الحلقة (separate from حفظ اليوم)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.paddingM,
+                  ),
+                  child: StudentActivitiesHomeEntry(halaqaId: halaqaId),
                 ),
               ),
 

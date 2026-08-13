@@ -1,1 +1,25 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"rafiq-academy","appId":"1:201515597019:android:ccadce210455313375e0fe","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"rafiq-academy","configurations":{"android":"1:201515597019:android:ccadce210455313375e0fe","ios":"1:201515597019:ios:12f98908cfa6519875e0fe"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "rafiq-academy",
+          "appId": "1:201515597019:android:ccadce210455313375e0fe",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "rafiq-academy",
+          "configurations": {
+            "android": "1:201515597019:android:ccadce210455313375e0fe",
+            "ios": "1:201515597019:ios:12f98908cfa6519875e0fe"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  }
+}

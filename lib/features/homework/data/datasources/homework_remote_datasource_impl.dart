@@ -32,7 +32,20 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
         .collection(FirestoreCollections.assignments)
         .where(AssignmentPolicy.studentIdField, isEqualTo: studentId)
         .orderBy(AssignmentPolicy.dueDateField, descending: true)
-        .limit(AssignmentPolicy.latestLimit);
+        .limit(AssignmentPolicy.latestScanLimit);
+  }
+
+  Future<HomeworkEntity?> _pickLatestLessonHomework(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) async {
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      if (!AssignmentPolicy.isLessonHomeworkData(data)) continue;
+      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
+      final refreshed = await doc.reference.get();
+      return _toHomework(AssignmentModel.fromFirestore(refreshed));
+    }
+    return null;
   }
 
   @override
@@ -40,10 +53,7 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
     try {
       final snapshot = await _latestQuery(studentId).get();
       if (snapshot.docs.isEmpty) return null;
-      final doc = snapshot.docs.first;
-      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
-      final refreshed = await doc.reference.get();
-      return _toHomework(AssignmentModel.fromFirestore(refreshed));
+      return _pickLatestLessonHomework(snapshot);
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -53,10 +63,7 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
   Stream<HomeworkEntity?> watchLatestHomework(String studentId) {
     return _latestQuery(studentId).snapshots().asyncMap((snapshot) async {
       if (snapshot.docs.isEmpty) return null;
-      final doc = snapshot.docs.first;
-      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
-      final refreshed = await doc.reference.get();
-      return _toHomework(AssignmentModel.fromFirestore(refreshed));
+      return _pickLatestLessonHomework(snapshot);
     });
   }
 

@@ -171,6 +171,46 @@ class HomeworkReviewed extends AcademyEvent {
   ];
 }
 
+/// Lightweight Halaqa activity published to the whole roster (not lesson homework).
+///
+/// Emitted once per roster student so existing observer fan-out
+/// (subject student + linked parents) stays reusable. Payload is activity
+/// facts only — no presentation copy.
+class HalaqaActivityPublished extends AcademyEvent {
+  final String activityId;
+  @override
+  final String studentId;
+  final String halaqaId;
+  final String assignedBy;
+  final String prompt;
+  final DateTime? deadline;
+
+  const HalaqaActivityPublished({
+    required this.activityId,
+    required this.studentId,
+    required this.halaqaId,
+    required this.assignedBy,
+    required this.prompt,
+    this.deadline,
+  });
+
+  @override
+  String get eventId => AcademyEventIds.halaqaActivityPublished(
+        activityId: activityId,
+        studentId: studentId,
+      );
+
+  @override
+  List<Object?> get props => [
+    activityId,
+    studentId,
+    halaqaId,
+    assignedBy,
+    prompt,
+    deadline,
+  ];
+}
+
 /// Deterministic identities of academy facts (not channel message ids).
 class AcademyEventIds {
   const AcademyEventIds._();
@@ -186,4 +226,11 @@ class AcademyEventIds {
   /// One operational review fact per recitation record.
   static String homeworkReviewed(String recitationRecordId) =>
       'homework_reviewed_$recitationRecordId';
+
+  /// One operational activity-publish fact per (activity, student) pair.
+  static String halaqaActivityPublished({
+    required String activityId,
+    required String studentId,
+  }) =>
+      'halaqa_activity_published_${activityId}_$studentId';
 }

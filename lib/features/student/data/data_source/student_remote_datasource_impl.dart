@@ -125,14 +125,17 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
           .collection(FirestoreCollections.assignments)
           .where(AssignmentPolicy.studentIdField, isEqualTo: studentId)
           .orderBy(AssignmentPolicy.dueDateField, descending: true)
-          .limit(AssignmentPolicy.latestLimit)
+          .limit(AssignmentPolicy.latestScanLimit)
           .get();
 
-      if (snapshot.docs.isEmpty) return null;
-      final doc = snapshot.docs.first;
-      await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
-      final refreshed = await doc.reference.get();
-      return AssignmentModel.fromFirestore(refreshed);
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (!AssignmentPolicy.isLessonHomeworkData(data)) continue;
+        await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
+        final refreshed = await doc.reference.get();
+        return AssignmentModel.fromFirestore(refreshed);
+      }
+      return null;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -164,14 +167,17 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
         .collection(FirestoreCollections.assignments)
         .where(AssignmentPolicy.studentIdField, isEqualTo: studentId)
         .orderBy(AssignmentPolicy.dueDateField, descending: true)
-        .limit(AssignmentPolicy.latestLimit)
+        .limit(AssignmentPolicy.latestScanLimit)
         .snapshots()
         .asyncMap((snapshot) async {
-          if (snapshot.docs.isEmpty) return null;
-          final doc = snapshot.docs.first;
-          await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
-          final refreshed = await doc.reference.get();
-          return AssignmentModel.fromFirestore(refreshed);
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            if (!AssignmentPolicy.isLessonHomeworkData(data)) continue;
+            await AssignmentHomeworkFieldsEnsure.ensureOnDocument(doc);
+            final refreshed = await doc.reference.get();
+            return AssignmentModel.fromFirestore(refreshed);
+          }
+          return null;
         });
   }
 

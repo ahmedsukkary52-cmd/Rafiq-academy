@@ -4,6 +4,15 @@
       "collectionGroup": "assignments",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "halaqaId", "order": "ASCENDING" },
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "assignments",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "dueDate", "order": "DESCENDING" }
       ]

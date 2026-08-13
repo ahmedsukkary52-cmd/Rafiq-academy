@@ -52,7 +52,9 @@ class InAppAcademySignalComposer {
   static String _type(AcademyEvent event) => switch (event) {
     StudentAbsentRecorded() ||
     StudentAbsenceCorrected() => NotificationTypes.attendance,
-    HomeworkAssigned() || HomeworkReviewed() => NotificationTypes.assignment,
+    HomeworkAssigned() ||
+    HomeworkReviewed() ||
+    HalaqaActivityPublished() => NotificationTypes.assignment,
   };
 
   static String _title(AcademyEvent event, {required String observerId}) =>
@@ -62,6 +64,7 @@ class InAppAcademySignalComposer {
         HomeworkAssigned() => 'تكليف جديد',
         HomeworkReviewed(:final studentId) =>
           observerId == studentId ? 'تم تقييم تسميعك' : 'تم تقييم التسميع',
+        HalaqaActivityPublished() => 'مهمة جديدة للحلقة',
       };
 
   static String _body(
@@ -92,6 +95,15 @@ class InAppAcademySignalComposer {
         studentLabel: name,
         grade: grade,
       ),
+      HalaqaActivityPublished(
+        :final studentId,
+        :final prompt,
+      ) =>
+        _activityPublishedBody(
+          forSubjectStudent: observerId == studentId,
+          studentLabel: name,
+          prompt: prompt,
+        ),
     };
   }
 
@@ -133,6 +145,25 @@ class InAppAcademySignalComposer {
     return 'تم تقييم تسميع $studentLabel: $trimmed';
   }
 
+  static String _activityPublishedBody({
+    required bool forSubjectStudent,
+    required String studentLabel,
+    required String prompt,
+  }) {
+    final preview = prompt.trim();
+    final clipped = preview.length > 60
+        ? '${preview.substring(0, 60)}…'
+        : preview;
+    if (forSubjectStudent) {
+      return clipped.isEmpty
+          ? 'مهمة جديدة من معلم الحلقة — افتح أنشطة الحلقة'
+          : 'مهمة جديدة: $clipped';
+    }
+    return clipped.isEmpty
+        ? 'مهمة جديدة لـ $studentLabel'
+        : 'مهمة جديدة لـ $studentLabel: $clipped';
+  }
+
   static String _statusLabel(String status) => switch (status) {
     AttendancePolicy.statusLate => 'متأخر',
     _ => 'حاضر',
@@ -146,7 +177,9 @@ class InAppAcademySignalComposer {
       StudentAbsentRecorded(:final studentName) => studentName,
       StudentAbsenceCorrected(:final studentName) => studentName,
       HomeworkAssigned() ||
-      HomeworkReviewed() => studentNamesById[event.studentId] ?? '',
+      HomeworkReviewed() ||
+      HalaqaActivityPublished() =>
+        studentNamesById[event.studentId] ?? '',
     };
     final trimmed = fromEvent.trim();
     return trimmed.isEmpty ? 'الطالب' : trimmed;

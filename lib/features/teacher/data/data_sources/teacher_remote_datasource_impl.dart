@@ -8,6 +8,7 @@ import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
 import '../../../../shared/domain/absence_request.dart';
 import '../../../../shared/domain/academy_event.dart';
+import '../../../../shared/domain/assignment_kind.dart';
 import '../../../../shared/domain/assignment_policy.dart';
 import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
@@ -471,6 +472,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           'reviewRange': reviewRange,
           'dueDate': Timestamp.fromDate(dueDate),
           // نفس مستند التكليف يحمل حقول واجباتي (Single Source of Truth)
+          AssignmentPolicy.kindField: AssignmentKind.wireLessonHomework,
+          AssignmentPolicy.createdAtField: Timestamp.fromDate(DateTime.now()),
           ...AssignmentModel.defaultHomeworkFields(
             newMemorizationRange: newMemorizationRange,
             reviewRange: reviewRange,
@@ -508,12 +511,15 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
           .collection(FirestoreCollections.assignments)
           .where(AssignmentPolicy.halaqaIdField, isEqualTo: halaqaId)
           .orderBy(AssignmentPolicy.dueDateField, descending: true)
-          .limit(AssignmentPolicy.latestLimit)
+          .limit(AssignmentPolicy.latestScanLimit)
           .get();
 
-      if (snapshot.docs.isEmpty) return null;
-      final raw = snapshot.docs.first.data()[AssignmentPolicy.dueDateField];
-      if (raw is Timestamp) return raw.toDate();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (!AssignmentPolicy.isLessonHomeworkData(data)) continue;
+        final raw = data[AssignmentPolicy.dueDateField];
+        if (raw is Timestamp) return raw.toDate();
+      }
       return null;
     } catch (e) {
       throw ServerException(e.toString());

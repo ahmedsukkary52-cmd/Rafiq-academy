@@ -24,6 +24,7 @@ import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../tasks/teacher_tasks_tab.dart';
 import '../utils/assign_sheet_deep_link_gate.dart';
 import '../utils/teacher_workflow_ownership.dart';
 import '../widgets/teacher_home_figma_cards.dart';
@@ -469,9 +470,10 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                                           halaqaId: widget.halaqaId,
                                           embedded: true,
                                         ),
-                                        _HomeworkTab(
+                                        TeacherTasksTab(
+                                          halaqaId: widget.halaqaId,
                                           canWrite: canWrite,
-                                          onAssign: () =>
+                                          onOpenLessonAssignment: () =>
                                               _openSendAssignmentSheet(
                                             context,
                                             studentCount: studentCount,
@@ -1135,56 +1137,6 @@ class _OutlineAction extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ── Other tabs ────────────────────────────────────────────────────────────────
-
-class _HomeworkTab extends StatelessWidget {
-  final bool canWrite;
-  final VoidCallback onAssign;
-
-  const _HomeworkTab({
-    required this.canWrite,
-    required this.onAssign,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('المهام', style: AppTextStyles.headlineMedium),
-          const SizedBox(height: 8),
-          Text(
-            'إرسال تكليف الحفظ/المراجعة لطلاب هذه الحلقة',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 20),
-          if (canWrite)
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: onAssign,
-                child: const Text('إرسال تكليف'),
-              ),
-            )
-          else
-            Text(
-              'التنفيذ متاح لمعلم الحلقة فقط',
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-        ],
       ),
     );
   }

@@ -34,6 +34,8 @@ class FirestoreCollections {
   static const String conversations = 'conversations';
   static const String messagesSubcollection = 'messages';
   static const String posts = 'posts';
+  /// Threaded replies under a `halaqaActivity` assignment document.
+  static const String activityResponsesSubcollection = 'activityResponses';
   static const String commentsSubcollection = 'comments';
   static const String calendarEvents = 'calendarEvents';
   static const String contentLibrary = 'contentLibrary';

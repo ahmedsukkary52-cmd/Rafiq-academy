@@ -42,7 +42,8 @@ class AcademyEventObservation {
           :final studentId,
         ) => [LinkedParentsObserver(studentId)],
         HomeworkAssigned(:final studentId) ||
-        HomeworkReviewed(:final studentId) => [
+        HomeworkReviewed(:final studentId) ||
+        HalaqaActivityPublished(:final studentId) => [
           SubjectStudentObserver(studentId),
           LinkedParentsObserver(studentId),
         ],

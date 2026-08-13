@@ -148,6 +148,16 @@ import 'package:rafiq_academy/features/content/domain/usecases/content_usecases.
     as _i89;
 import 'package:rafiq_academy/features/content/presentation/bloc/content_bloc.dart'
     as _i542;
+import 'package:rafiq_academy/features/halaqa_activity/data/datasources/halaqa_activity_remote_datasource.dart'
+    as _i852;
+import 'package:rafiq_academy/features/halaqa_activity/data/datasources/halaqa_activity_remote_datasource_impl.dart'
+    as _i950;
+import 'package:rafiq_academy/features/halaqa_activity/data/repositories/halaqa_activity_repository_impl.dart'
+    as _i196;
+import 'package:rafiq_academy/features/halaqa_activity/domain/repositories/halaqa_activity_repository.dart'
+    as _i7;
+import 'package:rafiq_academy/features/halaqa_activity/domain/usecases/halaqa_activity_usecases.dart'
+    as _i900;
 import 'package:rafiq_academy/features/homework/data/datasources/homework_remote_datasource.dart'
     as _i31;
 import 'package:rafiq_academy/features/homework/data/datasources/homework_remote_datasource_impl.dart'
@@ -473,6 +483,12 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i444.AwardsRemoteDatasource>(
       () => _i982.AwardsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i852.HalaqaActivityRemoteDatasource>(
+      () => _i950.HalaqaActivityRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        storage: gh<_i457.FirebaseStorage>(),
       ),
     );
     gh.lazySingleton<_i756.ScheduleRemoteDatasource>(
@@ -971,6 +987,31 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i273.AcademyEventSink>(
       () => diModule.academyEventSink(gh<_i815.InAppAcademyEventHandler>()),
+    );
+    gh.lazySingleton<_i7.HalaqaActivityRepository>(
+      () => _i196.HalaqaActivityRepositoryImpl(
+        remoteDatasource: gh<_i852.HalaqaActivityRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+        eventSink: gh<_i273.AcademyEventSink>(),
+        postsRepository: gh<_i486.PostsRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i900.PublishHalaqaActivityUseCase>(
+      () => _i900.PublishHalaqaActivityUseCase(
+        gh<_i7.HalaqaActivityRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i900.ListHalaqaActivitiesUseCase>(
+      () =>
+          _i900.ListHalaqaActivitiesUseCase(gh<_i7.HalaqaActivityRepository>()),
+    );
+    gh.lazySingleton<_i900.GetHalaqaActivityUseCase>(
+      () => _i900.GetHalaqaActivityUseCase(gh<_i7.HalaqaActivityRepository>()),
+    );
+    gh.lazySingleton<_i900.SubmitHalaqaActivityResponseUseCase>(
+      () => _i900.SubmitHalaqaActivityResponseUseCase(
+        gh<_i7.HalaqaActivityRepository>(),
+      ),
     );
     gh.lazySingleton<_i1050.TeacherRepository>(
       () => _i63.TeacherRepositoryImpl(

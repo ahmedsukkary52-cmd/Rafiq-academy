@@ -4,8 +4,10 @@ import 'package:rafiq_academy/features/student/data/data_source/student_remote_d
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/data/assignment_homework_fields_ensure.dart';
 import '../../../../shared/domain/assignment_policy.dart';
+import '../../domain/merge_student_achievements.dart';
 import '../models/achievement_model.dart';
 import '../models/assignment_model.dart';
 import '../models/halaqa_model.dart';
@@ -102,17 +104,23 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
   @override
   Future<List<AchievementModel>> getAchievements(String studentId) async {
     try {
-      // No orderBy('date'): teacher Awards docs use `grantedAt` instead of
-      // `date` and would be excluded from an ordered query.
-      final snapshot = await firestore
-          .collection(FirestoreCollections.achievements)
-          .where('studentId', isEqualTo: studentId)
-          .get();
+      final collection = firestore.collection(FirestoreCollections.achievements);
+      final results = await Future.wait([
+        collection.where('studentId', isEqualTo: studentId).get(),
+        collection
+            .where(
+              AchievementsFirestoreContract.recipientStudentIdsField,
+              arrayContains: studentId,
+            )
+            .get(),
+      ]);
 
-      final achievements =
-          snapshot.docs.map(AchievementModel.fromFirestore).toList()
-            ..sort((a, b) => b.date.compareTo(a.date));
-      return achievements;
+      final byStudentId = results[0].docs.map(AchievementModel.fromFirestore);
+      final byRecipients = results[1].docs.map(AchievementModel.fromFirestore);
+      return mergeStudentAchievements(
+        byStudentId,
+        byRecipients,
+      ).whereType<AchievementModel>().toList();
     } catch (e) {
       throw ServerException(e.toString());
     }

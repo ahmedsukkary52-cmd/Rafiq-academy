@@ -3,10 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../awards/domain/entities/award_entities.dart';
+import '../../domain/entities/achievement_entity.dart';
 import '../../domain/student_awards_stats.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
@@ -85,7 +87,7 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -103,20 +105,56 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
                             mainAxisSpacing: 12,
                             crossAxisSpacing: 12,
                             childAspectRatio: 1.05,
-                            children: AwardType.values
+                            children: AwardTypeInfo.formTypes
                                 .map(
-                                  (type) =>
-                                  _StudentAwardTypeCard(
+                                  (type) => _StudentAwardTypeCard(
                                     type: type,
                                     earned: stats.earnedTypes.contains(type),
                                   ),
-                            )
+                                )
                                 .toList(),
                           ),
                         ],
                       ),
                     ),
                   ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Text(
+                        'جوائزي',
+                        style: AppTextStyles.titleLarge.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (state.achievements.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                        child: Text(
+                          'لا توجد جوائز ممنوحة لك بعد',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                      sliver: SliverList.separated(
+                        itemCount: state.achievements.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return _ReceivedAwardTile(
+                            achievement: state.achievements[index],
+                          );
+                        },
+                      ),
+                    ),
                 ],
               );
             },
@@ -241,21 +279,26 @@ class _StudentAwardTypeCard extends StatelessWidget {
     required this.earned,
   });
 
-  Color get _color =>
-      switch (type) {
-        AwardType.completionBadge => AppColors.awardCompletion,
-        AwardType.performanceStars => AppColors.awardPerformance,
-        AwardType.perfectAttendance => AppColors.awardAttendance,
-        AwardType.studentOfWeek => AppColors.awardWeekly,
-      };
+  Color get _color => switch (type) {
+    AwardType.completionBadge ||
+    AwardType.completion => AppColors.awardCompletion,
+    AwardType.performanceStars ||
+    AwardType.performance => AppColors.awardPerformance,
+    AwardType.perfectAttendance ||
+    AwardType.attendance => AppColors.awardAttendance,
+    AwardType.studentOfWeek || AwardType.achievement => AppColors.awardWeekly,
+    AwardType.custom => AppColors.primary,
+  };
 
-  IconData get _icon =>
-      switch (type) {
-        AwardType.completionBadge => Icons.verified_rounded,
-        AwardType.performanceStars => Icons.star_rounded,
-        AwardType.perfectAttendance => Icons.person_rounded,
-        AwardType.studentOfWeek => Icons.emoji_events_rounded,
-      };
+  IconData get _icon => switch (type) {
+    AwardType.completionBadge || AwardType.completion => Icons.verified_rounded,
+    AwardType.performanceStars || AwardType.performance => Icons.star_rounded,
+    AwardType.perfectAttendance ||
+    AwardType.attendance => Icons.person_rounded,
+    AwardType.studentOfWeek ||
+    AwardType.achievement => Icons.emoji_events_rounded,
+    AwardType.custom => Icons.workspace_premium_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -315,6 +358,93 @@ class _StudentAwardTypeCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ReceivedAwardTile extends StatelessWidget {
+  final AchievementEntity achievement;
+
+  const _ReceivedAwardTile({required this.achievement});
+
+  @override
+  Widget build(BuildContext context) {
+    final type = achievement.type.awardType ?? AwardType.custom;
+    final imageUrl = achievement.imageUrl;
+    final description = achievement.description?.trim() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? Image.network(
+                    imageUrl,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 64,
+                      height: 64,
+                      color: AppColors.primaryLight,
+                      child: const Icon(Icons.emoji_events_outlined),
+                    ),
+                  )
+                : Container(
+                    width: 64,
+                    height: 64,
+                    color: AppColors.primaryLight,
+                    child: const Icon(Icons.emoji_events_outlined),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  achievement.title.trim().isEmpty
+                      ? type.title
+                      : achievement.title.trim(),
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Text(
+                  '${type.formCategory.title} · ${formatDateDmy(achievement.date)}',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textHint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

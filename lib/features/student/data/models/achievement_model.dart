@@ -10,21 +10,30 @@ class AchievementModel extends AchievementEntity {
     required super.studentId,
     required super.type,
     required super.title,
+    super.description,
+    super.imageUrl,
     required super.issuedBy,
     required super.date,
+    super.recipientStudentIds,
   });
 
   factory AchievementModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final recipients =
+        AchievementsFirestoreContract.resolveRecipientStudentIds(data);
     return AchievementModel(
       id: doc.id,
-      studentId: data[AchievementsFirestoreContract.studentIdField] ?? '',
+      studentId: data[AchievementsFirestoreContract.studentIdField] ??
+          (recipients.isNotEmpty ? recipients.first : ''),
       type: typeFromFirestoreKey(
         data[AchievementsFirestoreContract.typeField] ?? '',
       ),
       title: AchievementsFirestoreContract.resolveTitle(data),
+      description: AchievementsFirestoreContract.resolveDescription(data),
+      imageUrl: data[AchievementsFirestoreContract.imageUrlField] as String?,
       issuedBy: AchievementsFirestoreContract.resolveActor(data),
       date: AchievementsFirestoreContract.resolveDate(data),
+      recipientStudentIds: recipients,
     );
   }
 
@@ -45,6 +54,11 @@ class AchievementModel extends AchievementEntity {
           AwardType.performanceStars => AchievementType.performanceStars,
           AwardType.perfectAttendance => AchievementType.perfectAttendance,
           AwardType.studentOfWeek => AchievementType.studentOfWeek,
+          AwardType.attendance => AchievementType.attendance,
+          AwardType.completion => AchievementType.completion,
+          AwardType.performance => AchievementType.performance,
+          AwardType.achievement => AchievementType.achievement,
+          AwardType.custom => AchievementType.custom,
         };
       }
     }
@@ -63,12 +77,7 @@ class AchievementModel extends AchievementEntity {
       AchievementType.star => 'star',
       AchievementType.badge => 'badge',
       AchievementType.certificate => 'certificate',
-      AchievementType.completionBadge => AwardType.completionBadge.firestoreKey,
-      AchievementType.performanceStars =>
-        AwardType.performanceStars.firestoreKey,
-      AchievementType.perfectAttendance =>
-        AwardType.perfectAttendance.firestoreKey,
-      AchievementType.studentOfWeek => AwardType.studentOfWeek.firestoreKey,
+      _ => type.awardType?.firestoreKey ?? 'star',
     };
   }
 }

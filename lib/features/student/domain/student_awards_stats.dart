@@ -31,7 +31,7 @@ StudentAwardsStats computeStudentAwardsStats(
     if (!achievement.date.isBefore(startOfMonth)) {
       thisMonthCount++;
     }
-    final type = achievement.type.awardType;
+    final type = achievement.type.awardType?.formCategory;
     if (type != null) earnedTypes.add(type);
   }
 

@@ -51,17 +51,7 @@ class AwardsRepositoryImpl implements AwardsRepository {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.grantAward(
-        GrantedAwardModel(
-          id: award.id,
-          studentId: award.studentId,
-          studentName: award.studentName,
-          studentImageUrl: award.studentImageUrl,
-          type: award.type,
-          note: award.note,
-          grantedBy: award.grantedBy,
-          halaqaId: award.halaqaId,
-          grantedAt: award.grantedAt,
-        ),
+        GrantedAwardModel.fromEntity(award),
       );
       return const Right(unit);
     } on ServerException catch (e) {

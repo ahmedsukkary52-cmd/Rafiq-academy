@@ -207,7 +207,9 @@ class GetTeacherHomeFeedUseCase
           id: 'award_${award.id}',
           kind: TeacherRecentActivityKind.award,
           title: 'منح شارة "${award.type.title}"',
-          subtitle: award.studentName,
+          subtitle: award.recipientCount > 1
+              ? '${award.recipientCount} طلاب'
+              : award.studentName,
           occurredAt: award.grantedAt,
           halaqaId: halaqa.id,
         ),

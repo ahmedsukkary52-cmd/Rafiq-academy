@@ -47,6 +47,29 @@ void main() {
       );
     });
 
+    test('maps new form type keys', () {
+      expect(
+        AchievementModel.typeFromFirestoreKey('attendance'),
+        AchievementType.attendance,
+      );
+      expect(
+        AchievementModel.typeFromFirestoreKey('completion'),
+        AchievementType.completion,
+      );
+      expect(
+        AchievementModel.typeFromFirestoreKey('performance'),
+        AchievementType.performance,
+      );
+      expect(
+        AchievementModel.typeFromFirestoreKey('achievement'),
+        AchievementType.achievement,
+      );
+      expect(
+        AchievementModel.typeFromFirestoreKey('custom'),
+        AchievementType.custom,
+      );
+    });
+
     test('unknown keys still fall back to star', () {
       expect(
         AchievementModel.typeFromFirestoreKey('unknown_type'),

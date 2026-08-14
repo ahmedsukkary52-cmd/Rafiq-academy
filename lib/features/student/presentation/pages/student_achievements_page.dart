@@ -374,22 +374,24 @@ class _AchievementRow extends StatelessWidget {
     AchievementType.star => '⭐',
     AchievementType.badge => '🎖️',
     AchievementType.certificate => '📜',
-    AchievementType.completionBadge => '✅',
-    AchievementType.performanceStars => '🌟',
-    AchievementType.perfectAttendance => '📅',
-    AchievementType.studentOfWeek => '🏆',
+    AchievementType.completionBadge ||
+    AchievementType.completion => '✅',
+    AchievementType.performanceStars ||
+    AchievementType.performance => '🌟',
+    AchievementType.perfectAttendance ||
+    AchievementType.attendance => '📅',
+    AchievementType.studentOfWeek ||
+    AchievementType.achievement => '🏆',
+    AchievementType.custom => '🎖️',
   };
 
   static String _typeLabel(AchievementType type) =>
-      type.awardType?.title ??
+      type.awardType?.formCategory.title ??
       switch (type) {
         AchievementType.star => 'نجمة',
         AchievementType.badge => 'شارة',
         AchievementType.certificate => 'شهادة',
-        AchievementType.completionBadge => AwardType.completionBadge.title,
-        AchievementType.performanceStars => AwardType.performanceStars.title,
-        AchievementType.perfectAttendance => AwardType.perfectAttendance.title,
-        AchievementType.studentOfWeek => AwardType.studentOfWeek.title,
+        _ => type.awardType?.title ?? 'جائزة',
       };
 
   static String _formatDate(DateTime date) => formatDateDmy(date);

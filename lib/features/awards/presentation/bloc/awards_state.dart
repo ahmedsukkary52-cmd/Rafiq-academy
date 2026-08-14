@@ -29,6 +29,7 @@ class AwardsState extends Equatable {
   /// الـ PDF bytes جاهزة للمشاركة/الطباعة من الـ UI
   final List<int>? certificateBytes;
   final String? certificateError;
+  final String? dashboardHalaqaId;
 
   const AwardsState({
     this.statsStatus = SectionStatus.initial,
@@ -42,6 +43,7 @@ class AwardsState extends Equatable {
     this.certificateStatus = SubmissionStatus.idle,
     this.certificateBytes,
     this.certificateError,
+    this.dashboardHalaqaId,
   });
 
   factory AwardsState.initial() => const AwardsState();
@@ -58,6 +60,7 @@ class AwardsState extends Equatable {
     SubmissionStatus? certificateStatus,
     Object? certificateBytes = _unset,
     Object? certificateError = _unset,
+    Object? dashboardHalaqaId = _unset,
   }) {
     return AwardsState(
       statsStatus: statsStatus ?? this.statsStatus,
@@ -83,6 +86,9 @@ class AwardsState extends Equatable {
       certificateError: identical(certificateError, _unset)
           ? this.certificateError
           : certificateError as String?,
+      dashboardHalaqaId: identical(dashboardHalaqaId, _unset)
+          ? this.dashboardHalaqaId
+          : dashboardHalaqaId as String?,
     );
   }
 
@@ -99,5 +105,6 @@ class AwardsState extends Equatable {
     certificateStatus,
     certificateBytes,
     certificateError,
+    dashboardHalaqaId,
   ];
 }

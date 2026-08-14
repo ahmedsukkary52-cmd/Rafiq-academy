@@ -2,7 +2,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../domain/entities/award_entities.dart';
 import '../../domain/usecases/awards_usecases.dart';
 import 'awards_event.dart';
 import 'awards_state.dart';
@@ -34,6 +33,7 @@ class AwardsBloc extends Bloc<AwardsEvent, AwardsState> {
   ) async {
     emit(
       state.copyWith(
+        dashboardHalaqaId: event.halaqaId,
         statsStatus: SectionStatus.loading,
         awardsStatus: SectionStatus.loading,
       ),
@@ -101,24 +101,13 @@ class AwardsBloc extends Bloc<AwardsEvent, AwardsState> {
           grantError: failure.message,
         ),
       ),
-      (_) {
-        // Optimistic: نضيف الجائزة للقائمة وندّث الإحصائيات محلياً
-        final updatedAwards = [event.award, ...state.grantedAwards];
-        final updatedStats = state.stats == null
-            ? null
-            : AwardsStatsEntity(
-                totalRecipients: state.stats!.totalRecipients,
-                thisMonthCount: state.stats!.thisMonthCount + 1,
-                totalAwardsCount: state.stats!.totalAwardsCount + 1,
-              );
-
-        emit(
-          state.copyWith(
-            grantStatus: SubmissionStatus.success,
-            grantedAwards: updatedAwards,
-            stats: updatedStats,
-          ),
-        );
+      (_) async {
+        emit(state.copyWith(grantStatus: SubmissionStatus.success));
+        final scope = state.dashboardHalaqaId ?? event.award.halaqaId;
+        await Future.wait([
+          _loadStats(scope, emit),
+          _loadGrantedAwards(scope, emit),
+        ]);
       },
     );
   }

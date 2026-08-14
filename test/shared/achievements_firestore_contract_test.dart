@@ -16,6 +16,7 @@ void main() {
 
       expect(fields[AchievementsFirestoreContract.studentIdField], 's1');
       expect(fields[AchievementsFirestoreContract.halaqaIdField], 'h1');
+      expect(fields[AchievementsFirestoreContract.halaqaIdsField], ['h1']);
       expect(fields[AchievementsFirestoreContract.typeField], 'completion_badge');
       expect(fields[AchievementsFirestoreContract.grantedByField], 'teacher-1');
       expect(fields[AchievementsFirestoreContract.issuedByField], 'teacher-1');

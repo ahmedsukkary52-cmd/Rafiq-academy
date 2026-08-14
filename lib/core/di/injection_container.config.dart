@@ -483,6 +483,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i444.AwardsRemoteDatasource>(
       () => _i982.AwardsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+        storage: gh<_i457.FirebaseStorage>(),
       ),
     );
     gh.lazySingleton<_i852.HalaqaActivityRemoteDatasource>(

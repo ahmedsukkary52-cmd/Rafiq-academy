@@ -49,8 +49,8 @@ void main() {
       expect(stats.thisMonthCount, 3);
       expect(stats.typesEarnedCount, 2);
       expect(stats.earnedTypes, {
-        AwardType.studentOfWeek,
-        AwardType.performanceStars,
+        AwardType.achievement,
+        AwardType.performance,
       });
     });
 

@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Exported from live release (2026-07-06):
+//   projects/rafiq-academy/rulesets/76dd27d7-1127-499c-91a0-b3c0f02c5d09
+// Previous console "test mode" rules (expired 2026-08-05 UTC):
+//   match /{document=**} {
+//     allow read, write: if request.time < timestamp.date(2026, 8, 5);
+//   }
+// That expiry caused permission-denied on users/{uid} after Auth succeeded.
+//
+// Interim: require a signed-in Firebase Auth user (closes anonymous access).
+// Full role/ownership rules remain Category B (B-R1 hardening) — do not loosen
+// this back to a time-boxed open world.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

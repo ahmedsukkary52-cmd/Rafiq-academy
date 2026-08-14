@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rafiq_academy/features/post/presentation/pages/posts_list_page.dart';
+import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_awards_tab.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_classes_page.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_dashboard_tab.dart';
 import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_messages_tab.dart';
@@ -17,8 +17,9 @@ import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../presentation/bloc/teacher_bloc.dart';
 import '../../presentation/bloc/teacher_event.dart';
+import '../teacher_home_nav.dart';
 
-/// Figma 1:432 shell — 5 tabs: الرئيسية · الطلاب · المنشورات · الرسائل · حسابي
+/// Figma 1:432 shell — 5 tabs: الرئيسية · الطلاب · الجوائز · الرسائل · حسابي
 class TeacherHomePage extends StatefulWidget {
   const TeacherHomePage({super.key});
 
@@ -73,7 +74,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
             tabProfile: _tabProfile,
           ),
           const TeacherClassesPage(),
-          const PostsListPage(halaqaId: 'general'),
+          const TeacherAwardsTab(),
           const TeacherMessagesTab(),
           const TeacherProfileTab(),
         ],
@@ -92,12 +93,12 @@ class _TeacherBottomNav extends StatelessWidget {
 
   const _TeacherBottomNav({required this.selected, required this.onChanged});
 
-  static const tabs = [
-    (icon: Icons.home_rounded, label: 'الرئيسية'),
-    (icon: Icons.groups_rounded, label: 'الطلاب'),
-    (icon: Icons.article_outlined, label: 'المنشورات'),
-    (icon: Icons.chat_bubble_outline, label: 'الرسائل'),
-    (icon: Icons.person_outline, label: 'حسابي'),
+  static const _icons = [
+    Icons.home_rounded,
+    Icons.groups_rounded,
+    Icons.emoji_events_outlined,
+    Icons.chat_bubble_outline,
+    Icons.person_outline,
   ];
 
   @override
@@ -117,8 +118,8 @@ class _TeacherBottomNav extends StatelessWidget {
         child: SizedBox(
           height: AppSizes.bottomNavHeight,
           child: Row(
-            children: List.generate(tabs.length, (i) {
-              final tab = tabs[i];
+            children: List.generate(TeacherHomeNav.labels.length, (i) {
+              final label = TeacherHomeNav.labels[i];
               final isSelected = i == selected;
 
               return Expanded(
@@ -129,7 +130,7 @@ class _TeacherBottomNav extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        tab.icon,
+                        _icons[i],
                         color: isSelected
                             ? AppColors.primary
                             : AppColors.textSecondary,
@@ -137,7 +138,7 @@ class _TeacherBottomNav extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        tab.label,
+                        label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.labelSmall.copyWith(

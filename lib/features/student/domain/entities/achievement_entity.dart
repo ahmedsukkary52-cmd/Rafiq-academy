@@ -1,6 +1,26 @@
 import 'package:equatable/equatable.dart';
 
-enum AchievementType { star, badge, certificate }
+import '../../../awards/domain/entities/award_entities.dart';
+
+enum AchievementType {
+  star,
+  badge,
+  certificate,
+  completionBadge,
+  performanceStars,
+  perfectAttendance,
+  studentOfWeek,
+}
+
+extension AchievementTypeMapping on AchievementType {
+  AwardType? get awardType => switch (this) {
+    AchievementType.completionBadge => AwardType.completionBadge,
+    AchievementType.performanceStars => AwardType.performanceStars,
+    AchievementType.perfectAttendance => AwardType.perfectAttendance,
+    AchievementType.studentOfWeek => AwardType.studentOfWeek,
+    _ => null,
+  };
+}
 
 class AchievementEntity extends Equatable {
   final String id;

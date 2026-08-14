@@ -9,6 +9,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../awards/domain/entities/award_entities.dart';
 import '../../domain/entities/achievement_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
@@ -373,13 +374,23 @@ class _AchievementRow extends StatelessWidget {
     AchievementType.star => '⭐',
     AchievementType.badge => '🎖️',
     AchievementType.certificate => '📜',
+    AchievementType.completionBadge => '✅',
+    AchievementType.performanceStars => '🌟',
+    AchievementType.perfectAttendance => '📅',
+    AchievementType.studentOfWeek => '🏆',
   };
 
-  static String _typeLabel(AchievementType type) => switch (type) {
-    AchievementType.star => 'نجمة',
-    AchievementType.badge => 'شارة',
-    AchievementType.certificate => 'شهادة',
-  };
+  static String _typeLabel(AchievementType type) =>
+      type.awardType?.title ??
+      switch (type) {
+        AchievementType.star => 'نجمة',
+        AchievementType.badge => 'شارة',
+        AchievementType.certificate => 'شهادة',
+        AchievementType.completionBadge => AwardType.completionBadge.title,
+        AchievementType.performanceStars => AwardType.performanceStars.title,
+        AchievementType.perfectAttendance => AwardType.perfectAttendance.title,
+        AchievementType.studentOfWeek => AwardType.studentOfWeek.title,
+      };
 
   static String _formatDate(DateTime date) => formatDateDmy(date);
 }

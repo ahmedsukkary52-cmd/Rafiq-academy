@@ -644,8 +644,6 @@ class _HeaderCircleButton extends StatelessWidget {
   }
 }
 
-}
-
 /// Lazy Home Analytics summary — local fetch only (not TeacherBloc).
 class _HomeAnalyticsSummarySlot extends StatefulWidget {
   final String? featuredHalaqaId;

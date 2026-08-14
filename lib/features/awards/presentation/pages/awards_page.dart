@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:printing/printing.dart';
-import 'dart:typed_data';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
@@ -18,7 +16,14 @@ import '../bloc/awards_state.dart';
 class AwardsPage extends StatefulWidget {
   final String halaqaId;
 
-  const AwardsPage({super.key, required this.halaqaId});
+  /// Home tab: no route back affordance beyond the shell.
+  final bool embedded;
+
+  const AwardsPage({
+    super.key,
+    required this.halaqaId,
+    this.embedded = false,
+  });
 
   @override
   State<AwardsPage> createState() => _AwardsPageState();
@@ -35,6 +40,14 @@ class _AwardsPageState extends State<AwardsPage> {
   }
 
   @override
+  void didUpdateWidget(AwardsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.halaqaId != widget.halaqaId) {
+      _bloc.add(LoadAwardsDashboardEvent(widget.halaqaId));
+    }
+  }
+
+  @override
   void dispose() {
     _bloc.close();
     super.dispose();
@@ -44,132 +57,129 @@ class _AwardsPageState extends State<AwardsPage> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _bloc,
-      child: MultiBlocListener(
-        listeners: [
-          BlocListener<AwardsBloc, AwardsState>(
-            listenWhen: (previous, current) =>
-                previous.certificateStatus != current.certificateStatus,
-            listener: (context, state) async {
-              if (state.certificateStatus == SubmissionStatus.success &&
-                  state.certificateBytes != null) {
-                await Printing.sharePdf(
-                  bytes: Uint8List.fromList(state.certificateBytes!),
-                  filename: 'شهادة_تقدير.pdf',
-                );
-                _bloc.add(const ResetCertificateEvent());
-              }
-            },
-          ),
-          BlocListener<AwardsBloc, AwardsState>(
-            listenWhen: (previous, current) =>
-                previous.grantStatus != current.grantStatus,
-            listener: (context, state) {
-              if (state.grantStatus == SubmissionStatus.success) {
-                AppSnackBar.showSuccess(context, 'تم منح الجائزة بنجاح');
-                _bloc.add(const ResetGrantAwardEvent());
-              } else if (state.grantStatus == SubmissionStatus.error) {
-                AppSnackBar.showError(
-                  context,
-                  state.grantError ?? 'تعذر منح الجائزة',
-                );
-                _bloc.add(const ResetGrantAwardEvent());
-              }
-            },
-          ),
-        ],
-        child: Scaffold(
-          backgroundColor: AppColors.dark,
-          appBar: AppBar(
-            backgroundColor: AppColors.dark,
-            foregroundColor: Colors.white,
-            title: const Text('منح الجوائز'),
-            actions: [
-              TextButton.icon(
-                onPressed: () => _showGrantAwardSheet(context),
-                icon: const Icon(Icons.add_rounded, color: AppColors.secondary),
-                label: const Text(
-                  '+ جائزة جديدة',
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    color: AppColors.secondary,
-                  ),
+      child: BlocListener<AwardsBloc, AwardsState>(
+        listenWhen: (previous, current) =>
+        previous.grantStatus != current.grantStatus,
+        listener: (context, state) {
+          if (state.grantStatus == SubmissionStatus.success) {
+            AppSnackBar.showSuccess(context, 'تم منح الجائزة بنجاح');
+            _bloc.add(const ResetGrantAwardEvent());
+          } else if (state.grantStatus == SubmissionStatus.error) {
+            AppSnackBar.showError(
+              context,
+              state.grantError ?? 'تعذر منح الجائزة',
+            );
+            _bloc.add(const ResetGrantAwardEvent());
+          }
+        },
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.textPrimary,
+              elevation: 0,
+              automaticallyImplyLeading: !widget.embedded,
+              title: Text(
+                'الجوائز',
+                style: AppTextStyles.headlineMedium.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ],
-          ),
-          body: BlocBuilder<AwardsBloc, AwardsState>(
-            buildWhen: (previous, current) =>
-                previous.statsStatus != current.statsStatus ||
-                previous.stats != current.stats ||
-                previous.statsError != current.statsError ||
-                previous.awardsStatus != current.awardsStatus ||
-                previous.grantedAwards != current.grantedAwards ||
-                previous.awardsError != current.awardsError,
-            builder: (context, state) {
-              return CustomScrollView(
-                slivers: [
-                  // ── إحصائيات ─────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSizes.paddingM),
-                      child: _AwardsStatsRow(stats: state.stats),
+              actions: [
+                TextButton.icon(
+                  onPressed: () => _showGrantAwardSheet(context),
+                  icon: const Icon(
+                    Icons.add_rounded,
+                    color: AppColors.primary,
+                  ),
+                  label: Text(
+                    'جائزة جديدة',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                ),
+              ],
+            ),
+            body: BlocBuilder<AwardsBloc, AwardsState>(
+              buildWhen: (previous, current) =>
+              previous.statsStatus != current.statsStatus ||
+                  previous.stats != current.stats ||
+                  previous.statsError != current.statsError ||
+                  previous.awardsStatus != current.awardsStatus ||
+                  previous.grantedAwards != current.grantedAwards ||
+                  previous.awardsError != current.awardsError,
+              builder: (context, state) {
+                if (state.statsStatus == SectionStatus.initial ||
+                    (state.statsStatus == SectionStatus.loading &&
+                        state.stats == null)) {
+                  return const AppLoadingWidget();
+                }
 
-                  // ── أنواع الجوائز ─────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSizes.paddingM,
-                        0,
-                        AppSizes.paddingM,
-                        16,
+                if (state.statsStatus == SectionStatus.error &&
+                    state.stats == null) {
+                  return AppErrorWidget(
+                    message: state.statsError ?? 'تعذر تحميل الجوائز',
+                    onRetry: () =>
+                        _bloc.add(
+                          LoadAwardsDashboardEvent(widget.halaqaId),
+                        ),
+                  );
+                }
+
+                return CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSizes.paddingM,
+                          AppSizes.paddingM,
+                          AppSizes.paddingM,
+                          0,
+                        ),
+                        child: _AwardsStatsRow(stats: state.stats),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'أنواع الجوائز',
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: Colors.white,
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSizes.paddingM,
+                          AppSizes.paddingL,
+                          AppSizes.paddingM,
+                          24,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'أنواع الجوائز',
+                              style: AppTextStyles.titleLarge.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1.3,
-                            children: AwardType.values
-                                .map((type) => _AwardTypeCard(type: type))
-                                .toList(),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 1.15,
+                              children: AwardType.values
+                                  .map((type) => _AwardTypeCard(type: type))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-
-                  // ── شهادة تقدير ───────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.paddingM,
-                      ),
-                      child: _CertificateCard(
-                        onGenerate: () => _showCertificateSheet(context),
-                        isLoading:
-                            state.certificateStatus ==
-                            SubmissionStatus.submitting,
-                      ),
-                    ),
-                  ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -187,23 +197,7 @@ class _AwardsPageState extends State<AwardsPage> {
       ),
     );
   }
-
-  void _showCertificateSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: _bloc,
-        child: _CertificateSheet(halaqaId: widget.halaqaId),
-      ),
-    );
-  }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _AwardsStatsRow
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _AwardsStatsRow extends StatelessWidget {
   final AwardsStatsEntity? stats;
@@ -214,47 +208,94 @@ class _AwardsStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _StatChip(value: '${stats?.totalRecipients ?? 0}', label: 'مستفيد'),
-        const SizedBox(width: 12),
-        _StatChip(value: '${stats?.thisMonthCount ?? 0}', label: 'هذا الشهر'),
-        const SizedBox(width: 12),
-        _StatChip(
+        _StatCard(
           value: '${stats?.totalAwardsCount ?? 0}',
           label: 'إجمالي الجوائز',
+          icon: Icons.emoji_events_outlined,
+          iconBg: AppColors.secondaryBg,
+          iconColor: AppColors.secondary,
+        ),
+        const SizedBox(width: 10),
+        _StatCard(
+          value: '${stats?.thisMonthCount ?? 0}',
+          label: 'هذا الشهر',
+          icon: Icons.calendar_month_outlined,
+          iconBg: AppColors.primaryLight,
+          iconColor: AppColors.primaryDark,
+        ),
+        const SizedBox(width: 10),
+        _StatCard(
+          value: '${stats?.totalRecipients ?? 0}',
+          label: 'المستفيدون',
+          icon: Icons.groups_outlined,
+          iconBg: AppColors.successBg,
+          iconColor: AppColors.success,
         ),
       ],
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
+class _StatCard extends StatelessWidget {
   final String value;
   final String label;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
 
-  const _StatChip({required this.value, required this.label});
+  const _StatCard({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.07),
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppSizes.radiusL),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.softShadow,
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(height: 10),
             Text(
               value,
               style: AppTextStyles.headlineMedium.copyWith(
-                color: AppColors.primary,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
-              style: AppTextStyles.labelSmall.copyWith(color: Colors.white60),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -262,10 +303,6 @@ class _StatChip extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _AwardTypeCard
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _AwardTypeCard extends StatelessWidget {
   final AwardType type;
@@ -290,13 +327,19 @@ class _AwardTypeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(AppSizes.paddingM),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
             width: 48,
@@ -310,13 +353,17 @@ class _AwardTypeCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             type.title,
-            style: AppTextStyles.titleMedium,
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 2),
           Text(
             type.description,
-            style: AppTextStyles.labelSmall,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -324,73 +371,6 @@ class _AwardTypeCard extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _CertificateCard
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _CertificateCard extends StatelessWidget {
-  final VoidCallback onGenerate;
-  final bool isLoading;
-
-  const _CertificateCard({required this.onGenerate, required this.isLoading});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.secondaryBg,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
-        border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
-      ),
-      padding: const EdgeInsets.all(AppSizes.paddingM),
-      child: Row(
-        children: [
-          AppButton(
-            label: 'إنشاء شهادة',
-            isLoading: isLoading,
-            onPressed: onGenerate,
-            width: 130,
-            height: 42,
-            backgroundColor: AppColors.secondary,
-          ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    'شهادة تقدير',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.description_outlined,
-                    color: AppColors.secondary,
-                    size: 16,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'إنشاء وطباعة شهادات PDF لطلابك',
-                style: AppTextStyles.labelSmall,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _GrantAwardSheet
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _GrantAwardSheet extends StatefulWidget {
   final String halaqaId;
@@ -416,14 +396,18 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     final uid = authState is AuthAuthenticated ? authState.user.uid : '';
-    final students = context.watch<TeacherBloc>().state.students;
+    final teacherState = context
+        .watch<TeacherBloc>()
+        .state;
+    final students = teacherState.studentsHalaqaId == widget.halaqaId
+        ? teacherState.students
+        : const [];
 
     return _BottomSheet(
       title: 'منح جائزة',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // نوع الجائزة
           Text('نوع الجائزة', style: AppTextStyles.labelLarge),
           const SizedBox(height: 8),
           GridView.count(
@@ -440,7 +424,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
                 child: Container(
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.primary.withOpacity(0.1)
+                        ? AppColors.primary.withValues(alpha: 0.1)
                         : AppColors.surfaceGrey,
                     borderRadius: BorderRadius.circular(AppSizes.radiusM),
                     border: Border.all(
@@ -460,9 +444,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
               );
             }).toList(),
           ),
-
           const SizedBox(height: 16),
-
           Text('الطالب', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           if (students.isEmpty)
@@ -488,31 +470,23 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
                       ? _studentId
                       : null,
                   isExpanded: true,
-                  hint: Text(
-                    'اختر الطالب',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                  items: students
-                      .map(
-                        (s) => DropdownMenuItem(
-                          value: s.uid,
-                          child: Text(s.name, style: AppTextStyles.bodyMedium),
-                        ),
-                      )
-                      .toList(),
+                  hint: Text('اختر الطالب', style: AppTextStyles.bodyMedium),
+                  items: [
+                    for (final s in students)
+                      DropdownMenuItem<String>(
+                        value: s.uid,
+                        child: Text(s.name, style: AppTextStyles.bodyMedium),
+                      ),
+                  ],
                   onChanged: (value) => setState(() => _studentId = value),
                 ),
               ),
             ),
-
           const SizedBox(height: 16),
-
           Text('ملاحظة (اختياري)', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           AppTextField(hint: 'مثال: ختم جزء تبارك', controller: _noteCtrl),
-
           const SizedBox(height: 20),
-
           AppButton(
             label: 'منح الجائزة',
             onPressed: _studentId == null
@@ -527,6 +501,7 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
                           id: '',
                           studentId: _studentId!,
                           studentName: selected.name,
+                          studentImageUrl: selected.profileImageUrl,
                           type: _type,
                           note: _noteCtrl.text.trim().isEmpty
                               ? null
@@ -545,94 +520,6 @@ class _GrantAwardSheetState extends State<_GrantAwardSheet> {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _CertificateSheet
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _CertificateSheet extends StatefulWidget {
-  final String halaqaId;
-
-  const _CertificateSheet({required this.halaqaId});
-
-  @override
-  State<_CertificateSheet> createState() => _CertificateSheetState();
-}
-
-class _CertificateSheetState extends State<_CertificateSheet> {
-  final _nameCtrl = TextEditingController();
-  final _achievementCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _achievementCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authState = context.read<AuthBloc>().state;
-    final teacherName = authState is AuthAuthenticated
-        ? authState.user.name
-        : 'المعلم';
-
-    return _BottomSheet(
-      title: 'إنشاء شهادة تقدير',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text('اسم الطالب', style: AppTextStyles.labelLarge),
-          const SizedBox(height: 6),
-          AppTextField(hint: 'أحمد محمد العلي', controller: _nameCtrl),
-
-          const SizedBox(height: 16),
-
-          Text('الإنجاز', style: AppTextStyles.labelLarge),
-          const SizedBox(height: 6),
-          AppTextField(
-            hint: 'مثال: إتمام حفظ جزء تبارك كاملاً',
-            controller: _achievementCtrl,
-          ),
-
-          const SizedBox(height: 20),
-
-          BlocBuilder<AwardsBloc, AwardsState>(
-            buildWhen: (previous, current) =>
-                previous.certificateStatus != current.certificateStatus,
-            builder: (context, state) => AppButton(
-              label: 'إنشاء وتنزيل الشهادة',
-              isLoading: state.certificateStatus == SubmissionStatus.submitting,
-              onPressed: () {
-                if (_nameCtrl.text.isEmpty || _achievementCtrl.text.isEmpty) {
-                  AppSnackBar.showError(context, 'يرجى ملء جميع الحقول');
-                  return;
-                }
-                context.read<AwardsBloc>().add(
-                  GenerateCertificateEvent(
-                    CertificateDataEntity(
-                      studentName: _nameCtrl.text.trim(),
-                      halaqaName: 'حلقة المتقدمين',
-                      academyName: 'أكاديمية رفيق للتحفيظ',
-                      achievement: _achievementCtrl.text.trim(),
-                      date: DateTime.now(),
-                      teacherName: teacherName,
-                    ),
-                  ),
-                );
-                Navigator.pop(context);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _BottomSheet helper
-// ══════════════════════════════════════════════════════════════════════════════
 
 class _BottomSheet extends StatelessWidget {
   final String title;
@@ -657,7 +544,7 @@ class _BottomSheet extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             Center(

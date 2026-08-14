@@ -368,6 +368,8 @@ class _SectionSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
 class _AnalyticsHeader extends StatelessWidget {
   final HalaqaAnalyticsEntity? analytics;
   final bool loading;

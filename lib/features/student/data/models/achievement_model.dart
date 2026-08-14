@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../shared/data/achievements_firestore_contract.dart';
+import '../../../awards/domain/entities/award_entities.dart';
 import '../../domain/entities/achievement_entity.dart';
 
 class AchievementModel extends AchievementEntity {
@@ -18,7 +19,7 @@ class AchievementModel extends AchievementEntity {
     return AchievementModel(
       id: doc.id,
       studentId: data[AchievementsFirestoreContract.studentIdField] ?? '',
-      type: _typeFromString(
+      type: typeFromFirestoreKey(
         data[AchievementsFirestoreContract.typeField] ?? '',
       ),
       title: AchievementsFirestoreContract.resolveTitle(data),
@@ -36,16 +37,38 @@ class AchievementModel extends AchievementEntity {
     AchievementsFirestoreContract.dateField: Timestamp.fromDate(date),
   };
 
-  static AchievementType _typeFromString(String value) => switch (value) {
-    'star' => AchievementType.star,
-    'badge' => AchievementType.badge,
-    'certificate' => AchievementType.certificate,
-    _ => AchievementType.star,
-  };
+  static AchievementType typeFromFirestoreKey(String value) {
+    for (final type in AwardType.values) {
+      if (type.firestoreKey == value) {
+        return switch (type) {
+          AwardType.completionBadge => AchievementType.completionBadge,
+          AwardType.performanceStars => AchievementType.performanceStars,
+          AwardType.perfectAttendance => AchievementType.perfectAttendance,
+          AwardType.studentOfWeek => AchievementType.studentOfWeek,
+        };
+      }
+    }
+    return switch (value) {
+      'star' => AchievementType.star,
+      'badge' => AchievementType.badge,
+      'certificate' => AchievementType.certificate,
+      _ => AchievementType.star,
+    };
+  }
 
-  static String _typeToString(AchievementType type) => switch (type) {
-    AchievementType.star => 'star',
-    AchievementType.badge => 'badge',
-    AchievementType.certificate => 'certificate',
-  };
+  static String _typeToString(AchievementType type) {
+    final award = type.awardType;
+    if (award != null) return award.firestoreKey;
+    return switch (type) {
+      AchievementType.star => 'star',
+      AchievementType.badge => 'badge',
+      AchievementType.certificate => 'certificate',
+      AchievementType.completionBadge => AwardType.completionBadge.firestoreKey,
+      AchievementType.performanceStars =>
+        AwardType.performanceStars.firestoreKey,
+      AchievementType.perfectAttendance =>
+        AwardType.perfectAttendance.firestoreKey,
+      AchievementType.studentOfWeek => AwardType.studentOfWeek.firestoreKey,
+    };
+  }
 }

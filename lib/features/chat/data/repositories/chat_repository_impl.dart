@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
@@ -20,22 +22,48 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Stream<Either<Failure, List<ConversationEntity>>> watchConversations(
-      String uid,
-      ) {
+    String uid,
+  ) {
+    // Convert Firestore errors into Left events. Stream.handleError swallows
+    // them without emitting, which left the Chat inbox stuck on loading.
     return remoteDatasource
         .watchConversations(uid)
-        .map<Either<Failure, List<ConversationEntity>>>((list) => Right(list))
-        .handleError((e) => Left(ServerFailure(e.toString())));
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleData: (list, sink) => sink.add(
+              Right<Failure, List<ConversationEntity>>(
+                List<ConversationEntity>.from(list),
+              ),
+            ),
+            handleError: (error, stackTrace, sink) => sink.add(
+              Left<Failure, List<ConversationEntity>>(
+                ServerFailure(error.toString()),
+              ),
+            ),
+          ),
+        );
   }
 
   @override
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(
-      String conversationId,
-      ) {
+    String conversationId,
+  ) {
     return remoteDatasource
         .watchMessages(conversationId)
-        .map<Either<Failure, List<MessageEntity>>>((list) => Right(list))
-        .handleError((e) => Left(ServerFailure(e.toString())));
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleData: (list, sink) => sink.add(
+              Right<Failure, List<MessageEntity>>(
+                List<MessageEntity>.from(list),
+              ),
+            ),
+            handleError: (error, stackTrace, sink) => sink.add(
+              Left<Failure, List<MessageEntity>>(
+                ServerFailure(error.toString()),
+              ),
+            ),
+          ),
+        );
   }
 
   @override

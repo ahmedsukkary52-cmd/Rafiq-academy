@@ -117,7 +117,7 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
       // واحدة من Firestore في كل أول محادثة).
       return ConversationModel(
         id: conversationId,
-        participants: participants,
+        participants: List<ChatParticipantEntity>.from(participants),
         lastMessage: null,
         lastMessageAt: DateTime.now(),
         lastMessageSenderId: null,

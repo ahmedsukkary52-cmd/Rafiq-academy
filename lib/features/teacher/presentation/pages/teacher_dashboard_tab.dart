@@ -8,6 +8,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../analytics/domain/usecases/analytics_usecases.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
@@ -204,6 +205,13 @@ class TeacherDashboardTab extends StatelessWidget {
           error: state.todayAgendaError,
           onRetry: () =>
               context.read<TeacherBloc>().add(const LoadTodayAgendaEvent()),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        child: _HomeAnalyticsSummarySlot(
+          featuredHalaqaId: agenda.featuredSession?.halaqaId,
+          teacherHalaqaIds: state.halaqat.map((h) => h.id).toList(),
         ),
       ),
       Padding(
@@ -632,6 +640,123 @@ class _HeaderCircleButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+}
+
+/// Lazy Home Analytics summary — local fetch only (not TeacherBloc).
+class _HomeAnalyticsSummarySlot extends StatefulWidget {
+  final String? featuredHalaqaId;
+  final List<String> teacherHalaqaIds;
+
+  const _HomeAnalyticsSummarySlot({
+    required this.featuredHalaqaId,
+    required this.teacherHalaqaIds,
+  });
+
+  @override
+  State<_HomeAnalyticsSummarySlot> createState() =>
+      _HomeAnalyticsSummarySlotState();
+}
+
+class _HomeAnalyticsSummarySlotState extends State<_HomeAnalyticsSummarySlot> {
+  String? _halaqaId;
+  bool _loading = false;
+  String? _error;
+  double? _attendance;
+  double? _performance;
+  int _loadGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncAndLoad();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeAnalyticsSummarySlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextId = resolveTeacherHomeAnalyticsHalaqaId(
+      featuredSessionHalaqaId: widget.featuredHalaqaId,
+      teacherHalaqaIds: widget.teacherHalaqaIds,
+    );
+    if (nextId != _halaqaId) {
+      _syncAndLoad();
+    }
+  }
+
+  void _syncAndLoad() {
+    final id = resolveTeacherHomeAnalyticsHalaqaId(
+      featuredSessionHalaqaId: widget.featuredHalaqaId,
+      teacherHalaqaIds: widget.teacherHalaqaIds,
+    );
+    _halaqaId = id;
+    if (id == null) {
+      setState(() {
+        _loading = false;
+        _error = null;
+        _attendance = null;
+        _performance = null;
+      });
+      return;
+    }
+    _load(id);
+  }
+
+  Future<void> _load(String halaqaId) async {
+    final gen = ++_loadGeneration;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _attendance = null;
+      _performance = null;
+    });
+
+    final now = DateTime.now();
+    final from = now.subtract(const Duration(days: 30));
+    final result = await sl<GetHalaqaAnalyticsUseCase>()(
+      HalaqaAnalyticsParams(halaqaId: halaqaId, from: from, to: now),
+    );
+    if (!mounted || gen != _loadGeneration) return;
+
+    result.fold(
+      (f) => setState(() {
+        _loading = false;
+        _error = f.message;
+        _attendance = null;
+        _performance = null;
+      }),
+      (analytics) => setState(() {
+        _loading = false;
+        _error = null;
+        _attendance = analytics.attendancePercent;
+        _performance = analytics.averagePerformancePercent;
+      }),
+    );
+  }
+
+  void _openAnalytics() {
+    final id = _halaqaId;
+    if (id == null) return;
+    context.push(AppRoutes.teacherAnalytics.replaceFirst(':halaqaId', id));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_halaqaId == null) return const SizedBox.shrink();
+
+    return TeacherHomeAnalyticsSummaryCard(
+      loading: _loading,
+      errorMessage: _error,
+      attendancePercent: _attendance,
+      performancePercent: _performance,
+      onTap: _openAnalytics,
+      onRetry: () {
+        final id = _halaqaId;
+        if (id != null) _load(id);
+      },
     );
   }
 }

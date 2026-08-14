@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
@@ -35,7 +36,10 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       @factoryParam this.conversationId,
       @factoryParam this.currentUserId,
       ) : super(ChatRoomState.initial()) {
-    on<WatchMessagesStartedEvent>(_onWatchMessagesStarted);
+    on<WatchMessagesStartedEvent>(
+      _onWatchMessagesStarted,
+      transformer: restartable(),
+    );
     on<SendMessageRequestedEvent>(_onSendMessage);
 
     add(const WatchMessagesStartedEvent());

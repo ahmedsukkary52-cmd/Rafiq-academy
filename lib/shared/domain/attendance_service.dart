@@ -202,6 +202,22 @@ class AttendanceService {
     markedStudentIds: markedStudentIds,
   );
 
+  /// Whether the local draft differs from the last saved session marks.
+  bool hasUnsavedChanges({
+    required Iterable<String> rosterStudentIds,
+    required Map<String, AttendanceStatus?> draft,
+    required Map<String, AttendanceStatus> saved,
+  }) {
+    for (final rawId in rosterStudentIds) {
+      final id = rawId.trim();
+      if (id.isEmpty) continue;
+      final draftStatus = draft[id];
+      final savedStatus = saved[id];
+      if (draftStatus != savedStatus) return true;
+    }
+    return false;
+  }
+
   /// Builds an upsert plan for one student per operational session.
   ///
   /// Always targets [AttendancePolicy.documentId]. Refuses writes when the

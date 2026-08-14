@@ -45,10 +45,16 @@ class ConversationEntity extends Equatable {
   /// الطرف التاني في المحادثة (مش أنا). مفيد جداً للـ UI عشان يعرض
   /// "بتكلم مين" من غير ما يدور بنفسه في الـ participants.
   ChatParticipantEntity otherParticipant(String currentUid) {
-    return participants.firstWhere(
-          (p) => p.uid != currentUid,
-      orElse: () => participants.first,
-    );
+    // Do not use Iterable.firstWhere(orElse:): Firestore mapping stores
+    // List<ChatParticipantModel>, and Dart list invariance makes
+    // `() => ChatParticipantEntity` an invalid orElse (inbox crash).
+    for (final p in participants) {
+      if (p.uid != currentUid) return p;
+    }
+    if (participants.isEmpty) {
+      return const ChatParticipantEntity(uid: '', name: 'محادثة', role: '');
+    }
+    return participants.first;
   }
 
   bool hasUnread() => unreadCount > 0;

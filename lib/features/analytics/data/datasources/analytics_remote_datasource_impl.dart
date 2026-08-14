@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
+import '../../domain/analytics_recitation_honesty.dart';
 import '../../domain/entities/analytics_entities.dart';
 import 'analytics_remote_datasource.dart';
 
@@ -43,6 +44,8 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       }
 
       // جلب سجلات التسميع والحضور بالتوازي
+      // Requires composite index: recitationRecords (halaqaId ASC, date ASC)
+      // — see AnalyticsFirestoreIndexInventory (Phase 1: inventory only).
       final results = await Future.wait([
         firestore
             .collection(FirestoreCollections.recitationRecords)
@@ -61,39 +64,12 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       final recitationDocs = results[0].docs;
       final attendanceDocs = results[1].docs;
 
-      // حساب توزيع الأداء من التسميعات
-      final gradeCount = <String, int>{
-        RecitationGrades.excellent: 0,
-        RecitationGrades.veryGood: 0,
-        RecitationGrades.good: 0,
-        'يحتاج تحسين': 0,
-      };
-
-      for (final doc in recitationDocs) {
-        final grade = (doc.data())['grade'] as String? ?? '';
-        if (gradeCount.containsKey(grade)) {
-          gradeCount[grade] = (gradeCount[grade] ?? 0) + 1;
-        }
-      }
-
-      // حساب متوسط الأداء: ممتاز=100، جيد جداً=80، جيد=60، يحتاج=40
-      final gradeWeights = {
-        RecitationGrades.excellent: 100.0,
-        RecitationGrades.veryGood: 80.0,
-        RecitationGrades.good: 60.0,
-        'يحتاج تحسين': 40.0,
-      };
-
-      double totalScore = 0;
-      int totalGrades = 0;
-      for (final entry in gradeCount.entries) {
-        totalScore += (gradeWeights[entry.key] ?? 0) * entry.value;
-        totalGrades += entry.value;
-      }
-
-      final avgPerformance = totalGrades > 0 ? totalScore / totalGrades : 0.0;
+      final performance = AnalyticsRecitationHonesty.aggregatePerformance(
+        recitationDocs.map(_toRecitationRef),
+      );
 
       // حساب نسبة الحضور (D1: late counts as attended; one mark per student/day)
+      // Attendance SSOT unchanged — no honesty filter on attendance.
       final statuses = AttendancePolicy.uniqueDayStatuses(
         attendanceDocs.map((d) {
           final data = d.data();
@@ -120,10 +96,10 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
 
       return HalaqaAnalyticsEntity(
         halaqaId: halaqaId,
-        averagePerformancePercent: avgPerformance,
+        averagePerformancePercent: performance.averagePercent,
         attendancePercent: attendancePercent,
         totalStudents: totalStudents,
-        performanceDistribution: gradeCount,
+        performanceDistribution: performance.distribution,
         weeklyAttendance: weeklyAttendance,
       );
     } catch (e) {
@@ -149,7 +125,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
               isGreaterThanOrEqualTo: Timestamp.fromDate(windowStart),
             )
             .get(),
-        // طلاب مش اتقيّموا من أسبوعين
+        // تسميعات النافذة — التقييم الصادق يُصفّى عبر AnalyticsRecitationHonesty
         firestore
             .collection(FirestoreCollections.recitationRecords)
             .where('halaqaId', isEqualTo: halaqaId)
@@ -185,10 +161,10 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
             );
       }
 
-      final evaluatedStudentIds = recitationDocs
-          .map((d) => (d.data())['studentId'] as String? ?? '')
-          .where((id) => id.isNotEmpty)
-          .toSet();
+      final evaluatedStudentIds =
+          AnalyticsRecitationHonesty.evaluatedStudentIds(
+            recitationDocs.map(_toRecitationRef),
+          );
 
       final halaqaDoc = await firestore
           .collection(FirestoreCollections.halaqat)
@@ -199,6 +175,7 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
       );
 
       for (final studentId in studentIds) {
+        // Thresholds / lowPerformance unchanged — only evaluation honesty input.
         final signal = StudentAtRiskPolicy.evaluate(
           marksInWindow: marksByStudent[studentId] ?? const [],
           hasEvaluationInWindow: evaluatedStudentIds.contains(studentId),
@@ -254,53 +231,37 @@ class AnalyticsRemoteDatasourceImpl implements AnalyticsRemoteDatasource {
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(oneMonth))
           .get();
 
-      // تجميع النقاط لكل طالب
-      final scoreMap = <String, double>{};
-      final countMap = <String, int>{};
-      final nameMap = <String, String>{};
-      final imageMap = <String, String?>{};
+      final ranked = AnalyticsRecitationHonesty.rankTopStudents(
+        snap.docs.map(_toRecitationRef),
+        limit: limit,
+      );
 
-      const weights = {
-        'ممتاز': 100.0,
-        'جيد جداً': 80.0,
-        'جيد': 60.0,
-        'يحتاج تحسين': 40.0,
-      };
-
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final studentId = data['studentId'] as String? ?? '';
-        final grade = data['grade'] as String? ?? '';
-        final name = data['studentName'] as String? ?? '';
-
-        scoreMap[studentId] =
-            (scoreMap[studentId] ?? 0) + (weights[grade] ?? 0);
-        countMap[studentId] = (countMap[studentId] ?? 0) + 1;
-        nameMap[studentId] = name;
-      }
-
-      // حساب المتوسط وترتيب الطلاب
-      final averages =
-          scoreMap.entries
-              .map((e) => MapEntry(e.key, e.value / (countMap[e.key] ?? 1)))
-              .toList()
-            ..sort((a, b) => b.value.compareTo(a.value));
-
-      return averages.take(limit).indexed.map((entry) {
+      return ranked.indexed.map((entry) {
         final rank = entry.$1 + 1;
-        final studentId = entry.$2.key;
-        final avg = entry.$2.value;
+        final score = entry.$2;
         return TopStudentEntity(
-          studentId: studentId,
-          studentName: nameMap[studentId] ?? '',
-          profileImageUrl: imageMap[studentId],
-          performancePercent: avg,
+          studentId: score.studentId,
+          studentName: score.studentName,
+          profileImageUrl: null,
+          performancePercent: score.performancePercent,
           rank: rank,
         );
       }).toList();
     } catch (e) {
       throw ServerException(e.toString());
     }
+  }
+
+  AnalyticsRecitationRef _toRecitationRef(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return AnalyticsRecitationRef(
+      studentId: data['studentId'] as String? ?? '',
+      studentName: data['studentName'] as String?,
+      grade: data['grade'] as String?,
+      reviewStatus: data['reviewStatus'] as String?,
+    );
   }
 
   /// حساب نسبة الحضور لكل يوم في آخر 7 أيام تقويمية

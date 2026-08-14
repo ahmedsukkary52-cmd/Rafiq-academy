@@ -2,46 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/admin/presentation/pages/admin_home_page.dart';
+import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_state.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
+// Awards
+import '../../features/awards/presentation/pages/awards_page.dart';
+import '../../features/chat/presentation/chat_route_extra.dart';
 import '../../features/chat/presentation/pages/chat_room.dart';
 import '../../features/chat/presentation/pages/student_chat_page.dart';
 import '../../features/content/presentation/pages/content_library_page.dart';
+import '../../features/homework/presentation/pages/student_homework_page.dart';
 import '../../features/notifications/presentation/pages/notification_page.dart';
+import '../../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../../features/parent/presentation/pages/parent_absence_requests_page.dart';
 import '../../features/parent/presentation/pages/parent_home_page.dart';
-import '../../features/student/presentation/pages/student_evaluation_page.dart';
-import '../../features/student/presentation/pages/student_profile_page.dart';
-import '../../features/supervisor/presentation/pages/supervisor_home_page.dart';
-import '../../features/teacher/presentation/pages/teacher_evalutation_page.dart';
-import '../constants/app_constants.dart';
-import 'supervisor_escalation_paths.dart';
-import '../../features/auth/presentation/bloc/auth_bloc.dart';
-import '../../features/auth/presentation/bloc/auth_state.dart';
-import '../../features/auth/presentation/pages/splash_page.dart';
-import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/auth/presentation/pages/register_page.dart';
-import '../../features/onboarding/presentation/pages/onboarding_page.dart';
-
-// Student
-import '../../features/student/presentation/pages/student_home_page.dart';
+import '../../features/progress_report/presentation/pages/student_progress_report_page.dart';
+import '../../features/review_schedule/presentation/pages/student_review_schedule_page.dart';
+import '../../features/schedule/presentation/pages/student_schedule_page.dart';
 import '../../features/student/presentation/pages/avatar_selection_page.dart';
 import '../../features/student/presentation/pages/settings_page.dart';
 import '../../features/student/presentation/pages/student_achievements_page.dart';
-import '../../features/student/presentation/pages/student_badges_page.dart';
-import '../../features/student/presentation/pages/student_streak_page.dart';
-import '../../features/student/presentation/pages/student_mushaf_page.dart';
 import '../../features/student/presentation/pages/student_audio_library_page.dart';
-import '../../features/schedule/presentation/pages/student_schedule_page.dart';
-import '../../features/homework/presentation/pages/student_homework_page.dart';
-import '../../features/review_schedule/presentation/pages/student_review_schedule_page.dart';
-import '../../features/progress_report/presentation/pages/student_progress_report_page.dart';
-
+import '../../features/student/presentation/pages/student_badges_page.dart';
+import '../../features/student/presentation/pages/student_evaluation_page.dart';
+// Student
+import '../../features/student/presentation/pages/student_home_page.dart';
+import '../../features/student/presentation/pages/student_mushaf_page.dart';
+import '../../features/student/presentation/pages/student_profile_page.dart';
+import '../../features/student/presentation/pages/student_streak_page.dart';
+import '../../features/supervisor/presentation/pages/supervisor_home_page.dart';
+import '../../features/teacher/presentation/pages/teacher_attendance_page.dart';
+import '../../features/teacher/presentation/pages/teacher_class_detail_page.dart';
+import '../../features/teacher/presentation/pages/teacher_evalutation_page.dart';
+import '../../features/teacher/presentation/pages/teacher_excuses_page.dart';
 // Teacher
 import '../../features/teacher/presentation/pages/teacher_home_page.dart';
-import '../../features/teacher/presentation/pages/teacher_class_detail_page.dart';
-import '../../features/teacher/presentation/pages/teacher_attendance_page.dart';
-
-// Awards
-import '../../features/awards/presentation/pages/awards_page.dart';
+import '../constants/app_constants.dart';
+import 'supervisor_escalation_paths.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -78,11 +78,15 @@ class AppRoutes {
   static const String teacherAttend = '/teacher/attendance/:halaqaId';
   static const String teacherEvals = '/teacher/halaqa/:halaqaId/evaluations';
   static const String teacherStudent = '/teacher/student/:studentId';
-  // H6 / A-H8: teacherAnalytics / teacherCalendar / teacherContent routes removed
-  // (orphan deep-links; student content path kept).
+
+  /// Analytics Phase 2 re-entry (was H6 / A-H8 orphan quarantine).
+  static const String teacherAnalytics = '/teacher/halaqa/:halaqaId/analytics';
+
+  // H6 / A-H8: teacherCalendar / teacherContent remain removed (orphan).
   static const String teacherAwards = '/teacher/halaqa/:halaqaId/awards';
   static const String teacherChat = '/teacher/chat/:conversationId';
   static const String teacherNotifs = '/teacher/notifications';
+  static const String teacherExcuses = '/teacher/excuses';
 
   // Other roles
   static const String parent = '/parent';
@@ -286,11 +290,11 @@ class AppRouter {
           GoRoute(
             path: 'chat/:conversationId',
             builder: (_, state) {
-              final extra = state.extra as Map<String, String?>?;
+              final extra = ChatRouteExtra.parse(state.extra);
               return ChatRoomPage(
                 conversationId: state.pathParameters['conversationId']!,
-                otherUserName: extra?['name'] ?? 'المعلم',
-                otherUserImage: extra?['image'],
+                otherUserName: extra[ChatRouteExtra.nameKey] ?? 'المعلم',
+                otherUserImage: extra[ChatRouteExtra.imageKey],
               );
             },
           ),
@@ -320,6 +324,12 @@ class AppRouter {
                 ),
               ),
               GoRoute(
+                path: 'analytics',
+                builder: (_, state) => AnalyticsDashboardPage(
+                  halaqaId: state.pathParameters['halaqaId']!,
+                ),
+              ),
+              GoRoute(
                 path: 'awards',
                 builder: (_, state) =>
                     AwardsPage(halaqaId: state.pathParameters['halaqaId']!),
@@ -344,11 +354,11 @@ class AppRouter {
           GoRoute(
             path: 'chat/:conversationId',
             builder: (_, state) {
-              final extra = state.extra as Map<String, String?>?;
+              final extra = ChatRouteExtra.parse(state.extra);
               return ChatRoomPage(
                 conversationId: state.pathParameters['conversationId']!,
-                otherUserName: extra?['name'] ?? 'محادثة',
-                otherUserImage: extra?['image'],
+                otherUserName: extra[ChatRouteExtra.nameKey] ?? 'محادثة',
+                otherUserImage: extra[ChatRouteExtra.imageKey],
               );
             },
           ),
@@ -356,6 +366,11 @@ class AppRouter {
           GoRoute(
             path: 'notifications',
             builder: (_, __) => const NotificationsPage(),
+          ),
+          // طلبات الاعتذار (Phase 1 UI shell)
+          GoRoute(
+            path: 'excuses',
+            builder: (_, __) => const TeacherExcusesPage(),
           ),
         ],
       ),

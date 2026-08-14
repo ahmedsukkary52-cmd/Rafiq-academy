@@ -3,7 +3,12 @@
 **Status:** Approved (product)  
 **Date:** 2026-07-31  
 **Scope:** Slice H6 only (`docs/PRODUCTION_HARDENING_PHASE0.md`) — **A-H8**, **A-H9**, **A-H16**, **A-H17**  
-**Out of scope:** H7 awards schema, wiring posts/analytics/calendar as product features, admin console UI, supervisor report inbox, Category B
+**Out of scope (original H6):** H7 awards schema, wiring calendar/content as product features, admin
+console UI, supervisor report inbox, Category B.
+
+**Later product re-entry:** Teacher Analytics restored in **Analytics Phase 2** (
+`AppRoutes.teacherAnalytics`) with Class Details entry — see
+`H6SurfaceCleanup.reEnteredTeacherAnalyticsPath`.
 
 ---
 
@@ -36,16 +41,25 @@ Delete or quarantine orphan / misleading presentation surfaces without changing 
 
 ## What shipped
 
-| Change | Path / note |
-|--------|-------------|
-| Orphan routes removed | `lib/core/router/router_app.dart` |
-| Inventory + contracts | `lib/shared/hardening/h6_surface_cleanup.dart` |
-| ChatConversationsPage deleted | Was never registered |
-| TeacherPostsTab deleted | Removed from teacher bottom nav |
-| Supervisor report UI removed | `supervisor_home_page.dart` |
-| Quarantine banners | `PostsListPage`, `AnalyticsDashboardPage`, `CalendarPage`, `AdminBloc`, `AdminHomePage`, `submitReport` |
-| DI hygiene | `RegisterNewStudentUseCase` config restored to `SupervisorRepository` (pre-existing mismatch vs committed usecase) |
-| Feature trees kept (DI) | analytics / calendar / posts / ChatConversationsBloc for live chat — not product-wired |
+| Change                        | Path / note                                                                                                                                |
+|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| Orphan routes removed         | `lib/core/router/router_app.dart`                                                                                                          |
+| Inventory + contracts         | `lib/shared/hardening/h6_surface_cleanup.dart`                                                                                             |
+| ChatConversationsPage deleted | Was never registered                                                                                                                       |
+| TeacherPostsTab deleted       | Removed from teacher bottom nav                                                                                                            |
+| Supervisor report UI removed  | `supervisor_home_page.dart`                                                                                                                |
+| Quarantine banners            | `PostsListPage`, `AnalyticsDashboardPage`, `CalendarPage`, `AdminBloc`, `AdminHomePage`, `submitReport`                                    |
+| DI hygiene                    | `RegisterNewStudentUseCase` config restored to `SupervisorRepository` (pre-existing mismatch vs committed usecase)                         |
+| Feature trees kept (DI)       | analytics / calendar / posts / ChatConversationsBloc for live chat — analytics **product-wired** in Phase 2; calendar/posts remain unwired |
+
+### Analytics Phase 2 amendment
+
+| Change              | Note                                                                                     |
+|---------------------|------------------------------------------------------------------------------------------|
+| Route restored      | `/teacher/halaqa/:halaqaId/analytics`                                                    |
+| Class Details entry | Header stats row opens Analytics                                                         |
+| Index inventory     | `recitationRecords` `halaqaId`+`date` in `firestore.indexes.json` (deploy separately)    |
+| H6 inventory        | Analytics removed from `removedRoutePaths`; listed under `reEnteredTeacherAnalyticsPath` |
 
 ---
 

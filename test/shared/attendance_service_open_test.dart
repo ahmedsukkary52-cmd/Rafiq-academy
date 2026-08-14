@@ -238,4 +238,36 @@ void main() {
       );
     });
   });
+
+  group('AttendanceService.hasUnsavedChanges', () {
+    test('false when draft matches saved', () {
+      expect(
+        service.hasUnsavedChanges(
+          rosterStudentIds: const [studentId],
+          draft: const {studentId: AttendanceStatus.present},
+          saved: const {studentId: AttendanceStatus.present},
+        ),
+        isFalse,
+      );
+    });
+
+    test('true when draft differs or is newly marked', () {
+      expect(
+        service.hasUnsavedChanges(
+          rosterStudentIds: const [studentId],
+          draft: const {studentId: AttendanceStatus.late},
+          saved: const {studentId: AttendanceStatus.present},
+        ),
+        isTrue,
+      );
+      expect(
+        service.hasUnsavedChanges(
+          rosterStudentIds: const [studentId],
+          draft: const {studentId: AttendanceStatus.present},
+          saved: const {},
+        ),
+        isTrue,
+      );
+    });
+  });
 }

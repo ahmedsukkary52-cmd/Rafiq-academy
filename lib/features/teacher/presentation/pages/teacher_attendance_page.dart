@@ -49,16 +49,29 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   DateTime? _hydratedAttendanceDate;
   int _hydratedAttendanceHash = 0;
 
+  /// After a successful save, ignore dirty until the next hydrate (or edit).
+  bool _suppressDirtyUntilHydrate = false;
+
   @override
   void initState() {
     super.initState();
     _selectedDate = AttendancePolicy.dayStart(DateTime.now());
     final bloc = context.read<TeacherBloc>();
+    _ensureHalaqatLoaded(bloc);
     bloc.add(LoadHalaqaStudentsEvent(widget.halaqaId));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _bootstrapSessionDate(bloc);
     });
+  }
+
+  void _ensureHalaqatLoaded(TeacherBloc bloc) {
+    if (_halaqaFromState(bloc.state) != null) return;
+    final auth = context
+        .read<AuthBloc>()
+        .state;
+    if (auth is! AuthAuthenticated) return;
+    bloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
   }
 
   void _bootstrapSessionDate(TeacherBloc bloc) {
@@ -103,14 +116,18 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
         );
     if (!loaded) return false;
 
+    // Do not clobber in-progress edits while a save round-trip reloads.
+    if (state.attendanceSubmissionStatus == SubmissionStatus.submitting ||
+        state.attendanceSubmissionStatus == SubmissionStatus.success) {
+      return false;
+    }
+
     final hash = Object.hashAll(
       state.dayAttendance.map(
         (r) => Object.hash(r.id, r.studentId, r.status, r.sessionId),
       ),
     );
-    final studentsHash = Object.hashAll(
-      state.students.map((s) => s.uid),
-    );
+    final studentsHash = Object.hashAll(state.students.map((s) => s.uid));
     final combined = Object.hash(hash, studentsHash);
     if (_hydratedAttendanceDate != null &&
         AttendancePolicy.isSameCalendarDay(
@@ -123,6 +140,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
     _hydratedAttendanceDate = open.sessionDate;
     _hydratedAttendanceHash = combined;
+    _suppressDirtyUntilHydrate = false;
     _draft
       ..clear()
       ..addAll({
@@ -164,7 +182,10 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
   void _setStatus(String id, AttendanceStatus status, {required bool canEdit}) {
     if (!canEdit) return;
-    setState(() => _draft[id] = status);
+    setState(() {
+      _suppressDirtyUntilHydrate = false;
+      _draft[id] = status;
+    });
   }
 
   bool _isRegisterComplete(List<HalaqaStudentSummaryEntity> students) {
@@ -174,6 +195,16 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       markedStudentIds: _draft.entries
           .where((e) => e.value != null)
           .map((e) => e.key),
+    );
+  }
+
+  bool _hasUnsavedChanges(List<HalaqaStudentSummaryEntity> students,
+      AttendanceOpenModel open,) {
+    if (_suppressDirtyUntilHydrate) return false;
+    return _attendanceService.hasUnsavedChanges(
+      rosterStudentIds: students.map((s) => s.uid),
+      draft: _draft,
+      saved: open.existingByStudentId,
     );
   }
 
@@ -238,126 +269,159 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
   int _count(AttendanceStatus status) =>
       _draft.values.where((s) => s == status).length;
 
+  void _onSubmissionStatusChanged(TeacherState state) {
+    if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
+      AppSnackBar.showSuccess(context, 'تم حفظ الحضور');
+      if (state.attendanceEventsUnpublished) {
+        AppSnackBar.showInfo(
+          context,
+          'الحضور محفوظ — تعذر إرسال إشعار الغياب',
+        );
+      }
+      setState(() => _suppressDirtyUntilHydrate = true);
+      context.read<TeacherBloc>().add(const ResetAttendanceSubmissionEvent());
+    } else if (state.attendanceSubmissionStatus == SubmissionStatus.error &&
+        state.attendanceSubmissionError != null) {
+      AppSnackBar.showError(context, state.attendanceSubmissionError!);
+      context.read<TeacherBloc>().add(const ResetAttendanceSubmissionEvent());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final canWrite = TeacherWorkflowOwnership.canExecute(context);
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: BlocConsumer<TeacherBloc, TeacherState>(
-        listenWhen: (prev, curr) =>
+      child: MultiBlocListener(
+        listeners: [
+          // Snackbar exactly once per submission status transition.
+          BlocListener<TeacherBloc, TeacherState>(
+            listenWhen: (prev, curr) =>
             prev.attendanceSubmissionStatus !=
-                curr.attendanceSubmissionStatus ||
+                curr.attendanceSubmissionStatus,
+            listener: (context, state) => _onSubmissionStatusChanged(state),
+          ),
+          // Hydrate draft when roster / day marks load (not on save success).
+          BlocListener<TeacherBloc, TeacherState>(
+            listenWhen: (prev, curr) =>
             prev.dayAttendance != curr.dayAttendance ||
-            prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
-            prev.students != curr.students ||
-            prev.studentsStatus != curr.studentsStatus,
-        listener: (context, state) {
-          final open = _openModel(state);
-          if (_hydrateDraftIfNeeded(state, open)) {
-            setState(() {});
-          }
+                prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
+                prev.students != curr.students ||
+                prev.studentsStatus != curr.studentsStatus ||
+                prev.halaqat != curr.halaqat,
+            listener: (context, state) {
+              final open = _openModel(state);
+              _hydrateDraftIfNeeded(state, open);
+              // Rebuild so canEdit picks up schedule endAt once halaqa loads.
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
+        child: BlocBuilder<TeacherBloc, TeacherState>(
+          buildWhen: (prev, curr) =>
+          prev.dayAttendance != curr.dayAttendance ||
+              prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
+              prev.dayAttendanceError != curr.dayAttendanceError ||
+              prev.dayAttendanceDate != curr.dayAttendanceDate ||
+              prev.students != curr.students ||
+              prev.studentsStatus != curr.studentsStatus ||
+              prev.studentsError != curr.studentsError ||
+              prev.studentsHalaqaId != curr.studentsHalaqaId ||
+              prev.halaqat != curr.halaqat ||
+              prev.attendanceSubmissionStatus !=
+                  curr.attendanceSubmissionStatus,
+          builder: (context, state) {
+            final open = _openModel(state);
+            final submitting =
+                state.attendanceSubmissionStatus ==
+                    SubmissionStatus.submitting;
+            final dateLocked = submitting;
+            final canEdit = canWrite && open.canEdit && !submitting;
+            final studentsForHalaqa =
+            state.studentsHalaqaId == widget.halaqaId
+                ? state.students
+                : const <HalaqaStudentSummaryEntity>[];
+            final dirty = _hasUnsavedChanges(studentsForHalaqa, open);
+            final complete = _isRegisterComplete(studentsForHalaqa);
+            final saveEnabled =
+                canEdit && complete && dirty && !submitting && canWrite;
 
-          if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
-            AppSnackBar.showSuccess(context, 'تم حفظ الحضور');
-            if (state.attendanceEventsUnpublished) {
-              AppSnackBar.showInfo(
-                context,
-                'الحضور محفوظ — تعذر إرسال إشعار الغياب',
-              );
-            }
-            context.read<TeacherBloc>().add(
-              const ResetAttendanceSubmissionEvent(),
+            final body = _buildBody(
+              context: context,
+              state: state,
+              open: open,
+              students: studentsForHalaqa,
+              canEdit: canEdit,
+              dateLocked: dateLocked,
+              submitting: submitting,
+              canWrite: canWrite,
+              saveEnabled: saveEnabled,
             );
-          } else if (state.attendanceSubmissionStatus ==
-                  SubmissionStatus.error &&
-              state.attendanceSubmissionError != null) {
-            AppSnackBar.showError(context, state.attendanceSubmissionError!);
-            context.read<TeacherBloc>().add(
-              const ResetAttendanceSubmissionEvent(),
-            );
-          }
-        },
-        builder: (context, state) {
-          final open = _openModel(state);
 
-          final submitting =
-              state.attendanceSubmissionStatus == SubmissionStatus.submitting;
-          final dateLocked = submitting;
-          final canEdit = canWrite && open.canEdit && !submitting;
-          final studentsForHalaqa =
-              state.studentsHalaqaId == widget.halaqaId
-              ? state.students
-              : const <HalaqaStudentSummaryEntity>[];
-
-          final body = _buildBody(
-            context: context,
-            state: state,
-            open: open,
-            students: studentsForHalaqa,
-            canEdit: canEdit,
-            dateLocked: dateLocked,
-            submitting: submitting,
-            canWrite: canWrite,
-          );
-
-          return Scaffold(
-            backgroundColor: AppColors.background,
-            body: widget.embedded
-                ? Column(
-                    children: [
-                      _EmbeddedHeader(
-                        onCalendar: () => _pickDate(locked: dateLocked),
-                        canEdit: canEdit,
+            return Scaffold(
+              backgroundColor: AppColors.background,
+              body: widget.embedded
+                  ? Column(
+                children: [
+                  _EmbeddedHeader(
+                    onCalendar: () => _pickDate(locked: dateLocked),
+                    canEdit: canEdit,
+                  ),
+                  Expanded(child: body),
+                ],
+              )
+                  : Stack(
+                children: [
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 340,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.primaryGradient,
                       ),
-                      Expanded(child: body),
-                    ],
-                  )
-                : Stack(
+                    ),
+                  ),
+                  Column(
                     children: [
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
+                      _AttendanceHeader(
+                        onBack: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/teacher');
+                          }
+                        },
+                        onCalendar: () =>
+                            _pickDate(locked: dateLocked),
+                      ),
+                      Expanded(
                         child: Container(
-                          height: 340,
+                          width: double.infinity,
                           decoration: const BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                          ),
-                        ),
-                      ),
-                      Column(
-                        children: [
-                          _AttendanceHeader(
-                            onBack: () {
-                              if (context.canPop()) {
-                                context.pop();
-                              } else {
-                                context.go('/teacher');
-                              }
-                            },
-                            onCalendar: () => _pickDate(locked: dateLocked),
-                          ),
-                          Expanded(
-                            child: Container(
-                              width: double.infinity,
-                              decoration: const BoxDecoration(
-                                color: AppColors.background,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(AppSizes.radiusXL),
-                                  topRight: Radius.circular(AppSizes.radiusXL),
-                                ),
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(
+                                AppSizes.radiusXL,
                               ),
-                              clipBehavior: Clip.antiAlias,
-                              child: body,
+                              topRight: Radius.circular(
+                                AppSizes.radiusXL,
+                              ),
                             ),
                           ),
-                        ],
+                          clipBehavior: Clip.antiAlias,
+                          child: body,
+                        ),
                       ),
                     ],
                   ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -371,6 +435,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     required bool dateLocked,
     required bool submitting,
     required bool canWrite,
+    required bool saveEnabled,
   }) {
     final studentsLoading =
         (state.studentsStatus == SectionStatus.loading ||
@@ -418,9 +483,6 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       );
     }
 
-    final complete = _isRegisterComplete(students);
-    final saveEnabled = canEdit && complete && !submitting;
-
     return Column(
       children: [
         Padding(
@@ -431,6 +493,19 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
             onNext: () => _shiftDate(1, locked: dateLocked),
           ),
         ),
+        if (!open.canEdit) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'انتهت الجلسة — الحضور للعرض فقط',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -478,11 +553,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
                     size: AppSizes.iconM,
                     color: AppColors.onPrimary,
                   ),
-            onPressed: !canWrite
-                ? null
-                : saveEnabled
-                ? () => _onSave(state, open)
-                : null,
+            onPressed: saveEnabled ? () => _onSave(state, open) : null,
           ),
         ),
       ],
@@ -690,7 +761,7 @@ class _DateCard extends StatelessWidget {
   }
 }
 
-// ── Summary chips (W2 D6: present / absent / late only) ───────────────────────
+// ── Summary chips: present / absent / late / excused ───────────────────────────
 
 class _SummaryRow extends StatelessWidget {
   final int present;
@@ -865,9 +936,10 @@ class _RegisterHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // RTL visual order (right → left): الطالب · متأخر · غائب · حاضر · معذور
     return Container(
       color: AppColors.primary,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       child: Row(
         children: [
           Expanded(
@@ -912,13 +984,24 @@ class _RegisterHeader extends StatelessWidget {
               ),
             ),
           ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Text(
+              'معذور',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-const double _statusColumnWidth = 48;
+const double _statusColumnWidth = 44;
 
 class _StudentRow extends StatelessWidget {
   final _RegisterStudent student;
@@ -939,7 +1022,7 @@ class _StudentRow extends StatelessWidget {
         : String.fromCharCodes(trimmed.runes.take(1));
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Row(
         children: [
           Expanded(
@@ -1000,6 +1083,17 @@ class _StudentRow extends StatelessWidget {
                 color: AppColors.success,
                 icon: Icons.check_rounded,
                 onTap: () => onStatusChanged(AttendanceStatus.present),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: Center(
+              child: _StatusToggle(
+                selected: student.status == AttendanceStatus.excused,
+                color: AppColors.primaryDark,
+                icon: Icons.verified_outlined,
+                onTap: () => onStatusChanged(AttendanceStatus.excused),
               ),
             ),
           ),

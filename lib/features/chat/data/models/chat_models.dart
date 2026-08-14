@@ -11,11 +11,12 @@ class ChatParticipantModel extends ChatParticipantEntity {
   });
 
   factory ChatParticipantModel.fromMap(Map<String, dynamic> map) {
+    final image = map['profileImageUrl'];
     return ChatParticipantModel(
-      uid: map['uid'] ?? '',
-      name: map['name'] ?? '',
-      role: map['role'] ?? '',
-      profileImageUrl: map['profileImageUrl'] as String?,
+      uid: map['uid']?.toString() ?? '',
+      name: map['name']?.toString() ?? '',
+      role: map['role']?.toString() ?? '',
+      profileImageUrl: image is String ? image : null,
     );
   }
 
@@ -46,31 +47,47 @@ class ConversationModel extends ConversationEntity {
     required super.unreadCount,
   });
 
-  /// محتاجين الـ [currentUid] هنا عشان نستخرج العدد الصح من map
-  /// الـ unreadCounts المخزّن في المستند، اللي بيحتوي على عدد كل
-  /// مستخدم على حدة، مش رقم واحد عام للمحادثة.
-  factory ConversationModel.fromFirestore(
-      DocumentSnapshot doc, {
+  /// [currentUid] is required so we can extract this user's unread count from
+  /// the per-uid `unreadCounts` map stored on the document.
+  factory ConversationModel.fromFirestore(DocumentSnapshot doc, {
+    required String currentUid,
+  }) {
+    final raw = doc.data();
+    return ConversationModel.fromMap(
+      doc.id,
+      raw is Map<String, dynamic> ? raw : const <String, dynamic>{},
+      currentUid: currentUid,
+    );
+  }
+
+  factory ConversationModel.fromMap(String id,
+      Map<String, dynamic> data, {
         required String currentUid,
       }) {
-    final data = doc.data() as Map<String, dynamic>;
+    final participants = <ChatParticipantEntity>[];
+    final participantsRaw = data['participants'];
+    if (participantsRaw is List) {
+      for (final p in participantsRaw) {
+        if (p is Map) {
+          participants.add(
+            ChatParticipantModel.fromMap(Map<String, dynamic>.from(p)),
+          );
+        }
+      }
+    }
 
-    final participantsRaw = data['participants'] as List<dynamic>? ?? [];
-    final participants = participantsRaw
-        .map((p) => ChatParticipantModel.fromMap(p as Map<String, dynamic>))
-        .toList();
-
-    final unreadCounts = Map<String, dynamic>.from(data['unreadCounts'] ?? {});
+    final unreadRaw = data['unreadCounts'];
+    final unreadCounts = unreadRaw is Map
+        ? Map<String, dynamic>.from(unreadRaw)
+        : <String, dynamic>{};
 
     return ConversationModel(
-      id: doc.id,
+      id: id,
       participants: participants,
-      lastMessage: data['lastMessage'] as String?,
-      lastMessageAt: data['lastMessageAt'] != null
-          ? (data['lastMessageAt'] as Timestamp).toDate()
-          : null,
-      lastMessageSenderId: data['lastMessageSenderId'] as String?,
-      unreadCount: (unreadCounts[currentUid] ?? 0) as int,
+      lastMessage: _stringFrom(data['lastMessage']),
+      lastMessageAt: dateTimeFromFirestore(data['lastMessageAt']),
+      lastMessageSenderId: _stringFrom(data['lastMessageSenderId']),
+      unreadCount: intFromFirestore(unreadCounts[currentUid]),
     );
   }
 }
@@ -84,17 +101,47 @@ class MessageModel extends MessageEntity {
     required super.sentAt,
   });
 
-  factory MessageModel.fromFirestore(
-      DocumentSnapshot doc, {
-        required String conversationId,
-      }) {
-    final data = doc.data() as Map<String, dynamic>;
-    return MessageModel(
-      id: doc.id,
+  factory MessageModel.fromFirestore(DocumentSnapshot doc, {
+    required String conversationId,
+  }) {
+    final raw = doc.data();
+    return MessageModel.fromMap(
+      doc.id,
+      raw is Map<String, dynamic> ? raw : const <String, dynamic>{},
       conversationId: conversationId,
-      senderId: data['senderId'] ?? '',
-      text: data['text'] ?? '',
-      sentAt: (data['sentAt'] as Timestamp).toDate(),
     );
   }
+
+  factory MessageModel.fromMap(String id,
+      Map<String, dynamic> data, {
+        required String conversationId,
+      }) {
+    return MessageModel(
+      id: id,
+      conversationId: conversationId,
+      senderId: data['senderId']?.toString() ?? '',
+      text: data['text']?.toString() ?? '',
+      // Server timestamps are null on the local optimistic snapshot. Using
+      // now() keeps the stream alive and shows the bubble immediately.
+      sentAt: dateTimeFromFirestore(data['sentAt']) ?? DateTime.now(),
+    );
+  }
+}
+
+DateTime? dateTimeFromFirestore(Object? value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  return null;
+}
+
+int intFromFirestore(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return 0;
+}
+
+String? _stringFrom(Object? value) {
+  if (value == null) return null;
+  if (value is String) return value;
+  return value.toString();
 }

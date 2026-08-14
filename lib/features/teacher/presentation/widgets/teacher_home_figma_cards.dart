@@ -669,3 +669,386 @@ class _ActivityTile extends StatelessWidget {
     );
   }
 }
+
+/// Home Analytics entry — white elevated summary (Phase: Home Analytics card).
+///
+/// Presentation only. Parent resolves [halaqaId], fetches via
+/// [GetHalaqaAnalyticsUseCase], and passes honest loading / error / metrics.
+/// Never invents 0% when metrics are missing.
+class TeacherHomeAnalyticsSummaryCard extends StatelessWidget {
+  final bool loading;
+  final String? errorMessage;
+  final double? attendancePercent;
+  final double? performancePercent;
+  final VoidCallback? onTap;
+  final VoidCallback? onRetry;
+
+  const TeacherHomeAnalyticsSummaryCard({
+    super.key,
+    this.loading = false,
+    this.errorMessage,
+    this.attendancePercent,
+    this.performancePercent,
+    this.onTap,
+    this.onRetry,
+  });
+
+  bool get _hasMetrics =>
+      attendancePercent != null && performancePercent != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+        child: InkWell(
+          onTap: loading || errorMessage != null || !_hasMetrics ? null : onTap,
+          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.softShadow,
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: loading
+                  ? const _AnalyticsSummarySkeleton()
+                  : errorMessage != null
+                  ? _AnalyticsSummaryError(
+                      message: errorMessage!,
+                      onRetry: onRetry,
+                    )
+                  : !_hasMetrics
+                  ? const _AnalyticsSummaryEmpty()
+                  : _AnalyticsSummaryLoaded(
+                      attendancePercent: attendancePercent!,
+                      performancePercent: performancePercent!,
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalyticsSummaryLoaded extends StatelessWidget {
+  final double attendancePercent;
+  final double performancePercent;
+
+  const _AnalyticsSummaryLoaded({
+    required this.attendancePercent,
+    required this.performancePercent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const _AnalyticsAccentMark(),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'التحليلات',
+                      textAlign: TextAlign.right,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppColors.textHint.withValues(alpha: 0.9),
+                    size: 22,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'ملخص آخر ٣٠ يوماً — افتح لوحة التحليلات',
+                textAlign: TextAlign.right,
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AnalyticsMetricChip(
+                      label: 'نسبة الحضور',
+                      value:
+                          '${teacherHomeEasternDigits('${attendancePercent.round()}')}%',
+                      accent: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _AnalyticsMetricChip(
+                      label: 'متوسط الأداء',
+                      value:
+                          '${teacherHomeEasternDigits('${performancePercent.round()}')}%',
+                      accent: AppColors.gradeVeryGood,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Decorative grade-color accent only — does not encode percentages.
+class _AnalyticsAccentMark extends StatelessWidget {
+  const _AnalyticsAccentMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: CustomPaint(painter: _AnalyticsAccentArcPainter()),
+    );
+  }
+}
+
+class _AnalyticsAccentArcPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 5;
+    const stroke = 7.0;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    const colors = [
+      AppColors.gradeExcellent,
+      AppColors.gradeVeryGood,
+      AppColors.gradeGood,
+      AppColors.gradeNeedsWork,
+    ];
+    // Equal decorative segments — not data-driven.
+    const sweep = 1.55; // ~89° each, with gaps
+    var start = -1.2;
+    for (final color in colors) {
+      canvas.drawArc(
+        rect,
+        start,
+        sweep * 0.72,
+        false,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke
+          ..strokeCap = StrokeCap.round,
+      );
+      start += sweep * 0.85;
+    }
+    canvas.drawCircle(
+      center,
+      radius - 11,
+      Paint()..color = AppColors.primaryLight,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _AnalyticsMetricChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color accent;
+
+  const _AnalyticsMetricChip({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey,
+        borderRadius: BorderRadius.circular(AppSizes.radiusM),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: accent,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalyticsSummarySkeleton extends StatelessWidget {
+  const _AnalyticsSummarySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bone(double w, double h) => Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        color: AppColors.border.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+    return Row(
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: AppColors.border.withValues(alpha: 0.45),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              bone(120, 14),
+              const SizedBox(height: 8),
+              bone(180, 10),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(child: bone(double.infinity, 48)),
+                  const SizedBox(width: 10),
+                  Expanded(child: bone(double.infinity, 48)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnalyticsSummaryError extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
+
+  const _AnalyticsSummaryError({required this.message, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'التحليلات',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.titleMedium.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          message,
+          textAlign: TextAlign.right,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        if (onRetry != null) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              onPressed: onRetry,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AnalyticsSummaryEmpty extends StatelessWidget {
+  const _AnalyticsSummaryEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'التحليلات',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.titleMedium.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'لا توجد بيانات تحليلات كافية للعرض حالياً',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Resolves which halaqa the Home Analytics card should open.
+///
+/// Order: featured session → first teacher halaqa → null (hide card).
+String? resolveTeacherHomeAnalyticsHalaqaId({
+  required String? featuredSessionHalaqaId,
+  required List<String> teacherHalaqaIds,
+}) {
+  final featured = featuredSessionHalaqaId?.trim() ?? '';
+  if (featured.isNotEmpty) return featured;
+  for (final id in teacherHalaqaIds) {
+    final t = id.trim();
+    if (t.isNotEmpty) return t;
+  }
+  return null;
+}

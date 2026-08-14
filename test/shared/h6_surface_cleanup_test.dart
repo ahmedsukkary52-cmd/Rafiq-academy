@@ -4,21 +4,28 @@ import 'package:rafiq_academy/shared/hardening/h6_surface_cleanup.dart';
 
 void main() {
   group('H6SurfaceCleanup inventory', () {
-    test('orphan route paths are documented and no longer AppRoutes constants', () {
+    test('remaining orphan routes stay removed; analytics is re-entered', () {
       expect(
         H6SurfaceCleanup.removedRoutePaths,
         containsAll(const [
           '/student/history',
-          '/teacher/halaqa/:halaqaId/analytics',
           '/teacher/calendar',
           '/teacher/content',
         ]),
       );
-
-      // AppRoutes must not reintroduce removed orphan constants.
-      expect(AppRoutes.studentContent, isNot(equals('/student/history')));
-      expect(AppRoutes.teacherAwards, isNot(contains('/analytics')));
-      expect(AppRoutes.teacher, equals('/teacher'));
+      expect(
+        H6SurfaceCleanup.removedRoutePaths,
+        isNot(contains('/teacher/halaqa/:halaqaId/analytics')),
+      );
+      expect(
+        H6SurfaceCleanup.reEnteredTeacherAnalyticsPath,
+        AppRoutes.teacherAnalytics,
+      );
+      expect(
+        H6SurfaceCleanup.preservedTeacherAnalyticsPath,
+        AppRoutes.teacherAnalytics,
+      );
+      expect(AppRoutes.teacherAnalytics, contains('/analytics'));
     });
 
     test('live W1–W8 surfaces stay registered on AppRoutes', () {
@@ -33,6 +40,10 @@ void main() {
       expect(
         AppRoutes.teacherChat,
         H6SurfaceCleanup.preservedTeacherChatPath,
+      );
+      expect(
+        AppRoutes.teacherAnalytics,
+        H6SurfaceCleanup.preservedTeacherAnalyticsPath,
       );
       expect(AppRoutes.admin, H6SurfaceCleanup.preservedAdminPath);
       expect(

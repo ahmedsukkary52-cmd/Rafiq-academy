@@ -2,18 +2,25 @@ import '../../core/router/router_app.dart';
 
 /// H6 surface cleanup inventory (A-H8, A-H9, A-H16, A-H17).
 ///
-/// Documents deleted / quarantined presentation surfaces. Does **not** change
-/// W1–W8 ownership, admit, day board, events, or استئذان behavior.
+/// Documents deleted / quarantined / **re-entered** presentation surfaces.
+/// Does **not** change W1–W8 ownership, admit, day board, events, or استئذان
+/// behavior beyond approved product re-entries (Analytics Phase 2).
 class H6SurfaceCleanup {
   const H6SurfaceCleanup._();
 
-  /// Orphan routes removed from [AppRouter] (were deep-link only).
+  /// Orphan routes still removed from [AppRouter] (deep-link only / unwired).
   static const removedRoutePaths = <String>[
     '/student/history',
-    '/teacher/halaqa/:halaqaId/analytics',
     '/teacher/calendar',
     '/teacher/content',
   ];
+
+  /// Teacher Analytics — re-entered in Analytics Phase 2 (no longer orphan).
+  ///
+  /// Was removed under A-H8; restored with Class Details entry + honesty
+  /// hardening. Listed for audit trail, not as an active quarantine.
+  static const reEnteredTeacherAnalyticsPath =
+      '/teacher/halaqa/:halaqaId/analytics';
 
   /// Unregistered duplicate page deleted in H6.
   /// Live chat remains [TeacherMessagesTab] / [StudentChatPage] + [ChatRoomPage].
@@ -32,6 +39,7 @@ class H6SurfaceCleanup {
   static const preservedStudentContentPath = AppRoutes.studentContent;
   static const preservedTeacherAwardsPath = AppRoutes.teacherAwards;
   static const preservedTeacherChatPath = AppRoutes.teacherChat;
+  static const preservedTeacherAnalyticsPath = AppRoutes.teacherAnalytics;
   static const preservedAdminPath = AppRoutes.admin;
   static const preservedSupervisorPath = AppRoutes.supervisor;
 

@@ -7,7 +7,6 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/domain/usecases/get_student_halaqa_usecase.dart';
@@ -98,6 +97,7 @@ class _StudentChatPageState extends State<StudentChatPage> {
     );
 
     final bloc = sl<ChatConversationsBloc>();
+    bloc.add(StartWatchingConversationsEvent(auth.user.uid));
     bloc.add(const ResetStartConversationEvent());
     bloc.add(
       StartConversationEvent(currentUser: currentUser, otherUser: teacher),
@@ -113,7 +113,10 @@ class _StudentChatPageState extends State<StudentChatPage> {
         ':conversationId',
         conversation.id,
       ),
-      extra: {'name': other.name, 'image': other.profileImageUrl},
+      extra: <String, String?>{
+        'name': other.name,
+        'image': other.profileImageUrl,
+      },
     );
     sl<ChatConversationsBloc>().add(const ResetStartConversationEvent());
   }
@@ -170,19 +173,76 @@ class _StudentChatPageState extends State<StudentChatPage> {
                     ],
                   ),
                 )
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const AppLoadingWidget(),
-                    const SizedBox(height: 16),
-                    Text(
-                      'جاري فتح محادثة معلمك...',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                  ],
-                ),
+              : const _StudentChatOpeningSkeleton(),
         ),
       ),
+    );
+  }
+}
+
+class _StudentChatOpeningSkeleton extends StatefulWidget {
+  const _StudentChatOpeningSkeleton();
+
+  @override
+  State<_StudentChatOpeningSkeleton> createState() =>
+      _StudentChatOpeningSkeletonState();
+}
+
+class _StudentChatOpeningSkeletonState
+    extends State<_StudentChatOpeningSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(
+      begin: 0.35,
+      end: 0.85,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final bone = AppColors.border.withValues(alpha: _pulse.value);
+        Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: bone,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        );
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircleAvatar(radius: 28, backgroundColor: bone),
+              const SizedBox(height: 20),
+              bar(160, 14),
+              const SizedBox(height: 12),
+              bar(220, 12),
+              const SizedBox(height: 8),
+              bar(180, 12),
+            ],
+          ),
+        );
+      },
     );
   }
 }

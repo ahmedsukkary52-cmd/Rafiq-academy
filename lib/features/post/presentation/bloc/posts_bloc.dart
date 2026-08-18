@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/posts_entities.dart';
+import '../../domain/post_audience_target.dart';
 import '../../domain/usecases/posts_usecases.dart';
 import 'posts_event.dart';
 import 'posts_state.dart';
@@ -59,13 +60,37 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     WatchPostsEvent event,
     Emitter<PostsState> emit,
   ) async {
+    final halaqaId = normalizePostsWatchHalaqaId(event.halaqaId);
+    if (halaqaId == null) {
+      emit(
+        state.copyWith(
+          postsStatus: SectionStatus.error,
+          postsError: 'لا توجد حلقة محددة للمنشورات',
+          posts: const [],
+          watchedHalaqaId: null,
+        ),
+      );
+      return;
+    }
+
     final generation = _sessionGeneration;
-    emit(state.copyWith(postsStatus: SectionStatus.loading, postsError: null));
+    final switching = state.watchedHalaqaId != halaqaId;
+    emit(
+      state.copyWith(
+        postsStatus: SectionStatus.loading,
+        postsError: null,
+        watchedHalaqaId: halaqaId,
+        // Clear stale list when switching halaqa so isolation is visible immediately.
+        posts: switching ? const [] : state.posts,
+      ),
+    );
 
     await emit.forEach(
-      watchPosts(WatchPostsParams(event.halaqaId)),
+      watchPosts(WatchPostsParams(halaqaId)),
       onData: (either) {
         if (generation != _sessionGeneration) return state;
+        // Ignore late snapshots from a previous halaqa after a switch.
+        if (state.watchedHalaqaId != halaqaId) return state;
         return either.fold(
           (failure) => state.copyWith(
             postsStatus: SectionStatus.error,
@@ -148,8 +173,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           createPostError: failure.message,
         ),
       ),
-      // الـ stream (WatchPostsEvent) هيحدّث القائمة تلقائياً من Firestore
-      // بعد نجاح النشر، مفيش داعي نضيف المنشور يدوياً للقائمة.
+      // Active WatchPosts stream refreshes the list from Firestore after create.
       (_) => emit(state.copyWith(createPostStatus: SubmissionStatus.success)),
     );
   }

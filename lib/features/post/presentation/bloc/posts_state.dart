@@ -15,6 +15,9 @@ class PostsState extends Equatable {
   final List<PostEntity> posts;
   final String? postsError;
 
+  /// Halaqa currently being watched — used to clear stale posts on switch.
+  final String? watchedHalaqaId;
+
   // ── التعليقات (لمنشور محدد) ────────────────────────────────────────────
   final SectionStatus commentsStatus;
   final List<CommentEntity> comments;
@@ -33,6 +36,7 @@ class PostsState extends Equatable {
     this.postsStatus = SectionStatus.initial,
     this.posts = const [],
     this.postsError,
+    this.watchedHalaqaId,
     this.commentsStatus = SectionStatus.initial,
     this.comments = const [],
     this.activePostId,
@@ -49,6 +53,7 @@ class PostsState extends Equatable {
     SectionStatus? postsStatus,
     List<PostEntity>? posts,
     Object? postsError = _unset,
+    Object? watchedHalaqaId = _unset,
     SectionStatus? commentsStatus,
     List<CommentEntity>? comments,
     Object? activePostId = _unset,
@@ -64,6 +69,9 @@ class PostsState extends Equatable {
       postsError: identical(postsError, _unset)
           ? this.postsError
           : postsError as String?,
+      watchedHalaqaId: identical(watchedHalaqaId, _unset)
+          ? this.watchedHalaqaId
+          : watchedHalaqaId as String?,
       commentsStatus: commentsStatus ?? this.commentsStatus,
       comments: comments ?? this.comments,
       activePostId: identical(activePostId, _unset)
@@ -88,6 +96,7 @@ class PostsState extends Equatable {
     postsStatus,
     posts,
     postsError,
+    watchedHalaqaId,
     commentsStatus,
     comments,
     activePostId,

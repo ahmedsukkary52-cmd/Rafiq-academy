@@ -8,6 +8,7 @@ import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../presentation/bloc/notifications_bloc.dart';
 import '../../presentation/bloc/notifications_event.dart';
@@ -116,7 +117,7 @@ class NotificationsPage extends StatelessWidget {
                       previous.error != current.error,
                   builder: (context, state) {
                     if (state.status == SectionStatus.loading) {
-                      return const AppLoadingWidget();
+                      return const TeacherNotificationsListSkeleton();
                     }
                     if (state.status == SectionStatus.error) {
                       return AppErrorWidget(

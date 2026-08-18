@@ -7,6 +7,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../halaqa_activity/domain/usecases/halaqa_activity_usecases.dart';
 import '../../../halaqa_activity/presentation/halaqa_activity_ui_mapper.dart';
+import '../widgets/teacher_loading_skeletons.dart';
 import 'create_halaqa_activity_sheet.dart';
 import 'teacher_activity_detail_page.dart';
 
@@ -163,7 +164,7 @@ class _TeacherTasksTabState extends State<TeacherTasksTab> {
           ),
           const SizedBox(height: 12),
           if (_status == ActivityListLoadState.loading)
-            const SizedBox(height: 160, child: AppLoadingWidget())
+            const TeacherTasksListSkeleton()
           else if (_status == ActivityListLoadState.error)
             AppErrorWidget(
               message: _error ?? 'حدث خطأ',

@@ -221,6 +221,12 @@ class AwardRecipientSelection {
     Map<String, List<AwardRecipientStudent>> rosters,
   ) => resolvedRecipients(rosters).map((student) => student.uid).toList();
 
+  AwardRecipientSelection ensuringStudentSelected(String studentId) {
+    final id = studentId.trim();
+    if (id.isEmpty || selectedStudentIds.contains(id)) return this;
+    return copyWith(selectedStudentIds: {...selectedStudentIds, id});
+  }
+
   static List<AwardHalaqaOption> selectedHalaqatInOrder({
     required List<AwardHalaqaOption> teacherHalaqat,
     required Set<String> selectedHalaqaIds,

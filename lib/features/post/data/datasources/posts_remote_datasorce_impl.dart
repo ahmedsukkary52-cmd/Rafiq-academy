@@ -8,6 +8,7 @@ import 'package:rafiq_academy/features/post/data/datasources/posts_remote_dataso
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../domain/entities/posts_entities.dart';
+import '../../domain/post_audience_target.dart';
 import '../models/post_models.dart';
 
 @LazySingleton(as: PostsRemoteDatasource)
@@ -94,9 +95,15 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
       // ثانياً: حفظ الـ document في Firestore
       // audienceTarget = halaqaId للمنشورات الخاصة بحلقة، أو 'all' للعامة.
       // بنستخدم حقل واحد عشان الـ whereIn query في watchPosts يشتغل.
-      final audienceTarget = audience == PostAudience.allHalaqat
-          ? 'all'
-          : halaqaId ?? 'all';
+      final audienceTarget = resolvePostAudienceTarget(
+        audience: audience,
+        halaqaId: halaqaId,
+      );
+      if (audienceTarget == null) {
+        throw const ServerException(
+          'يجب تحديد الحلقة قبل نشر منشور خاص بها',
+        );
+      }
 
       await _postsRef.add({
         'authorId': authorId,

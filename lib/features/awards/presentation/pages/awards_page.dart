@@ -12,6 +12,7 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../teacher/domain/repositories/teacher_repository.dart';
 import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
 import '../../../teacher/presentation/bloc/teacher_bloc.dart';
+import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
 import '../../domain/award_recipient_selection.dart';
 import '../../domain/entities/award_entities.dart';
 import '../bloc/awards_bloc.dart';
@@ -116,7 +117,7 @@ class _AwardsPageState extends State<AwardsPage> {
                 if (state.statsStatus == SectionStatus.initial ||
                     (state.statsStatus == SectionStatus.loading &&
                         state.stats == null)) {
-                  return const AppLoadingWidget();
+                  return const TeacherAwardsDashboardSkeleton();
                 }
 
                 if (state.statsStatus == SectionStatus.error &&
@@ -197,10 +198,7 @@ class _AwardsPageState extends State<AwardsPage> {
                     if (state.awardsStatus == SectionStatus.loading &&
                         state.grantedAwards.isEmpty)
                       const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: AppLoadingWidget(),
-                        ),
+                        child: TeacherAwardsHistorySkeleton(),
                       )
                     else if (state.grantedAwards.isEmpty)
                       SliverToBoxAdapter(
@@ -246,7 +244,7 @@ class _AwardsPageState extends State<AwardsPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: _bloc,
-        child: _CreateAwardSheet(
+        child: CreateAwardSheet(
           halaqaId: widget.halaqaId,
           preset: preset,
         ),
@@ -534,17 +532,23 @@ class _AwardHistoryTile extends StatelessWidget {
   }
 }
 
-class _CreateAwardSheet extends StatefulWidget {
+class CreateAwardSheet extends StatefulWidget {
   final String halaqaId;
   final AwardType? preset;
+  final String? preselectedStudentId;
 
-  const _CreateAwardSheet({required this.halaqaId, this.preset});
+  const CreateAwardSheet({
+    super.key,
+    required this.halaqaId,
+    this.preset,
+    this.preselectedStudentId,
+  });
 
   @override
-  State<_CreateAwardSheet> createState() => _CreateAwardSheetState();
+  State<CreateAwardSheet> createState() => _CreateAwardSheetState();
 }
 
-class _CreateAwardSheetState extends State<_CreateAwardSheet> {
+class _CreateAwardSheetState extends State<CreateAwardSheet> {
   late AwardType _type;
   final _titleCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
@@ -566,6 +570,10 @@ class _CreateAwardSheetState extends State<_CreateAwardSheet> {
     }
     _selection = AwardRecipientSelection(
       selectedHalaqaIds: {widget.halaqaId},
+      selectedStudentIds: {
+        if ((widget.preselectedStudentId ?? '').trim().isNotEmpty)
+          widget.preselectedStudentId!.trim(),
+      },
     );
     _titleCtrl.addListener(_onFieldsChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -600,6 +608,9 @@ class _CreateAwardSheetState extends State<_CreateAwardSheet> {
           ),
         ),
       ),
+    );
+    _selection = _selection.ensuringStudentSelected(
+      widget.preselectedStudentId ?? '',
     );
   }
 
@@ -636,6 +647,9 @@ class _CreateAwardSheetState extends State<_CreateAwardSheet> {
               imageUrl: student.profileImageUrl,
             ),
           ),
+        );
+        _selection = _selection.ensuringStudentSelected(
+          widget.preselectedStudentId ?? '',
         );
       }),
     );

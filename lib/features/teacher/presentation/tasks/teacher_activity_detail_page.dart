@@ -8,6 +8,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../halaqa_activity/domain/usecases/halaqa_activity_usecases.dart';
 import '../../../halaqa_activity/presentation/halaqa_activity_ui_mapper.dart';
+import '../widgets/teacher_loading_skeletons.dart';
 
 class TeacherActivityDetailPage extends StatefulWidget {
   final String halaqaId;
@@ -69,7 +70,10 @@ class _TeacherActivityDetailPageState extends State<TeacherActivityDetailPage> {
         title: const Text('تفاصيل المهمة'),
       ),
       body: switch (_status) {
-        ActivityListLoadState.loading => const AppLoadingWidget(),
+        ActivityListLoadState.loading => const Padding(
+            padding: EdgeInsets.all(AppSizes.paddingM),
+            child: TeacherTasksListSkeleton(itemCount: 4),
+          ),
         ActivityListLoadState.error => AppErrorWidget(
             message: _error ?? 'حدث خطأ',
             onRetry: _load,

@@ -19,6 +19,7 @@ import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../widgets/teacher_home_figma_cards.dart';
+import '../widgets/teacher_loading_skeletons.dart';
 
 /// Teacher «حلقاتي» — production list (search / filter / Firestore-backed cards).
 class TeacherClassesPage extends StatefulWidget {
@@ -404,7 +405,7 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
                   builder: (context, state) {
                     if (state.halaqatStatus == SectionStatus.loading ||
                         state.halaqatStatus == SectionStatus.initial) {
-                      return const AppLoadingWidget();
+                      return const TeacherClassesListSkeleton();
                     }
                     if (state.halaqatStatus == SectionStatus.error) {
                       return AppErrorWidget(

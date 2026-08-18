@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -12,7 +11,9 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
 import '../../domain/entities/posts_entities.dart';
+import '../../domain/post_audience_target.dart';
 import '../bloc/posts_bloc.dart';
 import '../bloc/posts_event.dart';
 import '../bloc/posts_state.dart';
@@ -36,10 +37,13 @@ class PostsListPage extends StatefulWidget {
 
 class _PostsListPageState extends State<PostsListPage> {
   late final PostsBloc _bloc;
+  final _messageController = TextEditingController();
+  final List<File> _selectedFiles = [];
+  final List<AttachmentType> _selectedTypes = [];
   String _currentUid = '';
   String _currentUserName = '';
-  Timer? _loadingFallback;
-  bool _allowEmptyWhileLoading = false;
+
+  String? get _watchHalaqaId => normalizePostsWatchHalaqaId(widget.halaqaId);
 
   @override
   void initState() {
@@ -50,39 +54,126 @@ class _PostsListPageState extends State<PostsListPage> {
       _currentUserName = authState.user.name;
     }
     _bloc = sl<PostsBloc>();
-    _bloc.add(WatchPostsEvent(widget.halaqaId ?? 'general'));
-    // If Firestore never emits, fall back to empty state instead of spinning forever.
-    _loadingFallback = Timer(const Duration(seconds: 5), () {
-      if (!mounted) return;
-      final s = _bloc.state;
-      if (s.postsStatus == SectionStatus.loading && s.posts.isEmpty) {
-        setState(() => _allowEmptyWhileLoading = true);
-      }
+    _messageController.addListener(() {
+      if (mounted) setState(() {});
     });
+    _startWatch();
+  }
+
+  @override
+  void didUpdateWidget(covariant PostsListPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (normalizePostsWatchHalaqaId(oldWidget.halaqaId) != _watchHalaqaId) {
+      _startWatch();
+    }
+  }
+
+  void _startWatch() {
+    final halaqaId = _watchHalaqaId;
+    if (halaqaId == null) {
+      _bloc.add(const WatchPostsEvent(''));
+      return;
+    }
+    _bloc.add(WatchPostsEvent(halaqaId));
   }
 
   @override
   void dispose() {
-    _loadingFallback?.cancel();
+    _messageController.dispose();
     super.dispose();
   }
 
-  Future<void> _navigateToCreatePost() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CreatePostPage(
-          halaqaId: widget.halaqaId,
-          currentUserName: _currentUserName,
-          currentUid: _currentUid,
-        ),
+  Future<void> _pickFiles() async {
+    if (_bloc.state.createPostStatus == SubmissionStatus.submitting) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'mp3', 'wav', 'mp4', 'png', 'jpg', 'jpeg'],
+      allowMultiple: true,
+    );
+    if (result == null) return;
+    for (final file in result.files) {
+      final path = file.path;
+      if (path == null) continue;
+      final ext = file.extension?.toLowerCase() ?? '';
+      final AttachmentType? type = switch (ext) {
+        'pdf' => AttachmentType.pdf,
+        'mp3' || 'wav' => AttachmentType.audio,
+        'mp4' => AttachmentType.video,
+        'png' || 'jpg' || 'jpeg' => AttachmentType.image,
+        _ => null,
+      };
+      if (type == null) continue;
+      setState(() {
+        _selectedFiles.add(File(path));
+        _selectedTypes.add(type);
+      });
+    }
+  }
+
+  void _removeFile(int index) {
+    if (_bloc.state.createPostStatus == SubmissionStatus.submitting) return;
+    setState(() {
+      _selectedFiles.removeAt(index);
+      _selectedTypes.removeAt(index);
+    });
+  }
+
+  void _clearComposer() {
+    _messageController.clear();
+    setState(() {
+      _selectedFiles.clear();
+      _selectedTypes.clear();
+    });
+  }
+
+  bool _canSend(bool submitting) {
+    final hasText = _messageController.text.trim().isNotEmpty;
+    final hasAttachments = _selectedFiles.isNotEmpty;
+    return !submitting &&
+        _watchHalaqaId != null &&
+        (hasText || hasAttachments);
+  }
+
+  void _sendPost() {
+    final halaqaId = _watchHalaqaId;
+    if (halaqaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد حلقة محددة للمنشورات')),
+      );
+      return;
+    }
+    if (!_canSend(
+      _bloc.state.createPostStatus == SubmissionStatus.submitting,
+    )) {
+      return;
+    }
+
+    _bloc.add(
+      CreatePostEvent(
+        authorId: _currentUid,
+        authorName: _currentUserName,
+        content: _messageController.text,
+        halaqaId: halaqaId,
+        audience: PostAudience.specificHalaqa,
+        attachmentFiles: List<File>.from(_selectedFiles),
+        attachmentTypes: List<AttachmentType>.from(_selectedTypes),
       ),
     );
+  }
 
-    if (result == true && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('تم نشر المنشور بنجاح')));
+  void _onCreateStatus(PostsState state) {
+    if (state.createPostStatus == SubmissionStatus.success) {
+      _clearComposer();
+      _bloc.add(const ResetCreatePostEvent());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم نشر المنشور بنجاح')),
+      );
+    } else if (state.createPostStatus == SubmissionStatus.error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(state.createPostError ?? 'فشل النشر')),
+      );
+      _bloc.add(const ResetCreatePostEvent());
     }
   }
 
@@ -90,123 +181,267 @@ class _PostsListPageState extends State<PostsListPage> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _bloc,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: widget.embedded
-            ? null
-            : AppBar(
-                title: const Text('المنشورات'),
-                actions: [
+      child: BlocListener<PostsBloc, PostsState>(
+        listenWhen: (previous, current) =>
+            previous.createPostStatus != current.createPostStatus,
+        listener: (context, state) => _onCreateStatus(state),
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: widget.embedded
+              ? null
+              : AppBar(title: const Text('المنشورات')),
+          body: Column(
+            children: [
+              if (widget.embedded)
+                Material(
+                  color: AppColors.surface,
+                  child: ListTile(
+                    title: Text(
+                      'المنشورات',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: BlocBuilder<PostsBloc, PostsState>(
+                  buildWhen: (previous, current) =>
+                      previous.postsStatus != current.postsStatus ||
+                      previous.posts != current.posts ||
+                      previous.postsError != current.postsError,
+                  builder: (context, state) {
+                    if (state.postsStatus == SectionStatus.error) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              state.postsError ?? 'حدث خطأ',
+                              style: AppTextStyles.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _startWatch,
+                              child: const Text('إعادة المحاولة'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    if (state.postsStatus == SectionStatus.loading &&
+                        state.posts.isEmpty) {
+                      return const TeacherPostsListSkeleton();
+                    }
+                    if (state.posts.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.post_add_outlined,
+                              size: 64,
+                              color: AppColors.textHint.withValues(alpha: 0.4),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'لا توجد منشورات بعد',
+                              style: AppTextStyles.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(AppSizes.paddingM),
+                      itemCount: state.posts.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final post = state.posts[index];
+                        return _PostItem(
+                          post: post,
+                          currentUid: _currentUid,
+                          onLike: () => _bloc.add(
+                            ToggleLikeEvent(
+                              postId: post.id,
+                              uid: _currentUid,
+                              isCurrentlyLiked: post.isLikedBy(_currentUid),
+                            ),
+                          ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PostDetailPage(
+                                post: post,
+                                currentUid: _currentUid,
+                                currentUserName: _currentUserName,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              BlocBuilder<PostsBloc, PostsState>(
+                buildWhen: (previous, current) =>
+                    previous.createPostStatus != current.createPostStatus,
+                builder: (context, state) {
+                  final submitting =
+                      state.createPostStatus == SubmissionStatus.submitting;
+                  return _PostsComposerBar(
+                    messageController: _messageController,
+                    selectedFiles: _selectedFiles,
+                    selectedTypes: _selectedTypes,
+                    submitting: submitting,
+                    canSend: _canSend(submitting),
+                    onPickFiles: _pickFiles,
+                    onRemoveFile: _removeFile,
+                    onSend: _sendPost,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PostsComposerBar extends StatelessWidget {
+  final TextEditingController messageController;
+  final List<File> selectedFiles;
+  final List<AttachmentType> selectedTypes;
+  final bool submitting;
+  final bool canSend;
+  final VoidCallback onPickFiles;
+  final ValueChanged<int> onRemoveFile;
+  final VoidCallback onSend;
+
+  const _PostsComposerBar({
+    required this.messageController,
+    required this.selectedFiles,
+    required this.selectedTypes,
+    required this.submitting,
+    required this.canSend,
+    required this.onPickFiles,
+    required this.onRemoveFile,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      elevation: 4,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (selectedFiles.isNotEmpty) ...[
+                SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: selectedFiles.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final file = selectedFiles[index];
+                      final type = selectedTypes[index];
+                      final color = switch (type) {
+                        AttachmentType.pdf => AppColors.error,
+                        AttachmentType.audio => AppColors.primary,
+                        AttachmentType.video => AppColors.secondary,
+                        AttachmentType.image => AppColors.success,
+                      };
+                      final icon = switch (type) {
+                        AttachmentType.pdf => Icons.picture_as_pdf_rounded,
+                        AttachmentType.audio => Icons.audiotrack_rounded,
+                        AttachmentType.video => Icons.play_circle_rounded,
+                        AttachmentType.image => Icons.image_rounded,
+                      };
+                      final name = file.path.split(RegExp(r'[\\/]')).last;
+                      return Chip(
+                        avatar: Icon(icon, color: color, size: 16),
+                        label: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 120),
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: submitting ? null : () => onRemoveFile(index),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   IconButton(
-                    icon: const Icon(Icons.add_rounded),
-                    onPressed: _navigateToCreatePost,
+                    onPressed: submitting ? null : onPickFiles,
+                    icon: const Icon(Icons.attach_file_rounded),
+                    color: AppColors.primary,
+                    tooltip: 'إرفاق',
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: messageController,
+                      enabled: !submitting,
+                      minLines: 1,
+                      maxLines: 4,
+                      textAlign: TextAlign.right,
+                      style: AppTextStyles.bodyLarge,
+                      decoration: InputDecoration(
+                        hintText: 'اكتب منشوراً...',
+                        filled: true,
+                        fillColor: AppColors.surfaceGrey,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                      onSubmitted: (_) {
+                        if (canSend) onSend();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    onPressed: canSend ? onSend : null,
+                    icon: submitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : Icon(
+                            Icons.send_rounded,
+                            color: canSend
+                                ? AppColors.primary
+                                : AppColors.textHint,
+                          ),
+                    tooltip: 'إرسال',
                   ),
                 ],
               ),
-        body: Column(
-          children: [
-            if (widget.embedded)
-              Material(
-                color: AppColors.surface,
-                child: ListTile(
-                  title: Text(
-                    'المنشورات',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.add_rounded),
-                    color: AppColors.primary,
-                    onPressed: _navigateToCreatePost,
-                  ),
-                ),
-              ),
-            Expanded(
-              child: BlocBuilder<PostsBloc, PostsState>(
-          buildWhen: (previous, current) =>
-              previous.postsStatus != current.postsStatus ||
-              previous.posts != current.posts ||
-              previous.postsError != current.postsError,
-          builder: (context, state) {
-            if (state.postsStatus == SectionStatus.error) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      state.postsError ?? 'حدث خطأ',
-                      style: AppTextStyles.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => _bloc.add(
-                        WatchPostsEvent(widget.halaqaId ?? 'general'),
-                      ),
-                      child: const Text('إعادة المحاولة'),
-                    ),
-                  ],
-                ),
-              );
-            }
-            // Avoid endless spinner: show empty when nothing to show yet.
-            if (state.posts.isEmpty) {
-              if (state.postsStatus == SectionStatus.loading &&
-                  !_allowEmptyWhileLoading) {
-                return const AppLoadingWidget();
-              }
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.post_add_outlined,
-                      size: 64,
-                      color: AppColors.textHint.withValues(alpha: 0.4),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لا توجد منشورات بعد',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                  ],
-                ),
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.all(AppSizes.paddingM),
-              itemCount: state.posts.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final post = state.posts[index];
-                return _PostItem(
-                  post: post,
-                  currentUid: _currentUid,
-                  onLike: () => _bloc.add(
-                    ToggleLikeEvent(
-                      postId: post.id,
-                      uid: _currentUid,
-                      isCurrentlyLiked: post.isLikedBy(_currentUid),
-                    ),
-                  ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PostDetailPage(
-                        post: post,
-                        currentUid: _currentUid,
-                        currentUserName: _currentUserName,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -234,7 +469,6 @@ class _PostItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Header: author and time
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -388,218 +622,6 @@ class _AttachmentItem extends StatelessWidget {
             Text(attachment.fileName, style: AppTextStyles.labelMedium),
             const SizedBox(width: 6),
             Icon(_icon, color: _color, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CreatePostPage extends StatefulWidget {
-  final String? halaqaId;
-  final String currentUserName;
-  final String currentUid;
-
-  const CreatePostPage({
-    super.key,
-    required this.halaqaId,
-    required this.currentUserName,
-    required this.currentUid,
-  });
-
-  @override
-  State<CreatePostPage> createState() => _CreatePostPageState();
-}
-
-class _CreatePostPageState extends State<CreatePostPage> {
-  final _contentController = TextEditingController();
-  final List<File> _selectedFiles = [];
-  final List<AttachmentType> _selectedTypes = [];
-  PostAudience _audience = PostAudience.specificHalaqa;
-  bool _isSubmitting = false;
-
-  Future<void> _pickFiles() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'mp3', 'wav', 'mp4', 'png', 'jpg', 'jpeg'],
-      allowMultiple: true,
-    );
-    if (result == null) return;
-    for (final file in result.files) {
-      final path = file.path;
-      if (path == null) continue;
-      final ext = file.extension?.toLowerCase() ?? '';
-      AttachmentType type;
-      switch (ext) {
-        case 'pdf':
-          type = AttachmentType.pdf;
-          break;
-        case 'mp3':
-        case 'wav':
-          type = AttachmentType.audio;
-          break;
-        case 'mp4':
-          type = AttachmentType.video;
-          break;
-        case 'png':
-        case 'jpg':
-        case 'jpeg':
-          type = AttachmentType.image;
-          break;
-        default:
-          continue;
-      }
-      setState(() {
-        _selectedFiles.add(File(path));
-        _selectedTypes.add(type);
-      });
-    }
-  }
-
-  void _removeFile(int index) {
-    setState(() {
-      _selectedFiles.removeAt(index);
-      _selectedTypes.removeAt(index);
-    });
-  }
-
-  Future<void> _submit() async {
-    if (_contentController.text.trim().isEmpty) return;
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    final bloc = sl<PostsBloc>();
-    bloc.add(
-      CreatePostEvent(
-        authorId: widget.currentUid,
-        authorName: widget.currentUserName,
-        content: _contentController.text,
-        halaqaId: widget.halaqaId,
-        audience: _audience,
-        attachmentFiles: _selectedFiles,
-        attachmentTypes: _selectedTypes,
-      ),
-    );
-
-    await Future.doWhile(
-      () => Future.delayed(const Duration(milliseconds: 100), () {
-        return bloc.state.createPostStatus == SubmissionStatus.submitting;
-      }),
-    );
-
-    if (!mounted) return;
-    if (bloc.state.createPostStatus == SubmissionStatus.success) {
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(bloc.state.createPostError ?? 'فشل النشر')),
-      );
-    }
-    setState(() {
-      _isSubmitting = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('نشر منشور'),
-        actions: [
-          TextButton(
-            onPressed: _isSubmitting ? null : _submit,
-            child: const Text('نشر'),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSizes.paddingM),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _contentController,
-              maxLines: null,
-              decoration: const InputDecoration(
-                hintText: 'اكتب شيئاً...',
-                border: InputBorder.none,
-              ),
-              style: AppTextStyles.bodyLarge,
-              textAlign: TextAlign.right,
-            ),
-            const SizedBox(height: 20),
-            if (_selectedFiles.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: List.generate(_selectedFiles.length, (index) {
-                  final file = _selectedFiles[index];
-                  final type = _selectedTypes[index];
-                  final color = switch (type) {
-                    AttachmentType.pdf => AppColors.error,
-                    AttachmentType.audio => AppColors.primary,
-                    AttachmentType.video => AppColors.secondary,
-                    AttachmentType.image => AppColors.success,
-                  };
-                  final icon = switch (type) {
-                    AttachmentType.pdf => Icons.picture_as_pdf_rounded,
-                    AttachmentType.audio => Icons.audiotrack_rounded,
-                    AttachmentType.video => Icons.play_circle_rounded,
-                    AttachmentType.image => Icons.image_rounded,
-                  };
-                  return Chip(
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon, color: color, size: 18),
-                        const SizedBox(width: 6),
-                        Text(file.path.split('/').last),
-                      ],
-                    ),
-                    deleteIcon: const Icon(Icons.close, size: 18),
-                    onDeleted: () => _removeFile(index),
-                  );
-                }),
-              ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: SegmentedButton<PostAudience>(
-                    segments: const [
-                      ButtonSegment(
-                        value: PostAudience.specificHalaqa,
-                        label: Text('الحلقة'),
-                      ),
-                      ButtonSegment(
-                        value: PostAudience.allHalaqat,
-                        label: Text('الجميع'),
-                      ),
-                    ],
-                    selected: {_audience},
-                    onSelectionChanged: (selection) {
-                      setState(() {
-                        _audience = selection.first;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: _pickFiles,
-                  icon: const Icon(Icons.attach_file),
-                  label: const Text('إرفاق'),
-                ),
-              ],
-            ),
           ],
         ),
       ),

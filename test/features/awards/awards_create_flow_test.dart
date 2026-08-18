@@ -339,6 +339,20 @@ void main() {
       expect(selection.selectedStudentIds.contains('s3'), isFalse);
       expect(selection.selectedStudentIds.contains('s5'), isTrue);
     });
+
+    test('profile award flow preselects the opened student', () {
+      var selection = AwardRecipientSelection(
+        selectedHalaqaIds: const {'h-morning'},
+      ).ensuringStudentSelected('s1');
+
+      expect(selection.selectedHalaqaIds, {'h-morning'});
+      expect(selection.selectedStudentIds, {'s1'});
+      expect(selection.uniqueRecipientIds(rosters), ['s1']);
+      expect(selection.isHalaqaFullySelected('h-morning', rosters), isFalse);
+
+      selection = selection.ensuringStudentSelected('s1');
+      expect(selection.selectedStudentIds, {'s1'});
+    });
   });
 
   group('multi-halaqa award persistence', () {

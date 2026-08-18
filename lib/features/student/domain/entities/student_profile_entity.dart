@@ -4,6 +4,7 @@ class StudentProfileEntity extends Equatable {
   final String uid;
   final String name;
   final String? profileImageUrl;
+  final String? phone;
   final String? halaqaId;
   final String halaqaName; // denormalized - ظهر في التصميم "حلقة المتقدمين"
   final String currentPlanName;
@@ -43,10 +44,13 @@ class StudentProfileEntity extends Equatable {
   /// كل الشخصيات اللي الطالب فتحها (المجانية + المشتراة بالعملات)
   final List<String> unlockedAvatarIds;
 
+  final DateTime? createdAt;
+
   const StudentProfileEntity({
     required this.uid,
     required this.name,
     this.profileImageUrl,
+    this.phone,
     this.halaqaId,
     this.halaqaName = '',
     required this.currentPlanName,
@@ -62,6 +66,7 @@ class StudentProfileEntity extends Equatable {
     this.coins = 0,
     this.avatarId = 'fox',
     this.unlockedAvatarIds = const ['fox', 'panda', 'lion', 'rabbit', 'owl'],
+    this.createdAt,
   });
 
   /// هدف الأسبوع: إجمالي الآيات المطلوب في الخطة الأسبوعية
@@ -77,6 +82,7 @@ class StudentProfileEntity extends Equatable {
       uid: uid,
       name: name,
       profileImageUrl: profileImageUrl,
+      phone: phone,
       halaqaId: halaqaId,
       halaqaName: halaqaName,
       currentPlanName: currentPlanName,
@@ -92,6 +98,7 @@ class StudentProfileEntity extends Equatable {
       coins: coins ?? this.coins,
       avatarId: avatarId ?? this.avatarId,
       unlockedAvatarIds: unlockedAvatarIds ?? this.unlockedAvatarIds,
+      createdAt: createdAt,
     );
   }
 
@@ -100,6 +107,7 @@ class StudentProfileEntity extends Equatable {
     uid,
     name,
     profileImageUrl,
+    phone,
     halaqaId,
     halaqaName,
     currentPlanName,
@@ -115,5 +123,6 @@ class StudentProfileEntity extends Equatable {
     coins,
     avatarId,
     unlockedAvatarIds,
+    createdAt,
   ];
 }

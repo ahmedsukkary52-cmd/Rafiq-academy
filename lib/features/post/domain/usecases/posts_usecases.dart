@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/posts_entities.dart';
+import '../post_audience_target.dart';
 import '../repositories/posts_repository.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -59,11 +60,29 @@ class CreatePostUseCase extends UseCase<Unit, CreatePostParams> {
       );
     }
 
+    final audienceTarget = resolvePostAudienceTarget(
+      audience: params.audience,
+      halaqaId: params.halaqaId,
+    );
+    if (audienceTarget == null) {
+      return Future.value(
+        const Left(
+          ValidationFailure('يجب تحديد الحلقة قبل نشر منشور خاص بها'),
+        ),
+      );
+    }
+
+    final scopedHalaqaId = params.audience == PostAudience.allHalaqat
+        ? params.halaqaId?.trim()
+        : audienceTarget;
+
     return repository.createPost(
       authorId: params.authorId,
       authorName: params.authorName,
       content: params.content.trim(),
-      halaqaId: params.halaqaId,
+      halaqaId: scopedHalaqaId == null || scopedHalaqaId.isEmpty
+          ? null
+          : scopedHalaqaId,
       audience: params.audience,
       attachmentFiles: params.attachmentFiles,
       attachmentTypes: params.attachmentTypes,

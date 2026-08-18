@@ -63,15 +63,27 @@ class PostModel extends PostEntity {
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    return PostModel.fromData(
+      id: doc.id,
+      data: doc.data() as Map<String, dynamic>,
+    );
+  }
 
+  /// Map-based parse for tests / shared with [fromFirestore].
+  ///
+  /// [createdAt] may be null on the first local snapshot after a write that
+  /// used [FieldValue.serverTimestamp] — do not cast to [Timestamp] blindly.
+  factory PostModel.fromData({
+    required String id,
+    required Map<String, dynamic> data,
+  }) {
     final attachmentsRaw = data['attachments'] as List<dynamic>? ?? [];
     final attachments = attachmentsRaw
         .map((a) => PostAttachmentModel.fromMap(a as Map<String, dynamic>))
         .toList();
 
     return PostModel(
-      id: doc.id,
+      id: id,
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? '',
       authorImageUrl: data['authorImageUrl'] as String?,
@@ -81,7 +93,7 @@ class PostModel extends PostEntity {
       audience: data['audience'] == 'allHalaqat'
           ? PostAudience.allHalaqat
           : PostAudience.specificHalaqa,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: _readCreatedAt(data['createdAt']),
       isPinned: data['isPinned'] as bool? ?? false,
       likedBy: List<String>.from(data['likedBy'] ?? []),
       commentsCount: (data['commentsCount'] ?? 0) as int,
@@ -112,7 +124,15 @@ class CommentModel extends CommentEntity {
       authorName: data['authorName'] ?? '',
       authorImageUrl: data['authorImageUrl'] as String?,
       content: data['content'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: _readCreatedAt(data['createdAt']),
     );
   }
+}
+
+/// Handles null [createdAt] on the initial local snapshot after
+/// `FieldValue.serverTimestamp()` writes.
+DateTime _readCreatedAt(dynamic raw) {
+  if (raw is Timestamp) return raw.toDate();
+  if (raw is DateTime) return raw;
+  return DateTime.now();
 }

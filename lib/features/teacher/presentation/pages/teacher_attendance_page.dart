@@ -19,6 +19,7 @@ import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../utils/teacher_workflow_ownership.dart';
 import '../widgets/teacher_home_figma_cards.dart';
+import '../widgets/teacher_loading_skeletons.dart';
 
 /// Teacher Attendance — Figma 1:914 + session-scoped Firestore via [TeacherBloc].
 class TeacherAttendancePage extends StatefulWidget {
@@ -470,7 +471,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       );
     }
     if (studentsLoading || (attendanceLoading && students.isEmpty)) {
-      return const AppLoadingWidget();
+      return const TeacherRosterRowsSkeleton();
     }
     if (students.isEmpty) {
       return Center(
@@ -521,7 +522,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: attendanceLoading
-                ? const AppLoadingWidget()
+                ? const TeacherRosterRowsSkeleton()
                 : _RegisterCard(
                     students: [
                       for (final s in students)

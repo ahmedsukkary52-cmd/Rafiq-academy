@@ -7,6 +7,7 @@ class StudentProfileModel extends StudentProfileEntity {
     required super.uid,
     required super.name,
     super.profileImageUrl,
+    super.phone,
     super.halaqaId,
     super.halaqaName,
     required super.currentPlanName,
@@ -22,6 +23,7 @@ class StudentProfileModel extends StudentProfileEntity {
     super.coins,
     super.avatarId,
     super.unlockedAvatarIds,
+    super.createdAt,
   });
 
   factory StudentProfileModel.fromFirestore({
@@ -29,15 +31,27 @@ class StudentProfileModel extends StudentProfileEntity {
     required DocumentSnapshot profileDoc,
     String halaqaName = '',
   }) {
-    final user = userDoc.data() as Map<String, dynamic>;
-    final profile = profileDoc.data() as Map<String, dynamic>;
-
-    return StudentProfileModel(
+    return StudentProfileModel.fromMaps(
       uid: userDoc.id,
+      user: userDoc.data() as Map<String, dynamic>,
+      profile: profileDoc.data() as Map<String, dynamic>,
+      halaqaName: halaqaName,
+    );
+  }
+
+  factory StudentProfileModel.fromMaps({
+    required String uid,
+    required Map<String, dynamic> user,
+    required Map<String, dynamic> profile,
+    String halaqaName = '',
+  }) {
+    return StudentProfileModel(
+      uid: uid,
       name: user['name'] ?? '',
       profileImageUrl: user['profileImageUrl'] as String?,
+      phone: _readNonEmptyString(user['phone']),
       halaqaId: profile['halaqaId'] as String?,
-      halaqaName: halaqaName,
+      halaqaName: _readNonEmptyString(profile['halaqaName']) ?? halaqaName,
       currentPlanName: profile['currentPlanName'] ?? '',
       overallProgressPercent: (profile['overallProgressPercent'] ?? 0)
           .toDouble(),
@@ -54,6 +68,19 @@ class StudentProfileModel extends StudentProfileEntity {
       unlockedAvatarIds: profile['unlockedAvatarIds'] != null
           ? List<String>.from(profile['unlockedAvatarIds'])
           : const ['fox', 'panda', 'lion', 'rabbit', 'owl'],
+      createdAt:
+          _readDate(profile['createdAt']) ?? _readDate(user['createdAt']),
     );
+  }
+
+  static String? _readNonEmptyString(dynamic raw) {
+    final value = (raw as String?)?.trim() ?? '';
+    return value.isEmpty ? null : value;
+  }
+
+  static DateTime? _readDate(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    return null;
   }
 }

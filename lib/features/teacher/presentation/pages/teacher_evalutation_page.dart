@@ -18,6 +18,7 @@ import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../utils/teacher_workflow_ownership.dart';
 import '../widgets/teacher_home_figma_cards.dart';
+import '../widgets/teacher_loading_skeletons.dart';
 
 /// Teacher Evaluations — Figma 1:1056 + Firestore via [TeacherBloc].
 class TeacherEvaluationsPage extends StatefulWidget {
@@ -327,7 +328,7 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
             state.evaluationsStatus == SectionStatus.initial);
 
     if (isInitialLoading) {
-      return const AppLoadingWidget();
+      return const TeacherRosterRowsSkeleton();
     }
 
     if (state.evaluationsStatus == SectionStatus.error) {
@@ -1159,9 +1160,9 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
                   builder: (context, state) {
                     if (state.studentsStatus == SectionStatus.loading ||
                         state.studentsStatus == SectionStatus.initial) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: CircularProgressIndicator()),
+                      return const SizedBox(
+                        height: 120,
+                        child: TeacherRosterRowsSkeleton(itemCount: 2),
                       );
                     }
                     if (state.studentsStatus == SectionStatus.error) {

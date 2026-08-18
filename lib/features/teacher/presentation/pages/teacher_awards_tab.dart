@@ -11,6 +11,7 @@ import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
 import '../teacher_home_nav.dart';
+import '../widgets/teacher_loading_skeletons.dart';
 
 /// Teacher Home tab for الجوائز — halaqa-scoped, not an aggregate.
 class TeacherAwardsTab extends StatefulWidget {
@@ -55,7 +56,7 @@ class _TeacherAwardsTabState extends State<TeacherAwardsTab> {
         if (state.halaqatStatus == SectionStatus.initial ||
             (state.halaqatStatus == SectionStatus.loading &&
                 state.halaqat.isEmpty)) {
-          return const AppLoadingWidget();
+          return const TeacherAwardsDashboardSkeleton();
         }
 
         if (state.halaqatStatus == SectionStatus.error &&

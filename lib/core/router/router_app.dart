@@ -79,6 +79,14 @@ class AppRoutes {
   static const String teacherEvals = '/teacher/halaqa/:halaqaId/evaluations';
   static const String teacherStudent = '/teacher/student/:studentId';
 
+  /// Teacher Student Profile. Pass [halaqaId] when opening from Class Details.
+  static String teacherStudentProfile(String studentId, {String? halaqaId}) {
+    final id = studentId.trim();
+    final scoped = halaqaId?.trim() ?? '';
+    if (scoped.isEmpty) return '/teacher/student/$id';
+    return '/teacher/student/$id?halaqaId=${Uri.encodeQueryComponent(scoped)}';
+  }
+
   /// Analytics Phase 2 re-entry (was H6 / A-H8 orphan quarantine).
   static const String teacherAnalytics = '/teacher/halaqa/:halaqaId/analytics';
 
@@ -348,6 +356,7 @@ class AppRouter {
             path: 'student/:studentId',
             builder: (_, state) => StudentProfilePage(
               studentId: state.pathParameters['studentId']!,
+              halaqaId: state.uri.queryParameters['halaqaId'],
             ),
           ),
           // شاشة المحادثة

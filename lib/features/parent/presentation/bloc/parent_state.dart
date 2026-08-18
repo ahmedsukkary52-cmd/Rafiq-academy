@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/parent_household.dart';
+import '../../domain/parent_wallet.dart';
 import '../../domain/repositories/parent_repositories.dart';
 
 class _Unset {
@@ -16,6 +18,10 @@ class ParentState extends Equatable {
   final List<String> childrenIds;
   final String? childrenError;
   final String? selectedChildId;
+  final List<ParentChildSnapshot> childrenSnapshots;
+  final List<ParentStaffContact> staffContacts;
+  final ParentFamilySummary familySummary;
+  final List<ParentAlert> alerts;
 
   // ── التقرير الأسبوعي ──────────────────────────────────────────────────
   final SectionStatus reportStatus;
@@ -48,11 +54,21 @@ class ParentState extends Equatable {
   final PaymentInitiationEntity? paymentInitiation;
   final String? paymentInitiationError;
 
+  final SectionStatus walletStatus;
+  final ParentWalletEntity? wallet;
+  final String? walletError;
+  final SubmissionStatus walletPayStatus;
+  final String? walletPayError;
+
   const ParentState({
     this.childrenStatus = SectionStatus.initial,
     this.childrenIds = const [],
     this.childrenError,
     this.selectedChildId,
+    this.childrenSnapshots = const [],
+    this.staffContacts = const [],
+    this.familySummary = ParentFamilySummary.empty,
+    this.alerts = const [],
     this.reportStatus = SectionStatus.initial,
     this.weeklyReport,
     this.reportError,
@@ -72,15 +88,35 @@ class ParentState extends Equatable {
     this.paymentInitiationStatus = SubmissionStatus.idle,
     this.paymentInitiation,
     this.paymentInitiationError,
+    this.walletStatus = SectionStatus.initial,
+    this.wallet,
+    this.walletError,
+    this.walletPayStatus = SubmissionStatus.idle,
+    this.walletPayError,
   });
 
   factory ParentState.initial() => const ParentState();
+
+  ParentChildSnapshot? snapshotFor(String studentId) {
+    for (final child in childrenSnapshots) {
+      if (child.studentId == studentId) return child;
+    }
+    return null;
+  }
+
+  String childDisplayName(String studentId) {
+    return snapshotFor(studentId)?.displayName ?? 'طالب';
+  }
 
   ParentState copyWith({
     SectionStatus? childrenStatus,
     List<String>? childrenIds,
     Object? childrenError = _unset,
     Object? selectedChildId = _unset,
+    List<ParentChildSnapshot>? childrenSnapshots,
+    List<ParentStaffContact>? staffContacts,
+    ParentFamilySummary? familySummary,
+    List<ParentAlert>? alerts,
     SectionStatus? reportStatus,
     Object? weeklyReport = _unset,
     Object? reportError = _unset,
@@ -100,6 +136,11 @@ class ParentState extends Equatable {
     SubmissionStatus? paymentInitiationStatus,
     Object? paymentInitiation = _unset,
     Object? paymentInitiationError = _unset,
+    SectionStatus? walletStatus,
+    Object? wallet = _unset,
+    Object? walletError = _unset,
+    SubmissionStatus? walletPayStatus,
+    Object? walletPayError = _unset,
   }) {
     return ParentState(
       childrenStatus: childrenStatus ?? this.childrenStatus,
@@ -110,6 +151,10 @@ class ParentState extends Equatable {
       selectedChildId: identical(selectedChildId, _unset)
           ? this.selectedChildId
           : selectedChildId as String?,
+      childrenSnapshots: childrenSnapshots ?? this.childrenSnapshots,
+      staffContacts: staffContacts ?? this.staffContacts,
+      familySummary: familySummary ?? this.familySummary,
+      alerts: alerts ?? this.alerts,
       reportStatus: reportStatus ?? this.reportStatus,
       weeklyReport: identical(weeklyReport, _unset)
           ? this.weeklyReport
@@ -152,6 +197,17 @@ class ParentState extends Equatable {
       paymentInitiationError: identical(paymentInitiationError, _unset)
           ? this.paymentInitiationError
           : paymentInitiationError as String?,
+      walletStatus: walletStatus ?? this.walletStatus,
+      wallet: identical(wallet, _unset)
+          ? this.wallet
+          : wallet as ParentWalletEntity?,
+      walletError: identical(walletError, _unset)
+          ? this.walletError
+          : walletError as String?,
+      walletPayStatus: walletPayStatus ?? this.walletPayStatus,
+      walletPayError: identical(walletPayError, _unset)
+          ? this.walletPayError
+          : walletPayError as String?,
     );
   }
 
@@ -161,6 +217,10 @@ class ParentState extends Equatable {
     childrenIds,
     childrenError,
     selectedChildId,
+    childrenSnapshots,
+    staffContacts,
+    familySummary,
+    alerts,
     reportStatus,
     weeklyReport,
     reportError,
@@ -180,5 +240,10 @@ class ParentState extends Equatable {
     paymentInitiationStatus,
     paymentInitiation,
     paymentInitiationError,
+    walletStatus,
+    wallet,
+    walletError,
+    walletPayStatus,
+    walletPayError,
   ];
 }

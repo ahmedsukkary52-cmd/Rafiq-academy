@@ -1,4 +1,6 @@
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/parent_household.dart';
+import '../../domain/parent_wallet.dart';
 import '../models/parent_model.dart';
 
 abstract class ParentRemoteDatasource {
@@ -32,4 +34,22 @@ abstract class ParentRemoteDatasource {
   );
 
   Future<PaymentInitiationEntity> initiatePayment(String paymentId);
+
+  Future<ParentWalletEntity> getWallet(String parentId);
+
+  Future<void> payPaymentFromWallet({
+    required String parentId,
+    required String paymentId,
+  });
+
+  Future<ParentHousehold> getHousehold({
+    required String parentId,
+    required List<String> childrenIds,
+  });
+
+  Future<List<ParentAttendanceMark>> getAttendanceMarks({
+    required String studentId,
+    required DateTime start,
+    required DateTime endExclusive,
+  });
 }

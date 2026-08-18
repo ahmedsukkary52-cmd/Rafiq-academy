@@ -2,7 +2,8 @@ import '../../../../core/constants/app_constants.dart';
 
 /// قواعد مين يقدر يتواصل مع مين، مبنية على السبسيفيكيشن الأصلي + شات الطالب:
 /// - الطالب بيتواصل مع معلمه فقط
-/// - المعلم وولي الأمر بيتواصلوا مع المشرف أو الإدارة (والمعلم مع الطالب أيضاً)
+/// - المعلم وولي الأمر بيتواصلوا مع المشرف أو الإدارة (والمعلم مع الطالب
+///   وولي الأمر أيضاً؛ ولي الأمر مع المعلم والمشرف والإدارة)
 /// - المشرف بيتواصل مع المعلم وولي الأمر والإدارة
 /// - الإدارة بتتواصل مع الكل (ما عدا الطالب مباشرة — عبر المعلم)
 ///
@@ -23,8 +24,9 @@ class ChatPermissionPolicy {
       AppRoles.student,
       AppRoles.supervisor,
       AppRoles.admin,
+      AppRoles.parent,
     },
-    AppRoles.parent: {AppRoles.supervisor, AppRoles.admin},
+    AppRoles.parent: {AppRoles.teacher, AppRoles.supervisor, AppRoles.admin},
     AppRoles.supervisor: {AppRoles.teacher, AppRoles.parent, AppRoles.admin},
     AppRoles.admin: {AppRoles.teacher, AppRoles.parent, AppRoles.supervisor},
   };

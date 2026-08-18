@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
-import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/utils/time_format.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
+import '../../../chat/presentation/bloc/chat_conversations_event.dart';
+import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
-import '../../../notifications/presentation/bloc/notifications_state.dart';
-import '../../../../shared/widgets/confirm_logout.dart';
-import '../../domain/entities/parent_entities.dart';
+import '../../../../shared/widgets/shared_widgets.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
-import '../bloc/parent_state.dart';
+import '../parent_home_nav.dart';
+import 'parent_children_page.dart';
+import 'parent_dashboard_tab.dart';
+import 'parent_messages_tab.dart';
+import 'parent_profile_tab.dart';
+import 'parent_subscriptions_page.dart';
 
-/// Parent home — children list + weekly report (Sprint 1 + 2).
+/// Parent shell — 5 tabs: الرئيسية · أبنائي · الرسائل · المتجر · الحساب
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
 
@@ -29,6 +30,8 @@ class ParentHomePage extends StatefulWidget {
 }
 
 class _ParentHomePageState extends State<ParentHomePage> {
+  int _currentTab = ParentHomeNav.homeIndex;
+
   @override
   void initState() {
     super.initState();
@@ -36,456 +39,147 @@ class _ParentHomePageState extends State<ParentHomePage> {
   }
 
   void _loadData() {
-    _loadChildren();
-    _watchNotifications();
-  }
-
-  void _loadChildren() {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
-    context.read<ParentBloc>().add(LoadChildrenEvent(authState.user.uid));
-  }
-
-  void _watchNotifications() {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) return;
+    final uid = authState.user.uid;
+    context.read<ParentBloc>().add(LoadChildrenEvent(uid));
     sl<NotificationsBloc>().add(
-      StartWatchingNotificationsEvent(
-        uid: authState.user.uid,
-        role: AppRoles.parent,
-      ),
+      StartWatchingNotificationsEvent(uid: uid, role: AppRoles.parent),
     );
+    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
   }
 
-  void _selectChild(String studentId) {
-    context.read<ParentBloc>().add(SelectChildEvent(studentId));
-  }
-
-  void _retryReport() {
-    final selectedId = context.read<ParentBloc>().state.selectedChildId;
-    if (selectedId == null) return;
-    _selectChild(selectedId);
+  void _switchTab(int index) {
+    if (index < 0 || index > ParentHomeNav.accountIndex) return;
+    setState(() => _currentTab = index);
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = context.watch<AuthBloc>().state;
-    final parentName = authState is AuthAuthenticated
-        ? authState.user.name
-        : '';
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('نافذة ولي الأمر'),
-        actions: [
-          BlocSelector<NotificationsBloc, NotificationsState, int>(
-            bloc: sl<NotificationsBloc>(),
-            selector: (state) => state.unreadCount,
-            builder: (context, unreadCount) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 8, right: 8),
-                child: NotificationBadge(
-                  count: unreadCount,
-                  child: IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    tooltip: 'الإشعارات',
-                    onPressed: () => context.push(AppRoutes.parentNotifs),
-                  ),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'تسجيل الخروج',
-            onPressed: () => confirmAndLogout(context),
-          ),
-        ],
-      ),
-      body: BlocConsumer<ParentBloc, ParentState>(
-        listenWhen: (prev, curr) =>
-            prev.childrenStatus != curr.childrenStatus ||
-            prev.childrenIds != curr.childrenIds ||
-            prev.selectedChildId != curr.selectedChildId,
-        listener: (context, state) {
-          // After children load, load the current-week report for the
-          // auto-selected child via the existing SelectChildEvent flow.
-          if (state.childrenStatus == SectionStatus.loaded &&
-              state.selectedChildId != null &&
-              state.reportStatus == SectionStatus.initial) {
-            _selectChild(state.selectedChildId!);
-          }
-        },
-        builder: (context, state) {
-          if (state.childrenStatus == SectionStatus.initial ||
-              state.childrenStatus == SectionStatus.loading) {
-            return const AppLoadingWidget();
-          }
-
-          if (state.childrenStatus == SectionStatus.error) {
-            return AppErrorWidget(
-              message: state.childrenError ?? 'حدث خطأ',
-              onRetry: _loadChildren,
-            );
-          }
-
-          if (state.childrenIds.isEmpty) {
-            return const _EmptyChildren();
-          }
-
-          return ListView(
-            padding: const EdgeInsets.all(AppSizes.paddingM),
-            children: [
-              Text(
-                parentName.isEmpty ? 'ولي الأمر' : parentName,
-                style: AppTextStyles.headlineLarge,
-                textAlign: TextAlign.right,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'الأبناء المرتبطون: ${state.childrenIds.length}',
-                style: AppTextStyles.bodyMedium,
-                textAlign: TextAlign.right,
-              ),
-              const SizedBox(height: AppSizes.paddingM),
-              ...state.childrenIds.map((id) {
-                final isSelected = id == state.selectedChildId;
-                final name =
-                    (isSelected &&
-                        state.weeklyReport != null &&
-                        state.weeklyReport!.studentId == id &&
-                        state.weeklyReport!.studentName.trim().isNotEmpty)
-                    ? state.weeklyReport!.studentName.trim()
-                    : 'طالب';
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ChildCard(
-                    name: name,
-                    isSelected: isSelected,
-                    onTap: () => _selectChild(id),
-                  ),
-                );
-              }),
-              const SizedBox(height: AppSizes.paddingM),
-              AppCard(
-                onTap: () => context.push(AppRoutes.parentAbsence),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.chevron_left_rounded,
-                      color: AppColors.primary,
-                    ),
-                    const Spacer(),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'طلبات الاستئذان',
-                          style: AppTextStyles.titleLarge,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'تقديم ومتابعة طلباتك',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textHint,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: AppColors.primary.withValues(
-                        alpha: 0.12,
-                      ),
-                      child: const Icon(
-                        Icons.event_busy_outlined,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingM),
-              Text(
-                'التقرير الأسبوعي',
-                style: AppTextStyles.headlineMedium,
-                textAlign: TextAlign.right,
-              ),
-              const SizedBox(height: 8),
-              _WeeklyReportSection(state: state, onRetry: _retryReport),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ChildCard extends StatelessWidget {
-  final String name;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ChildCard({
-    required this.name,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : null,
-      child: Row(
-        children: [
-          Icon(
-            Icons.chevron_left_rounded,
-            color: isSelected ? AppColors.primary : AppColors.textHint,
-          ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(name, style: AppTextStyles.titleLarge),
-              const SizedBox(height: 2),
-              Text(
-                'طالب',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-            child: const Icon(
-              Icons.person_outline_rounded,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeeklyReportSection extends StatelessWidget {
-  final ParentState state;
-  final VoidCallback onRetry;
-
-  const _WeeklyReportSection({required this.state, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    if (state.reportStatus == SectionStatus.initial ||
-        state.reportStatus == SectionStatus.loading) {
-      return const SizedBox(height: 160, child: AppLoadingWidget());
-    }
-
-    if (state.reportStatus == SectionStatus.error) {
-      return AppErrorWidget(
-        message: state.reportError ?? 'تعذر تحميل التقرير',
-        onRetry: onRetry,
-      );
-    }
-
-    final report = state.weeklyReport;
-    if (report == null) {
-      return const _EmptyWeeklyReport();
-    }
-
-    final hasData =
-        report.totalSessions > 0 ||
-        report.totalVersesMemorized > 0 ||
-        report.teacherNotes.trim().isNotEmpty;
-
-    if (!hasData) {
-      return const _EmptyWeeklyReport();
-    }
-
-    return _WeeklyReportCard(report: report);
-  }
-}
-
-class _WeeklyReportCard extends StatelessWidget {
-  final WeeklyReportEntity report;
-
-  const _WeeklyReportCard({required this.report});
-
-  @override
-  Widget build(BuildContext context) {
-    final name = report.studentName.trim().isEmpty
-        ? 'طالب'
-        : report.studentName.trim();
-    final attendanceLabel = report.totalSessions == 0
-        ? '—'
-        : '${report.attendedSessions} / ${report.totalSessions}';
-    final percentLabel = report.totalSessions == 0
-        ? '—'
-        : '${report.attendancePercent.round()}%';
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            name,
-            style: AppTextStyles.titleLarge,
-            textAlign: TextAlign.right,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'أسبوع يبدأ ${_formatDate(report.weekStart)}',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.right,
-          ),
-          const SizedBox(height: AppSizes.paddingM),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(label: 'الحضور', value: attendanceLabel),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricTile(label: 'نسبة الحضور', value: percentLabel),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricTile(
-                  label: 'تقييمات',
-                  value: '${report.totalVersesMemorized}',
-                ),
-              ),
-            ],
-          ),
-          if (report.totalSessions > 0) ...[
-            const SizedBox(height: 8),
-            Text(
-              'يشمل الحضور والتأخر — الغياب فقط لا يُحسب',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textHint,
-              ),
-              textAlign: TextAlign.right,
-            ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: IndexedStack(
+          index: _currentTab,
+          children: [
+            ParentDashboardTab(onSwitchTab: _switchTab),
+            const ParentChildrenPage(),
+            const ParentMessagesTab(),
+            const ParentSubscriptionsPage(embedded: true),
+            ParentProfileTab(onSwitchTab: _switchTab),
           ],
-          if (report.teacherNotes.trim().isNotEmpty) ...[
-            const SizedBox(height: AppSizes.paddingM),
-            Text(
-              'ملاحظات المعلم',
-              style: AppTextStyles.titleMedium,
-              textAlign: TextAlign.right,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              report.teacherNotes.trim(),
-              style: AppTextStyles.bodyLarge,
-              textAlign: TextAlign.right,
-            ),
-          ],
-        ],
+        ),
+        bottomNavigationBar: _ParentBottomNav(
+          selected: _currentTab,
+          onChanged: _switchTab,
+        ),
       ),
     );
   }
-
-  static String _formatDate(DateTime date) => formatDateDmy(date);
 }
 
-class _MetricTile extends StatelessWidget {
-  final String label;
-  final String value;
+class _ParentBottomNav extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onChanged;
 
-  const _MetricTile({required this.label, required this.value});
+  const _ParentBottomNav({required this.selected, required this.onChanged});
+
+  static const _icons = [
+    Icons.home_rounded,
+    Icons.groups_rounded,
+    Icons.chat_bubble_outline,
+    Icons.storefront_outlined,
+    Icons.person_outline,
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceGrey,
-        borderRadius: BorderRadius.circular(AppSizes.radiusM),
-      ),
-      child: Column(
-        children: [
-          Text(value, style: AppTextStyles.titleLarge),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.center,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 12,
+            offset: Offset(0, -2),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _EmptyWeeklyReport extends StatelessWidget {
-  const _EmptyWeeklyReport();
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        children: [
-          Icon(
-            Icons.assessment_outlined,
-            size: 40,
-            color: AppColors.textHint.withValues(alpha: 0.5),
+      child: SafeArea(
+        child: SizedBox(
+          height: AppSizes.bottomNavHeight,
+          child: Row(
+            children: List.generate(ParentHomeNav.labels.length, (i) {
+              final isSelected = i == selected;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (i == ParentHomeNav.messagesIndex)
+                        BlocSelector<
+                          ChatConversationsBloc,
+                          ChatConversationsState,
+                          int
+                        >(
+                          bloc: sl<ChatConversationsBloc>(),
+                          selector: (state) => state.totalUnreadCount,
+                          builder: (context, unread) {
+                            return NotificationBadge(
+                              count: unread,
+                              child: Icon(
+                                _icons[i],
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                                size: AppSizes.iconL,
+                              ),
+                            );
+                          },
+                        )
+                      else
+                        Icon(
+                          _icons[i],
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                          size: AppSizes.iconL,
+                        ),
+                      const SizedBox(height: 3),
+                      Text(
+                        ParentHomeNav.labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          fontSize: 10,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'لا توجد بيانات لهذا الأسبوع بعد',
-            style: AppTextStyles.titleMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'سيظهر الحضور والتقييمات المعتمدة هنا.\nالتسميعات بانتظار مراجعة المعلم لا تُحتسب.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyChildren extends StatelessWidget {
-  const _EmptyChildren();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.paddingXL),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.family_restroom_rounded,
-              size: 64,
-              color: AppColors.textHint.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'لا يوجد طلاب مرتبطون بهذا الحساب بعد',
-              style: AppTextStyles.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'عند ربط أبنائك بحسابك من قِبل الأكاديمية ستظهر أسماؤهم هنا.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textHint,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
         ),
       ),
     );

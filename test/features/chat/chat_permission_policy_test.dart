@@ -19,14 +19,14 @@ void main() {
       );
     });
 
-    test('teacher may not chat with parent', () {
+    test('teacher may chat with parent', () {
       expect(
         ChatPermissionPolicy.canChat(AppRoles.teacher, AppRoles.parent),
-        isFalse,
+        isTrue,
       );
       expect(
         ChatPermissionPolicy.canChat(AppRoles.parent, AppRoles.teacher),
-        isFalse,
+        isTrue,
       );
     });
 
@@ -45,7 +45,11 @@ void main() {
       );
     });
 
-    test('parent may chat with supervisor and admin only', () {
+    test('parent may chat with teacher, supervisor and admin', () {
+      expect(
+        ChatPermissionPolicy.canChat(AppRoles.parent, AppRoles.teacher),
+        isTrue,
+      );
       expect(
         ChatPermissionPolicy.canChat(AppRoles.parent, AppRoles.supervisor),
         isTrue,

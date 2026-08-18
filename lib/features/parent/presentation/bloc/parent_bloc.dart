@@ -3,13 +3,19 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/utils/attendance_policy.dart';
+import '../../domain/entities/parent_entities.dart';
+import '../../domain/parent_household.dart';
+import '../../domain/parent_wallet.dart';
 import '../../domain/repositories/parent_repositories.dart';
 import '../../domain/usecases/get_absence_requests_usecase.dart';
 import '../../domain/usecases/get_children_ids_usecase.dart';
 import '../../domain/usecases/get_halaqat_for_student_usecase.dart';
+import '../../domain/usecases/get_parent_household_usecase.dart';
 import '../../domain/usecases/get_payments_usecase.dart';
+import '../../domain/usecases/get_wallet_usecase.dart';
 import '../../domain/usecases/get_weekly_report_usecase.dart';
 import '../../domain/usecases/initiate_payment_usecase.dart';
+import '../../domain/usecases/pay_payment_from_wallet_usecase.dart';
 import '../../domain/usecases/submit_absence_request_usecase.dart';
 import 'parent_event.dart';
 import 'parent_state.dart';
@@ -26,6 +32,9 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   final GetHalaqatForStudentUseCase getHalaqatForStudent;
   final SubmitAbsenceRequestUseCase submitAbsenceRequest;
   final InitiatePaymentUseCase initiatePayment;
+  final GetParentHouseholdUseCase getHousehold;
+  final GetWalletUseCase getWallet;
+  final PayPaymentFromWalletUseCase payFromWallet;
 
   ParentBloc({
     required this.getChildrenIds,
@@ -35,6 +44,9 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     required this.getHalaqatForStudent,
     required this.submitAbsenceRequest,
     required this.initiatePayment,
+    required this.getHousehold,
+    required this.getWallet,
+    required this.payFromWallet,
   }) : super(ParentState.initial()) {
     on<LoadChildrenEvent>(_onLoadChildren);
     on<SelectChildEvent>(_onSelectChild);
@@ -46,6 +58,9 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<ResetAbsenceSubmissionEvent>(_onResetAbsenceSubmission);
     on<InitiatePaymentEvent>(_onInitiatePayment);
     on<ResetPaymentInitiationEvent>(_onResetPaymentInitiation);
+    on<LoadWalletEvent>(_onLoadWallet);
+    on<PayPaymentFromWalletEvent>(_onPayFromWallet);
+    on<ResetWalletPayEvent>(_onResetWalletPay);
     on<ClearParentSessionEvent>(_onClearSession);
   }
 
@@ -73,27 +88,81 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
 
     final result = await getChildrenIds(ParentIdParams(event.parentId));
 
-    result.fold(
-      (failure) => emit(
+    final childrenFailure = result.fold<String?>((f) => f.message, (_) => null);
+    if (childrenFailure != null) {
+      emit(
         state.copyWith(
           childrenStatus: SectionStatus.error,
-          childrenError: failure.message,
+          childrenError: childrenFailure,
+        ),
+      );
+      return;
+    }
+
+    final children = result.getOrElse((_) => const <String>[]);
+    final selected =
+        state.selectedChildId ?? (children.isEmpty ? null : children.first);
+
+    emit(
+      state.copyWith(
+        childrenIds: children,
+        selectedChildId: selected,
+        childrenError: null,
+      ),
+    );
+
+    final householdResult = await getHousehold(
+      ParentHouseholdParams(parentId: event.parentId, childrenIds: children),
+    );
+    final paymentsResult = await getPayments(ParentIdParams(event.parentId));
+    final walletResult = await getWallet(ParentIdParams(event.parentId));
+
+    final household = householdResult.getOrElse((_) => const ParentHousehold());
+    final payments = paymentsResult.getOrElse((_) => const <PaymentEntity>[]);
+    final hydrated = ParentHouseholdAssembler.withPayments(
+      children: household.children,
+      payments: payments,
+    );
+
+    emit(
+      state.copyWith(
+        childrenStatus: householdResult.isLeft()
+            ? SectionStatus.error
+            : SectionStatus.loaded,
+        childrenError: householdResult.fold((f) => f.message, (_) => null),
+        childrenSnapshots: hydrated,
+        staffContacts: household.staffContacts,
+        paymentsStatus: paymentsResult.isLeft()
+            ? SectionStatus.error
+            : SectionStatus.loaded,
+        payments: payments,
+        paymentsError: paymentsResult.fold((f) => f.message, (_) => null),
+        walletStatus: walletResult.isLeft()
+            ? SectionStatus.error
+            : SectionStatus.loaded,
+        wallet: walletResult.getOrElse(
+          (_) => ParentWalletEntity.empty(event.parentId),
+        ),
+        walletError: walletResult.fold((f) => f.message, (_) => null),
+        familySummary: ParentHouseholdAssembler.summarize(
+          children: hydrated,
+          payments: payments,
+        ),
+        alerts: ParentHouseholdAssembler.alerts(
+          children: hydrated,
+          payments: payments,
         ),
       ),
-      (children) {
-        emit(
-          state.copyWith(
-            childrenStatus: SectionStatus.loaded,
-            childrenIds: children,
-            // أول ابن في القائمة يتحدد تلقائياً كـ "محدد حالياً" لو مفيش
-            // اختيار سابق، عشان الشاشة متفضلش فاضية لحد ما المستخدم يختار.
-            selectedChildId:
-                state.selectedChildId ??
-                (children.isEmpty ? null : children.first),
-          ),
-        );
-      },
     );
+
+    if (selected != null) {
+      add(
+        LoadWeeklyReportEvent(
+          studentId: selected,
+          weekStart: _startOfCurrentWeek(),
+        ),
+      );
+    }
   }
 
   void _onSelectChild(SelectChildEvent event, Emitter<ParentState> emit) {
@@ -191,12 +260,27 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
           paymentsError: failure.message,
         ),
       ),
-      (payments) => emit(
-        state.copyWith(
-          paymentsStatus: SectionStatus.loaded,
+      (payments) {
+        final hydrated = ParentHouseholdAssembler.withPayments(
+          children: state.childrenSnapshots,
           payments: payments,
-        ),
-      ),
+        );
+        emit(
+          state.copyWith(
+            paymentsStatus: SectionStatus.loaded,
+            payments: payments,
+            childrenSnapshots: hydrated,
+            familySummary: ParentHouseholdAssembler.summarize(
+              children: hydrated,
+              payments: payments,
+            ),
+            alerts: ParentHouseholdAssembler.alerts(
+              children: hydrated,
+              payments: payments,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -399,6 +483,73 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
         paymentInitiationStatus: SubmissionStatus.idle,
         paymentInitiation: null,
         paymentInitiationError: null,
+      ),
+    );
+  }
+
+  Future<void> _onLoadWallet(
+    LoadWalletEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(walletStatus: SectionStatus.loading, walletError: null),
+    );
+    final result = await getWallet(ParentIdParams(event.parentId));
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          walletStatus: SectionStatus.error,
+          walletError: failure.message,
+          wallet: ParentWalletEntity.empty(event.parentId),
+        ),
+      ),
+      (wallet) => emit(
+        state.copyWith(walletStatus: SectionStatus.loaded, wallet: wallet),
+      ),
+    );
+  }
+
+  Future<void> _onPayFromWallet(
+    PayPaymentFromWalletEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        walletPayStatus: SubmissionStatus.submitting,
+        walletPayError: null,
+      ),
+    );
+
+    final result = await payFromWallet(
+      PayPaymentFromWalletParams(
+        parentId: event.parentId,
+        paymentId: event.paymentId,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          walletPayStatus: SubmissionStatus.error,
+          walletPayError: failure.message,
+        ),
+      ),
+      (_) {
+        emit(state.copyWith(walletPayStatus: SubmissionStatus.success));
+        add(LoadPaymentsEvent(event.parentId));
+        add(LoadWalletEvent(event.parentId));
+      },
+    );
+  }
+
+  void _onResetWalletPay(
+    ResetWalletPayEvent event,
+    Emitter<ParentState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        walletPayStatus: SubmissionStatus.idle,
+        walletPayError: null,
       ),
     );
   }

@@ -103,6 +103,31 @@ class ResetPaymentInitiationEvent extends ParentEvent {
   const ResetPaymentInitiationEvent();
 }
 
+class LoadWalletEvent extends ParentEvent {
+  final String parentId;
+  const LoadWalletEvent(this.parentId);
+
+  @override
+  List<Object?> get props => [parentId];
+}
+
+class PayPaymentFromWalletEvent extends ParentEvent {
+  final String parentId;
+  final String paymentId;
+
+  const PayPaymentFromWalletEvent({
+    required this.parentId,
+    required this.paymentId,
+  });
+
+  @override
+  List<Object?> get props => [parentId, paymentId];
+}
+
+class ResetWalletPayEvent extends ParentEvent {
+  const ResetWalletPayEvent();
+}
+
 /// Clear projection on logout so the next identity cannot inherit state (H1).
 class ClearParentSessionEvent extends ParentEvent {
   const ClearParentSessionEvent();

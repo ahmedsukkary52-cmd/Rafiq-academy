@@ -5,6 +5,8 @@ import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/parent_household.dart';
+import '../../domain/parent_wallet.dart';
 import '../../domain/repositories/parent_repositories.dart';
 import '../data_source/parent_remote_datasource.dart';
 import '../models/parent_model.dart';
@@ -139,6 +141,78 @@ class ParentRepositoryImpl implements ParentRepository {
     try {
       final initiation = await remoteDatasource.initiatePayment(paymentId);
       return Right(initiation);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ParentWalletEntity>> getWallet(String parentId) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getWallet(parentId));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> payPaymentFromWallet({
+    required String parentId,
+    required String paymentId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.payPaymentFromWallet(
+        parentId: parentId,
+        paymentId: paymentId,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      final message = e.message;
+      if (message.contains('رصيد') ||
+          message.contains('بالفعل') ||
+          message.contains('غير مرتبطة') ||
+          message.contains('غير صالح')) {
+        return Left(ValidationFailure(message));
+      }
+      return Left(ServerFailure(message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ParentHousehold>> getHousehold({
+    required String parentId,
+    required List<String> childrenIds,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getHousehold(
+          parentId: parentId,
+          childrenIds: childrenIds,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<ParentAttendanceMark>>> getAttendanceMarks({
+    required String studentId,
+    required DateTime start,
+    required DateTime endExclusive,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getAttendanceMarks(
+          studentId: studentId,
+          start: start,
+          endExclusive: endExclusive,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
+import 'package:rafiq_academy/features/parent/domain/parent_household.dart';
+import 'package:rafiq_academy/features/parent/domain/parent_wallet.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/submit_absence_request_usecase.dart';
 import 'package:rafiq_academy/shared/utils/absence_request_ids.dart';
@@ -61,6 +63,25 @@ class _FakeParentRepository implements ParentRepository {
   Future<Either<Failure, PaymentInitiationEntity>> initiatePayment(
     String paymentId,
   ) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, ParentWalletEntity>> getWallet(String parentId) =>
+      throw UnimplementedError();
+  @override
+  Future<Either<Failure, Unit>> payPaymentFromWallet({
+    required String parentId,
+    required String paymentId,
+  }) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, ParentHousehold>> getHousehold({
+    required String parentId,
+    required List<String> childrenIds,
+  }) => throw UnimplementedError();
+  @override
+  Future<Either<Failure, List<ParentAttendanceMark>>> getAttendanceMarks({
+    required String studentId,
+    required DateTime start,
+    required DateTime endExclusive,
+  }) => throw UnimplementedError();
 }
 
 void main() {

@@ -3,6 +3,8 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
 import '../entities/parent_entities.dart';
+import '../parent_household.dart';
+import '../parent_wallet.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Repository Interface
@@ -51,6 +53,24 @@ abstract class ParentRepository {
   Future<Either<Failure, PaymentInitiationEntity>> initiatePayment(
     String paymentId,
   );
+
+  Future<Either<Failure, ParentWalletEntity>> getWallet(String parentId);
+
+  Future<Either<Failure, Unit>> payPaymentFromWallet({
+    required String parentId,
+    required String paymentId,
+  });
+
+  Future<Either<Failure, ParentHousehold>> getHousehold({
+    required String parentId,
+    required List<String> childrenIds,
+  });
+
+  Future<Either<Failure, List<ParentAttendanceMark>>> getAttendanceMarks({
+    required String studentId,
+    required DateTime start,
+    required DateTime endExclusive,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

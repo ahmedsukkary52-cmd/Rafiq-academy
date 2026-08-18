@@ -194,16 +194,24 @@ import 'package:rafiq_academy/features/parent/domain/repositories/parent_reposit
     as _i493;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_absence_requests_usecase.dart'
     as _i1044;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_attendance_marks_usecase.dart'
+    as _i1104;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_children_ids_usecase.dart'
     as _i379;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_halaqat_for_student_usecase.dart'
     as _i242;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_parent_household_usecase.dart'
+    as _i1103;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_payments_usecase.dart'
     as _i817;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_wallet_usecase.dart'
+    as _i1101;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_weekly_report_usecase.dart'
     as _i379;
 import 'package:rafiq_academy/features/parent/domain/usecases/initiate_payment_usecase.dart'
     as _i693;
+import 'package:rafiq_academy/features/parent/domain/usecases/pay_payment_from_wallet_usecase.dart'
+    as _i1102;
 import 'package:rafiq_academy/features/parent/domain/usecases/submit_absence_request_usecase.dart'
     as _i888;
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart'
@@ -816,6 +824,18 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i817.GetPaymentsUseCase>(
       () => _i817.GetPaymentsUseCase(gh<_i493.ParentRepository>()),
     );
+    gh.lazySingleton<_i1101.GetWalletUseCase>(
+      () => _i1101.GetWalletUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i1102.PayPaymentFromWalletUseCase>(
+      () => _i1102.PayPaymentFromWalletUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i1103.GetParentHouseholdUseCase>(
+      () => _i1103.GetParentHouseholdUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i1104.GetAttendanceMarksUseCase>(
+      () => _i1104.GetAttendanceMarksUseCase(gh<_i493.ParentRepository>()),
+    );
     gh.lazySingleton<_i379.GetWeeklyReportUseCase>(
       () => _i379.GetWeeklyReportUseCase(gh<_i493.ParentRepository>()),
     );
@@ -960,6 +980,9 @@ extension GetItInjectableX on _i174.GetIt {
         getHalaqatForStudent: gh<_i242.GetHalaqatForStudentUseCase>(),
         submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
         initiatePayment: gh<_i693.InitiatePaymentUseCase>(),
+        getHousehold: gh<_i1103.GetParentHouseholdUseCase>(),
+        getWallet: gh<_i1101.GetWalletUseCase>(),
+        payFromWallet: gh<_i1102.PayPaymentFromWalletUseCase>(),
       ),
     );
     gh.singleton<_i164.NotificationsBloc>(

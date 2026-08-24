@@ -82,65 +82,94 @@ Widget parentSkeletonCard({
 class ParentDashboardSkeleton extends StatelessWidget {
   const ParentDashboardSkeleton({super.key});
 
+  Widget _actionCell(Color bone) {
+    return Column(
+      children: [
+        CircleAvatar(radius: 22, backgroundColor: bone),
+        const SizedBox(height: 8),
+        parentSkeletonBar(bone: bone, width: 44, height: 10),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ParentPulse(
       builder: (context, bone) {
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (var i = 0; i < 6; i++)
-                  SizedBox(
-                    width: (MediaQuery.sizeOf(context).width - 52) / 3,
-                    child: parentSkeletonCard(
-                      bone: bone,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      child: Column(
-                        children: [
-                          parentSkeletonBar(
-                            bone: bone,
-                            width: 28,
-                            height: 28,
-                            radius: AppSizes.radiusM,
-                          ),
-                          const SizedBox(height: 8),
-                          parentSkeletonBar(bone: bone, width: 48, height: 10),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            parentSkeletonBar(bone: bone, width: 140, height: 14),
-            const SizedBox(height: 12),
-            for (var i = 0; i < 2; i++) ...[
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               parentSkeletonCard(
                 bone: bone,
+                padding: const EdgeInsets.fromLTRB(12, 18, 12, 16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    parentSkeletonBar(bone: bone, width: 160, height: 14),
-                    const SizedBox(height: 8),
-                    parentSkeletonBar(bone: bone, height: 11),
+                    Row(
+                      children: [
+                        for (var i = 0; i < 3; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          Expanded(child: _actionCell(bone)),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        for (var i = 0; i < 3; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          Expanded(child: _actionCell(bone)),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
-            ],
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 180,
-              child: parentSkeletonCard(
-                bone: bone,
-                child: const SizedBox.expand(),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: parentSkeletonBar(bone: bone, width: 140, height: 14),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              for (var i = 0; i < 2; i++) ...[
+                parentSkeletonCard(
+                  bone: bone,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      parentSkeletonBar(bone: bone, width: 160, height: 14),
+                      const SizedBox(height: 8),
+                      parentSkeletonBar(bone: bone, height: 11),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              const SizedBox(height: 8),
+              parentSkeletonBar(bone: bone, width: 150, height: 14),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 168,
+                child: parentSkeletonCard(
+                  bone: bone,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              parentSkeletonCard(
+                bone: bone,
+                child: Column(
+                  children: [
+                    parentSkeletonBar(bone: bone, width: 180, height: 14),
+                    const SizedBox(height: 12),
+                    parentSkeletonBar(
+                        bone: bone, height: 72, radius: AppSizes.radiusM),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -162,36 +191,66 @@ class ParentChildrenListSkeleton extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (_, __) => parentSkeletonCard(
             bone: bone,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    parentSkeletonBar(bone: bone, width: 44, height: 22),
-                    const Spacer(),
-                    Expanded(
+            padding: EdgeInsets.zero,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 6, color: bone),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          parentSkeletonBar(bone: bone, width: 140, height: 14),
-                          const SizedBox(height: 8),
-                          parentSkeletonBar(bone: bone, width: 90, height: 11),
+                          Row(
+                            children: [
+                              parentSkeletonBar(
+                                  bone: bone, width: 44, height: 28),
+                              const Spacer(),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    parentSkeletonBar(
+                                      bone: bone,
+                                      width: 140,
+                                      height: 14,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    parentSkeletonBar(
+                                      bone: bone,
+                                      width: 90,
+                                      height: 11,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              CircleAvatar(radius: 22, backgroundColor: bone),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          parentSkeletonBar(
+                            bone: bone,
+                            height: 8,
+                            radius: AppSizes.radiusFull,
+                          ),
+                          const SizedBox(height: 12),
+                          parentSkeletonBar(
+                            bone: bone,
+                            height: 36,
+                            radius: AppSizes.radiusM,
+                          ),
+                          const SizedBox(height: 10),
+                          parentSkeletonBar(
+                              bone: bone, height: 40, radius: AppSizes.radiusM),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    CircleAvatar(radius: 22, backgroundColor: bone),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                parentSkeletonBar(
-                  bone: bone,
-                  height: 8,
-                  radius: AppSizes.radiusFull,
-                ),
-                const SizedBox(height: 12),
-                parentSkeletonBar(bone: bone, height: 40, radius: AppSizes.radiusM),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         );

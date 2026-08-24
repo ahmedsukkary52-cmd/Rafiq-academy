@@ -12,32 +12,29 @@ class _Unset {
 const _unset = _Unset();
 
 class SupervisorState extends Equatable {
-  // ── الحلقات تحت الإشراف ───────────────────────────────────────────────
   final SectionStatus halaqatStatus;
   final List<HalaqaEntity> halaqat;
   final String? halaqatError;
 
-  // ── نظرة يوم الإشراف (W6) ─────────────────────────────────────────────
   final SectionStatus dayBoardStatus;
   final SupervisorDayBoard dayBoard;
   final String? dayBoardError;
 
-  // ── استئذان اليوم (W7 Slice 3 — read-only projection) ─────────────────
   final SectionStatus absenceRequestsStatus;
   final List<AbsenceRequestEntity> absenceRequests;
   final String? absenceRequestsError;
 
-  // ── إرسال تشجيع/وسام ──────────────────────────────────────────────────
   final SubmissionStatus issueAchievementStatus;
   final String? issueAchievementError;
 
-  // ── رفع تقرير ─────────────────────────────────────────────────────────
   final SubmissionStatus submitReportStatus;
   final String? submitReportError;
 
-  // ── تسجيل ملتحق جديد ──────────────────────────────────────────────────
-  final SubmissionStatus registerStudentStatus;
-  final String? registerStudentError;
+  final SubmissionStatus admitStudentStatus;
+  final String? admitStudentError;
+
+  final SubmissionStatus transferStudentStatus;
+  final String? transferStudentError;
 
   const SupervisorState({
     this.halaqatStatus = SectionStatus.initial,
@@ -53,8 +50,10 @@ class SupervisorState extends Equatable {
     this.issueAchievementError,
     this.submitReportStatus = SubmissionStatus.idle,
     this.submitReportError,
-    this.registerStudentStatus = SubmissionStatus.idle,
-    this.registerStudentError,
+    this.admitStudentStatus = SubmissionStatus.idle,
+    this.admitStudentError,
+    this.transferStudentStatus = SubmissionStatus.idle,
+    this.transferStudentError,
   });
 
   factory SupervisorState.initial() => const SupervisorState();
@@ -73,8 +72,10 @@ class SupervisorState extends Equatable {
     Object? issueAchievementError = _unset,
     SubmissionStatus? submitReportStatus,
     Object? submitReportError = _unset,
-    SubmissionStatus? registerStudentStatus,
-    Object? registerStudentError = _unset,
+    SubmissionStatus? admitStudentStatus,
+    Object? admitStudentError = _unset,
+    SubmissionStatus? transferStudentStatus,
+    Object? transferStudentError = _unset,
   }) {
     return SupervisorState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -102,11 +103,15 @@ class SupervisorState extends Equatable {
       submitReportError: identical(submitReportError, _unset)
           ? this.submitReportError
           : submitReportError as String?,
-      registerStudentStatus:
-          registerStudentStatus ?? this.registerStudentStatus,
-      registerStudentError: identical(registerStudentError, _unset)
-          ? this.registerStudentError
-          : registerStudentError as String?,
+      admitStudentStatus: admitStudentStatus ?? this.admitStudentStatus,
+      admitStudentError: identical(admitStudentError, _unset)
+          ? this.admitStudentError
+          : admitStudentError as String?,
+      transferStudentStatus:
+          transferStudentStatus ?? this.transferStudentStatus,
+      transferStudentError: identical(transferStudentError, _unset)
+          ? this.transferStudentError
+          : transferStudentError as String?,
     );
   }
 
@@ -125,7 +130,9 @@ class SupervisorState extends Equatable {
     issueAchievementError,
     submitReportStatus,
     submitReportError,
-    registerStudentStatus,
-    registerStudentError,
+    admitStudentStatus,
+    admitStudentError,
+    transferStudentStatus,
+    transferStudentError,
   ];
 }

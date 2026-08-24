@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
@@ -11,7 +12,6 @@ import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../parent_home_nav.dart';
@@ -21,7 +21,7 @@ import 'parent_messages_tab.dart';
 import 'parent_profile_tab.dart';
 import 'parent_subscriptions_page.dart';
 
-/// Parent shell — 5 tabs: الرئيسية · أبنائي · الرسائل · المتجر · الحساب
+/// Parent shell — 5 tabs: الرئيسية · أبنائي · الرسائل · المدفوعات · الحساب
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
 
@@ -89,7 +89,7 @@ class _ParentBottomNav extends StatelessWidget {
     Icons.home_rounded,
     Icons.groups_rounded,
     Icons.chat_bubble_outline,
-    Icons.storefront_outlined,
+    Icons.account_balance_wallet_outlined,
     Icons.person_outline,
   ];
 
@@ -130,25 +130,16 @@ class _ParentBottomNav extends StatelessWidget {
                           builder: (context, unread) {
                             return NotificationBadge(
                               count: unread,
-                              child: Icon(
-                                _icons[i],
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary,
-                                size: AppSizes.iconL,
+                              child: _NavIcon(
+                                icon: _icons[i],
+                                selected: isSelected,
                               ),
                             );
                           },
                         )
                       else
-                        Icon(
-                          _icons[i],
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                          size: AppSizes.iconL,
-                        ),
-                      const SizedBox(height: 3),
+                        _NavIcon(icon: _icons[i], selected: isSelected),
+                      const SizedBox(height: 4),
                       Text(
                         ParentHomeNav.labels[i],
                         maxLines: 1,
@@ -156,24 +147,13 @@ class _ParentBottomNav extends StatelessWidget {
                         style: AppTextStyles.labelSmall.copyWith(
                           fontSize: 10,
                           fontWeight: isSelected
-                              ? FontWeight.w600
+                              ? FontWeight.w700
                               : FontWeight.w400,
                           color: isSelected
                               ? AppColors.primary
                               : AppColors.textSecondary,
                         ),
                       ),
-                      if (isSelected) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -181,6 +161,31 @@ class _ParentBottomNav extends StatelessWidget {
             }),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NavIcon extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+
+  const _NavIcon({required this.icon, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 42,
+      height: 32,
+      decoration: BoxDecoration(
+        color: selected ? AppColors.primary : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: selected ? AppColors.onPrimary : AppColors.textSecondary,
       ),
     );
   }

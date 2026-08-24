@@ -21,6 +21,13 @@ class PaymentEntity extends Equatable {
   final PaymentStatus status;
   final String? method;
 
+  /// Screenshot proof on Storage (Parent upload). Not confirmation of payment.
+  final String? proofStoragePath;
+  final String? proofDownloadUrl;
+  final DateTime? proofSubmittedAt;
+  final String? proofSubmittedBy;
+  final String? proofFileName;
+
   const PaymentEntity({
     required this.id,
     required this.studentId,
@@ -30,6 +37,11 @@ class PaymentEntity extends Equatable {
     this.paidAt,
     required this.status,
     this.method,
+    this.proofStoragePath,
+    this.proofDownloadUrl,
+    this.proofSubmittedAt,
+    this.proofSubmittedBy,
+    this.proofFileName,
   });
 
   @override
@@ -42,6 +54,11 @@ class PaymentEntity extends Equatable {
     paidAt,
     status,
     method,
+    proofStoragePath,
+    proofDownloadUrl,
+    proofSubmittedAt,
+    proofSubmittedBy,
+    proofFileName,
   ];
 }
 

@@ -10,7 +10,6 @@ abstract class SupervisorEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// تحميل الحلقات اللي تحت إشراف المشرف
 class LoadSupervisedHalaqatEvent extends SupervisorEvent {
   final String supervisorId;
 
@@ -20,12 +19,10 @@ class LoadSupervisedHalaqatEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId];
 }
 
-/// Derive today's oversight board from already-loaded supervised halaqat (W6).
 class LoadSupervisorDayBoardEvent extends SupervisorEvent {
   const LoadSupervisorDayBoardEvent();
 }
 
-/// Read-only استئذان projection for today (W7 Slice 3).
 class LoadSupervisedAbsenceRequestsEvent extends SupervisorEvent {
   final String supervisorId;
   final DateTime date;
@@ -39,7 +36,6 @@ class LoadSupervisedAbsenceRequestsEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId, date];
 }
 
-/// إرسال تشجيع/وسام لطالب متميز
 class IssueAchievementEvent extends SupervisorEvent {
   final AchievementIssueEntity data;
 
@@ -53,7 +49,6 @@ class ResetIssueAchievementEvent extends SupervisorEvent {
   const ResetIssueAchievementEvent();
 }
 
-/// رفع تقرير دوري أو بلاغ للإدارة
 class SubmitSupervisorReportEvent extends SupervisorEvent {
   final SupervisorReportEntity report;
 
@@ -67,25 +62,52 @@ class ResetSubmitReportEvent extends SupervisorEvent {
   const ResetSubmitReportEvent();
 }
 
-/// تسجيل ملتحق جديد في حلقة
-class RegisterNewStudentEvent extends SupervisorEvent {
+/// Admit existing student into an assigned halaqa (Academy Admission).
+class AdmitStudentToHalaqaEvent extends SupervisorEvent {
+  final String supervisorId;
   final String halaqaId;
   final String studentId;
 
-  const RegisterNewStudentEvent({
+  const AdmitStudentToHalaqaEvent({
+    required this.supervisorId,
     required this.halaqaId,
     required this.studentId,
   });
 
   @override
-  List<Object?> get props => [halaqaId, studentId];
+  List<Object?> get props => [supervisorId, halaqaId, studentId];
 }
 
-class ResetRegisterStudentEvent extends SupervisorEvent {
-  const ResetRegisterStudentEvent();
+class ResetAdmitStudentEvent extends SupervisorEvent {
+  const ResetAdmitStudentEvent();
 }
 
-/// Clear projection on logout so the next identity cannot inherit state (H1).
+class TransferStudentBetweenHalaqatEvent extends SupervisorEvent {
+  final String supervisorId;
+  final String studentId;
+  final String sourceHalaqaId;
+  final String targetHalaqaId;
+
+  const TransferStudentBetweenHalaqatEvent({
+    required this.supervisorId,
+    required this.studentId,
+    required this.sourceHalaqaId,
+    required this.targetHalaqaId,
+  });
+
+  @override
+  List<Object?> get props => [
+    supervisorId,
+    studentId,
+    sourceHalaqaId,
+    targetHalaqaId,
+  ];
+}
+
+class ResetTransferStudentEvent extends SupervisorEvent {
+  const ResetTransferStudentEvent();
+}
+
 class ClearSupervisorSessionEvent extends SupervisorEvent {
   const ClearSupervisorSessionEvent();
 }

@@ -13,6 +13,7 @@ import '../../domain/parent_performance.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
+import '../parent_display.dart';
 import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_subpage_scaffold.dart';
 
@@ -63,6 +64,30 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
 
     return ParentSubpageScaffold(
       title: 'التقارير',
+      actions: [
+        Material(
+          color: AppColors.secondary,
+          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+          child: InkWell(
+            onTap: () {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('تصدير PDF قريباً')));
+            },
+            borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                'تصدير PDF',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
       body: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (p, c) => p.selectedChildId != c.selectedChildId,
         listener: (context, state) {
@@ -78,33 +103,41 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
             p.childrenSnapshots != c.childrenSnapshots,
         builder: (context, state) {
           return ListView(
-            padding: const EdgeInsets.all(AppSizes.paddingM),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              if (children.length > 1)
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final id in children)
-                      ChoiceChip(
-                        label: Text(state.childDisplayName(id)),
-                        selected: state.selectedChildId == id,
-                        onSelected: (_) => context.read<ParentBloc>().add(
-                          SelectChildEvent(id),
+              if (children.isNotEmpty)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final id in children) ...[
+                        ParentFilterChip(
+                          label: state.childDisplayName(id),
+                          selected: state.selectedChildId == id,
+                          onTap: () => context.read<ParentBloc>().add(
+                            SelectChildEvent(id),
+                          ),
                         ),
-                      ),
-                  ],
+                        const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
                 ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (var i = 0; i < _axes.length; i++)
-                    ChoiceChip(
-                      label: Text(_axes[i]),
-                      selected: _axisIndex == i,
-                      onSelected: (_) => setState(() => _axisIndex = i),
-                    ),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _axes.length; i++) ...[
+                      ParentFilterChip(
+                        label: _axes[i],
+                        selected: _axisIndex == i,
+                        onTap: () => setState(() => _axisIndex = i),
+                      ),
+                      if (i < _axes.length - 1) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               if (state.reportStatus == SectionStatus.initial ||
@@ -131,6 +164,9 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
                   axis: _axes[_axisIndex],
                   report: state.weeklyReport,
                   records: _records,
+                  childName: state.selectedChildId == null
+                      ? ''
+                      : state.childDisplayName(state.selectedChildId!),
                 ),
             ],
           );
@@ -144,52 +180,119 @@ class _ReportBody extends StatelessWidget {
   final String axis;
   final WeeklyReportEntity? report;
   final List<RecitationRecordEntity> records;
+  final String childName;
 
   const _ReportBody({
     required this.axis,
     required this.report,
     required this.records,
+    required this.childName,
   });
 
   @override
   Widget build(BuildContext context) {
     final notes = report?.teacherNotes.trim() ?? '';
+    final period = report == null
+        ? ''
+        : parentPaymentPeriodLabel(report!.weekStart);
+    final verses = report?.totalVersesMemorized ?? 0;
+    final attendance = report == null || report!.totalSessions == 0
+        ? null
+        : report!.attendancePercent;
+    final lastGrade = _lastGradeLabel();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppCard(
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'محور: $axis',
-                style: AppTextStyles.titleLarge,
-                textAlign: TextAlign.right,
+                period.isEmpty ? 'تقرير $axis' : 'تقرير $period',
+                style: AppTextStyles.headlineMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              const SizedBox(height: 8),
+              if (childName.isNotEmpty)
+                Text(
+                  childName,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _MiniStat(
+                    value: verses > 0 ? parentEasternDigits('$verses') : '—',
+                    label: 'آية محفوظة',
+                    color: AppColors.primaryLight,
+                  ),
+                  const SizedBox(width: 8),
+                  _MiniStat(
+                    value: parentPercentLabel(attendance),
+                    label: 'الحضور',
+                    color: const Color(0xFFE8F5E9),
+                  ),
+                  const SizedBox(width: 8),
+                  _MiniStat(
+                    value: lastGrade ?? '—',
+                    label: 'التقييم',
+                    color: AppColors.secondaryBg,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
               Text(
                 _axisBody(),
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
+                  height: 1.5,
                 ),
-                textAlign: TextAlign.right,
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        AppCard(
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8FAFC),
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('ملاحظة المعلمة', style: AppTextStyles.titleLarge),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.format_quote_rounded,
+                    color: AppColors.primaryDark,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'ملاحظة المعلمة',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               Text(
                 notes.isEmpty
                     ? 'لا توجد ملاحظة من المعلم في التقييمات المعتمدة لهذه الفترة.'
                     : notes,
-                style: AppTextStyles.bodyLarge,
-                textAlign: TextAlign.right,
+                style: AppTextStyles.bodyLarge.copyWith(height: 1.5),
               ),
             ],
           ),
@@ -198,21 +301,33 @@ class _ReportBody extends StatelessWidget {
     );
   }
 
+  String? _lastGradeLabel() {
+    final filtered = _filteredRecords();
+    if (filtered.isEmpty) return null;
+    if (axis == 'سلوك') return filtered.first.behaviorGrade?.label;
+    return filtered.first.grade?.label;
+  }
+
+  List<RecitationRecordEntity> _filteredRecords() {
+    return records.where((record) {
+      if (record.isPendingReview) return false;
+      if (axis == 'حفظ') return record.type == RecitationType.memorization;
+      if (axis == 'مراجعة') return record.type == RecitationType.review;
+      if (axis == 'سلوك') return record.behaviorGrade != null;
+      return false;
+    }).toList()..sort((a, b) => b.date.compareTo(a.date));
+  }
+
   String _axisBody() {
     if (axis == 'حضور') {
       final r = report;
       if (r == null || r.totalSessions == 0) {
         return 'لا يوجد حضور مسجّل لهذه الفترة.';
       }
-      return '${r.attendedSessions} / ${r.totalSessions} — ${r.attendancePercent.round()}%';
+      return '${parentEasternDigits('${r.attendedSessions}')} / ${parentEasternDigits('${r.totalSessions}')} جلسة — ${parentPercentLabel(r.attendancePercent)}';
     }
 
-    final filtered = records.where((record) {
-      if (axis == 'حفظ') return record.type == RecitationType.memorization;
-      if (axis == 'مراجعة') return record.type == RecitationType.review;
-      return record.behaviorGrade != null;
-    }).toList();
-
+    final filtered = _filteredRecords();
     if (filtered.isEmpty) {
       return 'لا توجد تقييمات معتمدة في محور $axis.';
     }
@@ -222,15 +337,61 @@ class _ReportBody extends StatelessWidget {
           .map((r) => r.behaviorGrade?.label)
           .whereType<String>()
           .toList();
-      return 'عدد التقييمات: ${labels.length}\nآخر تقييم: ${labels.first}';
+      return 'عدد التقييمات: ${parentEasternDigits('${labels.length}')}\nآخر تقييم: ${labels.first}';
     }
 
     final percent = ParentPerformance.averagePercent(filtered);
     final last = filtered.first.grade?.label ?? '—';
     return [
-      'عدد التقييمات المعتمدة: ${filtered.length}',
-      if (percent != null) 'متوسط الأداء: ${percent.round()}%',
+      'عدد التقييمات المعتمدة: ${parentEasternDigits('${filtered.length}')}',
+      if (percent != null) 'متوسط الأداء: ${parentPercentLabel(percent)}',
       'آخر تقييم: $last',
     ].join('\n');
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const _MiniStat({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

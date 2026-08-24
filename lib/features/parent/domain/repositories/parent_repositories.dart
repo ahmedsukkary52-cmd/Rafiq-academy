@@ -61,6 +61,13 @@ abstract class ParentRepository {
     required String paymentId,
   });
 
+  /// Parent screenshot proof for external payment. Never marks payment paid.
+  Future<Either<Failure, Unit>> submitPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String localFilePath,
+  });
+
   Future<Either<Failure, ParentHousehold>> getHousehold({
     required String parentId,
     required List<String> childrenIds,

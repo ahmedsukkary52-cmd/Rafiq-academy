@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -10,7 +11,6 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/usecases/get_attendance_marks_usecase.dart';
 import '../parent_display.dart';
-import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_subpage_scaffold.dart';
 
 class ParentAttendancePage extends StatefulWidget {
@@ -32,6 +32,8 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
   bool _loading = true;
   String? _error;
   List<ParentAttendanceMark> _marks = const [];
+
+  static const _weekdays = ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'];
 
   @override
   void initState() {
@@ -81,118 +83,266 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
   }
 
   int _count(String status) =>
-      _byDay.values.where((s) => s == status).length;
+      _byDay.values
+          .where((s) => s == status)
+          .length;
+
+  double? get _percent {
+    final present = _count(AttendancePolicy.statusPresent);
+    final late = _count(AttendancePolicy.statusLate);
+    final absent = _count(AttendancePolicy.statusAbsent);
+    final denom = present + late + absent;
+    if (denom == 0) return null;
+    return ((present + late) / denom) * 100;
+  }
+
+  Color? _colorFor(String? status) {
+    return switch ((status ?? '').trim()) {
+      AttendancePolicy.statusPresent => AppColors.success,
+      AttendancePolicy.statusAbsent => AppColors.error,
+      AttendancePolicy.statusLate => AppColors.secondary,
+      AttendancePolicy.statusExcused => AppColors.info,
+      _ => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final name = (widget.studentName ?? '').trim();
     final byDay = _byDay;
+    HijriCalendar.setLocal('ar');
+    final hijri = HijriCalendar.fromDate(_month);
+    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
+    final firstWeekday = DateTime(_month.year, _month.month, 1).weekday;
+    final leading = firstWeekday % 7; // Saturday-first grid
+
     return ParentSubpageScaffold(
       title: name.isEmpty ? 'سجل الحضور' : 'سجل الحضور — $name',
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                _StatChip(
-                  label: 'حاضر',
-                  color: AppColors.successBg,
-                  value: '${_count(AttendancePolicy.statusPresent)}',
-                ),
-                const SizedBox(width: 8),
-                _StatChip(
-                  label: 'غائب',
-                  color: const Color(0xFFFFEBEE),
-                  value: '${_count(AttendancePolicy.statusAbsent)}',
-                ),
-                const SizedBox(width: 8),
-                _StatChip(
-                  label: 'متأخر',
-                  color: AppColors.secondaryBg,
-                  value: '${_count(AttendancePolicy.statusLate)}',
-                ),
-                const SizedBox(width: 8),
-                _StatChip(
-                  label: 'معذور',
-                  color: AppColors.primaryLight,
-                  value: '${_count(AttendancePolicy.statusExcused)}',
-                ),
-              ],
-            ),
+          Row(
+            children: [
+              _StatChip(
+                label: 'حاضر',
+                color: const Color(0xFFE8F5E9),
+                value: _count(AttendancePolicy.statusPresent),
+              ),
+              const SizedBox(width: 8),
+              _StatChip(
+                label: 'غائب',
+                color: const Color(0xFFFFEBEE),
+                value: _count(AttendancePolicy.statusAbsent),
+              ),
+              const SizedBox(width: 8),
+              _StatChip(
+                label: 'متأخر',
+                color: AppColors.secondaryBg,
+                value: _count(AttendancePolicy.statusLate),
+              ),
+              const SizedBox(width: 8),
+              _StatChip(
+                label: 'معذور',
+                color: AppColors.primaryLight,
+                value: _count(AttendancePolicy.statusExcused),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
               children: [
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _month = DateTime(_month.year, _month.month - 1);
-                    });
-                    _load();
-                  },
-                  icon: const Icon(Icons.chevron_right_rounded),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'نسبة الحضور الشهرية',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      parentPercentLabel(_percent),
+                      style: AppTextStyles.titleLarge.copyWith(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: Text(
-                    '${_month.year}/${_month.month.toString().padLeft(2, '0')}',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.titleLarge,
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  child: LinearProgressIndicator(
+                    value: ((_percent ?? 0) / 100).clamp(0.0, 1.0),
+                    minHeight: 8,
+                    backgroundColor: AppColors.border,
+                    color: AppColors.success,
                   ),
                 ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _month = DateTime(_month.year, _month.month + 1);
-                    });
-                    _load();
-                  },
-                  icon: const Icon(Icons.chevron_left_rounded),
-                ),
               ],
             ),
           ),
-          Expanded(
-            child: _loading
-                ? const ParentListCardsSkeleton()
-                : _error != null
-                ? AppErrorWidget(message: _error!, onRetry: _load)
-                : byDay.isEmpty
-                ? const ParentEmptyState(
-                    icon: Icons.fact_check_outlined,
-                    title: 'لا توجد سجلات حضور في هذا الشهر',
-                    message:
-                        'يُعرض هنا الحاضر والغائب والمتأخر والمعذور من سجلات الحضور الموجودة.',
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: byDay.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final days = byDay.keys.toList()
-                        ..sort((a, b) => b.compareTo(a));
-                      final day = days[index];
-                      final status = byDay[day];
-                      return AppCard(
-                        child: Row(
-                          children: [
-                            Text(
-                              parentAttendanceLabel(status),
-                              style: AppTextStyles.titleMedium,
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${day.day}/${day.month}/${day.year}',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.textSecondary,
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 6),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _month = DateTime(_month.year, _month.month - 1);
+                          });
+                          _load();
+                        },
+                        icon: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.onPrimary,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          hijri.toFormat('MMMM yyyy'),
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.titleLarge.copyWith(
+                            color: AppColors.onPrimary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _month = DateTime(_month.year, _month.month + 1);
+                          });
+                          _load();
+                        },
+                        icon: const Icon(
+                          Icons.chevron_left_rounded,
+                          color: AppColors.onPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 14),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          for (final day in _weekdays)
+                            Expanded(
+                              child: Text(
+                                day,
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.textHint,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        )
+                      else
+                        if (_error != null)
+                          AppErrorWidget(message: _error!, onRetry: _load)
+                        else
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: leading + daysInMonth,
+                            gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 7,
+                              mainAxisSpacing: 6,
+                              crossAxisSpacing: 6,
+                            ),
+                            itemBuilder: (context, index) {
+                              if (index < leading) {
+                                return const SizedBox.shrink();
+                              }
+                              final day = index - leading + 1;
+                              final date = DateTime(
+                                  _month.year, _month.month, day);
+                              final status = byDay[AttendancePolicy.dayStart(
+                                  date)];
+                              final color = _colorFor(status);
+                              final isToday = AttendancePolicy
+                                  .isSameCalendarDay(
+                                date,
+                                DateTime.now(),
+                              );
+                              return Container(
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: color?.withValues(alpha: 0.16) ??
+                                      Colors.transparent,
+                                  shape: BoxShape.circle,
+                                  border: isToday
+                                      ? Border.all(
+                                      color: AppColors.primary, width: 1.4)
+                                      : null,
+                                ),
+                                child: Text(
+                                  parentEasternDigits('$day'),
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    color: color ?? AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          _LegendDot(color: AppColors.success, label: 'حاضر'),
+                          SizedBox(width: 10),
+                          _LegendDot(color: AppColors.error, label: 'غائب'),
+                          SizedBox(width: 10),
+                          _LegendDot(
+                              color: AppColors.secondary, label: 'متأخر'),
+                          SizedBox(width: 10),
+                          _LegendDot(color: AppColors.info, label: 'معذور'),
+                        ],
+                      ),
+                    ],
                   ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -203,7 +353,7 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
 class _StatChip extends StatelessWidget {
   final String label;
   final Color color;
-  final String value;
+  final int value;
 
   const _StatChip({
     required this.label,
@@ -218,14 +368,51 @@ class _StatChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(AppSizes.radiusM),
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(
-          '$value\n$label',
-          style: AppTextStyles.titleMedium,
-          textAlign: TextAlign.center,
+        child: Column(
+          children: [
+            Text(
+              parentEasternDigits('$value'),
+              style: AppTextStyles.headlineMedium.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
+        ),
+      ],
     );
   }
 }

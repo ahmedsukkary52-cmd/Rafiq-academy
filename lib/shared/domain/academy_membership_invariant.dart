@@ -1,29 +1,87 @@
 import '../../../../core/constants/app_constants.dart';
 
-/// Product contract for completed academy membership (W8 D-W8-7).
+/// Product contract for completed academy membership (Dual-Halaqa / W8 update).
 ///
 /// Business Owner: **Academy Admission Workflow**.
 /// The invariant itself is the contract — no field is definitive SSOT.
 ///
-/// Rule 5: membership is only **complete** when all members hold
-/// simultaneously, or else **not established**. No intermediate state.
+/// Per-pair membership `(studentId, halaqaId)` is complete when:
+/// 1. roster (`halaqat.studentIds`) contains the student
+/// 2. `role == student`
+/// 3. `users.isActive == true`
 ///
-/// Rule 7: evaluate members as a set — never treat one field as authority
-/// to imply the others.
+/// `studentProfiles.halaqaId` is **not** part of membership completeness —
+/// it is the primary/default UI pointer only (Student/Parent Phase 1).
+///
+/// Cap: a student may belong to at most [maxHalaqatPerStudent] halaqat.
 class AcademyMembershipInvariant {
   const AcademyMembershipInvariant._();
 
-  /// True only when every approved invariant member is satisfied together.
+  static const int maxHalaqatPerStudent = 2;
+
+  /// True when the per-pair membership invariant holds.
   static bool isComplete({
     required bool rosterContainsStudent,
-    required String? profileHalaqaId,
-    required String expectedHalaqaId,
     required String? role,
     required bool? isActive,
   }) {
     return rosterContainsStudent &&
-        profileHalaqaId == expectedHalaqaId &&
         role == AppRoles.student &&
         isActive == true;
+  }
+
+  /// Whether establish/add may set `studentProfiles.halaqaId` to the target.
+  ///
+  /// - First membership (no other memberships, empty primary) → yes.
+  /// - Add-second / already has primary → no (preserve primary).
+  static bool shouldSetPrimaryOnEstablish({
+    required String? currentPrimary,
+    required Iterable<String> membershipHalaqaIdsExcludingTarget,
+  }) {
+    final primary = currentPrimary?.trim() ?? '';
+    final others = membershipHalaqaIdsExcludingTarget
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (others.isNotEmpty) return false;
+    return primary.isEmpty;
+  }
+
+  /// Primary after an atomic move: remove [sourceHalaqaId], add [targetHalaqaId].
+  ///
+  /// - If primary was source → becomes target.
+  /// - If primary was non-source → unchanged.
+  /// - Empty primary → target.
+  static String? primaryAfterTransfer({
+    required String? currentPrimary,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  }) {
+    final primary = currentPrimary?.trim() ?? '';
+    final source = sourceHalaqaId.trim();
+    final target = targetHalaqaId.trim();
+    if (target.isEmpty) return primary.isEmpty ? null : primary;
+
+    if (primary.isEmpty || primary == source) return target;
+    return primary;
+  }
+
+  /// Clears orphan primary when the student has no remaining roster memberships,
+  /// or rebinds primary when it no longer points at a remaining halaqa.
+  static String? primaryAfterMembershipsChanged({
+    required String? currentPrimary,
+    required Iterable<String> remainingHalaqaIds,
+  }) {
+    final remaining = remainingHalaqaIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    if (remaining.isEmpty) return null;
+
+    final primary = currentPrimary?.trim() ?? '';
+    if (primary.isEmpty) return remaining.first;
+    if (remaining.contains(primary)) return primary;
+    final sorted = remaining.toList()..sort();
+    return sorted.first;
   }
 }

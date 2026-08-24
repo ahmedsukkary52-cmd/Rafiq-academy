@@ -181,6 +181,34 @@ class ParentRepositoryImpl implements ParentRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> submitPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String localFilePath,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.submitPaymentProof(
+        parentId: parentId,
+        paymentId: paymentId,
+        localFilePath: localFilePath,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      final message = e.message;
+      if (message.contains('بالفعل') ||
+          message.contains('غير مرتبطة') ||
+          message.contains('غير صالح') ||
+          message.contains('غير موجود') ||
+          message.contains('فارغ') ||
+          message.contains('أكبر من')) {
+        return Left(ValidationFailure(message));
+      }
+      return Left(ServerFailure(message));
+    }
+  }
+
+  @override
   Future<Either<Failure, ParentHousehold>> getHousehold({
     required String parentId,
     required List<String> childrenIds,

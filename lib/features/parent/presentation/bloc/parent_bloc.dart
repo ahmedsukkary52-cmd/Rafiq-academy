@@ -17,6 +17,7 @@ import '../../domain/usecases/get_weekly_report_usecase.dart';
 import '../../domain/usecases/initiate_payment_usecase.dart';
 import '../../domain/usecases/pay_payment_from_wallet_usecase.dart';
 import '../../domain/usecases/submit_absence_request_usecase.dart';
+import '../../domain/usecases/submit_payment_proof_usecase.dart';
 import 'parent_event.dart';
 import 'parent_state.dart';
 
@@ -35,6 +36,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   final GetParentHouseholdUseCase getHousehold;
   final GetWalletUseCase getWallet;
   final PayPaymentFromWalletUseCase payFromWallet;
+  final SubmitPaymentProofUseCase submitPaymentProof;
 
   ParentBloc({
     required this.getChildrenIds,
@@ -47,6 +49,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     required this.getHousehold,
     required this.getWallet,
     required this.payFromWallet,
+    required this.submitPaymentProof,
   }) : super(ParentState.initial()) {
     on<LoadChildrenEvent>(_onLoadChildren);
     on<SelectChildEvent>(_onSelectChild);
@@ -61,6 +64,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<LoadWalletEvent>(_onLoadWallet);
     on<PayPaymentFromWalletEvent>(_onPayFromWallet);
     on<ResetWalletPayEvent>(_onResetWalletPay);
+    on<SubmitPaymentProofEvent>(_onSubmitPaymentProof);
+    on<ResetPaymentProofEvent>(_onResetPaymentProof);
     on<ClearParentSessionEvent>(_onClearSession);
   }
 
@@ -550,6 +555,50 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
       state.copyWith(
         walletPayStatus: SubmissionStatus.idle,
         walletPayError: null,
+      ),
+    );
+  }
+
+  Future<void> _onSubmitPaymentProof(SubmitPaymentProofEvent event,
+      Emitter<ParentState> emit,) async {
+    emit(
+      state.copyWith(
+        paymentProofStatus: SubmissionStatus.submitting,
+        paymentProofError: null,
+        paymentProofPaymentId: event.paymentId,
+      ),
+    );
+
+    final result = await submitPaymentProof(
+      SubmitPaymentProofParams(
+        parentId: event.parentId,
+        paymentId: event.paymentId,
+        localFilePath: event.localFilePath,
+      ),
+    );
+
+    result.fold(
+          (failure) =>
+          emit(
+            state.copyWith(
+              paymentProofStatus: SubmissionStatus.error,
+              paymentProofError: failure.message,
+            ),
+          ),
+          (_) {
+        emit(state.copyWith(paymentProofStatus: SubmissionStatus.success));
+        add(LoadPaymentsEvent(event.parentId));
+      },
+    );
+  }
+
+  void _onResetPaymentProof(ResetPaymentProofEvent event,
+      Emitter<ParentState> emit,) {
+    emit(
+      state.copyWith(
+        paymentProofStatus: SubmissionStatus.idle,
+        paymentProofError: null,
+        paymentProofPaymentId: null,
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/academy_admission_firestore.dart';
 import '../../domain/admin_ops_broadcast.dart';
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
@@ -21,17 +22,23 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   Future<AcademyStatsEntity> getAcademyStats() async {
     try {
       final results = await Future.wait([
-        firestore.collection(FirestoreCollections.users)
+        firestore
+            .collection(FirestoreCollections.users)
             .where('role', isEqualTo: AppRoles.student)
             .where('isActive', isEqualTo: true)
-            .count().get(),
-        firestore.collection(FirestoreCollections.users)
+            .count()
+            .get(),
+        firestore
+            .collection(FirestoreCollections.users)
             .where('role', isEqualTo: AppRoles.teacher)
             .where('isActive', isEqualTo: true)
-            .count().get(),
-        firestore.collection(FirestoreCollections.halaqat)
+            .count()
+            .get(),
+        firestore
+            .collection(FirestoreCollections.halaqat)
             .where('status', isEqualTo: 'active')
-            .count().get(),
+            .count()
+            .get(),
       ]);
 
       return AcademyStatsEntity(
@@ -94,23 +101,13 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String halaqaId,
   }) async {
     try {
-      final batch = firestore.batch();
-
-      batch.update(
-        firestore.collection(FirestoreCollections.users).doc(studentId),
-        {'isActive': true},
+      await AcademyAdmissionFirestore.establishMembership(
+        firestore: firestore,
+        studentId: studentId,
+        halaqaId: halaqaId,
       );
-      batch.update(
-        firestore.collection(FirestoreCollections.studentProfiles).doc(
-            studentId),
-        {'halaqaId': halaqaId},
-      );
-      batch.update(
-        firestore.collection(FirestoreCollections.halaqat).doc(halaqaId),
-        {'studentIds': FieldValue.arrayUnion([studentId])},
-      );
-
-      await batch.commit();
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -122,10 +119,9 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required bool isActive,
   }) async {
     try {
-      await firestore
-          .collection(FirestoreCollections.users)
-          .doc(uid)
-          .update({'isActive': isActive});
+      await firestore.collection(FirestoreCollections.users).doc(uid).update({
+        'isActive': isActive,
+      });
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -229,8 +225,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           uid: usersSnap.docs[i].id,
           name: userData['name'] ?? '',
           profileImageUrl: userData['profileImageUrl'] as String?,
-          halaqatIds:
-          List<String>.from(profileData?['halaqatIds'] ?? const []),
+          halaqatIds: List<String>.from(profileData?['halaqatIds'] ?? const []),
           performanceRating: (profileData?['performanceRating'] as num?)
               ?.toDouble(),
           weeklyQuota: (profileData?['weeklyQuota'] ?? 0) as int,
@@ -295,8 +290,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         uniqueDates.add(DateTime(date.year, date.month, date.day));
       }
 
-      final sortedDates = uniqueDates.toList()
-        ..sort();
+      final sortedDates = uniqueDates.toList()..sort();
 
       return TeacherActivityEntity(
         teacherId: teacherId,

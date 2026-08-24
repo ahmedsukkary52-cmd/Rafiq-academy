@@ -3,12 +3,13 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/repositories/parent_repository.dart';
+import '../../domain/usecases/admit_student_to_halaqa_usecase.dart';
 import '../../domain/usecases/get_supervised_absence_requests_usecase.dart';
 import '../../domain/usecases/get_supervised_halaqat_usecase.dart';
 import '../../domain/usecases/get_supervisor_day_board_usecase.dart';
 import '../../domain/usecases/issue_achievement_usecase.dart';
-import '../../domain/usecases/register_new_student_usecase.dart';
 import '../../domain/usecases/submit_supervisor_report_usecase.dart';
+import '../../domain/usecases/transfer_student_between_halaqat_usecase.dart';
 import 'supervisor_event.dart';
 import 'supervisor_state.dart';
 
@@ -19,7 +20,8 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
   final GetSupervisedAbsenceRequestsUseCase getSupervisedAbsenceRequests;
   final IssueAchievementUseCase issueAchievement;
   final SubmitSupervisorReportUseCase submitSupervisorReport;
-  final RegisterNewStudentUseCase registerNewStudent;
+  final AdmitStudentToHalaqaUseCase admitStudentToHalaqa;
+  final TransferStudentBetweenHalaqatUseCase transferStudentBetweenHalaqat;
 
   String? _supervisorId;
 
@@ -29,7 +31,8 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     required this.getSupervisedAbsenceRequests,
     required this.issueAchievement,
     required this.submitSupervisorReport,
-    required this.registerNewStudent,
+    required this.admitStudentToHalaqa,
+    required this.transferStudentBetweenHalaqat,
   }) : super(SupervisorState.initial()) {
     on<LoadSupervisedHalaqatEvent>(_onLoadHalaqat);
     on<LoadSupervisorDayBoardEvent>(_onLoadDayBoard);
@@ -38,8 +41,10 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<ResetIssueAchievementEvent>(_onResetIssueAchievement);
     on<SubmitSupervisorReportEvent>(_onSubmitReport);
     on<ResetSubmitReportEvent>(_onResetSubmitReport);
-    on<RegisterNewStudentEvent>(_onRegisterStudent);
-    on<ResetRegisterStudentEvent>(_onResetRegisterStudent);
+    on<AdmitStudentToHalaqaEvent>(_onAdmitStudent);
+    on<ResetAdmitStudentEvent>(_onResetAdmitStudent);
+    on<TransferStudentBetweenHalaqatEvent>(_onTransferStudent);
+    on<ResetTransferStudentEvent>(_onResetTransferStudent);
     on<ClearSupervisorSessionEvent>(_onClearSession);
   }
 
@@ -235,44 +240,93 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     );
   }
 
-  Future<void> _onRegisterStudent(
-    RegisterNewStudentEvent event,
+  Future<void> _onAdmitStudent(
+    AdmitStudentToHalaqaEvent event,
     Emitter<SupervisorState> emit,
   ) async {
     emit(
       state.copyWith(
-        registerStudentStatus: SubmissionStatus.submitting,
-        registerStudentError: null,
+        admitStudentStatus: SubmissionStatus.submitting,
+        admitStudentError: null,
       ),
     );
 
-    final result = await registerNewStudent(
-      RegisterStudentParams(
+    final result = await admitStudentToHalaqa(
+      AdmitStudentParams(
+        supervisorId: event.supervisorId,
         halaqaId: event.halaqaId,
         studentId: event.studentId,
       ),
     );
 
-    result.fold(
-      (failure) => emit(
+    await result.fold(
+      (failure) async => emit(
         state.copyWith(
-          registerStudentStatus: SubmissionStatus.error,
-          registerStudentError: failure.message,
+          admitStudentStatus: SubmissionStatus.error,
+          admitStudentError: failure.message,
         ),
       ),
-      (_) =>
-          emit(state.copyWith(registerStudentStatus: SubmissionStatus.success)),
+      (_) async {
+        emit(state.copyWith(admitStudentStatus: SubmissionStatus.success));
+        add(LoadSupervisedHalaqatEvent(event.supervisorId));
+      },
     );
   }
 
-  void _onResetRegisterStudent(
-    ResetRegisterStudentEvent event,
+  void _onResetAdmitStudent(
+    ResetAdmitStudentEvent event,
     Emitter<SupervisorState> emit,
   ) {
     emit(
       state.copyWith(
-        registerStudentStatus: SubmissionStatus.idle,
-        registerStudentError: null,
+        admitStudentStatus: SubmissionStatus.idle,
+        admitStudentError: null,
+      ),
+    );
+  }
+
+  Future<void> _onTransferStudent(
+    TransferStudentBetweenHalaqatEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        transferStudentStatus: SubmissionStatus.submitting,
+        transferStudentError: null,
+      ),
+    );
+
+    final result = await transferStudentBetweenHalaqat(
+      TransferStudentParams(
+        supervisorId: event.supervisorId,
+        studentId: event.studentId,
+        sourceHalaqaId: event.sourceHalaqaId,
+        targetHalaqaId: event.targetHalaqaId,
+      ),
+    );
+
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
+          transferStudentStatus: SubmissionStatus.error,
+          transferStudentError: failure.message,
+        ),
+      ),
+      (_) async {
+        emit(state.copyWith(transferStudentStatus: SubmissionStatus.success));
+        add(LoadSupervisedHalaqatEvent(event.supervisorId));
+      },
+    );
+  }
+
+  void _onResetTransferStudent(
+    ResetTransferStudentEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        transferStudentStatus: SubmissionStatus.idle,
+        transferStudentError: null,
       ),
     );
   }

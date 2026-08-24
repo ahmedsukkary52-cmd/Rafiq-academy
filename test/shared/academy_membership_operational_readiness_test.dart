@@ -4,7 +4,7 @@ import 'package:rafiq_academy/shared/domain/academy_membership_consumption.dart'
 import 'package:rafiq_academy/shared/domain/academy_membership_invariant.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_day_readiness.dart';
 
-/// Slice 2 — operational readiness after Academy Admission (Rules 5–7).
+/// Operational readiness after Dual-Halaqa membership contract.
 void main() {
   const studentId = 's1';
   const halaqaId = 'h1';
@@ -22,7 +22,7 @@ void main() {
       },
     );
 
-    test('student-facing pointer uses profile.halaqaId only', () {
+    test('student-facing pointer uses profile.halaqaId only (primary)', () {
       expect(
         AcademyMembershipConsumption.studentFacingHalaqaId(halaqaId),
         halaqaId,
@@ -36,8 +36,6 @@ void main() {
       expect(
         AcademyMembershipInvariant.isComplete(
           rosterContainsStudent: false,
-          profileHalaqaId: null,
-          expectedHalaqaId: halaqaId,
           role: AppRoles.student,
           isActive: true,
         ),
@@ -51,8 +49,6 @@ void main() {
       expect(
         AcademyMembershipInvariant.isComplete(
           rosterContainsStudent: true,
-          profileHalaqaId: halaqaId,
-          expectedHalaqaId: halaqaId,
           role: AppRoles.student,
           isActive: true,
         ),
@@ -76,55 +72,53 @@ void main() {
       expect(readiness.gaps.first.quantity, 1);
     });
 
-    test('student home can resolve halaqa from profile pointer', () {
+    test('student home can resolve halaqa from primary pointer', () {
       expect(
         AcademyMembershipConsumption.studentFacingHalaqaId(halaqaId),
         halaqaId,
       );
     });
 
-    test('incomplete membership leaves student pointer unset', () {
+    test(
+      'roster membership can be complete while primary pointer is unset',
+      () {
+        expect(
+          AcademyMembershipInvariant.isComplete(
+            rosterContainsStudent: true,
+            role: AppRoles.student,
+            isActive: true,
+          ),
+          isTrue,
+        );
+        expect(
+          AcademyMembershipConsumption.studentFacingHalaqaId(null),
+          isNull,
+        );
+      },
+    );
+  });
+
+  group('Rule 7 — invariant-driven (not field-copy)', () {
+    test('roster alone does not imply login/active gate', () {
       expect(
         AcademyMembershipInvariant.isComplete(
           rosterContainsStudent: true,
-          profileHalaqaId: null,
-          expectedHalaqaId: halaqaId,
+          role: AppRoles.student,
+          isActive: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('profile alone is not authority to imply roster', () {
+      expect(
+        AcademyMembershipInvariant.isComplete(
+          rosterContainsStudent: false,
           role: AppRoles.student,
           isActive: true,
         ),
         isFalse,
       );
-      expect(AcademyMembershipConsumption.studentFacingHalaqaId(null), isNull);
     });
-  });
-
-  group('Rule 7 — invariant-driven (not field-copy)', () {
-    test(
-      'admission targets are evaluated as a set, not derived from one field',
-      () {
-        // Roster alone is not authority to imply profile (no copy roster → profile).
-        expect(
-          AcademyMembershipInvariant.isComplete(
-            rosterContainsStudent: true,
-            profileHalaqaId: null,
-            expectedHalaqaId: halaqaId,
-            role: AppRoles.student,
-            isActive: true,
-          ),
-          isFalse,
-        );
-        // Profile alone is not authority to imply roster (no copy profile → roster).
-        expect(
-          AcademyMembershipInvariant.isComplete(
-            rosterContainsStudent: false,
-            profileHalaqaId: halaqaId,
-            expectedHalaqaId: halaqaId,
-            role: AppRoles.student,
-            isActive: true,
-          ),
-          isFalse,
-        );
-      },
-    );
   });
 }

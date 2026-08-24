@@ -3,24 +3,22 @@ import 'package:rafiq_academy/core/constants/app_constants.dart';
 import 'package:rafiq_academy/shared/domain/academy_membership_observation.dart';
 
 void main() {
-  group('AcademyMembershipObservation (Rule 8)', () {
-    test('fromInvariant — only established or notEstablished', () {
+  group('AcademyMembershipObservation (Rule 8 / Dual-Halaqa)', () {
+    test('fromInvariant — established without profile match', () {
       expect(
         AcademyMembershipObservations.fromInvariant(
           rosterContainsStudent: true,
-          profileHalaqaId: 'h1',
-          expectedHalaqaId: 'h1',
           role: AppRoles.student,
           isActive: true,
         ),
         AcademyMembershipObservation.established,
       );
+    });
 
+    test('fromInvariant — notEstablished when roster missing', () {
       expect(
         AcademyMembershipObservations.fromInvariant(
-          rosterContainsStudent: true,
-          profileHalaqaId: null,
-          expectedHalaqaId: 'h1',
+          rosterContainsStudent: false,
           role: AppRoles.student,
           isActive: true,
         ),
@@ -32,8 +30,6 @@ void main() {
       expect(
         AcademyMembershipObservations.fromInvariant(
           rosterContainsStudent: false,
-          profileHalaqaId: null,
-          expectedHalaqaId: 'h1',
           role: AppRoles.student,
           isActive: true,
         ),
@@ -41,7 +37,7 @@ void main() {
       );
     });
 
-    test('student facing — pointer maps to two states only', () {
+    test('student facing — primary pointer maps to two states only', () {
       expect(
         AcademyMembershipObservations.forStudentFacing('h1'),
         AcademyMembershipObservation.established,

@@ -94,6 +94,10 @@ class ParentDestinations {
     return _push(context, const ParentSubscriptionsPage());
   }
 
+  static Future<void> absenceRequests(BuildContext context) {
+    return context.push(AppRoutes.parentAbsence);
+  }
+
   static Future<void> notifications(BuildContext context) {
     return context.push(AppRoutes.parentNotifs);
   }

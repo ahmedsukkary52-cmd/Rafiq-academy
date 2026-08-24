@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../shared/domain/student_at_risk_policy.dart';
+import '../../student/domain/entities/recitation_record_entity.dart';
 import 'entities/parent_entities.dart';
 
 class ParentStaffContact extends Equatable {
@@ -38,6 +39,7 @@ class ParentChildSnapshot extends Equatable {
   final RiskSignal? riskSignal;
   final double? attendancePercentInWindow;
   final PaymentStatus? paymentStatus;
+  final RecitationGrade? latestReviewedGrade;
 
   const ParentChildSnapshot({
     required this.studentId,
@@ -57,6 +59,7 @@ class ParentChildSnapshot extends Equatable {
     this.riskSignal,
     this.attendancePercentInWindow,
     this.paymentStatus,
+    this.latestReviewedGrade,
   });
 
   String get displayName {
@@ -83,6 +86,7 @@ class ParentChildSnapshot extends Equatable {
       riskSignal: riskSignal,
       attendancePercentInWindow: attendancePercentInWindow,
       paymentStatus: status,
+      latestReviewedGrade: latestReviewedGrade,
     );
   }
 
@@ -105,6 +109,7 @@ class ParentChildSnapshot extends Equatable {
     riskSignal,
     attendancePercentInWindow,
     paymentStatus,
+    latestReviewedGrade,
   ];
 }
 

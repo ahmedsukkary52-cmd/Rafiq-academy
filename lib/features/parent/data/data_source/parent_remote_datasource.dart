@@ -42,6 +42,13 @@ abstract class ParentRemoteDatasource {
     required String paymentId,
   });
 
+  /// Upload screenshot proof for external payment. Does **not** mark paid.
+  Future<void> submitPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String localFilePath,
+  });
+
   Future<ParentHousehold> getHousehold({
     required String parentId,
     required List<String> childrenIds,

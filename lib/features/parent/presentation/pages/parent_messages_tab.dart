@@ -15,6 +15,7 @@ import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../domain/parent_household.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_destinations.dart';
+import '../parent_display.dart';
 import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_subpage_scaffold.dart';
 import '../widgets/parent_user_avatar.dart';
@@ -26,6 +27,8 @@ class ParentMessagesTab extends StatefulWidget {
   State<ParentMessagesTab> createState() => _ParentMessagesTabState();
 }
 
+enum _ChatIntent { none, seed, open }
+
 class _ParentMessagesTabState extends State<ParentMessagesTab> {
   static const _tabs = [
     (role: AppRoles.teacher, label: 'المعلم'),
@@ -35,46 +38,105 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
 
   int _tab = 0;
   String _query = '';
-  bool _starting = false;
+  _ChatIntent _intent = _ChatIntent.none;
+  final _seededUids = <String>{};
 
-  Future<void> _startChat(ParentStaffContact contact) async {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final chat = sl<ChatConversationsBloc>().state;
+      if (chat.conversationsStatus != SectionStatus.loaded) return;
+      _seedLinkedChats(
+        uid: _uid,
+        contacts: _roleContacts(
+          context
+              .read<ParentBloc>()
+              .state
+              .staffContacts,
+        ),
+        conversations: chat.conversations,
+      );
+    });
+  }
+
+  bool get _busy => _intent != _ChatIntent.none;
+
+  String get _uid {
     final auth = context.read<AuthBloc>().state;
-    if (auth is! AuthAuthenticated || _starting) return;
-    setState(() => _starting = true);
+    return auth is AuthAuthenticated ? auth.user.uid : '';
+  }
 
-    final conversations = sl<ChatConversationsBloc>().state.conversations;
+  List<ParentStaffContact> _roleContacts(List<ParentStaffContact> staff) {
+    final role = _tabs[_tab].role;
+    return [for (final contact in staff) if (contact.role == role) contact];
+  }
+
+  ConversationEntity? _existingChat({
+    required String uid,
+    required String otherUid,
+    required List<ConversationEntity> conversations,
+  }) {
     for (final conversation in conversations) {
-      final other = conversation.otherParticipant(auth.user.uid);
-      if (other.uid == contact.uid) {
-        setState(() => _starting = false);
-        if (!mounted) return;
-        await ParentDestinations.chat(
-          context,
-          conversationId: conversation.id,
-          title: other.name.trim().isEmpty ? contact.name : other.name,
-          imageUrl: other.profileImageUrl ?? contact.profileImageUrl,
-        );
-        return;
+      if (conversation
+          .otherParticipant(uid)
+          .uid == otherUid) {
+        return conversation;
       }
     }
+    return null;
+  }
 
-    sl<ChatConversationsBloc>().add(const ResetStartConversationEvent());
-    sl<ChatConversationsBloc>().add(
-      StartConversationEvent(
-        currentUser: ChatParticipantEntity(
-          uid: auth.user.uid,
-          name: auth.user.name,
-          role: AppRoles.parent,
-          profileImageUrl: auth.user.profileImageUrl,
+  void _seedLinkedChats({
+    required String uid,
+    required List<ParentStaffContact> contacts,
+    required List<ConversationEntity> conversations,
+  }) {
+    if (_busy || uid.isEmpty) return;
+
+    final auth = context
+        .read<AuthBloc>()
+        .state;
+    if (auth is! AuthAuthenticated) return;
+
+    for (final contact in contacts) {
+      if (_seededUids.contains(contact.uid)) continue;
+      if (_existingChat(
+        uid: uid,
+        otherUid: contact.uid,
+        conversations: conversations,
+      ) !=
+          null) {
+        _seededUids.add(contact.uid);
+        continue;
+      }
+
+      _seededUids.add(contact.uid);
+      if (mounted) {
+        setState(() => _intent = _ChatIntent.seed);
+      } else {
+        _intent = _ChatIntent.seed;
+      }
+      sl<ChatConversationsBloc>().add(const ResetStartConversationEvent());
+      sl<ChatConversationsBloc>().add(
+        StartConversationEvent(
+          currentUser: ChatParticipantEntity(
+            uid: auth.user.uid,
+            name: auth.user.name,
+            role: AppRoles.parent,
+            profileImageUrl: auth.user.profileImageUrl,
+          ),
+          otherUser: ChatParticipantEntity(
+            uid: contact.uid,
+            name: contact.name,
+            role: contact.role,
+            profileImageUrl: contact.profileImageUrl,
+          ),
         ),
-        otherUser: ChatParticipantEntity(
-          uid: contact.uid,
-          name: contact.name,
-          role: contact.role,
-          profileImageUrl: contact.profileImageUrl,
-        ),
-      ),
-    );
+      );
+      return;
+    }
   }
 
   @override
@@ -84,182 +146,136 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
     final staff = context.select<ParentBloc, List<ParentStaffContact>>(
       (bloc) => bloc.state.staffContacts,
     );
+    final children = context.select<ParentBloc, List<ParentChildSnapshot>>(
+          (bloc) => bloc.state.childrenSnapshots,
+    );
+    final roleContacts = _roleContacts(staff);
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: BlocListener<ChatConversationsBloc, ChatConversationsState>(
+      child: BlocConsumer<ChatConversationsBloc, ChatConversationsState>(
         bloc: sl<ChatConversationsBloc>(),
         listenWhen: (p, c) =>
-            p.startConversationStatus != c.startConversationStatus,
+        p.startConversationStatus != c.startConversationStatus ||
+            p.conversations != c.conversations,
         listener: (context, state) async {
-          if (!_starting) return;
-          if (state.startConversationStatus == SubmissionStatus.error) {
-            setState(() => _starting = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.startConversationError ?? 'تعذر بدء المحادثة',
-                ),
-              ),
+          if (state.conversationsStatus == SectionStatus.loaded) {
+            _seedLinkedChats(
+              uid: uid,
+              contacts: roleContacts,
+              conversations: state.conversations,
             );
+          }
+
+          if (state.startConversationStatus == SubmissionStatus.error) {
+            final wasOpen = _intent == _ChatIntent.open;
+            setState(() => _intent = _ChatIntent.none);
+            if (wasOpen && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.startConversationError ?? 'تعذر بدء المحادثة',
+                  ),
+                ),
+              );
+            }
             return;
           }
+
           if (state.startConversationStatus == SubmissionStatus.success &&
               state.startedConversation != null) {
             final conversation = state.startedConversation!;
-            sl<ChatConversationsBloc>().add(const ResetStartConversationEvent());
-            setState(() => _starting = false);
-            final other = conversation.otherParticipant(uid);
-            if (!mounted) return;
-            await ParentDestinations.chat(
-              context,
-              conversationId: conversation.id,
-              title: other.name,
-              imageUrl: other.profileImageUrl,
+            sl<ChatConversationsBloc>().add(
+              const ResetStartConversationEvent(),
             );
+            final shouldOpen = _intent == _ChatIntent.open;
+            setState(() => _intent = _ChatIntent.none);
+            if (shouldOpen) {
+              final other = conversation.otherParticipant(uid);
+              if (!mounted) return;
+              await ParentDestinations.chat(
+                context,
+                conversationId: conversation.id,
+                title: other.name,
+                imageUrl: other.profileImageUrl,
+              );
+            } else {
+              _seedLinkedChats(
+                uid: uid,
+                contacts: roleContacts,
+                conversations: sl<ChatConversationsBloc>().state.conversations,
+              );
+            }
           }
         },
-        child: Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            title: const Text('الرسائل'),
-            automaticallyImplyLeading: false,
-          ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'بحث في المحادثات...',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) => setState(() => _query = v.trim()),
-                ),
-              ),
-              _ContactsStrip(
-                contacts: staff
-                    .where((c) => c.role == _tabs[_tab].role)
-                    .toList(),
-                onTap: _startChat,
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _tabs.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: Text(_tabs[i].label),
-                        selected: _tab == i,
-                        onSelected: (_) => setState(() => _tab = i),
-                      ),
+        builder: (context, state) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: const Text('الرسائل'),
+              automaticallyImplyLeading: false,
+            ),
+            body: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _tabs.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: Text(_tabs[i].label),
+                          selected: _tab == i,
+                          onSelected: (_) {
+                            if (_tab == i) return;
+                            setState(() => _tab = i);
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              final chat = sl<ChatConversationsBloc>().state;
+                              if (chat.conversationsStatus !=
+                                  SectionStatus.loaded) {
+                                return;
+                              }
+                              _seedLinkedChats(
+                                uid: _uid,
+                                contacts: _roleContacts(
+                                  context
+                                      .read<ParentBloc>()
+                                      .state
+                                      .staffContacts,
+                                ),
+                                conversations: chat.conversations,
+                              );
+                            });
+                          },
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
-                  bloc: sl<ChatConversationsBloc>(),
-                  builder: (context, state) {
-                    if (state.conversationsStatus == SectionStatus.initial ||
-                        state.conversationsStatus == SectionStatus.loading) {
-                      return const ParentListCardsSkeleton();
-                    }
-                    if (state.conversationsStatus == SectionStatus.error) {
-                      return AppErrorWidget(
-                        message:
-                            state.conversationsError ?? 'تعذر تحميل الرسائل',
-                        onRetry: () {
-                          if (uid.isEmpty) return;
-                          sl<ChatConversationsBloc>().add(
-                            StartWatchingConversationsEvent(uid),
-                          );
-                        },
-                      );
-                    }
-
-                    final role = _tabs[_tab].role;
-                    final items = state.conversations.where((c) {
-                      final other = c.otherParticipant(uid);
-                      if (other.role != role) return false;
-                      if (_query.isEmpty) return true;
-                      return other.name.contains(_query) ||
-                          (c.lastMessage ?? '').contains(_query);
-                    }).toList();
-
-                    if (items.isEmpty) {
-                      return ParentEmptyState(
-                        icon: Icons.chat_bubble_outline,
-                        title: 'لا توجد محادثات مع ${_tabs[_tab].label}',
-                        message:
-                            'التواصل 1:1 مع المعلم أو المشرف أو الإدارة من جهات الاتصال أعلاه.',
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        return _ConversationTile(
-                          conversation: items[index],
-                          currentUid: uid,
-                          roleLabel: _tabs[_tab].label,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ContactsStrip extends StatelessWidget {
-  final List<ParentStaffContact> contacts;
-  final ValueChanged<ParentStaffContact> onTap;
-
-  const _ContactsStrip({required this.contacts, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    if (contacts.isEmpty) return const SizedBox(height: 8);
-    return SizedBox(
-      height: 88,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemCount: contacts.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final contact = contacts[index];
-          final name = contact.name.trim().isEmpty ? '—' : contact.name.trim();
-          return InkWell(
-            onTap: () => onTap(contact),
-            child: SizedBox(
-              width: 72,
-              child: Column(
-                children: [
-                  ParentUserAvatar(
-                    name: name,
-                    imageUrl: contact.profileImageUrl,
-                    radius: 24,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.labelSmall,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'بحث في المحادثات...',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: (v) => setState(() => _query = v.trim()),
                   ),
-                ],
-              ),
+                ),
+                Expanded(
+                  child: _ConversationsBody(
+                    uid: uid,
+                    query: _query,
+                    role: _tabs[_tab].role,
+                    roleLabel: _tabs[_tab].label,
+                    contacts: roleContacts,
+                    children: children,
+                    state: state,
+                    seeding: _intent == _ChatIntent.seed,
+                  ),
+                ),
+              ],
             ),
           );
         },
@@ -268,15 +284,130 @@ class _ContactsStrip extends StatelessWidget {
   }
 }
 
+class _RingAvatar extends StatelessWidget {
+  final String name;
+  final String? imageUrl;
+
+  const _RingAvatar({required this.name, this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary, width: 2),
+      ),
+      child: ParentUserAvatar(
+        name: name,
+        imageUrl: imageUrl,
+        radius: 26,
+        backgroundColor: AppColors.primaryLight,
+        foregroundColor: AppColors.primaryDark,
+      ),
+    );
+  }
+}
+
+class _ConversationsBody extends StatelessWidget {
+  final String uid;
+  final String query;
+  final String role;
+  final String roleLabel;
+  final List<ParentStaffContact> contacts;
+  final List<ParentChildSnapshot> children;
+  final ChatConversationsState state;
+  final bool seeding;
+
+  const _ConversationsBody({
+    required this.uid,
+    required this.query,
+    required this.role,
+    required this.roleLabel,
+    required this.contacts,
+    required this.children,
+    required this.state,
+    required this.seeding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.conversationsStatus == SectionStatus.initial ||
+        state.conversationsStatus == SectionStatus.loading) {
+      return const ParentListCardsSkeleton();
+    }
+    if (state.conversationsStatus == SectionStatus.error) {
+      return AppErrorWidget(
+        message: state.conversationsError ?? 'تعذر تحميل الرسائل',
+        onRetry: () {
+          if (uid.isEmpty) return;
+          sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
+        },
+      );
+    }
+
+    final items = state.conversations.where((conversation) {
+      final other = conversation.otherParticipant(uid);
+      if (other.role != role) return false;
+      if (query.isEmpty) return true;
+      return other.name.contains(query) ||
+          (conversation.lastMessage ?? '').contains(query);
+    }).toList();
+
+    if (items.isEmpty) {
+      if (seeding) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
+      }
+      if (contacts.isEmpty) {
+        return ParentEmptyState(
+          icon: Icons.chat_bubble_outline,
+          title: 'لا يوجد $roleLabel مرتبط حالياً',
+          message: role == AppRoles.admin
+              ? 'عند توفر حساب إدارة ستظهر بطاقة المحادثة هنا.'
+              : 'عند ربط أبنائك بحلقة ستظهر بطاقة $roleLabel هنا تلقائياً.',
+        );
+      }
+      return const ParentListCardsSkeleton();
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final conversation = items[index];
+        final other = conversation.otherParticipant(uid);
+        return _ConversationTile(
+          conversation: conversation,
+          currentUid: uid,
+          roleLabel: roleLabel,
+          relation: parentStaffRelationCaption(
+            role: other.role,
+            staffUid: other.uid,
+            children: children,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ConversationTile extends StatelessWidget {
   final ConversationEntity conversation;
   final String currentUid;
   final String roleLabel;
+  final String relation;
 
   const _ConversationTile({
     required this.conversation,
     required this.currentUid,
     required this.roleLabel,
+    required this.relation,
   });
 
   @override
@@ -295,29 +426,28 @@ class _ConversationTile extends StatelessWidget {
           : null,
       child: Row(
         children: [
-          if (conversation.hasUnread())
-            Container(
-              width: 22,
-              height: 22,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '${conversation.unreadCount}',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.onPrimary,
-                ),
-              ),
-            ),
-          const SizedBox(width: 8),
+          _RingAvatar(name: other.name, imageUrl: other.profileImageUrl),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTextStyles.titleLarge),
-                const SizedBox(height: 4),
+                Text(
+                  relation,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.titleLarge,
+                ),
+                const SizedBox(height: 2),
                 Text(
                   conversation.lastMessage?.trim().isNotEmpty == true
                       ? conversation.lastMessage!.trim()
@@ -331,13 +461,40 @@ class _ConversationTile extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          ParentUserAvatar(
-            name: other.name,
-            imageUrl: other.profileImageUrl,
-            radius: 22,
+          if (conversation.hasUnread()) ...[
+            const SizedBox(width: 8),
+            _UnreadBadge(count: conversation.unreadCount),
+          ],
+          const Icon(
+            Icons.chevron_left_rounded,
+            color: AppColors.textHint,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UnreadBadge extends StatelessWidget {
+  final int count;
+
+  const _UnreadBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        count > 9 ? '+9' : '$count',
+        style: AppTextStyles.labelSmall.copyWith(
+          color: AppColors.onPrimary,
+        ),
       ),
     );
   }

@@ -228,12 +228,12 @@ class AppTheme {
       textTheme: textTheme,
       primaryTextTheme: _cairoTextTheme(base.primaryTextTheme),
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.dark,
         elevation: 0,
         centerTitle: true,
         titleTextStyle: AppTextStyles.headlineMedium.copyWith(
-          color: AppColors.onPrimary,
+          color: AppColors.dark,
         ),
       ),
       cardTheme: CardThemeData(

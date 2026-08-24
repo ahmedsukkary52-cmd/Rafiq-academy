@@ -37,7 +37,7 @@ class ParentUserAvatar extends StatelessWidget {
               _initial,
               style: AppTextStyles.titleLarge.copyWith(
                 color: foregroundColor,
-                fontSize: radius * 0.85,
+                fontSize: radius * 0.7,
               ),
             )
           : null,

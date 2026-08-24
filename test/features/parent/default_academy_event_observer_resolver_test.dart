@@ -124,6 +124,13 @@ class _FakeParentRepository implements ParentRepository {
     required String paymentId,
   }) => throw UnimplementedError();
   @override
+  Future<Either<Failure, Unit>> submitPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String localFilePath,
+  }) => throw UnimplementedError();
+
+  @override
   Future<Either<Failure, ParentHousehold>> getHousehold({
     required String parentId,
     required List<String> childrenIds,

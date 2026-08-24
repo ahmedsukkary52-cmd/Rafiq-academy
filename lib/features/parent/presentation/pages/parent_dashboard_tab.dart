@@ -10,13 +10,14 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
+import '../../domain/entities/parent_entities.dart';
+import '../../domain/parent_household.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
 import '../parent_destinations.dart';
 import '../parent_display.dart';
 import '../parent_home_nav.dart';
-import '../../domain/parent_household.dart';
 import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_user_avatar.dart';
 
@@ -35,9 +36,8 @@ class ParentDashboardTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
     final user = authState is AuthAuthenticated ? authState.user : null;
-    final parentName = user?.name.trim().isNotEmpty == true
-        ? user!.name.trim()
-        : 'ظˆظ„ظٹ ط§ظ„ط£ظ…ط±';
+    final rawName = user?.name.trim() ?? '';
+    final parentName = rawName.isEmpty ? 'ولي الأمر' : rawName;
 
     return BlocBuilder<ParentBloc, ParentState>(
       buildWhen: (p, c) =>
@@ -49,6 +49,10 @@ class ParentDashboardTab extends StatelessWidget {
           p.alerts != c.alerts ||
           p.familySummary != c.familySummary,
       builder: (context, state) {
+        final loading = state.childrenStatus == SectionStatus.initial ||
+            state.childrenStatus == SectionStatus.loading;
+        final failed = state.childrenStatus == SectionStatus.error;
+
         return RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () async => _reload(context),
@@ -56,72 +60,62 @@ class ParentDashboardTab extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
-                child: _DashboardHeader(
-                  name: parentName,
-                  imageUrl: user?.profileImageUrl,
-                  childrenCount: state.childrenIds.length,
-                  onNotifications: () =>
-                      ParentDestinations.notifications(context),
-                  onProfile: () => onSwitchTab(ParentHomeNav.accountIndex),
-                ),
-              ),
-              if (state.childrenStatus == SectionStatus.initial ||
-                  state.childrenStatus == SectionStatus.loading)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: ParentDashboardSkeleton(),
-                )
-              else if (state.childrenStatus == SectionStatus.error)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: AppErrorWidget(
-                    message: state.childrenError ?? 'طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„ط¨ظٹط§ظ†ط§طھ',
-                    onRetry: () => _reload(context),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      const _QuickActionsGrid(),
-                      const SizedBox(height: 20),
-                      _SectionTitle(
-                        title: 'ظ…ط±ظƒط² ط§ظ„طھظ†ط¨ظٹظ‡ط§طھ',
-                        actionLabel: 'ط§ظ„ظƒظ„',
-                        onAction: () =>
-                            ParentDestinations.notifications(context),
+                child: Stack(
+                  children: [
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: AppColors.primaryGradient,
+                        ),
+                        child: SizedBox(height: 340),
                       ),
-                      const SizedBox(height: 10),
-                      if (state.alerts.isEmpty)
-                        const _AlertsEmptyCard()
-                      else
-                        ...state.alerts.map(
-                          (alert) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _AlertCard(alert: alert),
+                    ),
+                    Column(
+                      children: [
+                        _ParentHomeHeader(
+                          name: parentName,
+                          imageUrl: user?.profileImageUrl,
+                          childrenCount: state.childrenIds.length,
+                          onNotifications: () =>
+                              ParentDestinations.notifications(context),
+                          onProfile: () =>
+                              onSwitchTab(ParentHomeNav.accountIndex),
+                        ),
+                        Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(AppSizes.radiusXL),
+                              topRight: Radius.circular(AppSizes.radiusXL),
+                            ),
+                          ),
+                          child: loading
+                              ? const ParentDashboardSkeleton()
+                              : failed
+                              ? Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 48,
+                            ),
+                            child: AppErrorWidget(
+                              message: state.childrenError ??
+                                  'تعذر تحميل البيانات',
+                              onRetry: () => _reload(context),
+                            ),
+                          )
+                              : _DashboardBody(
+                            state: state,
+                            onSwitchTab: onSwitchTab,
                           ),
                         ),
-                      const SizedBox(height: 20),
-                      _SectionTitle(
-                        title: 'ظ…طھط§ط¨ط¹ط© ط§ظ„ط£ط¨ظ†ط§ط،',
-                        actionLabel: 'ظ…ط´ط§ظ‡ط¯ط© ط§ظ„ظƒظ„',
-                        onAction: () =>
-                            onSwitchTab(ParentHomeNav.childrenIndex),
-                      ),
-                      const SizedBox(height: 10),
-                      if (state.childrenIds.isEmpty)
-                        const _ChildrenEmptyBanner()
-                      else
-                        _ChildrenCarousel(snapshots: state.childrenSnapshots),
-                      const SizedBox(height: 20),
-                      _FamilyCard(
-                        summary: state.familySummary,
-                        onTap: () => ParentDestinations.reports(context),
-                      ),
-                    ]),
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         );
@@ -130,14 +124,74 @@ class ParentDashboardTab extends StatelessWidget {
   }
 }
 
-class _DashboardHeader extends StatelessWidget {
+class _DashboardBody extends StatelessWidget {
+  final ParentState state;
+  final ValueChanged<int> onSwitchTab;
+
+  const _DashboardBody({
+    required this.state,
+    required this.onSwitchTab,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _QuickActionsCard(),
+          const SizedBox(height: 8),
+          _SectionTitle(
+            title: 'مركز التنبيهات الذكية',
+            actionLabel: 'الكل',
+            onAction: () => ParentDestinations.notifications(context),
+          ),
+          const SizedBox(height: 10),
+          if (state.alerts.isEmpty)
+            const _AlertsEmptyCard()
+          else
+            ...state.alerts.map(
+                  (alert) =>
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _AlertCard(alert: alert),
+                  ),
+            ),
+          const SizedBox(height: 12),
+          _SectionTitle(
+            title: 'مركز المتابعة السريع',
+            actionLabel: 'مشاهدة الكل',
+            onAction: () => onSwitchTab(ParentHomeNav.childrenIndex),
+          ),
+          const SizedBox(height: 10),
+          if (state.childrenIds.isEmpty)
+            const _ChildrenEmptyBanner()
+          else
+            _ChildrenCarousel(
+              snapshots: state.childrenSnapshots,
+              onSupervisor: () => onSwitchTab(ParentHomeNav.messagesIndex),
+            ),
+          const SizedBox(height: 20),
+          _FamilyCard(
+            summary: state.familySummary,
+            snapshots: state.childrenSnapshots,
+            onTap: () => ParentDestinations.reports(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParentHomeHeader extends StatelessWidget {
   final String name;
   final String? imageUrl;
   final int childrenCount;
   final VoidCallback onNotifications;
   final VoidCallback onProfile;
 
-  const _DashboardHeader({
+  const _ParentHomeHeader({
     required this.name,
     required this.imageUrl,
     required this.childrenCount,
@@ -145,61 +199,41 @@ class _DashboardHeader extends StatelessWidget {
     required this.onProfile,
   });
 
+  String _hijriChipLabel() {
+    HijriCalendar.setLocal('ar');
+    return HijriCalendar.now().toFormat('dd MMMM yyyy');
+  }
+
+  String _roleSubtitle() {
+    if (childrenCount <= 0) return 'ولي أمر';
+    return 'ولي أمر — ${parentEasternDigits('$childrenCount')} أبناء';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hijri = HijriCalendar.now();
-    final dateLabel =
-        '${hijri.hDay} ${hijri.longMonthName} ${hijri.hYear}';
-
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  BlocSelector<NotificationsBloc, NotificationsState, int>(
-                    bloc: sl<NotificationsBloc>(),
-                    selector: (s) => s.unreadCount,
-                    builder: (context, unread) {
-                      return NotificationBadge(
-                        count: unread,
-                        child: _HeaderIconButton(
-                          icon: Icons.notifications_outlined,
-                          onTap: onNotifications,
-                        ),
-                      );
-                    },
-                  ),
-                  const Spacer(),
-                  GestureDetector(
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: MediaQuery
+              .paddingOf(context)
+              .top + 12,
+          left: 20,
+          right: 20,
+          bottom: 36,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: InkWell(
                     onTap: onProfile,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
                     child: Row(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              name,
-                              style: AppTextStyles.titleLarge.copyWith(
-                                color: AppColors.onPrimary,
-                              ),
-                            ),
-                            Text(
-                              childrenCount == 0
-                                  ? 'ظˆظ„ظٹ ط§ظ„ط£ظ…ط±'
-                                  : 'ظˆظ„ظٹ ط£ظ…ط± â€” $childrenCount ط£ط¨ظ†ط§ط،',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.onPrimaryMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 10),
                         ParentUserAvatar(
                           name: name,
                           imageUrl: imageUrl,
@@ -207,57 +241,136 @@ class _DashboardHeader extends StatelessWidget {
                           backgroundColor: AppColors.onPrimaryOverlay,
                           foregroundColor: AppColors.onPrimary,
                         ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  color: AppColors.onPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _roleSubtitle(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  color: AppColors.onPrimaryMuted,
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 12,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(width: 8),
+                BlocSelector<NotificationsBloc, NotificationsState, int>(
+                  bloc: sl<NotificationsBloc>(),
+                  selector: (s) => s.unreadCount,
+                  builder: (context, unread) {
+                    return Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _HeaderSquareButton(
+                            icon: Icons.search_rounded,
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('قريباً')),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _HeaderSquareButton(
+                            icon: Icons.notifications_outlined,
+                            showDot: unread > 0,
+                            onTap: onNotifications,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'السلام عليكم',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                height: 1.4,
               ),
-              const SizedBox(height: 18),
-              Text(
-                'ط§ظ„ط³ظ„ط§ظ… ط¹ظ„ظٹظƒظ…',
-                style: AppTextStyles.headlineLarge.copyWith(
-                  color: AppColors.onPrimary,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'متابعة أبنائكم اليوم',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.displayLarge.copyWith(
+                color: AppColors.onPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 24,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.onPrimaryOverlay,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                ),
+                child: Text(
+                  parentEasternDigits(_hijriChipLabel()),
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.onPrimary,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    height: 1.2,
+                  ),
                 ),
               ),
-              Text(
-                'ظ…طھط§ط¨ط¹ط© ط£ط¨ظ†ط§ط¦ظƒظ… ط§ظ„ظٹظˆظ…',
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: AppColors.onPrimaryMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.onPrimaryOverlay,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                  ),
-                  child: Text(
-                    dateLabel,
-                    style: AppTextStyles.labelMedium.copyWith(
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _HeaderIconButton extends StatelessWidget {
+class _HeaderSquareButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final bool showDot;
 
-  const _HeaderIconButton({required this.icon, required this.onTap});
+  const _HeaderSquareButton({
+    required this.icon,
+    required this.onTap,
+    this.showDot = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -270,83 +383,138 @@ class _HeaderIconButton extends StatelessWidget {
         child: SizedBox(
           width: 40,
           height: 40,
-          child: Icon(icon, color: AppColors.onPrimary),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(icon, color: AppColors.onPrimary, size: 20),
+              if (showDot)
+                const Positioned(
+                  top: 8,
+                  right: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: SizedBox(width: 8, height: 8),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid();
+class _QuickActionsCard extends StatelessWidget {
+  const _QuickActionsCard();
 
   @override
   Widget build(BuildContext context) {
-    final items = <({IconData icon, Color color, String label, VoidCallback onTap})>[
-      (
+    final items = <_QuickAction>[
+      _QuickAction(
         icon: Icons.assessment_outlined,
         color: AppColors.success,
-        label: 'ط§ظ„طھظ‚ط§ط±ظٹط±',
+        label: 'التقارير',
         onTap: () => ParentDestinations.reports(context),
       ),
-      (
+      _QuickAction(
         icon: Icons.calendar_month_outlined,
         color: AppColors.info,
-        label: 'ط§ظ„ط¬ط¯ظˆظ„',
+        label: 'الجدول',
         onTap: () => ParentDestinations.schedule(context),
       ),
-      (
+      _QuickAction(
         icon: Icons.notifications_outlined,
-        color: const Color(0xFFE91E63),
-        label: 'ط§ظ„ط¥ط´ط¹ط§ط±ط§طھ',
+        color: const Color(0xFFE53935),
+        label: 'الإشعارات',
         onTap: () => ParentDestinations.notifications(context),
       ),
-      (
+      _QuickAction(
         icon: Icons.fact_check_outlined,
         color: AppColors.primary,
-        label: 'ط§ظ„ط­ط¶ظˆط±',
+        label: 'الحضور',
         onTap: () => _openNeedsChild(context, ParentDestinations.attendance),
       ),
-      (
+      _QuickAction(
         icon: Icons.grade_outlined,
         color: AppColors.secondary,
-        label: 'ط§ظ„طھظ‚ظٹظٹظ…ط§طھ',
+        label: 'التقييمات',
         onTap: () => _openNeedsChild(context, ParentDestinations.evaluations),
       ),
-      (
+      _QuickAction(
         icon: Icons.emoji_events_outlined,
         color: AppColors.awardWeekly,
-        label: 'ط§ظ„ط¥ظ†ط¬ط§ط²ط§طھ',
+        label: 'الإنجازات',
         onTap: () => ParentDestinations.achievements(context),
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.05,
-      children: [
-        for (final item in items)
-          Material(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppSizes.radiusL),
-            child: InkWell(
-              onTap: item.onTap,
-              borderRadius: BorderRadius.circular(AppSizes.radiusL),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(item.icon, color: item.color, size: 28),
-                  const SizedBox(height: 8),
-                  Text(item.label, style: AppTextStyles.titleMedium),
-                ],
-              ),
+    return Material(
+      color: AppColors.surface,
+      elevation: 0,
+      borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.softShadow,
+              blurRadius: 18,
+              offset: Offset(0, 8),
             ),
-          ),
-      ],
+          ],
+        ),
+        child: GridView.count(
+          padding: EdgeInsets.zero,
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 4,
+          childAspectRatio: 1.05,
+          children: [
+            for (final item in items)
+              InkWell(
+                onTap: item.onTap,
+                borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: item.color.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(item.icon, color: item.color, size: 24),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -360,17 +528,36 @@ class _QuickActionsGrid extends StatelessWidget {
     open,
   ) {
     final state = context.read<ParentBloc>().state;
-    final id = state.selectedChildId ??
-        (state.childrenIds.isNotEmpty ? state.childrenIds.first : null);
-    if (id == null) {
+    final selected = state.selectedChildId?.trim();
+    final fallback =
+    state.childrenIds.isEmpty ? null : state.childrenIds.first.trim();
+    final id = (selected != null && selected.isNotEmpty) ? selected : fallback;
+    if (id == null || id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ظ„ط§ ظٹظˆط¬ط¯ ط·ط§ظ„ط¨ ظ…ط±طھط¨ط· ظ„ط¹ط±ط¶ ظ‡ط°ظ‡ ط§ظ„طµظپط­ط©')),
+        const SnackBar(content: Text('لا يوجد طالب مرتبط لعرض هذه الصفحة')),
       );
       return;
     }
-    final name = state.childDisplayName(id);
-    open(context, studentId: id, studentName: name);
+    open(
+      context,
+      studentId: id,
+      studentName: state.childDisplayName(id),
+    );
   }
+}
+
+class _QuickAction {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAction({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+  });
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -388,9 +575,25 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        TextButton(onPressed: onAction, child: Text(actionLabel)),
-        const Spacer(),
-        Text(title, style: AppTextStyles.headlineMedium),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.headlineMedium.copyWith(
+              color: AppColors.primaryDark,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: onAction,
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            visualDensity: VisualDensity.compact,
+          ),
+          child: Text(actionLabel),
+        ),
       ],
     );
   }
@@ -401,20 +604,24 @@ class _AlertsEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return _SurfaceCard(
       child: Row(
         children: [
+          const Icon(
+            Icons.notifications_none_rounded,
+            color: AppColors.textHint,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'ظ„ط§ طھظˆط¬ط¯ طھظ†ط¨ظٹظ‡ط§طھ ط­ط§ظ„ظٹط§ظ‹. ط³طھط¸ظ‡ط± ظ‡ظ†ط§ ط§ظ„طھظ†ط¨ظٹظ‡ط§طھ ط§ظ„ظ…ط±طھط¨ط·ط© ط¨ط­ط§ظ„ط© ط§ظ„ط£ط¨ظ†ط§ط،.',
+              'لا توجد تنبيهات حالياً. ستظهر هنا التنبيهات المرتبطة بحالة الأبناء.',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
-              textAlign: TextAlign.right,
             ),
           ),
-          const SizedBox(width: 12),
-          const Icon(Icons.notifications_none_rounded, color: AppColors.textHint),
         ],
       ),
     );
@@ -426,45 +633,113 @@ class _AlertCard extends StatelessWidget {
 
   const _AlertCard({required this.alert});
 
+  Color get _accent {
+    return switch (alert.kind) {
+      ParentAlertKind.overduePayment => AppColors.warning,
+      ParentAlertKind.atRiskAbsence => AppColors.error,
+      ParentAlertKind.atRiskNoEval => AppColors.info,
+    };
+  }
+
+  IconData get _icon {
+    return switch (alert.kind) {
+      ParentAlertKind.overduePayment => Icons.payments_outlined,
+      ParentAlertKind.atRiskAbsence => Icons.event_busy_rounded,
+      ParentAlertKind.atRiskNoEval => Icons.warning_amber_rounded,
+    };
+  }
+
+  String get _actionLabel {
+    return switch (alert.kind) {
+      ParentAlertKind.overduePayment => 'سداد',
+      ParentAlertKind.atRiskAbsence => 'الحضور',
+      ParentAlertKind.atRiskNoEval => 'التقييم',
+    };
+  }
+
+  Future<void> _open(BuildContext context) {
+    final studentId = alert.studentId.trim();
+    if (alert.kind == ParentAlertKind.overduePayment) {
+      return ParentDestinations.subscriptions(context);
+    }
+    if (studentId.isEmpty) return Future.value();
+    if (alert.kind == ParentAlertKind.atRiskAbsence) {
+      return ParentDestinations.attendance(
+        context,
+        studentId: studentId,
+        studentName: alert.studentName,
+      );
+    }
+    return ParentDestinations.evaluations(
+      context,
+      studentId: studentId,
+      studentName: alert.studentName,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      onTap: () {
-        if (alert.kind == ParentAlertKind.overduePayment) {
-          ParentDestinations.subscriptions(context);
-          return;
-        }
-        if (alert.kind == ParentAlertKind.atRiskAbsence) {
-          ParentDestinations.attendance(
-            context,
-            studentId: alert.studentId,
-            studentName: alert.studentName,
-          );
-          return;
-        }
-        ParentDestinations.evaluations(
-          context,
-          studentId: alert.studentId,
-          studentName: alert.studentName,
-        );
-      },
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              alert.message,
-              style: AppTextStyles.bodyMedium,
-              textAlign: TextAlign.right,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppSizes.radiusL),
+      child: InkWell(
+        onTap: () => _open(context),
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 5,
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(AppSizes.radiusL),
+                      bottomRight: Radius.circular(AppSizes.radiusL),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    child: Row(
+                      children: [
+                        Icon(_icon, color: _accent),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            alert.message,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textPrimary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () => _open(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: _accent,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
+                          child: Text(_actionLabel),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
-          Icon(
-            alert.kind == ParentAlertKind.overduePayment
-                ? Icons.payments_outlined
-                : Icons.warning_amber_rounded,
-            color: AppColors.warning,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -475,11 +750,14 @@ class _ChildrenEmptyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return _SurfaceCard(
       child: Text(
-        'ظ„ط§ ظٹظˆط¬ط¯ ط·ظ„ط§ط¨ ظ…ط±طھط¨ط·ظˆظ† ط¨ظ‡ط°ط§ ط§ظ„ط­ط³ط§ط¨ ط¨ط¹ط¯.',
-        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
-        textAlign: TextAlign.right,
+        'لا يوجد طلاب مرتبطون بهذا الحساب بعد.',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }
@@ -487,83 +765,27 @@ class _ChildrenEmptyBanner extends StatelessWidget {
 
 class _ChildrenCarousel extends StatelessWidget {
   final List<ParentChildSnapshot> snapshots;
+  final VoidCallback onSupervisor;
 
-  const _ChildrenCarousel({required this.snapshots});
+  const _ChildrenCarousel({
+    required this.snapshots,
+    required this.onSupervisor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 176,
+      height: 268,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: snapshots.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
-          final child = snapshots[index];
-          final attendance = parentAttendanceLabel(child.todayAttendanceStatus);
-          final payment = parentPaymentLabel(child.paymentStatus);
           return SizedBox(
-            width: 260,
-            child: AppCard(
-              onTap: () => ParentDestinations.childProfile(
-                context,
-                studentId: child.studentId,
-                studentName: child.displayName,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () => ParentDestinations.childProfile(
-                          context,
-                          studentId: child.studentId,
-                          studentName: child.displayName,
-                        ),
-                        child: const Text('ط§ظ„ظ…ظ„ظپ'),
-                      ),
-                      const Spacer(),
-                      Flexible(
-                        child: Text(
-                          child.displayName,
-                          style: AppTextStyles.titleLarge,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ParentUserAvatar(
-                        name: child.displayName,
-                        imageUrl: child.profileImageUrl,
-                        radius: 18,
-                      ),
-                    ],
-                  ),
-                  Text(
-                    child.halaqaName.trim().isEmpty
-                        ? 'ظ„ظ… طھظڈط­ط¯ط¯ ط­ظ„ظ‚ط© ط¨ط¹ط¯'
-                        : child.halaqaName,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    [
-                      'ط§ظ„ظٹظˆظ…: $attendance',
-                      if (payment.isNotEmpty) payment,
-                      if (child.isAtRisk) 'ظٹط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©',
-                    ].join(' آ· '),
-                    style: AppTextStyles.labelMedium.copyWith(
-                      color: child.isAtRisk
-                          ? AppColors.warning
-                          : AppColors.textHint,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                ],
-              ),
+            width: 292,
+            child: _ChildFollowUpCard(
+              child: snapshots[index],
+              onSupervisor: onSupervisor,
             ),
           );
         },
@@ -572,67 +794,398 @@ class _ChildrenCarousel extends StatelessWidget {
   }
 }
 
-class _FamilyCard extends StatelessWidget {
-  final ParentFamilySummary summary;
-  final VoidCallback onTap;
+class _ChildFollowUpCard extends StatelessWidget {
+  final ParentChildSnapshot child;
+  final VoidCallback onSupervisor;
 
-  const _FamilyCard({required this.summary, required this.onTap});
+  const _ChildFollowUpCard({
+    required this.child,
+    required this.onSupervisor,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final name = child.displayName;
+    final halaqa = child.halaqaName.trim();
+    final attendance = parentAttendanceLabel(child.todayAttendanceStatus);
+    final payment = parentPaymentLabel(child.paymentStatus);
+    final hasSupervisor = (child.supervisorId ?? '')
+        .trim()
+        .isNotEmpty;
+    final progress = parentPercentLabel(
+      child.overallProgressPercent > 0 ? child.overallProgressPercent : null,
+    );
+    final attendancePct = parentPercentLabel(child.attendancePercentInWindow);
+
+    return _SurfaceCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              ParentUserAvatar(
+                name: name,
+                imageUrl: child.profileImageUrl,
+                radius: 20,
+                backgroundColor: AppColors.secondaryBg,
+                foregroundColor: AppColors.secondaryDeep,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.titleLarge.copyWith(height: 1.2),
+                    ),
+                    Text(
+                      halaqa.isEmpty ? 'لم تُحدد حلقة بعد' : halaqa,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textHint,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              _StatusChip(
+                label: child.isAtRisk ? 'يحتاج متابعة' : 'متابعة جيدة',
+                color: child.isAtRisk ? AppColors.warning : AppColors.success,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _MiniStat(value: progress, label: 'أداء'),
+              const SizedBox(width: 6),
+              _MiniStat(value: attendancePct, label: 'حضور'),
+              const SizedBox(width: 6),
+              _MiniStat(value: attendance, label: 'اليوم'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(AppSizes.radiusM),
+            ),
+            child: Text(
+              halaqa.isEmpty ? 'لا توجد حلقة مرتبطة اليوم' : 'الحلقة: $halaqa',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelMedium.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (payment.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: child.paymentStatus == PaymentStatus.overdue
+                    ? AppColors.secondaryBg
+                    : AppColors.successBg,
+                borderRadius: BorderRadius.circular(AppSizes.radiusS),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    child.paymentStatus == PaymentStatus.paid
+                        ? Icons.check_circle_rounded
+                        : Icons.payments_outlined,
+                    size: 16,
+                    color: child.paymentStatus == PaymentStatus.overdue
+                        ? AppColors.warning
+                        : AppColors.success,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'الاشتراك: $payment',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textPrimary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const Spacer(),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () =>
+                      ParentDestinations.childProfile(
+                        context,
+                        studentId: child.studentId,
+                        studentName: name,
+                      ),
+                  style: ElevatedButton.styleFrom(
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadiusGeometry.all(
+                          Radius.circular(8)),
+                    ),
+                    backgroundColor: AppColors.primaryGradientMid,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    minimumSize: const Size(0, 42),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('الملف'),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () =>
+                      ParentDestinations.reports(
+                        context,
+                        studentId: child.studentId,
+                        studentName: name,
+                      ),
+                  style: OutlinedButton.styleFrom(
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadiusGeometry.all(
+                          Radius.circular(8)),
+                    ),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    minimumSize: const Size(0, 42),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('تقرير'),
+                ),
+              ),
+              if (hasSupervisor) ...[
+                const SizedBox(width: 6),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onSupervisor,
+                    style: OutlinedButton.styleFrom(
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadiusGeometry.all(Radius.circular(
+                            8)),
+                      ),
+                      backgroundColor: AppColors.awardWeekly.withValues(
+                          alpha: 0.12),
+                      side: const BorderSide(color: AppColors.border),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      minimumSize: const Size(0, 42),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: AppColors.awardWeekly,
+                    ),
+                    child: const Text('المشرف'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 96),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: AppTextStyles.labelSmall.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _MiniStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceGrey,
+          borderRadius: BorderRadius.circular(AppSizes.radiusM),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textHint,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FamilyCard extends StatelessWidget {
+  final ParentFamilySummary summary;
+  final List<ParentChildSnapshot> snapshots;
+  final VoidCallback onTap;
+
+  const _FamilyCard({
+    required this.summary,
+    required this.snapshots,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final verses = snapshots.fold<int>(
+      0,
+          (sum, child) => sum + child.totalVersesMemorized,
+    );
+    final attendance = parentPercentLabel(summary.averageAttendancePercent);
+
     return Material(
       color: AppColors.dark,
-      borderRadius: BorderRadius.circular(AppSizes.radiusL),
+      borderRadius: BorderRadius.circular(AppSizes.radiusXL),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'ظ†ط¸ط±ط© ط¹ط§ط¦ظ„ظٹط©',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.secondary,
-                ),
-                textAlign: TextAlign.right,
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'أداء العائلة خلال ١٤ يوماً',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.headlineMedium.copyWith(
+                            color: AppColors.onPrimary,
+                          ),
+                        ),
+                        Text(
+                          'من نافذة الحضور والمتابعة الحالية',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.onPrimaryMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.onPrimaryOverlay,
+                      borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                    ),
+                    child: Text(
+                      'نظرة عائلية',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'ط£ط¯ط§ط، ط§ظ„ط¹ط§ط¦ظ„ط©',
-                style: AppTextStyles.headlineMedium.copyWith(
-                  color: AppColors.onPrimary,
-                ),
-                textAlign: TextAlign.right,
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _FamilyMetric(
+                    value: parentEasternDigits('${summary.childrenCount}'),
+                    label: 'أبناء',
+                  ),
+                  _FamilyMetric(value: attendance, label: 'متوسط الحضور'),
+                  _FamilyMetric(
+                    value: parentEasternDigits('$verses'),
+                    label: 'آيات محفوظة',
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.darkCard,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                ),
-                child: Row(
-                  children: [
-                    _FamilyMetric(
-                      value: '${summary.childrenCount}',
-                      label: 'ط£ط¨ظ†ط§ط،',
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _FamilyMetric(
+                    value: parentEasternDigits('${summary.presentTodayCount}'),
+                    label: 'حاضر اليوم',
+                  ),
+                  _FamilyMetric(
+                    value: parentEasternDigits('${summary.atRiskCount}'),
+                    label: 'يحتاج متابعة',
+                    emphasize: summary.atRiskCount > 0,
+                  ),
+                  _FamilyMetric(
+                    value: parentEasternDigits(
+                      '${summary.overduePaymentsCount}',
                     ),
-                    _FamilyMetric(
-                      value: '${summary.presentTodayCount}',
-                      label: 'ط­ط§ط¶ط± ط§ظ„ظٹظˆظ…',
-                    ),
-                    _FamilyMetric(
-                      value: '${summary.atRiskCount}',
-                      label: 'ظ…طھط§ط¨ط¹ط©',
-                    ),
-                    _FamilyMetric(
-                      value: '${summary.overduePaymentsCount}',
-                      label: 'ظ…طھط£ط®ط±',
-                    ),
-                  ],
-                ),
+                    label: 'متأخر سداد',
+                    emphasize: summary.overduePaymentsCount > 0,
+                  ),
+                ],
               ),
             ],
           ),
@@ -645,29 +1198,82 @@ class _FamilyCard extends StatelessWidget {
 class _FamilyMetric extends StatelessWidget {
   final String value;
   final String label;
+  final bool emphasize;
 
-  const _FamilyMetric({required this.value, required this.label});
+  const _FamilyMetric({
+    required this.value,
+    required this.label,
+    this.emphasize = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: AppTextStyles.headlineMedium.copyWith(
-              color: AppColors.onPrimary,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: AppColors.darkCard,
+          borderRadius: BorderRadius.circular(AppSizes.radiusM),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.headlineMedium.copyWith(
+                color: emphasize ? AppColors.error : AppColors.onPrimary,
+                fontSize: 16,
+                height: 1.2,
+              ),
             ),
-          ),
-          Text(
-            label,
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.onPrimaryMuted,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.onPrimaryMuted,
+                fontSize: 10,
+                height: 1.2,
+              ),
             ),
-            textAlign: TextAlign.center,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SurfaceCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const _SurfaceCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(14),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
       ),
+      child: child,
     );
   }
 }

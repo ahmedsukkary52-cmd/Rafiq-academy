@@ -60,6 +60,10 @@ class ParentState extends Equatable {
   final SubmissionStatus walletPayStatus;
   final String? walletPayError;
 
+  final SubmissionStatus paymentProofStatus;
+  final String? paymentProofError;
+  final String? paymentProofPaymentId;
+
   const ParentState({
     this.childrenStatus = SectionStatus.initial,
     this.childrenIds = const [],
@@ -93,6 +97,9 @@ class ParentState extends Equatable {
     this.walletError,
     this.walletPayStatus = SubmissionStatus.idle,
     this.walletPayError,
+    this.paymentProofStatus = SubmissionStatus.idle,
+    this.paymentProofError,
+    this.paymentProofPaymentId,
   });
 
   factory ParentState.initial() => const ParentState();
@@ -141,6 +148,9 @@ class ParentState extends Equatable {
     Object? walletError = _unset,
     SubmissionStatus? walletPayStatus,
     Object? walletPayError = _unset,
+    SubmissionStatus? paymentProofStatus,
+    Object? paymentProofError = _unset,
+    Object? paymentProofPaymentId = _unset,
   }) {
     return ParentState(
       childrenStatus: childrenStatus ?? this.childrenStatus,
@@ -208,6 +218,13 @@ class ParentState extends Equatable {
       walletPayError: identical(walletPayError, _unset)
           ? this.walletPayError
           : walletPayError as String?,
+      paymentProofStatus: paymentProofStatus ?? this.paymentProofStatus,
+      paymentProofError: identical(paymentProofError, _unset)
+          ? this.paymentProofError
+          : paymentProofError as String?,
+      paymentProofPaymentId: identical(paymentProofPaymentId, _unset)
+          ? this.paymentProofPaymentId
+          : paymentProofPaymentId as String?,
     );
   }
 
@@ -245,5 +262,8 @@ class ParentState extends Equatable {
     walletError,
     walletPayStatus,
     walletPayError,
+    paymentProofStatus,
+    paymentProofError,
+    paymentProofPaymentId,
   ];
 }

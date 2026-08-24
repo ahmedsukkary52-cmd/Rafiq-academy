@@ -166,9 +166,18 @@ class _FakeSupervisorRepository implements SupervisorRepository {
   Future<Either<Failure, Unit>> submitReport(SupervisorReportEntity r) =>
       throw UnimplementedError();
   @override
-  Future<Either<Failure, Unit>> registerNewStudent({
+  Future<Either<Failure, Unit>> admitStudentToHalaqa({
+    required String supervisorId,
     required String halaqaId,
     required String studentId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Unit>> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
   }) => throw UnimplementedError();
   @override
   Future<Either<Failure, List<AbsenceRequestEntity>>>

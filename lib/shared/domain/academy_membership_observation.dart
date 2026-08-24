@@ -1,6 +1,6 @@
 import 'academy_membership_invariant.dart';
 
-/// Externally observable membership completeness (W8 Rule 8).
+/// Externally observable membership completeness (W8 Rule 8 / Dual-Halaqa).
 ///
 /// Academy Admission exposes **only** these two states to consumers.
 /// Never invent a third “partial” membership state from individual fields.
@@ -16,18 +16,14 @@ enum AcademyMembershipObservation {
 class AcademyMembershipObservations {
   const AcademyMembershipObservations._();
 
-  /// Full contract observation from the approved invariant members.
+  /// Full contract observation from the per-pair invariant members.
   static AcademyMembershipObservation fromInvariant({
     required bool rosterContainsStudent,
-    required String? profileHalaqaId,
-    required String expectedHalaqaId,
     required String? role,
     required bool? isActive,
   }) {
     final complete = AcademyMembershipInvariant.isComplete(
       rosterContainsStudent: rosterContainsStudent,
-      profileHalaqaId: profileHalaqaId,
-      expectedHalaqaId: expectedHalaqaId,
       role: role,
       isActive: isActive,
     );
@@ -36,8 +32,8 @@ class AcademyMembershipObservations {
         : AcademyMembershipObservation.notEstablished;
   }
 
-  /// Student-facing surfaces: profile pointer present ⇒ established for that
-  /// surface; otherwise not established. Does **not** consult `isActive` alone.
+  /// Student-facing surfaces: profile **primary** pointer present ⇒ established
+  /// for that surface; otherwise not. Does **not** mean dual-halaqa membership.
   static AcademyMembershipObservation forStudentFacing(
     String? profileHalaqaId,
   ) {

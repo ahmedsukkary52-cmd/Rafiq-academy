@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart';
 
@@ -9,8 +12,10 @@ import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../analytics/domain/analytics_recitation_honesty.dart';
+import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
+import '../../domain/parent_payment_proof.dart';
 import '../../domain/parent_wallet.dart';
 import '../../domain/services/parent_recipient_resolver.dart';
 import '../models/parent_model.dart';
@@ -19,10 +24,12 @@ import '../models/parent_model.dart';
 class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   final FirebaseFirestore firestore;
   final FirebaseFunctions functions;
+  final FirebaseStorage storage;
 
   const ParentRemoteDatasourceImpl({
     required this.firestore,
     required this.functions,
+    required this.storage,
   });
 
   @override
@@ -277,6 +284,79 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     // } catch (e) {
     //         throw ServerException(e.toString());
     // }
+  }
+
+  @override
+  Future<void> submitPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String localFilePath,
+  }) async {
+    final pid = parentId.trim();
+    final payId = paymentId.trim();
+    final path = localFilePath.trim();
+    if (pid.isEmpty || payId.isEmpty || path.isEmpty) {
+      throw const ServerException('بيانات إثبات الدفع غير صالحة');
+    }
+
+    final file = File(path);
+    if (!await file.exists()) {
+      throw const ServerException('ملف الإيصال غير موجود');
+    }
+    final length = await file.length();
+    if (length <= 0) {
+      throw const ServerException('ملف الإيصال فارغ');
+    }
+    if (length > ParentPaymentProofContract.maxBytes) {
+      throw const ServerException('حجم الإيصال أكبر من ١٠ ميجا');
+    }
+
+    try {
+      final paymentRef = firestore
+          .collection(FirestoreCollections.payments)
+          .doc(payId);
+      final paymentSnap = await paymentRef.get();
+      if (!paymentSnap.exists) {
+        throw const ServerException('الدفعة غير موجودة');
+      }
+      final pdata = paymentSnap.data() ?? const <String, dynamic>{};
+      if ((pdata['parentId'] as String? ?? '').trim() != pid) {
+        throw const ServerException('هذه الدفعة غير مرتبطة بحسابك');
+      }
+      final status = (pdata['status'] as String? ?? '').trim();
+      if (status == 'paid') {
+        throw const ServerException('تم سداد هذه الدفعة بالفعل');
+      }
+
+      final ext = path.contains('.')
+          ? path.split('.').last.toLowerCase()
+          : 'jpg';
+      final safeExt = RegExp(r'^[a-z0-9]{1,8}$').hasMatch(ext) ? ext : 'jpg';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      final storagePath = ParentPaymentProofContract.storagePath(
+        parentId: pid,
+        paymentId: payId,
+        fileName: fileName,
+      );
+      final ref = storage.ref(storagePath);
+      await ref.putFile(file);
+      final downloadUrl = await ref.getDownloadURL();
+
+      await paymentRef.update({
+        ParentPaymentProofContract.proofStoragePathField: storagePath,
+        ParentPaymentProofContract.proofDownloadUrlField: downloadUrl,
+        ParentPaymentProofContract.proofSubmittedAtField:
+            FieldValue.serverTimestamp(),
+        ParentPaymentProofContract.proofSubmittedByField: pid,
+        ParentPaymentProofContract.proofFileNameField: fileName,
+        'method': ParentPaymentProofContract.externalMethod,
+        // Intentionally omit status / paidAt — Admin confirms payment.
+      });
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
   }
 
   @override
@@ -571,14 +651,26 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         : AttendancePolicy.attendancePercentFromStatuses(windowStatuses);
 
     var hasEval = false;
+    RecitationGrade? latestGrade;
+    DateTime? latestGradeDate;
     for (final doc in recitationSnap.docs) {
       final data = doc.data();
-      if (AnalyticsRecitationHonesty.countsAsEvaluationForAtRisk(
+      if (!AnalyticsRecitationHonesty.countsAsEvaluationForAtRisk(
         reviewStatus: data['reviewStatus'] as String?,
         grade: data['grade'] as String?,
       )) {
-        hasEval = true;
-        break;
+        continue;
+      }
+      hasEval = true;
+      final grade = _recitationGradeFrom(data['grade']);
+      if (grade == null) continue;
+      final rawDate = data['date'];
+      final date = rawDate is Timestamp
+          ? rawDate.toDate()
+          : (rawDate is DateTime ? rawDate : now);
+      if (latestGradeDate == null || date.isAfter(latestGradeDate)) {
+        latestGradeDate = date;
+        latestGrade = grade;
       }
     }
 
@@ -606,6 +698,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       isAtRisk: signal != null,
       riskSignal: signal,
       attendancePercentInWindow: attendancePercent,
+      latestReviewedGrade: latestGrade,
     );
   }
 
@@ -669,5 +762,17 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       return AttendancePolicy.statusAbsent;
     }
     return null;
+  }
+
+  static RecitationGrade? _recitationGradeFrom(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return null;
+    return switch (raw) {
+      'ممتاز' => RecitationGrade.excellent,
+      'جيد جداً' => RecitationGrade.veryGood,
+      'جيد' => RecitationGrade.good,
+      'يحتاج تحسين' => RecitationGrade.needsRetry,
+      _ => null,
+    };
   }
 }

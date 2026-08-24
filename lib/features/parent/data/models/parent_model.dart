@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/entities/parent_entities.dart';
+import '../../domain/parent_payment_proof.dart';
 
 export '../../../../shared/data/absence_request_model.dart';
 
@@ -14,10 +15,16 @@ class PaymentModel extends PaymentEntity {
     super.paidAt,
     required super.status,
     super.method,
+    super.proofStoragePath,
+    super.proofDownloadUrl,
+    super.proofSubmittedAt,
+    super.proofSubmittedBy,
+    super.proofFileName,
   });
 
   factory PaymentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final submitted = data[ParentPaymentProofContract.proofSubmittedAtField];
     return PaymentModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
@@ -29,6 +36,15 @@ class PaymentModel extends PaymentEntity {
           : null,
       status: _statusFromString(data['status'] ?? ''),
       method: data['method'] as String?,
+      proofStoragePath:
+          data[ParentPaymentProofContract.proofStoragePathField] as String?,
+      proofDownloadUrl:
+          data[ParentPaymentProofContract.proofDownloadUrlField] as String?,
+      proofSubmittedAt: submitted is Timestamp ? submitted.toDate() : null,
+      proofSubmittedBy:
+          data[ParentPaymentProofContract.proofSubmittedByField] as String?,
+      proofFileName:
+          data[ParentPaymentProofContract.proofFileNameField] as String?,
     );
   }
 

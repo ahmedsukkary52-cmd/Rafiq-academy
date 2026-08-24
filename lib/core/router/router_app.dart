@@ -19,6 +19,7 @@ import '../../features/notifications/presentation/pages/notification_page.dart';
 import '../../features/onboarding/presentation/pages/onboarding_page.dart';
 import '../../features/parent/presentation/pages/parent_absence_requests_page.dart';
 import '../../features/parent/presentation/pages/parent_home_page.dart';
+import '../../features/parent/presentation/pages/parent_notifications_page.dart';
 import '../../features/progress_report/presentation/pages/student_progress_report_page.dart';
 import '../../features/review_schedule/presentation/pages/student_review_schedule_page.dart';
 import '../../features/schedule/presentation/pages/student_schedule_page.dart';
@@ -395,7 +396,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'notifications',
-            builder: (_, __) => const NotificationsPage(),
+            builder: (_, __) => const ParentNotificationsPage(),
           ),
         ],
       ),

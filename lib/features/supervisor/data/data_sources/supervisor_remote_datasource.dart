@@ -10,20 +10,9 @@ abstract class SupervisorRemoteDatasource {
 
   Future<void> submitReport(SupervisorReportEntity report);
 
-  /// Admit / add existing student to [halaqaId] via Academy Admission Workflow.
-  /// Requires [halaqaId] to be supervised by [supervisorId].
-  Future<void> admitStudentToHalaqa({
-    required String supervisorId,
+  Future<void> registerNewStudent({
     required String halaqaId,
     required String studentId,
-  });
-
-  /// Immediate move between supervised halaqat (Dual-Halaqa transfer).
-  Future<void> transferStudentBetweenHalaqat({
-    required String supervisorId,
-    required String studentId,
-    required String sourceHalaqaId,
-    required String targetHalaqaId,
   });
 
   /// `users/{id}.name` for the given ids (chunked `whereIn`).

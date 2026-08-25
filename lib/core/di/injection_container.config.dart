@@ -302,8 +302,6 @@ import 'package:rafiq_academy/features/supervisor/data/repositories/supervisor_r
     as _i582;
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart'
     as _i307;
-import 'package:rafiq_academy/features/supervisor/domain/usecases/admit_student_to_halaqa_usecase.dart'
-    as _i954;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart'
     as _i904;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_halaqat_usecase.dart'
@@ -316,8 +314,6 @@ import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_s
     as _i499;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/submit_supervisor_report_usecase.dart'
     as _i910;
-import 'package:rafiq_academy/features/supervisor/domain/usecases/transfer_student_between_halaqat_usecase.dart'
-    as _i259;
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_bloc.dart'
     as _i149;
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart'
@@ -744,9 +740,6 @@ extension GetItInjectableX on _i174.GetIt {
         firebaseAuth: gh<_i59.FirebaseAuth>(),
       ),
     );
-    gh.lazySingleton<_i954.AdmitStudentToHalaqaUseCase>(
-      () => _i954.AdmitStudentToHalaqaUseCase(gh<_i307.SupervisorRepository>()),
-    );
     gh.lazySingleton<_i904.GetSupervisedAbsenceRequestsUseCase>(
       () => _i904.GetSupervisedAbsenceRequestsUseCase(
         gh<_i307.SupervisorRepository>(),
@@ -764,11 +757,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i910.SubmitSupervisorReportUseCase>(
       () =>
           _i910.SubmitSupervisorReportUseCase(gh<_i307.SupervisorRepository>()),
-    );
-    gh.lazySingleton<_i259.TransferStudentBetweenHalaqatUseCase>(
-      () => _i259.TransferStudentBetweenHalaqatUseCase(
-        gh<_i307.SupervisorRepository>(),
-      ),
     );
     gh.lazySingleton<_i552.ScheduleRepository>(
       () => _i268.ScheduleRepositoryImpl(gh<_i756.ScheduleRemoteDatasource>()),
@@ -1077,9 +1065,7 @@ extension GetItInjectableX on _i174.GetIt {
             gh<_i904.GetSupervisedAbsenceRequestsUseCase>(),
         issueAchievement: gh<_i13.IssueAchievementUseCase>(),
         submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
-        admitStudentToHalaqa: gh<_i954.AdmitStudentToHalaqaUseCase>(),
-        transferStudentBetweenHalaqat:
-            gh<_i259.TransferStudentBetweenHalaqatUseCase>(),
+        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
       ),
     );
     gh.lazySingleton<_i407.GetTeacherHomeFeedUseCase>(

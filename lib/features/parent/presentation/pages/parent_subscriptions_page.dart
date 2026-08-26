@@ -149,6 +149,8 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
     );
     if (selected == null || !mounted) return;
     await _startExternalPayThenProof(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(

@@ -93,7 +93,7 @@ class _HeaderCircleButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(width: 44, height: 44, child: Icon(icon, color: color)),
-      )),
+      ),
     );
   }
 }

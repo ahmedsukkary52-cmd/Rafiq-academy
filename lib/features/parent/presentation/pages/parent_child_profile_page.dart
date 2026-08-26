@@ -110,7 +110,6 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
         });
     });
   }
-  }
 
   Future<void> _startTeacherChat(ParentChildSnapshot? snapshot) async {
     final auth = context.read<AuthBloc>().state;
@@ -221,16 +220,18 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
     }
     items.sort((a, b) => b.date.compareTo(a.date));
     return items.take(3).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final snapshot = context.select<ParentBloc, ParentChildSnapshot?>(
       (bloc) => bloc.state.snapshotFor(widget.studentId),
     );
+    final fallbackName = (widget.studentName ?? '').trim();
     final name = (_profile?.name.trim().isNotEmpty == true)
         ? _profile!.name.trim()
         : (snapshot?.displayName ??
-              ((widget.studentName ?? '').trim().isEmptyy
-                  ? 'الطالب: widget.studentName!.trim()));
+              (fallbackName.isEmpty ? 'الطالب' : fallbackName));
     final halaqa = (_profile?.halaqaName.trim().isNotEmpty == true)
         ? _profile!.halaqaName.trim()
         : (snapshot?.halaqaName.trim() ?? '');

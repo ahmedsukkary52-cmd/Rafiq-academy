@@ -101,7 +101,7 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
             index: _currentTab,
             children: [
               SupervisorDashboardTab(onSwitchTab: _switchTab),
-              const SupervisorStudentsTab(),
+              SupervisorStudentsTab(onSwitchTab: _switchTab),
               const SupervisorMessagesTab(),
               SupervisorReportsTab(onSwitchTab: _switchTab),
               const SupervisorAccountTab(),

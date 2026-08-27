@@ -618,7 +618,7 @@ class _StatsGrid extends StatelessWidget {
         iconColor: AppColors.awardWeekly,
         value: unreadMessages,
         label: 'رسائل غير مقروءة',
-        footer: unreadMessages > 0 ? 'افتح صندوق الرسائل' : 'لا جديد',
+        footer: unreadMessages > 0 ? 'رسائل جديدة' : 'لا جديد',
         footerColor: AppColors.awardWeekly,
         onTap: onMessages,
       ),
@@ -646,7 +646,7 @@ class _StatsGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.18,
       ),
       itemBuilder: (context, i) => _StatCard(item: items[i]),
     );
@@ -691,7 +691,7 @@ class _StatCard extends StatelessWidget {
         onTap: item.onTap,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSizes.radiusL),
             border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
@@ -709,23 +709,27 @@ class _StatCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: Container(
-                  width: 34,
-                  height: 34,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: item.iconBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(item.icon, color: item.iconColor, size: 18),
+                  child: Icon(item.icon, color: item.iconColor, size: 17),
                 ),
               ),
               const Spacer(),
-              Text(
-                _easternDigits('${item.value}'),
-                style: AppTextStyles.headlineMedium.copyWith(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 26,
-                  height: 1.1,
-                  color: AppColors.textPrimary,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  _easternDigits('${item.value}'),
+                  style: AppTextStyles.headlineMedium.copyWith(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 24,
+                    height: 1.0,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
@@ -736,10 +740,10 @@ class _StatCard extends StatelessWidget {
                 style: AppTextStyles.labelMedium.copyWith(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                  fontSize: 11,
+                  height: 1.2,
                 ),
               ),
-              const SizedBox(height: 4),
               Text(
                 item.footer,
                 maxLines: 1,
@@ -747,7 +751,8 @@ class _StatCard extends StatelessWidget {
                 style: AppTextStyles.labelSmall.copyWith(
                   color: item.footerColor,
                   fontWeight: FontWeight.w600,
-                  fontSize: 11,
+                  fontSize: 10,
+                  height: 1.2,
                 ),
               ),
             ],
@@ -773,7 +778,7 @@ class _QuickActions extends StatelessWidget {
       (
         Icons.account_balance_wallet_outlined,
         AppColors.secondaryDeep,
-        'إدارة المدفوعات',
+      'المدفوعات',
         () {
           ScaffoldMessenger.of(
             context,
@@ -844,12 +849,14 @@ class _QuickActionTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+          height: 92,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSizes.radiusL),
             border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
           ),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 44,
@@ -864,12 +871,12 @@ class _QuickActionTile extends StatelessWidget {
               Text(
                 label,
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.labelSmall.copyWith(
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
-                  height: 1.25,
+                  height: 1.2,
                 ),
               ),
             ],

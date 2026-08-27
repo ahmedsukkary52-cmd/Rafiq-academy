@@ -10,6 +10,9 @@ class SupervisorStudentRow extends Equatable {
   final String? profileImageUrl;
   final List<String> halaqaIds;
   final List<String> halaqaNames;
+  final List<String> teacherIds;
+  final List<String> teacherNames;
+  final int level;
   final bool isAtRisk;
   final double attendancePercent;
   final String? lastGradeLabel;
@@ -21,6 +24,9 @@ class SupervisorStudentRow extends Equatable {
     this.profileImageUrl,
     this.halaqaIds = const [],
     this.halaqaNames = const [],
+    this.teacherIds = const [],
+    this.teacherNames = const [],
+    this.level = 1,
     this.isAtRisk = false,
     this.attendancePercent = 0,
     this.lastGradeLabel,
@@ -30,6 +36,12 @@ class SupervisorStudentRow extends Equatable {
   int get membershipCount => halaqaIds.length;
 
   bool get isDualMember => membershipCount >= 2;
+
+  bool get isOutstanding =>
+      overallProgressPercent >= 80 || (lastGradeLabel?.trim() == 'ممتاز');
+
+  bool get hasAttendanceConcern =>
+      attendancePercent > 0 && attendancePercent < 70;
 
   String get displayName {
     final trimmed = name.trim();
@@ -41,6 +53,26 @@ class SupervisorStudentRow extends Equatable {
     return halaqaNames.join(' · ');
   }
 
+  String get teacherLabel {
+    final names = teacherNames
+        .map((n) => n.trim())
+        .where((n) => n.isNotEmpty)
+        .toList();
+    if (names.isEmpty) return '';
+    return names.map((n) => n.startsWith('أ.') ? n : 'أ. $n').join(' · ');
+  }
+
+  String get searchBlob {
+    return [
+      displayName,
+      halaqaLabel,
+      teacherLabel,
+      ...teacherIds,
+      'مستوى $level',
+      if (lastGradeLabel != null) lastGradeLabel!,
+    ].join(' ').toLowerCase();
+  }
+
   @override
   List<Object?> get props => [
     studentId,
@@ -48,6 +80,9 @@ class SupervisorStudentRow extends Equatable {
     profileImageUrl,
     halaqaIds,
     halaqaNames,
+    teacherIds,
+    teacherNames,
+    level,
     isAtRisk,
     attendancePercent,
     lastGradeLabel,
@@ -93,13 +128,22 @@ class SupervisorRoster {
   static List<SupervisorStudentRow> mergeSummaries({
     required Iterable<HalaqaEntity> halaqat,
     required Map<String, List<HalaqaStudentSummaryEntity>> byHalaqaId,
+    Map<String, String> teacherNamesById = const {},
   }) {
     final byStudent = <String, SupervisorStudentRow>{};
     final namesById = {for (final h in halaqat) h.id: h.name};
+    final teacherByHalaqa = {
+      for (final h in halaqat)
+        if (h.teacherId.trim().isNotEmpty) h.id: h.teacherId.trim(),
+    };
 
     for (final entry in byHalaqaId.entries) {
       final halaqaId = entry.key;
       final halaqaName = namesById[halaqaId] ?? halaqaId;
+      final teacherId = teacherByHalaqa[halaqaId];
+      final teacherName = teacherId == null
+          ? ''
+          : (teacherNamesById[teacherId]?.trim() ?? '');
       for (final s in entry.value) {
         final id = s.uid.trim();
         if (id.isEmpty) continue;
@@ -111,6 +155,9 @@ class SupervisorRoster {
             profileImageUrl: s.profileImageUrl,
             halaqaIds: [halaqaId],
             halaqaNames: [halaqaName],
+            teacherIds: teacherId == null ? const [] : [teacherId],
+            teacherNames: teacherName.isEmpty ? const [] : [teacherName],
+            level: s.level,
             isAtRisk: s.isAtRisk,
             attendancePercent: s.attendancePercent,
             lastGradeLabel: s.lastGradeLabel,
@@ -119,9 +166,15 @@ class SupervisorRoster {
         } else {
           final ids = [...existing.halaqaIds];
           final names = [...existing.halaqaNames];
+          final tIds = [...existing.teacherIds];
+          final tNames = [...existing.teacherNames];
           if (!ids.contains(halaqaId)) {
             ids.add(halaqaId);
             names.add(halaqaName);
+          }
+          if (teacherId != null && !tIds.contains(teacherId)) {
+            tIds.add(teacherId);
+            if (teacherName.isNotEmpty) tNames.add(teacherName);
           }
           byStudent[id] = SupervisorStudentRow(
             studentId: id,
@@ -129,6 +182,9 @@ class SupervisorRoster {
             profileImageUrl: existing.profileImageUrl ?? s.profileImageUrl,
             halaqaIds: ids,
             halaqaNames: names,
+            teacherIds: tIds,
+            teacherNames: tNames,
+            level: existing.level >= s.level ? existing.level : s.level,
             isAtRisk: existing.isAtRisk || s.isAtRisk,
             attendancePercent: existing.attendancePercent > 0
                 ? existing.attendancePercent

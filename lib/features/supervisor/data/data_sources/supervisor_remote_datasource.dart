@@ -1,6 +1,8 @@
 import '../../../../shared/data/absence_request_model.dart';
+import '../../../parent/data/models/parent_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 abstract class SupervisorRemoteDatasource {
@@ -34,4 +36,11 @@ abstract class SupervisorRemoteDatasource {
     required List<String> halaqaIds,
     required DateTime date,
   });
+
+  Future<List<PaymentModel>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  });
+
+  Future<void> reviewPaymentProof(PaymentReviewParams params);
 }

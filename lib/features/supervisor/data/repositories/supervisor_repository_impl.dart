@@ -7,6 +7,7 @@ import '../../../../core/network/network_info.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../data_sources/supervisor_remote_datasource.dart';
@@ -125,6 +126,37 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
           date: date,
         ),
       );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<PaymentEntity>>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getPaymentsForStudents(
+          supervisorId: supervisorId,
+          studentIds: studentIds,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> reviewPaymentProof(
+    PaymentReviewParams params,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.reviewPaymentProof(params);
+      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

@@ -4,6 +4,7 @@ import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
+import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/supervisor_report_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart';
@@ -74,6 +75,17 @@ class _FakeSupervisorRepository implements SupervisorRepository {
   @override
   Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
     List<String> userIds,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<PaymentEntity>>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Unit>> reviewPaymentProof(
+    PaymentReviewParams params,
   ) => throw UnimplementedError();
 }
 

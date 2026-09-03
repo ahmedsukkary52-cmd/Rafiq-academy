@@ -9,6 +9,7 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 class SupervisorHalaqatPage extends StatelessWidget {
   const SupervisorHalaqatPage({super.key});
@@ -25,7 +26,7 @@ class SupervisorHalaqatPage extends StatelessWidget {
         builder: (context, state) {
           if (state.halaqatStatus == SectionStatus.initial ||
               state.halaqatStatus == SectionStatus.loading) {
-            return const Center(child: CircularProgressIndicator());
+            return const SupervisorCenteredListSkeleton();
           }
           if (state.halaqatStatus == SectionStatus.error) {
             return AppErrorWidget(

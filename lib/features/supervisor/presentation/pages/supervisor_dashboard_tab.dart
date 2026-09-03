@@ -26,6 +26,7 @@ import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
 import '../supervisor_home_nav.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 String _easternDigits(String input) {
   const western = '0123456789';
@@ -94,6 +95,20 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
     setState(() => _rosterLoading = true);
     final byHalaqa = <String, List<HalaqaStudentSummaryEntity>>{};
     final getStudents = sl<GetHalaqaStudentsUseCase>();
+
+    final auth = context.read<AuthBloc>().state;
+    if (auth is AuthAuthenticated) {
+      final studentIds = <String>{
+        for (final h in state.halaqat) ...h.studentIds,
+      }.toList();
+      context.read<SupervisorBloc>().add(
+        LoadSupervisedPaymentsEvent(
+          supervisorId: auth.user.uid,
+          studentIds: studentIds,
+        ),
+      );
+    }
+
     await Future.wait(
       state.halaqat.map((h) async {
         final result = await getStudents(HalaqaStudentsParams(h.id));
@@ -142,7 +157,9 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
           for (final h in state.halaqat)
             if (h.teacherId.trim().isNotEmpty) h.teacherId.trim(),
         }.length;
-        final students = SupervisorRoster.uniqueStudentIds(state.halaqat).length;
+        final students = SupervisorRoster.uniqueStudentIds(
+          state.halaqat,
+        ).length;
 
         return RefreshIndicator(
           color: AppColors.primary,
@@ -176,6 +193,9 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
                           onAccount: () => widget.onSwitchTab(
                             SupervisorHomeNav.accountIndex,
                           ),
+                          onSearch: () => widget.onSwitchTab(
+                            SupervisorHomeNav.studentsIndex,
+                          ),
                           onNotifications: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
@@ -195,8 +215,8 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
                           ),
                           child: loading
                               ? const Padding(
-                                  padding: EdgeInsets.all(48),
-                                  child: AppLoadingWidget(),
+                                  padding: EdgeInsets.fromLTRB(16, 24, 16, 24),
+                                  child: SupervisorStatsGridSkeleton(),
                                 )
                               : failed
                               ? Padding(
@@ -238,6 +258,7 @@ class _SupervisorHomeHeader extends StatelessWidget {
   final String? imageUrl;
   final int halaqatCount;
   final VoidCallback onAccount;
+  final VoidCallback onSearch;
   final VoidCallback onNotifications;
 
   const _SupervisorHomeHeader({
@@ -245,6 +266,7 @@ class _SupervisorHomeHeader extends StatelessWidget {
     required this.imageUrl,
     required this.halaqatCount,
     required this.onAccount,
+    required this.onSearch,
     required this.onNotifications,
   });
 
@@ -336,11 +358,7 @@ class _SupervisorHomeHeader extends StatelessWidget {
                         children: [
                           _HeaderSquareButton(
                             icon: Icons.search_rounded,
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('قريباً')),
-                              );
-                            },
+                            onTap: onSearch,
                           ),
                           const SizedBox(width: 8),
                           _HeaderSquareButton(
@@ -493,6 +511,9 @@ class _Body extends StatelessWidget {
                 teachers: teachersCount,
                 atRisk: atRisk.length,
                 unreadMessages: unread,
+                activeSubscriptions: state.payments
+                    .where((p) => p.status == PaymentStatus.paid)
+                    .length,
                 onStudents: () => onSwitchTab(SupervisorHomeNav.studentsIndex),
                 onHalaqat: () => SupervisorDestinations.halaqat(context),
                 onTeachers: () => SupervisorDestinations.teachers(context),
@@ -502,7 +523,7 @@ class _Body extends StatelessWidget {
             },
           ),
           const SizedBox(height: 20),
-          const _QuickActions(),
+          _QuickActions(onSwitchTab: onSwitchTab),
           const SizedBox(height: 22),
           _AlertsSection(
             alertCount: alertCount,
@@ -524,19 +545,21 @@ class _Body extends StatelessWidget {
               onAction: () => SupervisorDestinations.halaqat(context),
             ),
             const SizedBox(height: 10),
-            ...state.halaqat.take(4).map(
-              (h) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _HalaqaCard(
-                  name: h.name,
-                  students: h.studentIds.length,
-                  onTap: () => SupervisorDestinations.halaqaDetail(
-                    context,
-                    halaqaId: h.id,
+            ...state.halaqat
+                .take(4)
+                .map(
+                  (h) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _HalaqaCard(
+                      name: h.name,
+                      students: h.studentIds.length,
+                      onTap: () => SupervisorDestinations.halaqaDetail(
+                        context,
+                        halaqaId: h.id,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
           ],
         ],
       ),
@@ -550,6 +573,7 @@ class _StatsGrid extends StatelessWidget {
   final int teachers;
   final int atRisk;
   final int unreadMessages;
+  final int activeSubscriptions;
   final VoidCallback onStudents;
   final VoidCallback onHalaqat;
   final VoidCallback onTeachers;
@@ -562,6 +586,7 @@ class _StatsGrid extends StatelessWidget {
     required this.teachers,
     required this.atRisk,
     required this.unreadMessages,
+    required this.activeSubscriptions,
     required this.onStudents,
     required this.onHalaqat,
     required this.onTeachers,
@@ -626,15 +651,11 @@ class _StatsGrid extends StatelessWidget {
         icon: Icons.fact_check_outlined,
         iconBg: const Color(0xFFFFF0E6),
         iconColor: const Color(0xFFE67E22),
-        value: 0,
+        value: activeSubscriptions,
         label: 'اشتراكات نشطة',
-        footer: 'قريباً',
-        footerColor: AppColors.textHint,
-        onTap: () {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('قريباً')));
-        },
+        footer: 'عرض المدفوعات',
+        footerColor: AppColors.textSecondary,
+        onTap: () => SupervisorDestinations.payments(context),
       ),
     ];
 
@@ -709,16 +730,16 @@ class _StatCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: Container(
-                  width: 32,
-                  height: 32,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: item.iconBg,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(item.icon, color: item.iconColor, size: 17),
+                  child: Icon(item.icon, color: item.iconColor, size: 22),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
@@ -764,7 +785,9 @@ class _StatCard extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+  final ValueChanged<int> onSwitchTab;
+
+  const _QuickActions({required this.onSwitchTab});
 
   @override
   Widget build(BuildContext context) {
@@ -778,24 +801,35 @@ class _QuickActions extends StatelessWidget {
       (
         Icons.account_balance_wallet_outlined,
         AppColors.secondaryDeep,
-      'المدفوعات',
-        () {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('قريباً')));
-        },
+        'المدفوعات',
+        () => SupervisorDestinations.payments(context),
       ),
       (
-        Icons.assessment_outlined,
-        AppColors.success,
-        'تقرير سريع',
-        () => SupervisorDestinations.reportsQuick(context),
+        Icons.emoji_events_outlined,
+        AppColors.gradeGood,
+        'الجوائز',
+        () => SupervisorDestinations.awardsHub(context),
       ),
       (
         Icons.warning_amber_rounded,
         AppColors.error,
         'طلاب في خطر',
         () => SupervisorDestinations.followUp(context),
+      ),
+    ];
+
+    final more = <(IconData, Color, String, VoidCallback)>[
+      (
+        Icons.campaign_outlined,
+        AppColors.awardWeekly,
+        'الإعلانات',
+        () => SupervisorDestinations.announcements(context),
+      ),
+      (
+        Icons.calendar_month_outlined,
+        AppColors.secondaryDeep,
+        'التقويم',
+        () => SupervisorDestinations.calendar(context),
       ),
     ];
 
@@ -820,6 +854,25 @@ class _QuickActions extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var i = 0; i < more.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(
+                child: _QuickActionTile(
+                  icon: more[i].$1,
+                  color: more[i].$2,
+                  label: more[i].$3,
+                  onTap: more[i].$4,
+                ),
+              ),
+            ],
+            const Expanded(child: SizedBox()),
+            const SizedBox(width: 8),
+            const Expanded(child: SizedBox()),
           ],
         ),
       ],
@@ -939,9 +992,9 @@ class _AlertsSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         if (loading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: AppLoadingWidget(),
+          const SizedBox(
+            height: 200,
+            child: SupervisorListCardsSkeleton(itemCount: 2),
           )
         else if (atRisk.isEmpty && absences.isEmpty)
           AppCard(
@@ -981,9 +1034,7 @@ class _AlertsSection extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: _AlertTile(
                 title: 'استئذان غياب',
-                subtitle: reason.isEmpty
-                    ? 'طلب استئذان يحتاج مراجعة'
-                    : reason,
+                subtitle: reason.isEmpty ? 'طلب استئذان يحتاج مراجعة' : reason,
                 icon: Icons.event_busy_outlined,
                 iconColor: AppColors.warning,
                 actionLabel: 'عرض',

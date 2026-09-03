@@ -22,6 +22,7 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 class SupervisorFollowUpPage extends StatefulWidget {
   const SupervisorFollowUpPage({super.key});
@@ -153,7 +154,7 @@ class _SupervisorFollowUpPageState extends State<SupervisorFollowUpPage> {
         buildWhen: (p, c) => p.halaqat != c.halaqat,
         builder: (context, state) {
           if (_loading) {
-            return const Center(child: CircularProgressIndicator());
+            return const SupervisorCenteredListSkeleton();
           }
           if (_error != null) {
             return AppErrorWidget(message: _error!, onRetry: _load);

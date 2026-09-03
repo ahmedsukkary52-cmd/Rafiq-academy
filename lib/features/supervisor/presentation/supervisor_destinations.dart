@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../student/presentation/pages/student_profile_page.dart';
-import 'pages/supervisor_admin_request_page.dart';
+import 'pages/supervisor_announcements_page.dart';
 import 'pages/supervisor_attendance_page.dart';
 import 'pages/supervisor_awards_hub_page.dart';
+import 'pages/supervisor_calendar_page.dart';
 import 'pages/supervisor_excuses_page.dart';
 import 'pages/supervisor_follow_up_page.dart';
 import 'pages/supervisor_grant_award_page.dart';
 import 'pages/supervisor_halaqa_detail_page.dart';
 import 'pages/supervisor_halaqat_page.dart';
+import 'pages/supervisor_payments_page.dart';
 import 'pages/supervisor_register_page.dart';
 import 'pages/supervisor_reports_page.dart';
 import 'pages/supervisor_teachers_page.dart';
@@ -100,22 +102,25 @@ class SupervisorDestinations {
     );
   }
 
+  static Future<void> payments(BuildContext context) {
+    return _push(context, const SupervisorPaymentsPage());
+  }
+
+  static Future<void> announcements(BuildContext context) {
+    return _push(context, const SupervisorAnnouncementsPage());
+  }
+
+  static Future<void> calendar(BuildContext context) {
+    return _push(context, const SupervisorCalendarPage());
+  }
+
   static Future<void> teachers(BuildContext context) {
     return _push(context, const SupervisorTeachersPage());
   }
 
+  /// Opens the reports tab compose sheet — prefer [onSwitchTab] to reports index.
+  @Deprecated('Use reports tab with compose action instead')
   static Future<void> reportsQuick(BuildContext context) {
     return _push(context, const SupervisorReportsPage(quickCompose: true));
-  }
-
-  static Future<void> adminRequest(
-    BuildContext context, {
-    required String halaqaId,
-    required String halaqaName,
-  }) {
-    return _push(
-      context,
-      SupervisorAdminRequestPage(halaqaId: halaqaId, halaqaName: halaqaName),
-    );
   }
 }

@@ -20,11 +20,18 @@ class PaymentModel extends PaymentEntity {
     super.proofSubmittedAt,
     super.proofSubmittedBy,
     super.proofFileName,
+    super.reviewStatus,
+    super.reviewedBy,
+    super.reviewedAt,
+    super.reviewNotes,
+    super.amountPaidConfirmed,
+    super.remainingAmount,
   });
 
   factory PaymentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final submitted = data[ParentPaymentProofContract.proofSubmittedAtField];
+    final reviewed = data[ParentPaymentProofContract.reviewedAtField];
     return PaymentModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
@@ -45,6 +52,17 @@ class PaymentModel extends PaymentEntity {
           data[ParentPaymentProofContract.proofSubmittedByField] as String?,
       proofFileName:
           data[ParentPaymentProofContract.proofFileNameField] as String?,
+      reviewStatus:
+          data[ParentPaymentProofContract.reviewStatusField] as String?,
+      reviewedBy: data[ParentPaymentProofContract.reviewedByField] as String?,
+      reviewedAt: reviewed is Timestamp ? reviewed.toDate() : null,
+      reviewNotes: data[ParentPaymentProofContract.reviewNotesField] as String?,
+      amountPaidConfirmed:
+          (data[ParentPaymentProofContract.amountPaidConfirmedField] as num?)
+              ?.toDouble(),
+      remainingAmount:
+          (data[ParentPaymentProofContract.remainingAmountField] as num?)
+              ?.toDouble(),
     );
   }
 

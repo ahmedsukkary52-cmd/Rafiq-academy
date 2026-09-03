@@ -8,6 +8,7 @@ import '../../domain/usecases/get_supervised_absence_requests_usecase.dart';
 import '../../domain/usecases/get_supervised_halaqat_usecase.dart';
 import '../../domain/usecases/get_supervisor_day_board_usecase.dart';
 import '../../domain/usecases/issue_achievement_usecase.dart';
+import '../../domain/usecases/payment_review_usecases.dart';
 import '../../domain/usecases/submit_supervisor_report_usecase.dart';
 import '../../domain/usecases/transfer_student_between_halaqat_usecase.dart';
 import 'supervisor_event.dart';
@@ -22,6 +23,8 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
   final SubmitSupervisorReportUseCase submitSupervisorReport;
   final AdmitStudentToHalaqaUseCase admitStudentToHalaqa;
   final TransferStudentBetweenHalaqatUseCase transferStudentBetweenHalaqat;
+  final GetSupervisedPaymentsUseCase getSupervisedPayments;
+  final ReviewPaymentProofUseCase reviewPaymentProof;
 
   String? _supervisorId;
 
@@ -33,6 +36,8 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     required this.submitSupervisorReport,
     required this.admitStudentToHalaqa,
     required this.transferStudentBetweenHalaqat,
+    required this.getSupervisedPayments,
+    required this.reviewPaymentProof,
   }) : super(SupervisorState.initial()) {
     on<LoadSupervisedHalaqatEvent>(_onLoadHalaqat);
     on<LoadSupervisorDayBoardEvent>(_onLoadDayBoard);
@@ -45,6 +50,9 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<ResetAdmitStudentEvent>(_onResetAdmitStudent);
     on<TransferStudentBetweenHalaqatEvent>(_onTransferStudent);
     on<ResetTransferStudentEvent>(_onResetTransferStudent);
+    on<LoadSupervisedPaymentsEvent>(_onLoadPayments);
+    on<ReviewPaymentProofEvent>(_onReviewPayment);
+    on<ResetReviewPaymentEvent>(_onResetReviewPayment);
     on<ClearSupervisorSessionEvent>(_onClearSession);
   }
 
@@ -327,6 +335,84 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       state.copyWith(
         transferStudentStatus: SubmissionStatus.idle,
         transferStudentError: null,
+      ),
+    );
+  }
+
+  Future<void> _onLoadPayments(
+    LoadSupervisedPaymentsEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        paymentsStatus: SectionStatus.loading,
+        paymentsError: null,
+      ),
+    );
+    final result = await getSupervisedPayments(
+      SupervisedPaymentsParams(
+        supervisorId: event.supervisorId,
+        studentIds: event.studentIds,
+      ),
+    );
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.error,
+          paymentsError: failure.message,
+        ),
+      ),
+      (payments) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.loaded,
+          payments: payments,
+          paymentsError: null,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onReviewPayment(
+    ReviewPaymentProofEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        reviewPaymentStatus: SubmissionStatus.submitting,
+        reviewPaymentError: null,
+      ),
+    );
+    final result = await reviewPaymentProof(event.params);
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
+          reviewPaymentStatus: SubmissionStatus.error,
+          reviewPaymentError: failure.message,
+        ),
+      ),
+      (_) async {
+        emit(state.copyWith(reviewPaymentStatus: SubmissionStatus.success));
+        final studentIds = {
+          for (final h in state.halaqat) ...h.studentIds,
+        }.toList();
+        add(
+          LoadSupervisedPaymentsEvent(
+            supervisorId: event.params.supervisorId,
+            studentIds: studentIds,
+          ),
+        );
+      },
+    );
+  }
+
+  void _onResetReviewPayment(
+    ResetReviewPaymentEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        reviewPaymentStatus: SubmissionStatus.idle,
+        reviewPaymentError: null,
       ),
     );
   }

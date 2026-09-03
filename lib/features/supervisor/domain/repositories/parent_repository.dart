@@ -5,6 +5,7 @@ import '../../../../core/error/failure.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../entities/achievement_issue_entity.dart';
+import '../entities/payment_review_params.dart';
 import '../entities/supervisor_report_entity.dart';
 
 abstract class SupervisorRepository {
@@ -40,6 +41,14 @@ abstract class SupervisorRepository {
     required List<String> halaqaIds,
     required DateTime date,
   });
+
+  /// Payments for students in supervised halaqat (chunked `whereIn`).
+  Future<Either<Failure, List<PaymentEntity>>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  });
+
+  Future<Either<Failure, Unit>> reviewPaymentProof(PaymentReviewParams params);
 }
 
 class SupervisorIdParams extends Equatable {

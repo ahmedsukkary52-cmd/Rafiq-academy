@@ -17,6 +17,7 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 import 'supervisor_awards_hub_page.dart';
 
 class SupervisorGrantAwardPage extends StatefulWidget {
@@ -197,7 +198,7 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
                 state.issueAchievementStatus == SubmissionStatus.submitting;
 
             if (_loadingRoster) {
-              return const Center(child: CircularProgressIndicator());
+              return const SupervisorFormSkeleton();
             }
             if (_rosterError != null) {
               return AppErrorWidget(
@@ -295,13 +296,7 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: submitting ? null : _submit,
-                  child: submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('منح'),
+                  child: submitting ? const Text('جاري…') : const Text('منح'),
                 ),
               ],
             );

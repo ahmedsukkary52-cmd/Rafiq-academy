@@ -12,6 +12,7 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 class SupervisorHalaqaDetailPage extends StatefulWidget {
   final String halaqaId;
@@ -133,15 +134,6 @@ class _SupervisorHalaqaDetailPageState
                       sourceHalaqaId: halaqa.id,
                     ),
                   ),
-                  _ActionChip(
-                    icon: Icons.admin_panel_settings_outlined,
-                    label: 'طلب للإدارة',
-                    onTap: () => SupervisorDestinations.adminRequest(
-                      context,
-                      halaqaId: halaqa.id,
-                      halaqaName: halaqa.name,
-                    ),
-                  ),
                 ],
               ),
               if (_showStudents) ...[
@@ -162,9 +154,9 @@ class _SupervisorHalaqaDetailPageState
                 ),
                 const SizedBox(height: 12),
                 if (_loadingStudents)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
+                  const SizedBox(
+                    height: 220,
+                    child: SupervisorListCardsSkeleton(itemCount: 3),
                   )
                 else if (_studentsError != null)
                   AppErrorWidget(

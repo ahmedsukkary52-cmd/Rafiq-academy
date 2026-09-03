@@ -312,6 +312,8 @@ import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor
     as _i824;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/issue_achievement_usecase.dart'
     as _i13;
+import 'package:rafiq_academy/features/supervisor/domain/usecases/payment_review_usecases.dart'
+    as _i893;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_student_usecase.dart'
     as _i499;
 import 'package:rafiq_academy/features/supervisor/domain/usecases/submit_supervisor_report_usecase.dart'
@@ -758,6 +760,13 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i13.IssueAchievementUseCase>(
       () => _i13.IssueAchievementUseCase(gh<_i307.SupervisorRepository>()),
     );
+    gh.lazySingleton<_i893.GetSupervisedPaymentsUseCase>(
+      () =>
+          _i893.GetSupervisedPaymentsUseCase(gh<_i307.SupervisorRepository>()),
+    );
+    gh.lazySingleton<_i893.ReviewPaymentProofUseCase>(
+      () => _i893.ReviewPaymentProofUseCase(gh<_i307.SupervisorRepository>()),
+    );
     gh.lazySingleton<_i499.RegisterNewStudentUseCase>(
       () => _i499.RegisterNewStudentUseCase(gh<_i307.SupervisorRepository>()),
     );
@@ -1080,6 +1089,8 @@ extension GetItInjectableX on _i174.GetIt {
         admitStudentToHalaqa: gh<_i954.AdmitStudentToHalaqaUseCase>(),
         transferStudentBetweenHalaqat:
             gh<_i259.TransferStudentBetweenHalaqatUseCase>(),
+        getSupervisedPayments: gh<_i893.GetSupervisedPaymentsUseCase>(),
+        reviewPaymentProof: gh<_i893.ReviewPaymentProofUseCase>(),
       ),
     );
     gh.lazySingleton<_i407.GetTeacherHomeFeedUseCase>(

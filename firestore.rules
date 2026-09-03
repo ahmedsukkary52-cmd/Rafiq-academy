@@ -11,6 +11,11 @@ rules_version = '2';
 // Interim: require a signed-in Firebase Auth user (closes anonymous access).
 // Full role/ownership rules remain Category B (B-R1 hardening) — do not loosen
 // this back to a time-boxed open world.
+//
+// Payment proofs live on `payments/{paymentId}` (same doc). Parent may write
+// proof* + reviewStatus=pending_review only via app contract. Supervisor
+// review fields (reviewedBy/reviewedAt/reviewNotes/amountPaidConfirmed) and
+// status=paid are written by Supervisor review path. Parent must not set paid.
 
 service cloud.firestore {
   match /databases/{database}/documents {

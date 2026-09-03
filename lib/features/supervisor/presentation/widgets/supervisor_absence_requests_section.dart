@@ -8,6 +8,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../parent/domain/absence_request_projection.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
+import 'supervisor_loading_skeletons.dart';
 
 /// Read-only استئذان context for supervised halaqat (W7 Rule 2).
 ///
@@ -46,7 +47,10 @@ class SupervisorAbsenceRequestsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (status == SectionStatus.initial || status == SectionStatus.loading)
-          const SizedBox(height: 80, child: AppLoadingWidget())
+          const SizedBox(
+            height: 160,
+            child: SupervisorListCardsSkeleton(itemCount: 2),
+          )
         else if (status == SectionStatus.error)
           AppErrorWidget(
             message: error ?? 'تعذر تحميل طلبات الاستئذان',

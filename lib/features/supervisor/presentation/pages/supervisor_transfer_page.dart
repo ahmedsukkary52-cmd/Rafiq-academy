@@ -16,6 +16,7 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 /// Transfer / add-to-second-halaqa form (UI + validation only).
 /// Membership write deferred to Sprint 2.
@@ -264,10 +265,7 @@ class _SupervisorTransferPageState extends State<SupervisorTransferPage> {
                 ),
                 const SizedBox(height: 16),
                 if (_loadingRoster)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
+                  const SizedBox(height: 280, child: SupervisorFormSkeleton())
                 else if (_rosterError != null)
                   AppErrorWidget(message: _rosterError!, onRetry: _loadRoster)
                 else ...[
@@ -368,11 +366,7 @@ class _SupervisorTransferPageState extends State<SupervisorTransferPage> {
                         ? null
                         : () => _submit(halaqat),
                     child: submitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                        ? const Text('جاري…')
                         : Text(_isMove ? 'نقل' : 'إضافة'),
                   ),
                 ],

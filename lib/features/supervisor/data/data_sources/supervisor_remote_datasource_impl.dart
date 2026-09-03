@@ -9,8 +9,11 @@ import '../../../../shared/data/absence_request_model.dart';
 import '../../../../shared/data/academy_admission_firestore.dart';
 import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
+import '../../../parent/data/models/parent_model.dart';
+import '../../../parent/domain/parent_payment_proof.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 @LazySingleton(as: SupervisorRemoteDatasource)
@@ -191,6 +194,131 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       return items;
     } catch (e) {
       throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<PaymentModel>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  }) async {
+    try {
+      final sid = supervisorId.trim();
+      if (sid.isEmpty) {
+        throw const ServerException('معرّف المشرف غير صالح');
+      }
+      final ids = FirestoreInQuery.normalizeIds(studentIds);
+      if (ids.isEmpty) return const [];
+
+      final byId = <String, PaymentModel>{};
+      for (final chunk in FirestoreInQuery.chunkIds(ids)) {
+        final snap = await firestore
+            .collection(FirestoreCollections.payments)
+            .where('studentId', whereIn: chunk)
+            .get();
+        for (final doc in snap.docs) {
+          byId[doc.id] = PaymentModel.fromFirestore(doc);
+        }
+      }
+
+      final list = byId.values.toList()
+        ..sort((a, b) {
+          final aPending = a.hasProofAwaitingReview ? 0 : 1;
+          final bPending = b.hasProofAwaitingReview ? 0 : 1;
+          if (aPending != bPending) return aPending.compareTo(bPending);
+          return b.dueDate.compareTo(a.dueDate);
+        });
+      return list;
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> reviewPaymentProof(PaymentReviewParams params) async {
+    try {
+      final sid = params.supervisorId.trim();
+      final payId = params.paymentId.trim();
+      if (sid.isEmpty || payId.isEmpty) {
+        throw const ServerException('بيانات المراجعة غير صالحة');
+      }
+
+      final paymentRef = firestore
+          .collection(FirestoreCollections.payments)
+          .doc(payId);
+      final snap = await paymentRef.get();
+      if (!snap.exists) {
+        throw const ServerException('الدفعة غير موجودة');
+      }
+      final data = snap.data() ?? const <String, dynamic>{};
+      final studentId = (data['studentId'] as String?)?.trim() ?? '';
+      if (studentId.isEmpty) {
+        throw const ServerException('الدفعة غير مرتبطة بطالب');
+      }
+
+      await _assertStudentInSupervisedHalaqa(
+        supervisorId: sid,
+        studentId: studentId,
+      );
+
+      final proofPath =
+          (data[ParentPaymentProofContract.proofStoragePathField] as String?)
+              ?.trim() ??
+          '';
+      if (proofPath.isEmpty && data['proofSubmittedAt'] == null) {
+        throw const ServerException('لا يوجد إثبات دفع للمراجعة');
+      }
+
+      final decisionStatus = switch (params.decision) {
+        PaymentReviewDecision.approved => ParentPaymentProofContract.approved,
+        PaymentReviewDecision.rejected => ParentPaymentProofContract.rejected,
+        PaymentReviewDecision.partial => ParentPaymentProofContract.partial,
+      };
+
+      final notes = params.notes?.trim();
+      final update = <String, dynamic>{
+        ParentPaymentProofContract.reviewStatusField: decisionStatus,
+        ParentPaymentProofContract.reviewedByField: sid,
+        ParentPaymentProofContract.reviewedAtField:
+            FieldValue.serverTimestamp(),
+        if (notes != null && notes.isNotEmpty)
+          ParentPaymentProofContract.reviewNotesField: notes,
+        if (params.amountPaidConfirmed != null)
+          ParentPaymentProofContract.amountPaidConfirmedField:
+              params.amountPaidConfirmed,
+        if (params.remainingAmount != null)
+          ParentPaymentProofContract.remainingAmountField:
+              params.remainingAmount,
+      };
+
+      if (params.decision == PaymentReviewDecision.approved) {
+        update['status'] = 'paid';
+        update['paidAt'] = FieldValue.serverTimestamp();
+        update[ParentPaymentProofContract.remainingAmountField] = 0;
+        if (params.amountPaidConfirmed == null) {
+          final amount = (data['amount'] as num?)?.toDouble() ?? 0;
+          update[ParentPaymentProofContract.amountPaidConfirmedField] = amount;
+        }
+      }
+
+      await paymentRef.update(update);
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  Future<void> _assertStudentInSupervisedHalaqa({
+    required String supervisorId,
+    required String studentId,
+  }) async {
+    final halaqat = await getSupervisedHalaqat(supervisorId);
+    final allowed = halaqat.any((h) => h.studentIds.contains(studentId));
+    if (!allowed) {
+      throw const ServerException('الطالب ليس ضمن حلقاتك');
     }
   }
 }

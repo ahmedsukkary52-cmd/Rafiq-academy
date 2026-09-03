@@ -11,6 +11,7 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 /// Read-only استئذان projection for assigned halaqat (W7).
 /// Accept/Reject write ownership remains teacher — not wired here.
@@ -29,7 +30,7 @@ class SupervisorExcusesPage extends StatelessWidget {
         builder: (context, state) {
           if (state.absenceRequestsStatus == SectionStatus.initial ||
               state.absenceRequestsStatus == SectionStatus.loading) {
-            return const AppLoadingWidget();
+            return const SupervisorCenteredListSkeleton();
           }
           if (state.absenceRequestsStatus == SectionStatus.error) {
             return AppErrorWidget(

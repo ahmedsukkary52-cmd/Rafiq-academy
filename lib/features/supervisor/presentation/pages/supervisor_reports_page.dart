@@ -198,13 +198,7 @@ class _SupervisorReportsPageState extends State<SupervisorReportsPage> {
                 const SizedBox(height: 24),
                 FilledButton(
                   onPressed: submitting ? null : _submit,
-                  child: submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('إرسال'),
+                  child: submitting ? const Text('جاري…') : const Text('إرسال'),
                 ),
               ],
             );

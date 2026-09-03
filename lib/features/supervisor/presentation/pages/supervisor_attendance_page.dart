@@ -12,6 +12,7 @@ import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 class SupervisorAttendancePage extends StatefulWidget {
   final String? initialHalaqaId;
@@ -200,9 +201,7 @@ class _SupervisorAttendancePageState extends State<SupervisorAttendancePage> {
               ),
               const SizedBox(height: 12),
               if (_loading)
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                const Expanded(child: SupervisorCenteredListSkeleton())
               else if (_error != null)
                 Expanded(
                   child: AppErrorWidget(message: _error!, onRetry: _load),

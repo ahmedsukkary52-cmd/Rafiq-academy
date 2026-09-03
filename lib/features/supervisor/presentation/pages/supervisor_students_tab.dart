@@ -13,6 +13,8 @@ import '../../../chat/domain/usecases/chat_usecases.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/pages/chat_room.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../parent/domain/parent_payment_proof.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
 import '../../../teacher/domain/repositories/teacher_repository.dart';
@@ -24,6 +26,7 @@ import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
 import '../supervisor_home_nav.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 String _eastern(String input) {
   const western = '0123456789';
@@ -37,7 +40,7 @@ String _eastern(String input) {
   return buffer.toString();
 }
 
-enum _ChipFilter { all, outstanding, atRisk, absences, dual }
+enum _ChipFilter { all, outstanding, atRisk, absences, dual, paymentDue }
 
 class SupervisorStudentsTab extends StatefulWidget {
   final ValueChanged<int>? onSwitchTab;
@@ -112,6 +115,21 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
       });
       return;
     }
+
+    final auth = context.read<AuthBloc>().state;
+    if (auth is AuthAuthenticated &&
+        state.paymentsStatus == SectionStatus.initial) {
+      final studentIds = <String>{
+        for (final h in state.halaqat) ...h.studentIds,
+      }.toList();
+      context.read<SupervisorBloc>().add(
+        LoadSupervisedPaymentsEvent(
+          supervisorId: auth.user.uid,
+          studentIds: studentIds,
+        ),
+      );
+    }
+
     final key = state.halaqat.map((h) => h.id).join('|');
     if (key == _halaqaKey && _rows.isNotEmpty) return;
     _halaqaKey = key;
@@ -162,9 +180,7 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
 
     final teacherIds = <String>{
       for (final h in state.halaqat)
-        if (h.teacherId
-            .trim()
-            .isNotEmpty) h.teacherId.trim(),
+        if (h.teacherId.trim().isNotEmpty) h.teacherId.trim(),
     };
     final namesResult = await sl<SupervisorRepository>().getUserDisplayNames(
       teacherIds.toList(),
@@ -193,6 +209,16 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
       _ChipFilter.atRisk => list.where((r) => r.isAtRisk),
       _ChipFilter.absences => list.where((r) => r.hasAttendanceConcern),
       _ChipFilter.dual => list.where((r) => r.isDualMember),
+      _ChipFilter.paymentDue => list.where((r) {
+        final payments = context.read<SupervisorBloc>().state.payments;
+        return payments.any(
+          (p) =>
+              p.studentId == r.studentId &&
+              (p.status == PaymentStatus.due ||
+                  p.status == PaymentStatus.overdue ||
+                  p.hasProofAwaitingReview),
+        );
+      }),
     };
 
     final halaqaId = _halaqaFilterId;
@@ -240,9 +266,7 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
   }
 
   Future<void> _messageTeacher(SupervisorStudentRow row) async {
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) {
       AppSnackBar.showInfo(context, 'يجب تسجيل الدخول أولاً');
       return;
@@ -256,8 +280,10 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
     final participant = await sl<GetChatParticipantUseCase>()(
       ChatUidParams(teacherId),
     );
-    final other = participant.fold<ChatParticipantEntity?>((_) => null, (
-        p) => p);
+    final other = participant.fold<ChatParticipantEntity?>(
+      (_) => null,
+      (p) => p,
+    );
     if (other == null) {
       if (!mounted) return;
       AppSnackBar.showInfo(context, 'تعذر تحميل بيانات المعلم');
@@ -279,8 +305,8 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
     );
 
     final startState = await chatBloc.stream.firstWhere(
-          (s) =>
-      s.startConversationStatus == SubmissionStatus.success ||
+      (s) =>
+          s.startConversationStatus == SubmissionStatus.success ||
           s.startConversationStatus == SubmissionStatus.error,
     );
     if (!mounted) return;
@@ -299,28 +325,30 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
     chatBloc.add(const ResetStartConversationEvent());
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            ChatRoomPage(
-              conversationId: conversation.id,
-              otherUserName: other.name,
-              otherUserImage: other.profileImageUrl,
-            ),
+        builder: (_) => ChatRoomPage(
+          conversationId: conversation.id,
+          otherUserName: other.name,
+          otherUserImage: other.profileImageUrl,
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery
-        .paddingOf(context)
-        .top;
+    final top = MediaQuery.paddingOf(context).top;
     final visible = _visible;
     final teachers = _teachers;
 
     return BlocListener<SupervisorBloc, SupervisorState>(
       listenWhen: (p, c) =>
-          p.halaqatStatus != c.halaqatStatus || p.halaqat != c.halaqat,
-      listener: (context, state) => _syncFromBloc(state),
+          p.halaqatStatus != c.halaqatStatus ||
+          p.halaqat != c.halaqat ||
+          p.payments != c.payments,
+      listener: (context, state) {
+        _syncFromBloc(state);
+        if (mounted) setState(() {});
+      },
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
@@ -339,9 +367,7 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
                 onSearchFocus: () => _searchFocus.requestFocus(),
                 onFilterHint: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('استخدم الفلاتر أسفل البحث'),
-                    ),
+                    const SnackBar(content: Text('استخدم الفلاتر أسفل البحث')),
                   );
                 },
               ),
@@ -366,19 +392,13 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
               _DropdownFilters(
                 halaqat: _halaqat,
                 teachers: teachers,
-                levels: _levels.toList()
-                  ..sort(),
+                levels: _levels.toList()..sort(),
                 halaqaId: _halaqaFilterId,
                 teacherId: _teacherFilterId,
                 level: _levelFilter,
                 onHalaqa: (id) => setState(() => _halaqaFilterId = id),
                 onTeacher: (id) => setState(() => _teacherFilterId = id),
                 onLevel: (level) => setState(() => _levelFilter = level),
-                onSubscriptionSoon: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('فلتر الاشتراك قريباً')),
-                  );
-                },
               ),
               const SizedBox(height: 8),
               Expanded(child: _buildBody(visible)),
@@ -391,7 +411,7 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
 
   Widget _buildBody(List<SupervisorStudentRow> items) {
     if (_loading) {
-      return const Center(child: AppLoadingWidget());
+      return const SupervisorCenteredListSkeleton();
     }
     if (_error != null) {
       return AppErrorWidget(
@@ -468,15 +488,13 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
               : null;
           return _StudentCard(
             row: row,
-            onProfile: () =>
-                SupervisorDestinations.studentProfile(
+            onProfile: () => SupervisorDestinations.studentProfile(
               context,
               studentId: row.studentId,
               halaqaId: halaqaId,
             ),
             onMessage: () => _messageTeacher(row),
-            onAward: () =>
-                SupervisorDestinations.grantAward(
+            onAward: () => SupervisorDestinations.grantAward(
               context,
               preselectedStudentId: row.studentId,
               preselectedHalaqaId: halaqaId,
@@ -516,12 +534,9 @@ class _TopBar extends StatelessWidget {
         children: [
           _RoundIconButton(
             icon: Icons.arrow_forward_ios_rounded,
-            onTap: () =>
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('أنت في تبويب الطلاب'),
-                  ),
-                ),
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('أنت في تبويب الطلاب')),
+            ),
           ),
           Expanded(
             child: Text(
@@ -535,10 +550,7 @@ class _TopBar extends StatelessWidget {
           ),
           _RoundIconButton(icon: Icons.search_rounded, onTap: onSearchFocus),
           const SizedBox(width: 8),
-          _RoundIconButton(
-            icon: Icons.tune_rounded,
-            onTap: onFilterHint,
-          ),
+          _RoundIconButton(icon: Icons.tune_rounded, onTap: onFilterHint),
         ],
       ),
     );
@@ -591,23 +603,23 @@ class _SearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: 'بحث بالاسم، المعلم، الحلقة...',
-        hintStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textHint,
-        ),
+        hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
         prefixIcon: const Icon(
           Icons.search_rounded,
           color: AppColors.primaryDark,
         ),
         suffixIcon: showClear
             ? IconButton(
-          onPressed: onClear,
-          icon: const Icon(Icons.close_rounded, size: 18),
-        )
+                onPressed: onClear,
+                icon: const Icon(Icons.close_rounded, size: 18),
+              )
             : null,
         filled: true,
         fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 12),
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusL),
           borderSide: const BorderSide(color: AppColors.border),
@@ -644,6 +656,7 @@ class _ChipRow extends StatelessWidget {
       (_ChipFilter.atRisk, 'في خطر'),
       (_ChipFilter.absences, 'غيابات'),
       (_ChipFilter.dual, 'مزدوج'),
+      (_ChipFilter.paymentDue, 'اشتراك'),
     ];
 
     return SizedBox(
@@ -675,9 +688,7 @@ class _ChipRow extends StatelessWidget {
                 child: Text(
                   label,
                   style: AppTextStyles.labelMedium.copyWith(
-                    color: active
-                        ? AppColors.onPrimary
-                        : AppColors.primaryDark,
+                    color: active ? AppColors.onPrimary : AppColors.primaryDark,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -700,7 +711,6 @@ class _DropdownFilters extends StatelessWidget {
   final ValueChanged<String?> onHalaqa;
   final ValueChanged<String?> onTeacher;
   final ValueChanged<int?> onLevel;
-  final VoidCallback onSubscriptionSoon;
 
   const _DropdownFilters({
     required this.halaqat,
@@ -712,7 +722,6 @@ class _DropdownFilters extends StatelessWidget {
     required this.onHalaqa,
     required this.onTeacher,
     required this.onLevel,
-    required this.onSubscriptionSoon,
   });
 
   Future<void> _pickHalaqa(BuildContext context) async {
@@ -722,15 +731,11 @@ class _DropdownFilters extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) =>
-          _FilterSheet(
-            title: 'اختر الحلقة',
-            options: [
-              (null, 'كل الحلقات'),
-              ...halaqat.map((h) => (h.id, h.name)),
-            ],
-            selected: halaqaId,
-          ),
+      builder: (ctx) => _FilterSheet(
+        title: 'اختر الحلقة',
+        options: [(null, 'كل الحلقات'), ...halaqat.map((h) => (h.id, h.name))],
+        selected: halaqaId,
+      ),
     );
     if (picked == '__cancel__') return;
     onHalaqa(picked);
@@ -745,15 +750,14 @@ class _DropdownFilters extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) =>
-          _FilterSheet(
-            title: 'اختر المعلم',
-            options: [
-              (null, 'كل المعلمين'),
-              ...entries.map((e) => (e.key, e.value)),
-            ],
-            selected: teacherId,
-          ),
+      builder: (ctx) => _FilterSheet(
+        title: 'اختر المعلم',
+        options: [
+          (null, 'كل المعلمين'),
+          ...entries.map((e) => (e.key, e.value)),
+        ],
+        selected: teacherId,
+      ),
     );
     if (picked == '__cancel__') return;
     onTeacher(picked);
@@ -766,15 +770,14 @@ class _DropdownFilters extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) =>
-          _FilterSheet(
-            title: 'اختر المستوى',
-            options: [
-              (null, 'كل المستويات'),
-              ...levels.map((l) => ('$l', 'المستوى ${_eastern('$l')}')),
-            ],
-            selected: level?.toString(),
-          ),
+      builder: (ctx) => _FilterSheet(
+        title: 'اختر المستوى',
+        options: [
+          (null, 'كل المستويات'),
+          ...levels.map((l) => ('$l', 'المستوى ${_eastern('$l')}')),
+        ],
+        selected: level?.toString(),
+      ),
     );
     if (picked == '__cancel__') return;
     onLevel(picked == null ? null : int.tryParse(picked));
@@ -817,12 +820,6 @@ class _DropdownFilters extends StatelessWidget {
             label: levelLabel,
             active: level != null,
             onTap: () => _pickLevel(context),
-          ),
-          const SizedBox(width: 8),
-          _FilterPill(
-            label: 'الاشتراك',
-            active: false,
-            onTap: onSubscriptionSoon,
           ),
         ],
       ),
@@ -943,9 +940,9 @@ class _FilterSheet extends StatelessWidget {
                   ),
                   trailing: active
                       ? const Icon(
-                    Icons.check_rounded,
-                    color: AppColors.primary,
-                  )
+                          Icons.check_rounded,
+                          color: AppColors.primary,
+                        )
                       : null,
                   onTap: () => Navigator.pop(context, id),
                 );
@@ -1037,22 +1034,22 @@ class _StudentCard extends StatelessWidget {
                     radius: 24,
                     backgroundColor: badgeBg,
                     backgroundImage:
-                    row.profileImageUrl != null &&
-                        row.profileImageUrl!.isNotEmpty
+                        row.profileImageUrl != null &&
+                            row.profileImageUrl!.isNotEmpty
                         ? NetworkImage(row.profileImageUrl!)
                         : null,
                     child:
-                    row.profileImageUrl == null ||
-                        row.profileImageUrl!.isEmpty
+                        row.profileImageUrl == null ||
+                            row.profileImageUrl!.isEmpty
                         ? Text(
-                      row.displayName.isNotEmpty
-                          ? row.displayName[0]
-                          : '؟',
-                      style: AppTextStyles.titleLarge.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    )
+                            row.displayName.isNotEmpty
+                                ? row.displayName[0]
+                                : '؟',
+                            style: AppTextStyles.titleLarge.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
                         : null,
                   ),
                   const SizedBox(width: 10),
@@ -1140,10 +1137,7 @@ class _StudentCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _OutlineAction(
-                        label: 'الملف',
-                        onTap: onProfile,
-                      ),
+                      child: _OutlineAction(label: 'الملف', onTap: onProfile),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -1167,17 +1161,11 @@ class _StudentCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _OutlineAction(
-                        label: 'الملف',
-                        onTap: onProfile,
-                      ),
+                      child: _OutlineAction(label: 'الملف', onTap: onProfile),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: _OutlineAction(
-                        label: 'رسالة',
-                        onTap: onMessage,
-                      ),
+                      child: _OutlineAction(label: 'رسالة', onTap: onMessage),
                     ),
                     const SizedBox(width: 6),
                     Expanded(

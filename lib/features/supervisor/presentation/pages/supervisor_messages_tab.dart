@@ -19,6 +19,7 @@ import '../../../parent/domain/repositories/parent_repositories.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 /// Supervisor inbox — teachers / parents / admin only (no students, no groups).
 class SupervisorMessagesTab extends StatefulWidget {
@@ -229,7 +230,7 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
 
                   if (state.conversationsStatus == SectionStatus.loading ||
                       state.conversationsStatus == SectionStatus.initial) {
-                    return const Center(child: AppLoadingWidget());
+                    return const SupervisorCenteredListSkeleton();
                   }
 
                   if (state.conversationsStatus == SectionStatus.error) {
@@ -569,7 +570,7 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
               ),
               Expanded(
                 child: _loading
-                    ? const Center(child: AppLoadingWidget())
+                    ? const SupervisorCenteredListSkeleton()
                     : _contacts.isEmpty
                     ? Center(
                         child: Padding(

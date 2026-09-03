@@ -5,6 +5,7 @@ import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.da
 import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
+import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/supervisor_report_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor_day_board_usecase.dart';
@@ -114,8 +115,7 @@ class _FakeTeacherRepository implements TeacherRepository {
   Future<Either<Failure, Unit>> upsertTeacherEvaluation({
     required RecitationRecordEntity record,
     required List<String> retireDocumentIds,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
   @override
   Future<Either<Failure, AcademyEventPublication>> updateRecitationReview(
     UpdateRecitationReviewParams p,
@@ -185,6 +185,17 @@ class _FakeSupervisorRepository implements SupervisorRepository {
     required List<String> halaqaIds,
     required DateTime date,
   }) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<PaymentEntity>>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Unit>> reviewPaymentProof(
+    PaymentReviewParams params,
+  ) => throw UnimplementedError();
 }
 
 void main() {

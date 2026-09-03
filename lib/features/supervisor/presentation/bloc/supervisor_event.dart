@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 abstract class SupervisorEvent extends Equatable {
@@ -110,4 +111,30 @@ class ResetTransferStudentEvent extends SupervisorEvent {
 
 class ClearSupervisorSessionEvent extends SupervisorEvent {
   const ClearSupervisorSessionEvent();
+}
+
+class LoadSupervisedPaymentsEvent extends SupervisorEvent {
+  final String supervisorId;
+  final List<String> studentIds;
+
+  const LoadSupervisedPaymentsEvent({
+    required this.supervisorId,
+    required this.studentIds,
+  });
+
+  @override
+  List<Object?> get props => [supervisorId, studentIds];
+}
+
+class ReviewPaymentProofEvent extends SupervisorEvent {
+  final PaymentReviewParams params;
+
+  const ReviewPaymentProofEvent(this.params);
+
+  @override
+  List<Object?> get props => [params];
+}
+
+class ResetReviewPaymentEvent extends SupervisorEvent {
+  const ResetReviewPaymentEvent();
 }

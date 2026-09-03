@@ -36,6 +36,13 @@ class SupervisorState extends Equatable {
   final SubmissionStatus transferStudentStatus;
   final String? transferStudentError;
 
+  final SectionStatus paymentsStatus;
+  final List<PaymentEntity> payments;
+  final String? paymentsError;
+
+  final SubmissionStatus reviewPaymentStatus;
+  final String? reviewPaymentError;
+
   const SupervisorState({
     this.halaqatStatus = SectionStatus.initial,
     this.halaqat = const [],
@@ -54,6 +61,11 @@ class SupervisorState extends Equatable {
     this.admitStudentError,
     this.transferStudentStatus = SubmissionStatus.idle,
     this.transferStudentError,
+    this.paymentsStatus = SectionStatus.initial,
+    this.payments = const [],
+    this.paymentsError,
+    this.reviewPaymentStatus = SubmissionStatus.idle,
+    this.reviewPaymentError,
   });
 
   factory SupervisorState.initial() => const SupervisorState();
@@ -76,6 +88,11 @@ class SupervisorState extends Equatable {
     Object? admitStudentError = _unset,
     SubmissionStatus? transferStudentStatus,
     Object? transferStudentError = _unset,
+    SectionStatus? paymentsStatus,
+    List<PaymentEntity>? payments,
+    Object? paymentsError = _unset,
+    SubmissionStatus? reviewPaymentStatus,
+    Object? reviewPaymentError = _unset,
   }) {
     return SupervisorState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -112,6 +129,15 @@ class SupervisorState extends Equatable {
       transferStudentError: identical(transferStudentError, _unset)
           ? this.transferStudentError
           : transferStudentError as String?,
+      paymentsStatus: paymentsStatus ?? this.paymentsStatus,
+      payments: payments ?? this.payments,
+      paymentsError: identical(paymentsError, _unset)
+          ? this.paymentsError
+          : paymentsError as String?,
+      reviewPaymentStatus: reviewPaymentStatus ?? this.reviewPaymentStatus,
+      reviewPaymentError: identical(reviewPaymentError, _unset)
+          ? this.reviewPaymentError
+          : reviewPaymentError as String?,
     );
   }
 
@@ -134,5 +160,10 @@ class SupervisorState extends Equatable {
     admitStudentError,
     transferStudentStatus,
     transferStudentError,
+    paymentsStatus,
+    payments,
+    paymentsError,
+    reviewPaymentStatus,
+    reviewPaymentError,
   ];
 }

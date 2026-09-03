@@ -350,7 +350,9 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         ParentPaymentProofContract.proofSubmittedByField: pid,
         ParentPaymentProofContract.proofFileNameField: fileName,
         'method': ParentPaymentProofContract.externalMethod,
-        // Intentionally omit status / paidAt — Admin confirms payment.
+        ParentPaymentProofContract.reviewStatusField:
+            ParentPaymentProofContract.pendingReview,
+        // Parent never sets status/paidAt or supervisor review outcome fields.
       });
     } on ServerException {
       rethrow;
@@ -428,7 +430,8 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         }
 
         final walletSnap = await tx.get(walletRef);
-        final rawBalance = walletSnap.data()?[ParentWalletContract.balanceField];
+        final rawBalance = walletSnap
+            .data()?[ParentWalletContract.balanceField];
         final balance = rawBalance is num ? rawBalance.toDouble() : 0.0;
         if (balance < amount) {
           throw const ServerException('رصيد المحفظة غير كافٍ');
@@ -468,7 +471,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     required List<String> childrenIds,
   }) async {
     try {
-      final ids = childrenIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
+      final ids = childrenIds
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty)
+          .toList();
       if (parentId.trim().isEmpty) {
         throw const ServerException('معرّف ولي الأمر غير صالح');
       }
@@ -570,10 +576,11 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
     final userData = userDoc.data();
     final profileData = profileDoc.data();
-    final name = ((userData?['name'] as String?) ??
-            (profileData?['name'] as String?) ??
-            '')
-        .trim();
+    final name =
+        ((userData?['name'] as String?) ??
+                (profileData?['name'] as String?) ??
+                '')
+            .trim();
     final imageUrl = userData?['profileImageUrl'] as String?;
 
     var halaqaId = (profileData?['halaqaId'] as String?)?.trim() ?? '';
@@ -609,7 +616,8 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     if (staffIds.isNotEmpty) {
       final staffDocs = await Future.wait(
         staffIds.map(
-          (id) => firestore.collection(FirestoreCollections.users).doc(id).get(),
+          (id) =>
+              firestore.collection(FirestoreCollections.users).doc(id).get(),
         ),
       );
       for (final doc in staffDocs) {
@@ -748,7 +756,9 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   }
 
   static String? _pickTodayStatus(Iterable<String?> statuses) {
-    final list = statuses.map((s) => (s ?? '').trim()).where((s) => s.isNotEmpty);
+    final list = statuses
+        .map((s) => (s ?? '').trim())
+        .where((s) => s.isNotEmpty);
     if (list.contains(AttendancePolicy.statusPresent)) {
       return AttendancePolicy.statusPresent;
     }

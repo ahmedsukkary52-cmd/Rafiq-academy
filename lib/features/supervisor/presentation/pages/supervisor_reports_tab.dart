@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -5,6 +7,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../analytics/domain/entities/analytics_entities.dart';
 import '../../../analytics/domain/usecases/analytics_usecases.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -18,6 +21,34 @@ import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
+import '../supervisor_home_nav.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
+
+enum _ReportPeriod { weekly, monthly, term }
+
+class _AggregatedAnalytics {
+  final double attendancePercent;
+  final double averagePerformancePercent;
+  final int totalStudents;
+  final Map<String, int> performanceDistribution;
+  final Map<String, double> weeklyAttendance;
+
+  const _AggregatedAnalytics({
+    required this.attendancePercent,
+    required this.averagePerformancePercent,
+    required this.totalStudents,
+    required this.performanceDistribution,
+    required this.weeklyAttendance,
+  });
+
+  static const empty = _AggregatedAnalytics(
+    attendancePercent: 0,
+    averagePerformancePercent: 0,
+    totalStudents: 0,
+    performanceDistribution: {},
+    weeklyAttendance: {},
+  );
+}
 
 class SupervisorReportsTab extends StatefulWidget {
   final ValueChanged<int>? onSwitchTab;
@@ -28,24 +59,11 @@ class SupervisorReportsTab extends StatefulWidget {
   State<SupervisorReportsTab> createState() => _SupervisorReportsTabState();
 }
 
-class _HalaqaReportCard {
-  final HalaqaEntity halaqa;
-  final int studentCount;
-  final int atRiskCount;
-  final double? attendancePercent;
-
-  const _HalaqaReportCard({
-    required this.halaqa,
-    required this.studentCount,
-    required this.atRiskCount,
-    this.attendancePercent,
-  });
-}
-
 class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
-  List<_HalaqaReportCard> _cards = const [];
+  _ReportPeriod _period = _ReportPeriod.monthly;
   bool _loading = false;
   String? _error;
+  _AggregatedAnalytics _analytics = _AggregatedAnalytics.empty;
   int _loadGen = 0;
   String _halaqaKey = '';
 
@@ -57,6 +75,12 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
       _sync(context.read<SupervisorBloc>().state);
     });
   }
+
+  Duration _periodDuration(_ReportPeriod p) => switch (p) {
+    _ReportPeriod.weekly => const Duration(days: 7),
+    _ReportPeriod.monthly => const Duration(days: 30),
+    _ReportPeriod.term => const Duration(days: 90),
+  };
 
   void _sync(SupervisorState state) {
     if (state.halaqatStatus == SectionStatus.initial ||
@@ -71,12 +95,12 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
       setState(() {
         _loading = false;
         _error = state.halaqatError ?? 'تعذر تحميل الحلقات';
-        _cards = const [];
+        _analytics = _AggregatedAnalytics.empty;
       });
       return;
     }
-    final key = state.halaqat.map((h) => h.id).join('|');
-    if (key == _halaqaKey && _cards.isNotEmpty) return;
+    final key = '${state.halaqat.map((h) => h.id).join('|')}|$_period';
+    if (key == _halaqaKey && !_loading && _error == null) return;
     _halaqaKey = key;
     _load(state.halaqat);
   }
@@ -91,115 +115,245 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
     if (halaqat.isEmpty) {
       if (!mounted || gen != _loadGen) return;
       setState(() {
-        _cards = const [];
+        _analytics = _AggregatedAnalytics.empty;
         _loading = false;
       });
       return;
     }
 
-    final getStudents = sl<GetHalaqaStudentsUseCase>();
-    final getAtRisk = sl<GetAtRiskStudentsUseCase>();
-    final getAnalytics = sl<GetHalaqaAnalyticsUseCase>();
     final now = DateTime.now();
-    final from = now.subtract(const Duration(days: 30));
+    final from = now.subtract(_periodDuration(_period));
+    final getStudents = sl<GetHalaqaStudentsUseCase>();
+    final getAnalytics = sl<GetHalaqaAnalyticsUseCase>();
 
     final byHalaqa = <String, List<HalaqaStudentSummaryEntity>>{};
-    final atRiskByHalaqa = <String, int>{};
-    final attendanceByHalaqa = <String, double>{};
+    final analyticsList = <HalaqaAnalyticsEntity>[];
 
     await Future.wait(
       halaqat.map((h) async {
         final summaries = await getStudents(HalaqaStudentsParams(h.id));
         summaries.fold((_) {}, (list) => byHalaqa[h.id] = list);
 
-        final risk = await getAtRisk(HalaqaIdParams(h.id));
-        risk.fold((_) {}, (list) => atRiskByHalaqa[h.id] = list.length);
-
         final analytics = await getAnalytics(
           HalaqaAnalyticsParams(halaqaId: h.id, from: from, to: now),
         );
-        analytics.fold(
-          (_) {},
-          (a) => attendanceByHalaqa[h.id] = a.attendancePercent,
-        );
+        analytics.fold((_) {}, analyticsList.add);
       }),
     );
 
     if (!mounted || gen != _loadGen) return;
 
-    final merged = SupervisorRoster.mergeSummaries(
+    final roster = SupervisorRoster.mergeSummaries(
       halaqat: halaqat,
       byHalaqaId: byHalaqa,
     );
 
-    final cards = halaqat.map((h) {
-      final fromRoster = merged
-          .where((r) => r.halaqaIds.contains(h.id) && r.isAtRisk)
-          .length;
-      final atRisk = atRiskByHalaqa[h.id] ?? fromRoster;
-      return _HalaqaReportCard(
-        halaqa: h,
-        studentCount: h.studentIds.length,
-        atRiskCount: atRisk,
-        attendancePercent: attendanceByHalaqa[h.id],
-      );
-    }).toList();
+    final mergedDist = <String, int>{};
+    final weeklyBuckets = <String, List<double>>{};
+    var attendanceWeighted = 0.0;
+    var performanceWeighted = 0.0;
+    var weightSum = 0;
+
+    for (final a in analyticsList) {
+      final w = a.totalStudents > 0 ? a.totalStudents : 1;
+      weightSum += w;
+      attendanceWeighted += a.attendancePercent * w;
+      performanceWeighted += a.averagePerformancePercent * w;
+      for (final e in a.performanceDistribution.entries) {
+        mergedDist[e.key] = (mergedDist[e.key] ?? 0) + e.value;
+      }
+      for (final e in a.weeklyAttendance.entries) {
+        weeklyBuckets.putIfAbsent(e.key, () => []).add(e.value);
+      }
+    }
+
+    final weeklyMerged = <String, double>{
+      for (final e in weeklyBuckets.entries)
+        e.key: e.value.isEmpty
+            ? 0
+            : e.value.reduce((a, b) => a + b) / e.value.length,
+    };
 
     setState(() {
-      _cards = cards;
+      _analytics = _AggregatedAnalytics(
+        attendancePercent: weightSum > 0 ? attendanceWeighted / weightSum : 0,
+        averagePerformancePercent: weightSum > 0
+            ? performanceWeighted / weightSum
+            : 0,
+        totalStudents: roster.length,
+        performanceDistribution: mergedDist,
+        weeklyAttendance: weeklyMerged,
+      );
       _loading = false;
       _error = null;
     });
   }
 
-  Future<void> _composeReport(BuildContext context) async {
+  Future<void> _showComposeReportSheet(BuildContext context) async {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) {
       AppSnackBar.showInfo(context, 'يجب تسجيل الدخول أولاً');
       return;
     }
 
-    final controller = TextEditingController();
-    final content = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('تقرير مشرف'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          textAlign: TextAlign.right,
-          decoration: const InputDecoration(
-            hintText: 'اكتب محتوى التقرير...',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('إرسال'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (content == null || content.isEmpty || !context.mounted) return;
+    final state = context.read<SupervisorBloc>().state;
+    final halaqat = state.halaqat;
+    final contentCtrl = TextEditingController();
+    var type = 'periodic';
+    String? halaqaId;
+    String? teacherId;
 
+    const types = <String, String>{
+      'periodic': 'تقرير دوري',
+      'incident': 'بلاغ',
+      'follow_up': 'متابعة',
+    };
+
+    final submitted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              final teacherIds = <String>{
+                for (final h in halaqat)
+                  if (h.teacherId.trim().isNotEmpty) h.teacherId.trim(),
+              }.toList()..sort();
+
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'كتابة تقرير',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final entry in types.entries)
+                          ChoiceChip(
+                            label: Text(entry.value),
+                            selected: type == entry.key,
+                            onSelected: (_) =>
+                                setSheetState(() => type = entry.key),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      value: halaqaId,
+                      decoration: const InputDecoration(
+                        labelText: 'الحلقة (اختياري)',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('— بدون حلقة —'),
+                        ),
+                        for (final h in halaqat)
+                          DropdownMenuItem<String?>(
+                            value: h.id,
+                            child: Text(
+                              h.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (v) => setSheetState(() => halaqaId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      value: teacherId != null && teacherIds.contains(teacherId)
+                          ? teacherId
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: 'المعلم (اختياري)',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('— بدون معلم —'),
+                        ),
+                        for (final id in teacherIds)
+                          DropdownMenuItem<String?>(
+                            value: id,
+                            child: Text(id, overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (v) => setSheetState(() => teacherId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: contentCtrl,
+                      maxLines: 5,
+                      textAlign: TextAlign.right,
+                      decoration: const InputDecoration(
+                        labelText: 'المحتوى',
+                        alignLabelWithHint: true,
+                        hintText: 'اكتب محتوى التقرير...',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: () {
+                        if (contentCtrl.text.trim().isEmpty) {
+                          AppSnackBar.showInfo(
+                            sheetContext,
+                            'أدخل محتوى التقرير',
+                          );
+                          return;
+                        }
+                        Navigator.of(sheetContext).pop(true);
+                      },
+                      child: const Text('إرسال'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    if (submitted != true || !context.mounted) {
+      contentCtrl.dispose();
+      return;
+    }
+
+    final teacherRaw = (teacherId ?? '').trim();
     context.read<SupervisorBloc>().add(
       SubmitSupervisorReportEvent(
         SupervisorReportEntity(
           id: '',
           supervisorId: auth.user.uid,
-          type: 'periodic',
-          content: content,
+          halaqaId: halaqaId,
+          teacherId: teacherRaw.isEmpty ? null : teacherRaw,
+          type: type,
+          content: contentCtrl.text.trim(),
           date: DateTime.now(),
         ),
       ),
     );
+    contentCtrl.dispose();
   }
 
   @override
@@ -212,177 +366,576 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
         textDirection: TextDirection.rtl,
         child: Scaffold(
           backgroundColor: AppColors.background,
-          body: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                color: AppColors.surface,
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  MediaQuery.paddingOf(context).top + 12,
-                  16,
-                  12,
-                ),
-                child: Text(
-                  'التقارير',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.titleLarge.copyWith(
-                    fontWeight: FontWeight.w800,
+          body: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () async {
+              _halaqaKey = '';
+              await _load(context.read<SupervisorBloc>().state.halaqat);
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader(context)),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _PeriodTabs(
+                        period: _period,
+                        onChanged: (p) {
+                          setState(() => _period = p);
+                          _halaqaKey = '';
+                          _load(context.read<SupervisorBloc>().state.halaqat);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      if (_loading)
+                        const SizedBox(
+                          height: 280,
+                          child: SupervisorListCardsSkeleton(itemCount: 3),
+                        )
+                      else if (_error != null)
+                        AppErrorWidget(
+                          message: _error!,
+                          onRetry: () {
+                            _halaqaKey = '';
+                            _sync(context.read<SupervisorBloc>().state);
+                          },
+                        )
+                      else ...[
+                        _PerformanceCard(analytics: _analytics),
+                        const SizedBox(height: 14),
+                        _WeeklyAttendanceCard(
+                          weeklyData: _analytics.weeklyAttendance,
+                          rate: _analytics.attendancePercent,
+                        ),
+                        const SizedBox(height: 14),
+                        _ReportsGrid(
+                          onTopStudents: () => widget.onSwitchTab?.call(
+                            SupervisorHomeNav.studentsIndex,
+                          ),
+                          onAtRisk: () =>
+                              SupervisorDestinations.followUp(context),
+                          onAttendance: () =>
+                              SupervisorDestinations.attendance(context),
+                          onTeachers: () =>
+                              SupervisorDestinations.teachers(context),
+                        ),
+                      ],
+                    ]),
                   ),
                 ),
-              ),
-              Expanded(child: _buildBody(context)),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    if (_loading) {
-      return const Center(child: AppLoadingWidget());
-    }
-    if (_error != null) {
-      return AppErrorWidget(
-        message: _error!,
-        onRetry: () {
-          final state = context.read<SupervisorBloc>().state;
-          if (state.halaqatStatus == SectionStatus.error) {
-            final auth = context.read<AuthBloc>().state;
-            if (auth is AuthAuthenticated) {
-              context.read<SupervisorBloc>().add(
-                LoadSupervisedHalaqatEvent(auth.user.uid),
-              );
-            }
-          } else {
-            _halaqaKey = '';
-            _load(state.halaqat);
-          }
-        },
-      );
-    }
+  Widget _buildHeader(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final a = _analytics;
 
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: () async {
-        _halaqaKey = '';
-        await _load(context.read<SupervisorBloc>().state.halaqat);
-      },
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+    return Container(
+      color: AppColors.dark,
+      child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _composeReport(context),
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('كتابة تقرير'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.onPrimary,
+          Padding(
+            padding: EdgeInsets.fromLTRB(12, top + 8, 12, 0),
+            child: Row(
+              children: [
+                const SizedBox(width: 48),
+                Expanded(
+                  child: Text(
+                    'التقارير والتحليلات',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.titleLarge.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: () => SupervisorDestinations.awardsHub(context),
-                icon: const Icon(Icons.emoji_events_outlined),
-                label: const Text('الجوائز'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'ملخص الحلقات',
-            style: AppTextStyles.titleLarge.copyWith(
-              fontWeight: FontWeight.w800,
+                IconButton(
+                  tooltip: 'كتابة تقرير',
+                  onPressed: () => _showComposeReportSheet(context),
+                  icon: const Icon(
+                    Icons.edit_note_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          if (_cards.isEmpty)
-            AppCard(
-              child: Text(
-                'لا توجد حلقات لعرض تقاريرها',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            )
-          else
-            ..._cards.map(
-              (c) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: AppCard(
-                  onTap: () => SupervisorDestinations.halaqaDetail(
-                    context,
-                    halaqaId: c.halaqa.id,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: _loading
+                ? Text(
+                    'جاري…',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white70,
+                    ),
+                  )
+                : Row(
                     children: [
-                      Text(
-                        c.halaqa.name,
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.w800,
+                      Expanded(
+                        child: _HeaderStatPill(
+                          value: '%${a.attendancePercent.toInt()}',
+                          label: 'معدل الحضور',
+                          valueColor: AppColors.gradeVeryGood,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _StatChip(label: 'طلاب', value: '${c.studentCount}'),
-                          const SizedBox(width: 8),
-                          _StatChip(
-                            label: 'في خطر',
-                            value: '${c.atRiskCount}',
-                            accent: c.atRiskCount > 0 ? AppColors.error : null,
-                          ),
-                          if (c.attendancePercent != null) ...[
-                            const SizedBox(width: 8),
-                            _StatChip(
-                              label: 'حضور',
-                              value:
-                                  '${c.attendancePercent!.toStringAsFixed(0)}%',
-                            ),
-                          ],
-                        ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _HeaderStatPill(
+                          value: '%${a.averagePerformancePercent.toInt()}',
+                          label: 'متوسط الأداء',
+                          valueColor: AppColors.gradeGood,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _HeaderStatPill(
+                          value: '${a.totalStudents}',
+                          label: 'طالب نشط',
+                          valueColor: AppColors.gradeExcellent,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ),
-            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  final String label;
+class _HeaderStatPill extends StatelessWidget {
   final String value;
-  final Color? accent;
+  final String label;
+  final Color valueColor;
 
-  const _StatChip({required this.label, required this.value, this.accent});
+  const _HeaderStatPill({
+    required this.value,
+    required this.label,
+    required this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = accent ?? AppColors.primaryDark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: AppColors.darkCard,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              color: valueColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PeriodTabs extends StatelessWidget {
+  final _ReportPeriod period;
+  final ValueChanged<_ReportPeriod> onChanged;
+
+  const _PeriodTabs({required this.period, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <(_ReportPeriod, String)>[
+      (_ReportPeriod.monthly, 'شهري'),
+      (_ReportPeriod.weekly, 'أسبوعي'),
+      (_ReportPeriod.term, 'فصلي'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey,
         borderRadius: BorderRadius.circular(AppSizes.radiusFull),
       ),
-      child: Text(
-        '$label: $value',
-        style: AppTextStyles.labelSmall.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Row(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(items[i].$1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: period == items[i].$1
+                        ? AppColors.primary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  ),
+                  child: Text(
+                    items[i].$2,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: period == items[i].$1
+                          ? AppColors.onPrimary
+                          : AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
+    );
+  }
+}
+
+class _PerformanceCard extends StatelessWidget {
+  final _AggregatedAnalytics analytics;
+
+  const _PerformanceCard({required this.analytics});
+
+  @override
+  Widget build(BuildContext context) {
+    final dist = analytics.performanceDistribution;
+    final total = dist.values.fold<int>(0, (a, b) => a + b);
+    const colors = {
+      'ممتاز': AppColors.gradeExcellent,
+      'جيد جداً': AppColors.gradeVeryGood,
+      'جيد': AppColors.gradeGood,
+      'يحتاج تحسين': AppColors.gradeNeedsWork,
+    };
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'توزيع مستويات الأداء',
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (total == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Text(
+                'لا توجد بيانات كافية بعد',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
+            )
+          else ...[
+            SizedBox(
+              height: 150,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(140, 140),
+                    painter: _DistributionDonutPainter(
+                      dist: dist,
+                      colors: colors,
+                      total: total,
+                    ),
+                  ),
+                  Text(
+                    '$total طالب',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: dist.entries.map((e) {
+                final pct = total > 0 ? (e.value / total * 100).toInt() : 0;
+                final color = colors[e.key] ?? AppColors.textHint;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '%$pct ${e.key}',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DistributionDonutPainter extends CustomPainter {
+  final Map<String, int> dist;
+  final Map<String, Color> colors;
+  final int total;
+
+  _DistributionDonutPainter({
+    required this.dist,
+    required this.colors,
+    required this.total,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 12;
+    const strokeW = 22.0;
+    var startAngle = -math.pi / 2;
+
+    for (final entry in dist.entries) {
+      if (entry.value == 0) continue;
+      final sweep = (entry.value / total) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweep,
+        false,
+        Paint()
+          ..color = colors[entry.key] ?? AppColors.textHint
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeW,
+      );
+      startAngle += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DistributionDonutPainter old) => true;
+}
+
+class _WeeklyAttendanceCard extends StatelessWidget {
+  final Map<String, double> weeklyData;
+  final double rate;
+
+  const _WeeklyAttendanceCard({required this.weeklyData, required this.rate});
+
+  @override
+  Widget build(BuildContext context) {
+    const dayOrder = ['سب', 'أح', 'إث', 'ثل', 'أر', 'خم', 'جم'];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(
+                '%${rate.toInt()} معدل',
+                style: AppTextStyles.labelLarge.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'الحضور الأسبوعي',
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 132,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: dayOrder.map((day) {
+                final value = weeklyData[day] ?? 0;
+                final barHeight = (value / 100) * 96;
+                final color = value >= 70
+                    ? AppColors.primaryDark
+                    : value >= 40
+                    ? AppColors.gradeGood
+                    : AppColors.primary.withValues(alpha: 0.35);
+
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 400),
+                          width: double.infinity,
+                          height: value <= 0 ? 4 : barHeight.clamp(8, 96),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8),
+                              bottom: Radius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          day,
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportsGrid extends StatelessWidget {
+  final VoidCallback? onTopStudents;
+  final VoidCallback onAtRisk;
+  final VoidCallback onAttendance;
+  final VoidCallback onTeachers;
+
+  const _ReportsGrid({
+    required this.onTopStudents,
+    required this.onAtRisk,
+    required this.onAttendance,
+    required this.onTeachers,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (
+        Icons.star_rounded,
+        AppColors.gradeExcellent,
+        'المتفوقون',
+        'عدد الطلاب',
+        onTopStudents,
+      ),
+      (
+        Icons.warning_amber_rounded,
+        AppColors.error,
+        'في خطر',
+        'عدد الطلاب',
+        onAtRisk,
+      ),
+      (
+        Icons.event_available_rounded,
+        AppColors.primary,
+        'الحضور',
+        'تقارير الحضور',
+        onAttendance,
+      ),
+      (
+        Icons.search_rounded,
+        AppColors.gradeGood,
+        'المعلمون',
+        'أداء المعلمين',
+        onTeachers,
+      ),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.15,
+      ),
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return Material(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: item.$5,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: item.$2.withValues(alpha: 0.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(item.$1, color: item.$2, size: 22),
+                  ),
+                  const Spacer(),
+                  Text(
+                    item.$3,
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    item.$4,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

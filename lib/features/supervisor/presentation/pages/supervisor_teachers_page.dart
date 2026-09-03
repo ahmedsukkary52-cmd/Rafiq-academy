@@ -8,6 +8,7 @@ import '../../domain/repositories/parent_repository.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
+import '../widgets/supervisor_loading_skeletons.dart';
 
 class SupervisorTeachersPage extends StatefulWidget {
   const SupervisorTeachersPage({super.key});
@@ -93,7 +94,7 @@ class _SupervisorTeachersPageState extends State<SupervisorTeachersPage> {
               );
             }
             if (_loading && _names.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const SupervisorCenteredListSkeleton();
             }
             if (_error != null && _rows.isEmpty) {
               return AppErrorWidget(message: _error!, onRetry: _resolve);

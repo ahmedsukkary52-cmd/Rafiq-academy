@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../shared/domain/academy_membership_invariant.dart';
 import '../../student/domain/entities/halaqa_entity.dart';
 import '../../teacher/domain/entities/halaqa_students_summary_entity.dart';
 
@@ -208,7 +209,8 @@ class SupervisorRoster {
 class SupervisorMembershipFormValidation {
   const SupervisorMembershipFormValidation._();
 
-  static const int maxHalaqatPerStudent = 2;
+  static const int maxHalaqatPerStudent =
+      AcademyMembershipInvariant.maxHalaqatPerStudent;
 
   /// Existing-student admit/add into [targetHalaqaId].
   static String? registerError({
@@ -237,7 +239,7 @@ class SupervisorMembershipFormValidation {
     return null;
   }
 
-  /// Transfer form validation (write deferred to Sprint 2).
+  /// Transfer form validation (client-side; writes via AcademyAdmissionFirestore).
   static String? transferError({
     required String studentId,
     required String? sourceHalaqaId,

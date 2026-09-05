@@ -207,7 +207,14 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       if (sid.isEmpty) {
         throw const ServerException('معرّف المشرف غير صالح');
       }
-      final ids = FirestoreInQuery.normalizeIds(studentIds);
+
+      // Scope from supervised halaqat — do not trust client studentIds alone.
+      final supervised = await getSupervisedHalaqat(sid);
+      final allowed = <String>{for (final h in supervised) ...h.studentIds};
+      final requested = FirestoreInQuery.normalizeIds(studentIds).toSet();
+      final ids =
+          (requested.isEmpty ? allowed : requested.intersection(allowed))
+              .toList();
       if (ids.isEmpty) return const [];
 
       final byId = <String, PaymentModel>{};

@@ -32,19 +32,25 @@ class AcademyMembershipInvariant {
 
   /// Whether establish/add may set `studentProfiles.halaqaId` to the target.
   ///
-  /// - First membership (no other memberships, empty primary) → yes.
-  /// - Add-second / already has primary → no (preserve primary).
+  /// - First membership (no other roster memberships) → yes, even if primary
+  ///   is empty or an orphan pointer that is not a current membership.
+  /// - Add-second / already has other memberships → no (preserve primary).
   static bool shouldSetPrimaryOnEstablish({
     required String? currentPrimary,
     required Iterable<String> membershipHalaqaIdsExcludingTarget,
   }) {
-    final primary = currentPrimary?.trim() ?? '';
+    // [currentPrimary] kept for call-site clarity; orphans are healed when
+    // this is the first roster membership.
     final others = membershipHalaqaIdsExcludingTarget
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    if (others.isNotEmpty) return false;
-    return primary.isEmpty;
+    if (others.isEmpty) {
+      return true;
+    }
+    // Preserve an existing primary when adding a second membership.
+    final _ = currentPrimary;
+    return false;
   }
 
   /// Primary after an atomic move: remove [sourceHalaqaId], add [targetHalaqaId].

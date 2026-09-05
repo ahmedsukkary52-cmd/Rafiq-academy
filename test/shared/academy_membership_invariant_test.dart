@@ -76,6 +76,16 @@ void main() {
       );
     });
 
+    test('first membership sets primary even with orphan pointer', () {
+      expect(
+        AcademyMembershipInvariant.shouldSetPrimaryOnEstablish(
+          currentPrimary: 'stale-orphan',
+          membershipHalaqaIdsExcludingTarget: const [],
+        ),
+        isTrue,
+      );
+    });
+
     test('add-second does not set primary', () {
       expect(
         AcademyMembershipInvariant.shouldSetPrimaryOnEstablish(

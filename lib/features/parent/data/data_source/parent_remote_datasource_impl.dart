@@ -352,6 +352,13 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         'method': ParentPaymentProofContract.externalMethod,
         ParentPaymentProofContract.reviewStatusField:
             ParentPaymentProofContract.pendingReview,
+        // Clear prior supervisor outcome so resubmit awaits a fresh review.
+        ParentPaymentProofContract.reviewedByField: FieldValue.delete(),
+        ParentPaymentProofContract.reviewedAtField: FieldValue.delete(),
+        ParentPaymentProofContract.reviewNotesField: FieldValue.delete(),
+        ParentPaymentProofContract.amountPaidConfirmedField:
+            FieldValue.delete(),
+        ParentPaymentProofContract.remainingAmountField: FieldValue.delete(),
         // Parent never sets status/paidAt or supervisor review outcome fields.
       });
     } on ServerException {

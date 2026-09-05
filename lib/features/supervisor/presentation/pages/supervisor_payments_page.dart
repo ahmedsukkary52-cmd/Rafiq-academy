@@ -30,6 +30,7 @@ class SupervisorPaymentsPage extends StatefulWidget {
 class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
   _PaymentFilter _filter = _PaymentFilter.all;
   Map<String, String> _names = const {};
+  String _loadedHalaqaKey = '';
 
   @override
   void initState() {
@@ -45,6 +46,11 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
     return ids.toList();
   }
 
+  String _halaqaKey(SupervisorState state) {
+    final ids = state.halaqat.map((h) => h.id).toList()..sort();
+    return ids.join('|');
+  }
+
   Future<void> _resolveNames(List<String> ids) async {
     if (ids.isEmpty) return;
     final result = await sl<SupervisorRepository>().getUserDisplayNames(ids);
@@ -54,11 +60,29 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
     });
   }
 
-  void _load() {
+  void _load({bool force = false}) {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
     final bloc = context.read<SupervisorBloc>();
-    final ids = _studentIds(bloc.state);
+    final state = bloc.state;
+
+    // Wait until supervised halaqat are loaded to avoid empty false-success.
+    if (state.halaqatStatus != SectionStatus.loaded) {
+      if (state.halaqatStatus == SectionStatus.initial ||
+          state.halaqatStatus == SectionStatus.loading) {
+        return;
+      }
+    }
+
+    final key = _halaqaKey(state);
+    if (!force &&
+        key == _loadedHalaqaKey &&
+        state.paymentsStatus == SectionStatus.loaded) {
+      return;
+    }
+    _loadedHalaqaKey = key;
+
+    final ids = _studentIds(state);
     bloc.add(
       LoadSupervisedPaymentsEvent(supervisorId: auth.user.uid, studentIds: ids),
     );
@@ -117,28 +141,41 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<SupervisorBloc, SupervisorState>(
-      listenWhen: (p, c) =>
-          p.reviewPaymentStatus != c.reviewPaymentStatus ||
-          p.payments != c.payments,
-      listener: (context, state) {
-        if (state.payments.isNotEmpty) {
-          final ids = <String>{
-            for (final p in state.payments) ...[p.studentId, p.parentId],
-          }.toList();
-          _resolveNames(ids);
-        }
-        if (state.reviewPaymentStatus == SubmissionStatus.success) {
-          AppSnackBar.showSuccess(context, 'تم حفظ نتيجة المراجعة');
-          context.read<SupervisorBloc>().add(const ResetReviewPaymentEvent());
-        } else if (state.reviewPaymentStatus == SubmissionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.reviewPaymentError ?? 'تعذر حفظ المراجعة',
-          );
-          context.read<SupervisorBloc>().add(const ResetReviewPaymentEvent());
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<SupervisorBloc, SupervisorState>(
+          listenWhen: (p, c) =>
+              p.halaqatStatus != c.halaqatStatus || p.halaqat != c.halaqat,
+          listener: (context, state) => _load(),
+        ),
+        BlocListener<SupervisorBloc, SupervisorState>(
+          listenWhen: (p, c) =>
+              p.reviewPaymentStatus != c.reviewPaymentStatus ||
+              p.payments != c.payments,
+          listener: (context, state) {
+            if (state.payments.isNotEmpty) {
+              final ids = <String>{
+                for (final p in state.payments) ...[p.studentId, p.parentId],
+              }.toList();
+              _resolveNames(ids);
+            }
+            if (state.reviewPaymentStatus == SubmissionStatus.success) {
+              AppSnackBar.showSuccess(context, 'تم حفظ نتيجة المراجعة');
+              context.read<SupervisorBloc>().add(
+                const ResetReviewPaymentEvent(),
+              );
+            } else if (state.reviewPaymentStatus == SubmissionStatus.error) {
+              AppSnackBar.showError(
+                context,
+                state.reviewPaymentError ?? 'تعذر حفظ المراجعة',
+              );
+              context.read<SupervisorBloc>().add(
+                const ResetReviewPaymentEvent(),
+              );
+            }
+          },
+        ),
+      ],
       child: SupervisorSubpageScaffold(
         title: 'المدفوعات',
         actions: [
@@ -160,16 +197,33 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
           buildWhen: (p, c) =>
               p.paymentsStatus != c.paymentsStatus ||
               p.payments != c.payments ||
-              p.halaqat != c.halaqat,
+              p.halaqat != c.halaqat ||
+              p.halaqatStatus != c.halaqatStatus,
           builder: (context, state) {
-            if (state.paymentsStatus == SectionStatus.loading ||
+            final waitingHalaqat =
+                state.halaqatStatus == SectionStatus.initial ||
+                state.halaqatStatus == SectionStatus.loading;
+            if (waitingHalaqat ||
+                state.paymentsStatus == SectionStatus.loading ||
                 state.paymentsStatus == SectionStatus.initial) {
               return const SupervisorPaymentsListSkeleton();
+            }
+            if (state.halaqatStatus == SectionStatus.error) {
+              return AppErrorWidget(
+                message: state.halaqatError ?? 'تعذر تحميل الحلقات',
+                onRetry: () {
+                  final auth = context.read<AuthBloc>().state;
+                  if (auth is! AuthAuthenticated) return;
+                  context.read<SupervisorBloc>().add(
+                    LoadSupervisedHalaqatEvent(auth.user.uid),
+                  );
+                },
+              );
             }
             if (state.paymentsStatus == SectionStatus.error) {
               return AppErrorWidget(
                 message: state.paymentsError ?? 'تعذر التحميل',
-                onRetry: _load,
+                onRetry: () => _load(force: true),
               );
             }
 
@@ -180,7 +234,7 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
 
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async => _load(),
+              onRefresh: () async => _load(force: true),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),

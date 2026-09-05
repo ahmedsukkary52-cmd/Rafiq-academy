@@ -795,7 +795,7 @@ class _QuickActions extends StatelessWidget {
       (
         Icons.person_add_alt_1_rounded,
         AppColors.primaryDark,
-        'تسجيل طالب',
+        'قبول طالب',
         () => SupervisorDestinations.register(context),
       ),
       (

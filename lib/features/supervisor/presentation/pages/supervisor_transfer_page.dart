@@ -18,8 +18,9 @@ import '../bloc/supervisor_state.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
 import '../widgets/supervisor_loading_skeletons.dart';
 
-/// Transfer / add-to-second-halaqa form (UI + validation only).
-/// Membership write deferred to Sprint 2.
+/// Transfer / add-to-second-halaqa form.
+/// Writes go through [TransferStudentBetweenHalaqatEvent] /
+/// [AdmitStudentToHalaqaEvent] → AcademyAdmissionFirestore.
 class SupervisorTransferPage extends StatefulWidget {
   final String? preselectedStudentId;
   final String? preselectedSourceHalaqaId;

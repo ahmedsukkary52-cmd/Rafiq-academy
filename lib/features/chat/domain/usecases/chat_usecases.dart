@@ -25,6 +25,20 @@ class WatchConversationsUseCase
       repository.watchConversations(params.uid);
 }
 
+/// Admin-only academy-wide inbox (read oversight; does not join threads).
+@lazySingleton
+class WatchAllConversationsUseCase
+    extends StreamUseCase<List<ConversationEntity>, ChatUidParams> {
+  final ChatRepository repository;
+  WatchAllConversationsUseCase(this.repository);
+
+  @override
+  Stream<Either<Failure, List<ConversationEntity>>> call(
+    ChatUidParams params,
+  ) =>
+      repository.watchAllConversations(observerUid: params.uid);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // WatchMessagesUseCase
 // ══════════════════════════════════════════════════════════════════════════════

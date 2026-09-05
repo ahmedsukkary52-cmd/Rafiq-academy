@@ -24,12 +24,15 @@ class ChatRoomPage extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
   final String? otherUserImage;
+  /// Silent oversight: hide composer; do not join as participant.
+  final bool readOnly;
 
   const ChatRoomPage({
     super.key,
     required this.conversationId,
     required this.otherUserName,
     this.otherUserImage,
+    this.readOnly = false,
   });
 
   @override
@@ -65,6 +68,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   }
 
   void _sendMessage() {
+    if (widget.readOnly) return;
     final text = _messageCtrl.text.trim();
     if (text.isEmpty) return;
     _pendingSend = text;
@@ -265,10 +269,25 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       );
                     },
                   ),
-                  _ComposerBar(
-                    controller: _messageCtrl,
-                    onSend: _sendMessage,
-                  ),
+                  if (widget.readOnly)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                      color: AppColors.surface,
+                      child: Text(
+                        'وضع مراقبة — قراءة فقط',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    _ComposerBar(
+                      controller: _messageCtrl,
+                      onSend: _sendMessage,
+                    ),
                 ],
               ),
             );

@@ -1,44 +1,49 @@
 import 'package:flutter/material.dart';
-import '../../../../shared/theme/app_theme.dart';
 
-/// Admin home.
-///
-/// H6 / A-H9: do **not** wire stats / finance / complaints / broadcast /
-/// teacher-management AdminBloc events here — those writers are quarantined
-/// (no product UI). Keep this surface free of parallel ops delivery.
-class AdminHomePage extends StatelessWidget {
+import '../../../../shared/theme/app_theme.dart';
+import '../admin_home_nav.dart';
+import 'admin_dashboard_tab.dart';
+import 'admin_finance_tab.dart';
+import 'admin_management_tab.dart';
+import 'admin_settings_tab.dart';
+import 'admin_students_tab.dart';
+import '../widgets/admin_bottom_nav.dart';
+
+/// Admin shell — 5-tab IA matching Figma designs.
+class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
 
   @override
+  State<AdminHomePage> createState() => _AdminHomePageState();
+}
+
+class _AdminHomePageState extends State<AdminHomePage> {
+  int _currentTab = AdminHomeNav.dashboardIndex;
+
+  void _switchTab(int index) {
+    if (index == _currentTab) return;
+    setState(() => _currentTab = index);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('نافذة المدير')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingL),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.admin_panel_settings_outlined,
-                size: 48,
-                color: AppColors.textHint,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'نافذة المدير',
-                style: AppTextStyles.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Coming Soon',
-                style: AppTextStyles.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: IndexedStack(
+          index: _currentTab,
+          children: [
+            AdminDashboardTab(onSwitchTab: _switchTab),
+            const AdminStudentsTab(),
+            const AdminManagementTab(),
+            const AdminFinanceTab(),
+            const AdminSettingsTab(),
+          ],
+        ),
+        bottomNavigationBar: AdminBottomNav(
+          selected: _currentTab,
+          onChanged: _switchTab,
         ),
       ),
     );

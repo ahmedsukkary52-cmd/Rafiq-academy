@@ -30,22 +30,38 @@ import 'package:rafiq_academy/features/admin/domain/repositories/admin_repositor
     as _i255;
 import 'package:rafiq_academy/features/admin/domain/usecases/approve_new_student_usecase.dart'
     as _i928;
+import 'package:rafiq_academy/features/admin/domain/usecases/communication_settings_usecases.dart'
+    as _i866;
+import 'package:rafiq_academy/features/admin/domain/usecases/create_halaqa_usecase.dart'
+    as _i926;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_academy_stats_usecase.dart'
     as _i488;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_academy_student_roster_usecase.dart'
+    as _i309;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_admin_directory_usecases.dart'
+    as _i657;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_all_teachers_usecase.dart'
     as _i975;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_complaints_usecase.dart'
     as _i899;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_financial_summary_usecase.dart'
     as _i369;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_payments_usecase.dart'
+    as _i612;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_teacher_activity_log_usecase.dart'
     as _i1063;
+import 'package:rafiq_academy/features/admin/domain/usecases/grant_admin_reward_usecase.dart'
+    as _i550;
+import 'package:rafiq_academy/features/admin/domain/usecases/registration_request_usecases.dart'
+    as _i289;
 import 'package:rafiq_academy/features/admin/domain/usecases/respond_to_complaint_usecase.dart'
     as _i97;
 import 'package:rafiq_academy/features/admin/domain/usecases/send_broadcast_notification_usecase.dart'
     as _i57;
 import 'package:rafiq_academy/features/admin/domain/usecases/toggle_account_status_usecase.dart'
     as _i482;
+import 'package:rafiq_academy/features/admin/domain/usecases/update_complaint_usecase.dart'
+    as _i733;
 import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_performance_usecase.dart'
     as _i413;
 import 'package:rafiq_academy/features/admin/domain/usecases/update_teacher_quota_usecase.dart'
@@ -469,21 +485,28 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
+    gh.lazySingleton<_i444.AwardsRemoteDatasource>(
+      () => _i982.AwardsRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        storage: gh<_i457.FirebaseStorage>(),
+      ),
+    );
     gh.lazySingleton<_i164.ChatRemoteDatasource>(
       () => _i164.ChatRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i888.AwardsRepository>(
+      () => _i662.AwardsRepositoryImpl(
+        remoteDatasource: gh<_i444.AwardsRemoteDatasource>(),
+        pdfGenerator: gh<_i649.CertificatePdfGenerator>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
     gh.lazySingleton<_i31.HomeworkRemoteDatasource>(
       () => _i119.HomeworkRemoteDatasourceImpl(
         gh<_i974.FirebaseFirestore>(),
         gh<_i457.FirebaseStorage>(),
-      ),
-    );
-    gh.lazySingleton<_i444.AwardsRemoteDatasource>(
-      () => _i982.AwardsRemoteDatasourceImpl(
-        firestore: gh<_i974.FirebaseFirestore>(),
-        storage: gh<_i457.FirebaseStorage>(),
       ),
     );
     gh.lazySingleton<_i852.HalaqaActivityRemoteDatasource>(
@@ -569,6 +592,18 @@ extension GetItInjectableX on _i174.GetIt {
         remoteDatasource: gh<_i483.AuthRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
+    );
+    gh.lazySingleton<_i186.GetAwardsStatsUseCase>(
+      () => _i186.GetAwardsStatsUseCase(gh<_i888.AwardsRepository>()),
+    );
+    gh.lazySingleton<_i186.GetGrantedAwardsUseCase>(
+      () => _i186.GetGrantedAwardsUseCase(gh<_i888.AwardsRepository>()),
+    );
+    gh.lazySingleton<_i186.GrantAwardUseCase>(
+      () => _i186.GrantAwardUseCase(gh<_i888.AwardsRepository>()),
+    );
+    gh.lazySingleton<_i186.GenerateCertificatePdfUseCase>(
+      () => _i186.GenerateCertificatePdfUseCase(gh<_i888.AwardsRepository>()),
     );
     gh.lazySingleton<_i824.ProgressReportRepository>(
       () => _i1044.ProgressReportRepositoryImpl(
@@ -659,8 +694,29 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i928.ApproveNewStudentUseCase>(
       () => _i928.ApproveNewStudentUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.lazySingleton<_i866.GetCommunicationSettingsUseCase>(
+      () => _i866.GetCommunicationSettingsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i866.SaveCommunicationSettingsUseCase>(
+      () => _i866.SaveCommunicationSettingsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i926.CreateHalaqaUseCase>(
+      () => _i926.CreateHalaqaUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i926.EnsureAdminInternalChatUseCase>(
+      () => _i926.EnsureAdminInternalChatUseCase(gh<_i255.AdminRepository>()),
+    );
     gh.lazySingleton<_i488.GetAcademyStatsUseCase>(
       () => _i488.GetAcademyStatsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i309.GetAcademyStudentRosterUseCase>(
+      () => _i309.GetAcademyStudentRosterUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i657.GetAllHalaqatUseCase>(
+      () => _i657.GetAllHalaqatUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i657.GetAllSupervisorsUseCase>(
+      () => _i657.GetAllSupervisorsUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i975.GetAllTeachersUseCase>(
       () => _i975.GetAllTeachersUseCase(gh<_i255.AdminRepository>()),
@@ -671,8 +727,24 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i369.GetFinancialSummaryUseCase>(
       () => _i369.GetFinancialSummaryUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.lazySingleton<_i612.GetPaymentsUseCase>(
+      () => _i612.GetPaymentsUseCase(gh<_i255.AdminRepository>()),
+    );
     gh.lazySingleton<_i1063.GetTeacherActivityLogUseCase>(
       () => _i1063.GetTeacherActivityLogUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i550.GrantAdminRewardUseCase>(
+      () => _i550.GrantAdminRewardUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i289.GetRegistrationRequestsUseCase>(
+      () => _i289.GetRegistrationRequestsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i289.RejectRegistrationRequestUseCase>(
+      () => _i289.RejectRegistrationRequestUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i289.ApproveRegistrationRequestUseCase>(
+      () =>
+          _i289.ApproveRegistrationRequestUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i97.RespondToComplaintUseCase>(
       () => _i97.RespondToComplaintUseCase(gh<_i255.AdminRepository>()),
@@ -683,11 +755,22 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i482.ToggleAccountStatusUseCase>(
       () => _i482.ToggleAccountStatusUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.lazySingleton<_i733.UpdateComplaintUseCase>(
+      () => _i733.UpdateComplaintUseCase(gh<_i255.AdminRepository>()),
+    );
     gh.lazySingleton<_i413.UpdateTeacherPerformanceUseCase>(
       () => _i413.UpdateTeacherPerformanceUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i1014.UpdateTeacherQuotaUseCase>(
       () => _i1014.UpdateTeacherQuotaUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.factory<_i285.AwardsBloc>(
+      () => _i285.AwardsBloc(
+        getAwardsStats: gh<_i186.GetAwardsStatsUseCase>(),
+        getGrantedAwards: gh<_i186.GetGrantedAwardsUseCase>(),
+        grantAward: gh<_i186.GrantAwardUseCase>(),
+        generateCertificatePdf: gh<_i186.GenerateCertificatePdfUseCase>(),
+      ),
     );
     gh.factory<_i407.AudioLibraryBloc>(
       () => _i407.AudioLibraryBloc(
@@ -748,11 +831,33 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i81.SubmitHomeworkRecitationUseCase(gh<_i951.HomeworkRepository>()),
     );
-    gh.lazySingleton<_i888.AwardsRepository>(
-      () => _i662.AwardsRepositoryImpl(
-        remoteDatasource: gh<_i444.AwardsRemoteDatasource>(),
-        pdfGenerator: gh<_i649.CertificatePdfGenerator>(),
-        networkInfo: gh<_i696.NetworkInfo>(),
+    gh.singleton<_i409.AdminBloc>(
+      () => _i409.AdminBloc(
+        getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
+        getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
+        getPayments: gh<_i612.GetPaymentsUseCase>(),
+        getComplaints: gh<_i899.GetComplaintsUseCase>(),
+        approveNewStudent: gh<_i928.ApproveNewStudentUseCase>(),
+        toggleAccountStatus: gh<_i482.ToggleAccountStatusUseCase>(),
+        respondToComplaint: gh<_i97.RespondToComplaintUseCase>(),
+        sendBroadcastNotification: gh<_i57.SendBroadcastNotificationUseCase>(),
+        getAllTeachers: gh<_i975.GetAllTeachersUseCase>(),
+        updateTeacherPerformance: gh<_i413.UpdateTeacherPerformanceUseCase>(),
+        updateTeacherQuota: gh<_i1014.UpdateTeacherQuotaUseCase>(),
+        getTeacherActivityLog: gh<_i1063.GetTeacherActivityLogUseCase>(),
+        getAcademyStudentRoster: gh<_i309.GetAcademyStudentRosterUseCase>(),
+        getRegistrationRequests: gh<_i289.GetRegistrationRequestsUseCase>(),
+        rejectRegistrationRequest: gh<_i289.RejectRegistrationRequestUseCase>(),
+        approveRegistrationRequest:
+            gh<_i289.ApproveRegistrationRequestUseCase>(),
+        getAllHalaqat: gh<_i657.GetAllHalaqatUseCase>(),
+        getAllSupervisors: gh<_i657.GetAllSupervisorsUseCase>(),
+        updateComplaint: gh<_i733.UpdateComplaintUseCase>(),
+        getCommunicationSettings: gh<_i866.GetCommunicationSettingsUseCase>(),
+        saveCommunicationSettings: gh<_i866.SaveCommunicationSettingsUseCase>(),
+        grantAdminReward: gh<_i550.GrantAdminRewardUseCase>(),
+        createHalaqa: gh<_i926.CreateHalaqaUseCase>(),
+        ensureAdminInternalChat: gh<_i926.EnsureAdminInternalChatUseCase>(),
       ),
     );
     gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
@@ -766,6 +871,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i337.WatchConversationsUseCase>(
       () => _i337.WatchConversationsUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.WatchAllConversationsUseCase>(
+      () => _i337.WatchAllConversationsUseCase(gh<_i194.ChatRepository>()),
     );
     gh.lazySingleton<_i337.WatchMessagesUseCase>(
       () => _i337.WatchMessagesUseCase(gh<_i194.ChatRepository>()),
@@ -787,21 +895,6 @@ extension GetItInjectableX on _i174.GetIt {
         getHalaqaAnalytics: gh<_i1010.GetHalaqaAnalyticsUseCase>(),
         getAtRiskStudents: gh<_i1010.GetAtRiskStudentsUseCase>(),
         getTopStudents: gh<_i1010.GetTopStudentsUseCase>(),
-      ),
-    );
-    gh.singleton<_i409.AdminBloc>(
-      () => _i409.AdminBloc(
-        getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
-        getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
-        getComplaints: gh<_i899.GetComplaintsUseCase>(),
-        approveNewStudent: gh<_i928.ApproveNewStudentUseCase>(),
-        toggleAccountStatus: gh<_i482.ToggleAccountStatusUseCase>(),
-        respondToComplaint: gh<_i97.RespondToComplaintUseCase>(),
-        sendBroadcastNotification: gh<_i57.SendBroadcastNotificationUseCase>(),
-        getAllTeachers: gh<_i975.GetAllTeachersUseCase>(),
-        updateTeacherPerformance: gh<_i413.UpdateTeacherPerformanceUseCase>(),
-        updateTeacherQuota: gh<_i1014.UpdateTeacherQuotaUseCase>(),
-        getTeacherActivityLog: gh<_i1063.GetTeacherActivityLogUseCase>(),
       ),
     );
     gh.lazySingleton<_i1044.GetAbsenceRequestsUseCase>(
@@ -862,12 +955,6 @@ extension GetItInjectableX on _i174.GetIt {
         deleteFile: gh<_i89.DeleteFileUseCase>(),
       ),
     );
-    gh.singleton<_i618.ChatConversationsBloc>(
-      () => _i618.ChatConversationsBloc(
-        watchConversations: gh<_i337.WatchConversationsUseCase>(),
-        getOrCreateConversation: gh<_i337.GetOrCreateConversationUseCase>(),
-      ),
-    );
     gh.factory<_i421.HomeworkBloc>(
       () => _i421.HomeworkBloc(
         watchLatestHomework: gh<_i81.WatchLatestHomeworkUseCase>(),
@@ -890,18 +977,6 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i587.NotificationsRepository>(),
       ),
     );
-    gh.lazySingleton<_i186.GetAwardsStatsUseCase>(
-      () => _i186.GetAwardsStatsUseCase(gh<_i888.AwardsRepository>()),
-    );
-    gh.lazySingleton<_i186.GetGrantedAwardsUseCase>(
-      () => _i186.GetGrantedAwardsUseCase(gh<_i888.AwardsRepository>()),
-    );
-    gh.lazySingleton<_i186.GrantAwardUseCase>(
-      () => _i186.GrantAwardUseCase(gh<_i888.AwardsRepository>()),
-    );
-    gh.lazySingleton<_i186.GenerateCertificatePdfUseCase>(
-      () => _i186.GenerateCertificatePdfUseCase(gh<_i888.AwardsRepository>()),
-    );
     gh.factoryParam<_i467.ChatRoomBloc, String, String>(
       (conversationId, currentUserId) => _i467.ChatRoomBloc(
         gh<_i337.WatchMessagesUseCase>(),
@@ -913,6 +988,13 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i891.GetWeeklySessionsUseCase>(
       () => _i891.GetWeeklySessionsUseCase(gh<_i552.ScheduleRepository>()),
+    );
+    gh.singleton<_i618.ChatConversationsBloc>(
+      () => _i618.ChatConversationsBloc(
+        watchConversations: gh<_i337.WatchConversationsUseCase>(),
+        watchAllConversations: gh<_i337.WatchAllConversationsUseCase>(),
+        getOrCreateConversation: gh<_i337.GetOrCreateConversationUseCase>(),
+      ),
     );
     gh.factory<_i919.CalendarBloc>(
       () => _i919.CalendarBloc(
@@ -941,14 +1023,6 @@ extension GetItInjectableX on _i174.GetIt {
         addComment: gh<_i918.AddCommentUseCase>(),
         togglePin: gh<_i918.TogglePinUseCase>(),
         deletePost: gh<_i918.DeletePostUseCase>(),
-      ),
-    );
-    gh.factory<_i285.AwardsBloc>(
-      () => _i285.AwardsBloc(
-        getAwardsStats: gh<_i186.GetAwardsStatsUseCase>(),
-        getGrantedAwards: gh<_i186.GetGrantedAwardsUseCase>(),
-        grantAward: gh<_i186.GrantAwardUseCase>(),
-        generateCertificatePdf: gh<_i186.GenerateCertificatePdfUseCase>(),
       ),
     );
     gh.singleton<_i995.ParentBloc>(

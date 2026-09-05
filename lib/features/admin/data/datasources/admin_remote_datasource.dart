@@ -1,27 +1,46 @@
-
+import '../../domain/admin_grant_reward_params.dart';
 import '../../domain/entities/academy_stats_entity.dart';
+import '../../domain/entities/admin_directory_entity.dart';
+import '../../domain/entities/admin_halaqa_roster_entity.dart';
+import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
+import '../../domain/entities/admin_payment_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
+import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
 import '../../domain/entities/teacher_management_entity.dart';
-
-// ══════════════════════════════════════════════════════════════════════════════
-// AdminRemoteDatasource
-// ══════════════════════════════════════════════════════════════════════════════
 
 abstract class AdminRemoteDatasource {
   Future<AcademyStatsEntity> getAcademyStats();
   Future<FinancialSummaryEntity> getFinancialSummary();
+  Future<List<AdminPaymentEntity>> getPayments();
 
-  Future<void> approveNewStudent(
-      {required String studentId, required String halaqaId});
+  Future<void> approveNewStudent({
+    required String studentId,
+    required String halaqaId,
+  });
 
-  Future<void> toggleAccountStatus(
-      {required String uid, required bool isActive});
+  Future<void> toggleAccountStatus({
+    required String uid,
+    required bool isActive,
+  });
+
   Future<List<ComplaintEntity>> getComplaints();
 
-  Future<void> respondToComplaint(
-      {required String complaintId, required String response});
+  Future<void> respondToComplaint({
+    required String complaintId,
+    required String response,
+  });
+
+  Future<void> updateComplaint({
+    required String complaintId,
+    String? status,
+    String? priority,
+    String? assigneeId,
+    String? assigneeRole,
+    String? response,
+  });
+
   Future<void> sendBroadcastNotification({
     required String title,
     required String body,
@@ -45,4 +64,36 @@ abstract class AdminRemoteDatasource {
     required DateTime from,
     required DateTime to,
   });
+
+  Future<List<AdminHalaqaRosterEntity>> getAcademyStudentRoster();
+
+  Future<List<RegistrationRequestEntity>> getRegistrationRequests();
+
+  Future<void> rejectRegistrationRequest({required String studentId});
+
+  Future<void> approveRegistrationRequest({
+    required String studentId,
+    required String halaqaId,
+    String? teacherId,
+    String? supervisorId,
+  });
+
+  Future<List<AdminHalaqaSummaryEntity>> getAllHalaqat();
+
+  Future<List<AdminStaffSummaryEntity>> getAllSupervisors();
+
+  Future<CommunicationSettingsEntity> getCommunicationSettings();
+
+  Future<void> saveCommunicationSettings(CommunicationSettingsEntity settings);
+
+  Future<void> grantReward(AdminGrantRewardParams params);
+
+  Future<String> createHalaqa({
+    required String name,
+    required String teacherId,
+    required String supervisorId,
+    String meetingLink,
+  });
+
+  Future<String> ensureAdminInternalChat({required String adminUid});
 }

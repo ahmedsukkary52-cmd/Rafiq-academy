@@ -57,6 +57,20 @@ class ConversationEntity extends Equatable {
     return participants.first;
   }
 
+  /// Title for Admin oversight when the viewer is not a participant.
+  String displayTitleForObserver(String observerUid) {
+    final isParticipant = participants.any((p) => p.uid == observerUid);
+    if (isParticipant) return otherParticipant(observerUid).name;
+    if (participants.length >= 2) {
+      return '${participants[0].name} · ${participants[1].name}';
+    }
+    if (participants.length == 1) return participants.first.name;
+    return 'محادثة';
+  }
+
+  bool includesParticipant(String uid) =>
+      participants.any((p) => p.uid == uid);
+
   bool hasUnread() => unreadCount > 0;
 
   @override

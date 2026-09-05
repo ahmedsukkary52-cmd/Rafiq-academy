@@ -105,4 +105,34 @@ void main() {
       );
     });
   });
+
+  group('Admin student profile navigation', () {
+    test('admin may open student profile under /admin prefix', () {
+      expect(
+        AppRouteAccess.isAllowed(
+          path: '/admin/student/s1',
+          role: AppRoles.admin,
+        ),
+        isTrue,
+      );
+      expect(
+        AppRouteAccess.isAllowed(
+          path: '/teacher/student/s1',
+          role: AppRoles.admin,
+        ),
+        isFalse,
+      );
+    });
+
+    test('adminStudentProfile helper builds path with optional halaqaId', () {
+      expect(
+        AppRoutes.adminStudentProfile('abc'),
+        '/admin/student/abc',
+      );
+      expect(
+        AppRoutes.adminStudentProfile('abc', halaqaId: 'h1'),
+        '/admin/student/abc?halaqaId=h1',
+      );
+    });
+  });
 }

@@ -300,7 +300,10 @@ class ParentHouseholdAssembler {
     return result;
   }
 
-  static PaymentStatus? _worsePayment(PaymentStatus? current, PaymentStatus next) {
+  static PaymentStatus? _worsePayment(
+    PaymentStatus? current,
+    PaymentStatus next,
+  ) {
     if (current == null) return next;
     const rank = {
       PaymentStatus.paid: 0,

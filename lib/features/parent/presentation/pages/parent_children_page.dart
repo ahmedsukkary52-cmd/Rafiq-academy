@@ -51,9 +51,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
   }
 
   Future<void> _startSupervisorChat(ParentChildSnapshot child) async {
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     final supervisorId = (child.supervisorId ?? '').trim();
     if (auth is! AuthAuthenticated || _startingChat) return;
     if (supervisorId.isEmpty) {
@@ -63,10 +61,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
       return;
     }
 
-    final staff = context
-        .read<ParentBloc>()
-        .state
-        .staffContacts;
+    final staff = context.read<ParentBloc>().state.staffContacts;
     ParentStaffContact? contact;
     for (final item in staff) {
       if (item.uid == supervisorId) {
@@ -76,9 +71,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
     }
     contact ??= ParentStaffContact(
       uid: supervisorId,
-      name: child.supervisorName
-          .trim()
-          .isEmpty
+      name: child.supervisorName.trim().isEmpty
           ? 'المشرف'
           : child.supervisorName.trim(),
       role: AppRoles.supervisor,
@@ -94,9 +87,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
         await ParentDestinations.chat(
           context,
           conversationId: conversation.id,
-          title: other.name
-              .trim()
-              .isEmpty ? contact.name : other.name,
+          title: other.name.trim().isEmpty ? contact.name : other.name,
           imageUrl: other.profileImageUrl ?? contact.profileImageUrl,
         );
         return;
@@ -135,9 +126,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context
-        .watch<AuthBloc>()
-        .state;
+    final auth = context.watch<AuthBloc>().state;
     final uid = auth is AuthAuthenticated ? auth.user.uid : '';
 
     return Directionality(
@@ -145,7 +134,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
       child: BlocListener<ChatConversationsBloc, ChatConversationsState>(
         bloc: sl<ChatConversationsBloc>(),
         listenWhen: (p, c) =>
-        p.startConversationStatus != c.startConversationStatus,
+            p.startConversationStatus != c.startConversationStatus,
         listener: (context, state) async {
           if (!_startingChat) return;
           if (state.startConversationStatus == SubmissionStatus.error) {
@@ -181,26 +170,26 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
           appBar: AppBar(
             title: _searching
                 ? TextField(
-              controller: _searchController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'بحث عن ابن أو حلقة...',
-                hintStyle: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.dark,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: false,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              style: AppTextStyles.titleLarge.copyWith(
-                color: AppColors.onPrimary,
-              ),
-              cursorColor: AppColors.onPrimary,
-              onChanged: (value) => setState(() => _query = value),
-            )
+                    controller: _searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'بحث عن ابن أو حلقة...',
+                      hintStyle: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.dark,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: AppTextStyles.titleLarge.copyWith(
+                      color: AppColors.onPrimary,
+                    ),
+                    cursorColor: AppColors.onPrimary,
+                    onChanged: (value) => setState(() => _query = value),
+                  )
                 : const Text('أبنائي'),
             automaticallyImplyLeading: false,
             actions: [
@@ -223,7 +212,7 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
           ),
           body: BlocBuilder<ParentBloc, ParentState>(
             buildWhen: (p, c) =>
-            p.childrenStatus != c.childrenStatus ||
+                p.childrenStatus != c.childrenStatus ||
                 p.childrenIds != c.childrenIds ||
                 p.childrenError != c.childrenError ||
                 p.childrenSnapshots != c.childrenSnapshots,
@@ -243,13 +232,13 @@ class _ParentChildrenPageState extends State<ParentChildrenPage> {
                   icon: Icons.family_restroom_rounded,
                   title: 'لا يوجد طلاب مرتبطون بهذا الحساب بعد',
                   message:
-                  'عند ربط أبنائك بحسابك من قِبل الأكاديمية ستظهر أسماؤهم هنا.',
+                      'عند ربط أبنائك بحسابك من قِبل الأكاديمية ستظهر أسماؤهم هنا.',
                 );
               }
 
               final snapshots = state.childrenSnapshots;
-              final visible = <
-                  ({String id, String name, ParentChildSnapshot? snap})>[];
+              final visible =
+                  <({String id, String name, ParentChildSnapshot? snap})>[];
               for (final id in state.childrenIds) {
                 ParentChildSnapshot? snap;
                 for (final item in snapshots) {
@@ -321,8 +310,8 @@ class _ChildStatusCard extends StatelessWidget {
     final percent = snapshot == null
         ? null
         : (snapshot!.overallProgressPercent > 0
-        ? snapshot!.overallProgressPercent
-        : snapshot!.attendancePercentInWindow);
+              ? snapshot!.overallProgressPercent
+              : snapshot!.attendancePercentInWindow);
     final halaqa = snapshot?.halaqaName.trim() ?? '';
     final teacher = parentTeacherCaption(snapshot?.teacherName ?? '');
     final payment = parentPaymentLabel(snapshot?.paymentStatus);
@@ -332,9 +321,10 @@ class _ChildStatusCard extends StatelessWidget {
         .clamp(0.0, 1.0)
         .toDouble();
     final hasSupervisor =
-        (snapshot?.supervisorId ?? '')
-            .trim()
-            .isNotEmpty && onSupervisor != null;
+        (snapshot?.supervisorId ?? '').trim().isNotEmpty &&
+        onSupervisor != null;
+    // Escalation CTA — only when the child actually needs follow-up.
+    final showSupervisorContact = hasSupervisor && atRisk;
     final banner = snapshot == null ? null : parentChildStatusBanner(snapshot!);
 
     return Material(
@@ -438,17 +428,18 @@ class _ChildStatusCard extends StatelessWidget {
                           if (payment.isNotEmpty)
                             _StatusChip(
                               label: payment,
-                              color: snapshot?.paymentStatus ==
-                                  PaymentStatus.paid
+                              color:
+                                  snapshot?.paymentStatus == PaymentStatus.paid
                                   ? AppColors.success
                                   : AppColors.warning,
                             ),
                           _StatusChip(
                             label: attendance,
-                            color: switch (
-                            (snapshot?.todayAttendanceStatus ?? '').trim()) {
+                            color: switch ((snapshot?.todayAttendanceStatus ??
+                                    '')
+                                .trim()) {
                               AttendancePolicy.statusPresent =>
-                              AppColors.success,
+                                AppColors.success,
                               AttendancePolicy.statusAbsent => AppColors.error,
                               AttendancePolicy.statusLate => AppColors.warning,
                               _ => AppColors.info,
@@ -479,7 +470,8 @@ class _ChildStatusCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(
-                            AppSizes.radiusFull),
+                          AppSizes.radiusFull,
+                        ),
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 8,
@@ -489,27 +481,25 @@ class _ChildStatusCard extends StatelessWidget {
                       ),
                       if (banner != null) ...[
                         const SizedBox(height: 12),
-                        _BannerStrip(
-                          text: banner,
-                          warning: atRisk,
-                        ),
+                        _BannerStrip(text: banner, warning: atRisk),
                       ],
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () =>
-                                  ParentDestinations.childProfile(
-                                    context,
-                                    studentId: studentId,
-                                    studentName: name,
-                                  ),
+                              onPressed: () => ParentDestinations.childProfile(
+                                context,
+                                studentId: studentId,
+                                studentName: name,
+                              ),
                               style: ElevatedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 padding: const EdgeInsets.symmetric(
-                                    vertical: 16),
+                                  vertical: 16,
+                                ),
                                 backgroundColor: AppColors.primaryGradientMid,
                                 minimumSize: const Size(0, 42),
                                 visualDensity: VisualDensity.compact,
@@ -520,38 +510,41 @@ class _ChildStatusCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () =>
-                                  ParentDestinations.reports(
-                                    context,
-                                    studentId: studentId,
-                                    studentName: name,
-                                  ),
+                              onPressed: () => ParentDestinations.reports(
+                                context,
+                                studentId: studentId,
+                                studentName: name,
+                              ),
                               style: OutlinedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 padding: const EdgeInsets.symmetric(
-                                    vertical: 16),
+                                  vertical: 16,
+                                ),
                                 side: BorderSide(
                                   color: AppColors.primary.withValues(
-                                      alpha: 0.7),
+                                    alpha: 0.7,
+                                  ),
                                 ),
                                 backgroundColor: AppColors.primaryGradientStart
                                     .withValues(alpha: 0.07),
                                 minimumSize: const Size(0, 42),
                                 visualDensity: VisualDensity.compact,
                               ),
-                              child: Text('التقارير', style: GoogleFonts.cairo(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),),
+                              child: Text(
+                                'التقارير',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                             ),
                           ),
-
-
                         ],
                       ),
-                      if (overdue || hasSupervisor) ...[
+                      if (overdue || showSupervisorContact) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -569,22 +562,24 @@ class _ChildStatusCard extends StatelessWidget {
                                   child: const Text('سداد'),
                                 ),
                               ),
-                            if (overdue && hasSupervisor)
+                            if (overdue && showSupervisorContact)
                               const SizedBox(width: 8),
-                            if (hasSupervisor)
+                            if (showSupervisorContact)
                               Expanded(
                                 flex: overdue ? 2 : 1,
                                 child: OutlinedButton(
                                   onPressed: onSupervisor,
                                   style: OutlinedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                            12)),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                     foregroundColor: AppColors.error,
                                     side: const BorderSide(
-                                        color: AppColors.error),
+                                      color: AppColors.error,
+                                    ),
                                     backgroundColor: const Color(0xFFFDEAEA),
                                     minimumSize: const Size(0, 42),
                                     visualDensity: VisualDensity.compact,
@@ -683,9 +678,7 @@ class _BannerStrip extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            warning
-                ? Icons.warning_amber_rounded
-                : Icons.star_rounded,
+            warning ? Icons.warning_amber_rounded : Icons.star_rounded,
             size: 18,
             color: color,
           ),

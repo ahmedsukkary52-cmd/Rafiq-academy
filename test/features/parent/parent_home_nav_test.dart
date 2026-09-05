@@ -69,11 +69,7 @@ void main() {
           teacherId: 't1',
           supervisorId: 'sv1',
         ),
-        ParentChildSnapshot(
-          studentId: 's2',
-          name: 'سارة',
-          teacherId: 't1',
-        ),
+        ParentChildSnapshot(studentId: 's2', name: 'سارة', teacherId: 't1'),
       ];
       expect(
         parentStaffRelationCaption(

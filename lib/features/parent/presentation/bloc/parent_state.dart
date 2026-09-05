@@ -13,6 +13,9 @@ class _Unset {
 const _unset = _Unset();
 
 class ParentState extends Equatable {
+  /// Signed-in parent uid — required by ownership-checked usecases.
+  final String parentId;
+
   // ── الأبناء ────────────────────────────────────────────────────────────
   final SectionStatus childrenStatus;
   final List<String> childrenIds;
@@ -65,6 +68,7 @@ class ParentState extends Equatable {
   final String? paymentProofPaymentId;
 
   const ParentState({
+    this.parentId = '',
     this.childrenStatus = SectionStatus.initial,
     this.childrenIds = const [],
     this.childrenError,
@@ -116,6 +120,7 @@ class ParentState extends Equatable {
   }
 
   ParentState copyWith({
+    String? parentId,
     SectionStatus? childrenStatus,
     List<String>? childrenIds,
     Object? childrenError = _unset,
@@ -153,6 +158,7 @@ class ParentState extends Equatable {
     Object? paymentProofPaymentId = _unset,
   }) {
     return ParentState(
+      parentId: parentId ?? this.parentId,
       childrenStatus: childrenStatus ?? this.childrenStatus,
       childrenIds: childrenIds ?? this.childrenIds,
       childrenError: identical(childrenError, _unset)
@@ -230,6 +236,7 @@ class ParentState extends Equatable {
 
   @override
   List<Object?> get props => [
+    parentId,
     childrenStatus,
     childrenIds,
     childrenError,

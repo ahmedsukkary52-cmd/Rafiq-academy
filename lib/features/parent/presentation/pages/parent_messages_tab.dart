@@ -50,12 +50,7 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
       if (chat.conversationsStatus != SectionStatus.loaded) return;
       _seedLinkedChats(
         uid: _uid,
-        contacts: _roleContacts(
-          context
-              .read<ParentBloc>()
-              .state
-              .staffContacts,
-        ),
+        contacts: _roleContacts(context.read<ParentBloc>().state.staffContacts),
         conversations: chat.conversations,
       );
     });
@@ -70,7 +65,10 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
 
   List<ParentStaffContact> _roleContacts(List<ParentStaffContact> staff) {
     final role = _tabs[_tab].role;
-    return [for (final contact in staff) if (contact.role == role) contact];
+    return [
+      for (final contact in staff)
+        if (contact.role == role) contact,
+    ];
   }
 
   ConversationEntity? _existingChat({
@@ -79,9 +77,7 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
     required List<ConversationEntity> conversations,
   }) {
     for (final conversation in conversations) {
-      if (conversation
-          .otherParticipant(uid)
-          .uid == otherUid) {
+      if (conversation.otherParticipant(uid).uid == otherUid) {
         return conversation;
       }
     }
@@ -95,18 +91,16 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
   }) {
     if (_busy || uid.isEmpty) return;
 
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
 
     for (final contact in contacts) {
       if (_seededUids.contains(contact.uid)) continue;
       if (_existingChat(
-        uid: uid,
-        otherUid: contact.uid,
-        conversations: conversations,
-      ) !=
+            uid: uid,
+            otherUid: contact.uid,
+            conversations: conversations,
+          ) !=
           null) {
         _seededUids.add(contact.uid);
         continue;
@@ -147,7 +141,7 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
       (bloc) => bloc.state.staffContacts,
     );
     final children = context.select<ParentBloc, List<ParentChildSnapshot>>(
-          (bloc) => bloc.state.childrenSnapshots,
+      (bloc) => bloc.state.childrenSnapshots,
     );
     final roleContacts = _roleContacts(staff);
 
@@ -156,7 +150,7 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
       child: BlocConsumer<ChatConversationsBloc, ChatConversationsState>(
         bloc: sl<ChatConversationsBloc>(),
         listenWhen: (p, c) =>
-        p.startConversationStatus != c.startConversationStatus ||
+            p.startConversationStatus != c.startConversationStatus ||
             p.conversations != c.conversations,
         listener: (context, state) async {
           if (state.conversationsStatus == SectionStatus.loaded) {
@@ -356,12 +350,7 @@ class _ConversationsBody extends StatelessWidget {
 
     if (items.isEmpty) {
       if (seeding) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: CircularProgressIndicator(color: AppColors.primary),
-          ),
-        );
+        return const ParentListCardsSkeleton(itemCount: 3);
       }
       if (contacts.isEmpty) {
         return ParentEmptyState(
@@ -372,7 +361,11 @@ class _ConversationsBody extends StatelessWidget {
               : 'عند ربط أبنائك بحلقة ستظهر بطاقة $roleLabel هنا تلقائياً.',
         );
       }
-      return const ParentListCardsSkeleton();
+      return ParentEmptyState(
+        icon: Icons.chat_bubble_outline,
+        title: 'لا توجد محادثات مع $roleLabel بعد',
+        message: 'ابدأ المحادثة من بطاقة الابن أو انتظر تجهيز المحادثة.',
+      );
     }
 
     return ListView.separated(
@@ -465,10 +458,7 @@ class _ConversationTile extends StatelessWidget {
             const SizedBox(width: 8),
             _UnreadBadge(count: conversation.unreadCount),
           ],
-          const Icon(
-            Icons.chevron_left_rounded,
-            color: AppColors.textHint,
-          ),
+          const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
         ],
       ),
     );
@@ -492,9 +482,7 @@ class _UnreadBadge extends StatelessWidget {
       ),
       child: Text(
         count > 9 ? '+9' : '$count',
-        style: AppTextStyles.labelSmall.copyWith(
-          color: AppColors.onPrimary,
-        ),
+        style: AppTextStyles.labelSmall.copyWith(color: AppColors.onPrimary),
       ),
     );
   }

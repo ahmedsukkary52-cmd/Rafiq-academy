@@ -264,9 +264,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
   @override
   Future<PaymentInitiationEntity> initiatePayment(String paymentId) async {
-    throw const ServerException(
-      'الدفع الإلكتروني غير متاح حالياً، سيتم تفعيله قريباً',
-    ); // try {
+    throw const ServerException('الدفع الإلكتروني غير متاح حالياً'); // try {
     //   final callable = functions.httpsCallable('createPaymentIntention');
     //   final result = await callable.call<Map<String, dynamic>>({
     //     'paymentId': paymentId,
@@ -307,7 +305,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     if (length <= 0) {
       throw const ServerException('ملف الإيصال فارغ');
     }
-    if (length > ParentPaymentProofContract.maxBytes) {
+    if (length >= ParentPaymentProofContract.maxBytes) {
       throw const ServerException('حجم الإيصال أكبر من ١٠ ميجا');
     }
 
@@ -350,7 +348,16 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         ParentPaymentProofContract.proofSubmittedByField: pid,
         ParentPaymentProofContract.proofFileNameField: fileName,
         'method': ParentPaymentProofContract.externalMethod,
-        // Intentionally omit status / paidAt — Admin confirms payment.
+        ParentPaymentProofContract.reviewStatusField:
+            ParentPaymentProofContract.pendingReview,
+        // Clear prior supervisor outcome so resubmit awaits a fresh review.
+        ParentPaymentProofContract.reviewedByField: FieldValue.delete(),
+        ParentPaymentProofContract.reviewedAtField: FieldValue.delete(),
+        ParentPaymentProofContract.reviewNotesField: FieldValue.delete(),
+        ParentPaymentProofContract.amountPaidConfirmedField:
+            FieldValue.delete(),
+        ParentPaymentProofContract.remainingAmountField: FieldValue.delete(),
+        // Intentionally omit status / paidAt — Supervisor/Admin confirms.
       });
     } on ServerException {
       rethrow;
@@ -367,7 +374,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         throw const ServerException('معرّف ولي الأمر غير صالح');
       }
       final doc = await firestore
-          .collection(ParentWalletContract.collection)
+          .collection(FirestoreCollections.wallets)
           .doc(id)
           .get();
       if (!doc.exists) {
@@ -402,7 +409,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     try {
       await firestore.runTransaction((tx) async {
         final walletRef = firestore
-            .collection(ParentWalletContract.collection)
+            .collection(FirestoreCollections.wallets)
             .doc(pid);
         final paymentRef = firestore
             .collection(FirestoreCollections.payments)
@@ -428,7 +435,8 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         }
 
         final walletSnap = await tx.get(walletRef);
-        final rawBalance = walletSnap.data()?[ParentWalletContract.balanceField];
+        final rawBalance = walletSnap
+            .data()?[ParentWalletContract.balanceField];
         final balance = rawBalance is num ? rawBalance.toDouble() : 0.0;
         if (balance < amount) {
           throw const ServerException('رصيد المحفظة غير كافٍ');
@@ -468,7 +476,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     required List<String> childrenIds,
   }) async {
     try {
-      final ids = childrenIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
+      final ids = childrenIds
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty)
+          .toList();
       if (parentId.trim().isEmpty) {
         throw const ServerException('معرّف ولي الأمر غير صالح');
       }
@@ -570,10 +581,11 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
     final userData = userDoc.data();
     final profileData = profileDoc.data();
-    final name = ((userData?['name'] as String?) ??
-            (profileData?['name'] as String?) ??
-            '')
-        .trim();
+    final name =
+        ((userData?['name'] as String?) ??
+                (profileData?['name'] as String?) ??
+                '')
+            .trim();
     final imageUrl = userData?['profileImageUrl'] as String?;
 
     var halaqaId = (profileData?['halaqaId'] as String?)?.trim() ?? '';
@@ -609,7 +621,8 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     if (staffIds.isNotEmpty) {
       final staffDocs = await Future.wait(
         staffIds.map(
-          (id) => firestore.collection(FirestoreCollections.users).doc(id).get(),
+          (id) =>
+              firestore.collection(FirestoreCollections.users).doc(id).get(),
         ),
       );
       for (final doc in staffDocs) {
@@ -748,7 +761,9 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   }
 
   static String? _pickTodayStatus(Iterable<String?> statuses) {
-    final list = statuses.map((s) => (s ?? '').trim()).where((s) => s.isNotEmpty);
+    final list = statuses
+        .map((s) => (s ?? '').trim())
+        .where((s) => s.isNotEmpty);
     if (list.contains(AttendancePolicy.statusPresent)) {
       return AttendancePolicy.statusPresent;
     }

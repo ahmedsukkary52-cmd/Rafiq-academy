@@ -16,10 +16,7 @@ class ParentRecipientResolver {
 
   /// Split into chunks of [arrayContainsAnyLimit].
   static List<List<String>> chunkStudentIds(List<String> studentIds) =>
-      FirestoreInQuery.chunkIds(
-        studentIds,
-        limit: arrayContainsAnyLimit,
-      );
+      FirestoreInQuery.chunkIds(studentIds, limit: arrayContainsAnyLimit);
 
   /// Merge a parent profile into `studentId → parentIds`.
   ///

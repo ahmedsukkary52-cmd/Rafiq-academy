@@ -68,9 +68,10 @@ class _ParentEvaluationsPageState extends State<ParentEvaluationsPage> {
         _loading = false;
         _error = f.message;
       }),
+      // Parent only ever sees Supervisor-reviewed evaluations.
       (records) => setState(() {
         _loading = false;
-        _records = records;
+        _records = records.where((r) => !r.isPendingReview).toList();
       }),
     );
   }

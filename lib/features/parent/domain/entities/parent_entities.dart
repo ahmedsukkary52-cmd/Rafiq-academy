@@ -28,6 +28,14 @@ class PaymentEntity extends Equatable {
   final String? proofSubmittedBy;
   final String? proofFileName;
 
+  /// Supervisor / Admin review fields (see [ParentPaymentProofContract]).
+  final String? reviewStatus;
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
+  final String? reviewNotes;
+  final double? amountPaidConfirmed;
+  final double? remainingAmount;
+
   const PaymentEntity({
     required this.id,
     required this.studentId,
@@ -42,6 +50,12 @@ class PaymentEntity extends Equatable {
     this.proofSubmittedAt,
     this.proofSubmittedBy,
     this.proofFileName,
+    this.reviewStatus,
+    this.reviewedBy,
+    this.reviewedAt,
+    this.reviewNotes,
+    this.amountPaidConfirmed,
+    this.remainingAmount,
   });
 
   @override
@@ -59,6 +73,12 @@ class PaymentEntity extends Equatable {
     proofSubmittedAt,
     proofSubmittedBy,
     proofFileName,
+    reviewStatus,
+    reviewedBy,
+    reviewedAt,
+    reviewNotes,
+    amountPaidConfirmed,
+    remainingAmount,
   ];
 }
 

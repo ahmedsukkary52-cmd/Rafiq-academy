@@ -86,6 +86,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   ) async {
     emit(
       state.copyWith(
+        parentId: event.parentId,
         childrenStatus: SectionStatus.loading,
         childrenError: null,
       ),
@@ -163,6 +164,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     if (selected != null) {
       add(
         LoadWeeklyReportEvent(
+          parentId: event.parentId,
           studentId: selected,
           weekStart: _startOfCurrentWeek(),
         ),
@@ -180,8 +182,12 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
       ),
     );
 
+    final parentId = state.parentId.trim();
+    if (parentId.isEmpty) return;
+
     add(
       LoadWeeklyReportEvent(
+        parentId: parentId,
         studentId: event.studentId,
         weekStart: _startOfCurrentWeek(),
       ),
@@ -202,6 +208,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
 
     final result = await getWeeklyReport(
       WeeklyReportParams(
+        parentId: event.parentId,
         studentId: event.studentId,
         weekStart: event.weekStart,
       ),
@@ -547,10 +554,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     );
   }
 
-  void _onResetWalletPay(
-    ResetWalletPayEvent event,
-    Emitter<ParentState> emit,
-  ) {
+  void _onResetWalletPay(ResetWalletPayEvent event, Emitter<ParentState> emit) {
     emit(
       state.copyWith(
         walletPayStatus: SubmissionStatus.idle,
@@ -559,8 +563,10 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     );
   }
 
-  Future<void> _onSubmitPaymentProof(SubmitPaymentProofEvent event,
-      Emitter<ParentState> emit,) async {
+  Future<void> _onSubmitPaymentProof(
+    SubmitPaymentProofEvent event,
+    Emitter<ParentState> emit,
+  ) async {
     emit(
       state.copyWith(
         paymentProofStatus: SubmissionStatus.submitting,
@@ -578,22 +584,23 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     );
 
     result.fold(
-          (failure) =>
-          emit(
-            state.copyWith(
-              paymentProofStatus: SubmissionStatus.error,
-              paymentProofError: failure.message,
-            ),
-          ),
-          (_) {
+      (failure) => emit(
+        state.copyWith(
+          paymentProofStatus: SubmissionStatus.error,
+          paymentProofError: failure.message,
+        ),
+      ),
+      (_) {
         emit(state.copyWith(paymentProofStatus: SubmissionStatus.success));
         add(LoadPaymentsEvent(event.parentId));
       },
     );
   }
 
-  void _onResetPaymentProof(ResetPaymentProofEvent event,
-      Emitter<ParentState> emit,) {
+  void _onResetPaymentProof(
+    ResetPaymentProofEvent event,
+    Emitter<ParentState> emit,
+  ) {
     emit(
       state.copyWith(
         paymentProofStatus: SubmissionStatus.idle,

@@ -102,12 +102,17 @@ class ParentIdParams extends Equatable {
 }
 
 class WeeklyReportParams extends Equatable {
+  final String parentId;
   final String studentId;
   final DateTime weekStart;
-  const WeeklyReportParams({required this.studentId, required this.weekStart});
+  const WeeklyReportParams({
+    required this.parentId,
+    required this.studentId,
+    required this.weekStart,
+  });
 
   @override
-  List<Object?> get props => [studentId, weekStart];
+  List<Object?> get props => [parentId, studentId, weekStart];
 }
 
 /// Minimal halaqa choice for parent استئذان submit (W7).

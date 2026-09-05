@@ -13,6 +13,7 @@ import '../../domain/repositories/parent_repositories.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
+import '../widgets/parent_loading_skeletons.dart';
 
 /// W7 Slice 1 — parent استئذان submit + list own requests.
 ///
@@ -150,7 +151,7 @@ class _ParentAbsenceRequestsPageState extends State<ParentAbsenceRequestsPage> {
         builder: (context, state) {
           if (state.childrenStatus == SectionStatus.initial ||
               state.childrenStatus == SectionStatus.loading) {
-            return const AppLoadingWidget();
+            return const ParentListCardsSkeleton(itemCount: 3);
           }
 
           if (state.childrenStatus == SectionStatus.error) {
@@ -288,7 +289,7 @@ class _SubmitFormCard extends StatelessWidget {
                   for (final id in state.childrenIds)
                     DropdownMenuItem(
                       value: id,
-                      child: Text(_childLabel(state, id)),
+                      child: Text(state.childDisplayName(id)),
                     ),
                 ],
                 onChanged: submitting
@@ -365,15 +366,6 @@ class _SubmitFormCard extends StatelessWidget {
       ),
     );
   }
-
-  static String _childLabel(ParentState state, String id) {
-    if (state.weeklyReport != null &&
-        state.weeklyReport!.studentId == id &&
-        state.weeklyReport!.studentName.trim().isNotEmpty) {
-      return state.weeklyReport!.studentName.trim();
-    }
-    return 'طالب';
-  }
 }
 
 class _HalaqaField extends StatelessWidget {
@@ -395,7 +387,10 @@ class _HalaqaField extends StatelessWidget {
   Widget build(BuildContext context) {
     if (state.studentHalaqatStatus == SectionStatus.initial ||
         state.studentHalaqatStatus == SectionStatus.loading) {
-      return const SizedBox(height: 48, child: AppLoadingWidget());
+      return ParentPulse(
+        builder: (context, bone) =>
+            parentSkeletonBar(bone: bone, height: 48, radius: AppSizes.radiusM),
+      );
     }
 
     if (state.studentHalaqatStatus == SectionStatus.error) {
@@ -461,7 +456,11 @@ class _RequestsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (state.absenceRequestsStatus == SectionStatus.initial ||
         state.absenceRequestsStatus == SectionStatus.loading) {
-      return const SizedBox(height: 160, child: AppLoadingWidget());
+      return const ParentListCardsSkeleton(
+        itemCount: 2,
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+      );
     }
 
     if (state.absenceRequestsStatus == SectionStatus.error) {
@@ -480,17 +479,34 @@ class _RequestsSection extends StatelessWidget {
         for (final request in state.absenceRequests)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: _RequestTile(request: request),
+            child: _RequestTile(
+              request: request,
+              studentName: state.childDisplayName(request.studentId),
+              halaqaName: _halaqaName(state, request.halaqaId),
+            ),
           ),
       ],
     );
+  }
+
+  static String _halaqaName(ParentState state, String halaqaId) {
+    for (final halaqa in state.studentHalaqat) {
+      if (halaqa.id == halaqaId) return halaqa.name.trim();
+    }
+    return '';
   }
 }
 
 class _RequestTile extends StatelessWidget {
   final AbsenceRequestEntity request;
+  final String studentName;
+  final String halaqaName;
 
-  const _RequestTile({required this.request});
+  const _RequestTile({
+    required this.request,
+    required this.studentName,
+    required this.halaqaName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -519,19 +535,23 @@ class _RequestTile extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'طالب: ${request.studentId}',
+            'الابن: $studentName',
             style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
             textAlign: TextAlign.right,
           ),
-          Text(
-            'حلقة: ${request.halaqaId}',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.right,
-          ),
+          if (halaqaName.isNotEmpty)
+            Text(
+              'الحلقة: $halaqaName',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textHint,
+              ),
+              textAlign: TextAlign.right,
+            ),
           if (decided && reviewedBy.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
-              'قرار المعلم: ${AbsenceRequestProjection.statusLabel(request.status)} · راجع $reviewedBy',
+              'قرار المعلم: '
+              '${AbsenceRequestProjection.statusLabel(request.status)}',
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColors.textHint,
               ),

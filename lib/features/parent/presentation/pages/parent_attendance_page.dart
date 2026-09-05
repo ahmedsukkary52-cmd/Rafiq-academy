@@ -11,6 +11,7 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/usecases/get_attendance_marks_usecase.dart';
 import '../parent_display.dart';
+import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_subpage_scaffold.dart';
 
 class ParentAttendancePage extends StatefulWidget {
@@ -82,10 +83,7 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
     return map;
   }
 
-  int _count(String status) =>
-      _byDay.values
-          .where((s) => s == status)
-          .length;
+  int _count(String status) => _byDay.values.where((s) => s == status).length;
 
   double? get _percent {
     final present = _count(AttendancePolicy.statusPresent);
@@ -201,7 +199,9 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 6),
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   decoration: const BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.vertical(
@@ -268,72 +268,87 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
                       ),
                       const SizedBox(height: 8),
                       if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: CircularProgressIndicator(
-                            color: AppColors.primary,
+                        const ParentCalendarSkeleton()
+                      else if (_error != null)
+                        AppErrorWidget(message: _error!, onRetry: _load)
+                      else if (_marks.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 28,
+                          ),
+                          child: Text(
+                            'لا يوجد حضور مسجّل لهذا الشهر بعد.',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textHint,
+                            ),
                           ),
                         )
                       else
-                        if (_error != null)
-                          AppErrorWidget(message: _error!, onRetry: _load)
-                        else
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: leading + daysInMonth,
-                            gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 7,
-                              mainAxisSpacing: 6,
-                              crossAxisSpacing: 6,
-                            ),
-                            itemBuilder: (context, index) {
-                              if (index < leading) {
-                                return const SizedBox.shrink();
-                              }
-                              final day = index - leading + 1;
-                              final date = DateTime(
-                                  _month.year, _month.month, day);
-                              final status = byDay[AttendancePolicy.dayStart(
-                                  date)];
-                              final color = _colorFor(status);
-                              final isToday = AttendancePolicy
-                                  .isSameCalendarDay(
-                                date,
-                                DateTime.now(),
-                              );
-                              return Container(
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: color?.withValues(alpha: 0.16) ??
-                                      Colors.transparent,
-                                  shape: BoxShape.circle,
-                                  border: isToday
-                                      ? Border.all(
-                                      color: AppColors.primary, width: 1.4)
-                                      : null,
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: leading + daysInMonth,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 7,
+                                mainAxisSpacing: 6,
+                                crossAxisSpacing: 6,
+                              ),
+                          itemBuilder: (context, index) {
+                            if (index < leading) {
+                              return const SizedBox.shrink();
+                            }
+                            final day = index - leading + 1;
+                            final date = DateTime(
+                              _month.year,
+                              _month.month,
+                              day,
+                            );
+                            final status =
+                                byDay[AttendancePolicy.dayStart(date)];
+                            final color = _colorFor(status);
+                            final isToday = AttendancePolicy.isSameCalendarDay(
+                              date,
+                              DateTime.now(),
+                            );
+                            return Container(
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color:
+                                    color?.withValues(alpha: 0.16) ??
+                                    Colors.transparent,
+                                shape: BoxShape.circle,
+                                border: isToday
+                                    ? Border.all(
+                                        color: AppColors.primary,
+                                        width: 1.4,
+                                      )
+                                    : null,
+                              ),
+                              child: Text(
+                                parentEasternDigits('$day'),
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  color: color ?? AppColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                child: Text(
-                                  parentEasternDigits('$day'),
-                                  style: AppTextStyles.labelMedium.copyWith(
-                                    color: color ?? AppColors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          },
+                        ),
                       const SizedBox(height: 8),
-                      Row(
+                      const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
+                        children: [
                           _LegendDot(color: AppColors.success, label: 'حاضر'),
                           SizedBox(width: 10),
                           _LegendDot(color: AppColors.error, label: 'غائب'),
                           SizedBox(width: 10),
                           _LegendDot(
-                              color: AppColors.secondary, label: 'متأخر'),
+                            color: AppColors.secondary,
+                            label: 'متأخر',
+                          ),
                           SizedBox(width: 10),
                           _LegendDot(color: AppColors.info, label: 'معذور'),
                         ],

@@ -52,12 +52,6 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
     context.read<ParentBloc>().add(LoadWalletEvent(auth.user.uid));
   }
 
-  void _comingSoon() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('قريباً')));
-  }
-
   Future<void> _startExternalPayThenProof(PaymentEntity payment) async {
     final proceed = await showModalBottomSheet<bool>(
       context: context,
@@ -80,7 +74,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
       withData: false,
     );
     if (!mounted) return;
@@ -157,7 +151,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
       textDirection: TextDirection.rtl,
       child: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (p, c) =>
-        p.walletPayStatus != c.walletPayStatus ||
+            p.walletPayStatus != c.walletPayStatus ||
             p.walletPayError != c.walletPayError ||
             p.paymentProofStatus != c.paymentProofStatus ||
             p.paymentProofError != c.paymentProofError,
@@ -165,9 +159,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
           if (state.walletPayStatus == SubmissionStatus.error) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                  state.walletPayError ?? 'تعذر الدفع من المحفظة',
-                ),
+                content: Text(state.walletPayError ?? 'تعذر الدفع من المحفظة'),
               ),
             );
             context.read<ParentBloc>().add(const ResetWalletPayEvent());
@@ -199,7 +191,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
           }
         },
         buildWhen: (p, c) =>
-        p.paymentsStatus != c.paymentsStatus ||
+            p.paymentsStatus != c.paymentsStatus ||
             p.payments != c.payments ||
             p.paymentsError != c.paymentsError ||
             p.wallet != c.wallet ||
@@ -221,11 +213,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
   Widget _buildBody(BuildContext context, ParentState state) {
     if (state.paymentsStatus == SectionStatus.initial ||
         state.paymentsStatus == SectionStatus.loading) {
-      return const CustomScrollView(
-        slivers: [
-          SliverFillRemaining(child: ParentListCardsSkeleton()),
-        ],
-      );
+      return ParentPaymentsSkeleton(headerHeight: widget.embedded ? 300 : 230);
     }
 
     if (state.paymentsStatus == SectionStatus.error) {
@@ -277,10 +265,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                 ),
                 Column(
                   children: [
-                    _PaymentsHeader(
-                      embedded: widget.embedded,
-                      onHistory: _comingSoon,
-                    ),
+                    _PaymentsHeader(embedded: widget.embedded),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       child: _MonthlySummaryCard(
@@ -291,7 +276,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                         childrenCaption: childrenCaption,
                         walletBalance: walletBalance,
                         walletLoaded:
-                        state.walletStatus == SectionStatus.loaded ||
+                            state.walletStatus == SectionStatus.loaded ||
                             state.wallet != null,
                       ),
                     ),
@@ -328,38 +313,37 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                           icon: Icons.account_balance_wallet_outlined,
                           title: 'لا توجد مدفوعات في هذا التصنيف',
                           message:
-                          'ستظهر هنا اشتراكات أبنائك عند إضافتها من الأكاديمية.',
+                              'ستظهر هنا اشتراكات أبنائك عند إضافتها من الأكاديمية.',
                         ),
                       )
                     else
                       ...visible.map(
-                            (payment) =>
-                            _PaymentCard(
-                              payment: payment,
-                              studentName: state.childDisplayName(payment
-                                  .studentId),
-                              paying:
+                        (payment) => _PaymentCard(
+                          payment: payment,
+                          studentName: state.childDisplayName(
+                            payment.studentId,
+                          ),
+                          walletBalance: walletBalance,
+                          paying:
                               state.walletPayStatus ==
-                                  SubmissionStatus.submitting,
-                              uploadingProof:
+                              SubmissionStatus.submitting,
+                          uploadingProof:
                               proofBusy &&
-                                  state.paymentProofPaymentId == payment.id,
-                              onPay: () {
-                                final auth = context
-                                    .read<AuthBloc>()
-                                    .state;
-                                if (auth is! AuthAuthenticated) return;
-                                context.read<ParentBloc>().add(
-                                  PayPaymentFromWalletEvent(
-                                    parentId: auth.user.uid,
-                                    paymentId: payment.id,
-                                  ),
-                                );
-                              },
-                              onUploadReceipt: proofBusy
-                                  ? () {}
-                                  : () => _startExternalPayThenProof(payment),
-                            ),
+                              state.paymentProofPaymentId == payment.id,
+                          onPay: () {
+                            final auth = context.read<AuthBloc>().state;
+                            if (auth is! AuthAuthenticated) return;
+                            context.read<ParentBloc>().add(
+                              PayPaymentFromWalletEvent(
+                                parentId: auth.user.uid,
+                                paymentId: payment.id,
+                              ),
+                            );
+                          },
+                          onUploadReceipt: proofBusy
+                              ? () {}
+                              : () => _startExternalPayThenProof(payment),
+                        ),
                       ),
                     const SizedBox(height: 12),
                     _UploadReceiptCard(
@@ -383,18 +367,9 @@ class _ExternalPaySheet extends StatelessWidget {
 
   const _ExternalPaySheet({required this.payment});
 
-  Future<void> _openDestination(BuildContext context) async {
+  Future<void> _openDestination() async {
     final dest = ParentPaymentProofContract.transferDestination.trim();
-    if (dest.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'لم تُضبط بيانات التحويل بعد — اتبع تعليمات الأكاديمية',
-          ),
-        ),
-      );
-      return;
-    }
+    if (dest.isEmpty) return;
     final tel = dest.startsWith('tel:') ? dest : 'tel:$dest';
     final uri = Uri.tryParse(tel);
     if (uri == null) return;
@@ -404,6 +379,9 @@ class _ExternalPaySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amount = parentMoneyLabel(payment.amount);
+    final hasDestination = ParentPaymentProofContract.transferDestination
+        .trim()
+        .isNotEmpty;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -420,9 +398,9 @@ class _ExternalPaySheet extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '١) ادفع المبلغ خارج التطبيق.\n'
-                  '٢) التقط لقطة شاشة لإثبات الدفع.\n'
-                  '٣) ارفع اللقطة هنا للمراجعة.\n'
-                  'رفع الإيصال لا يعني اعتماد الدفع تلقائياً — الإدارة تعتمد بعد المراجعة.',
+              '٢) التقط لقطة شاشة لإثبات الدفع.\n'
+              '٣) ارفع الصورة هنا للمراجعة (صور فقط حتى ١٠ ميجا).\n'
+              'رفع الإيصال لا يعني اعتماد الدفع تلقائياً — الإدارة تعتمد بعد المراجعة.',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
                 height: 1.45,
@@ -460,17 +438,19 @@ class _ExternalPaySheet extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => _openDestination(context),
-              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              label: const Text('فتح طريقة الدفع الخارجية'),
-            ),
+            if (hasDestination) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _openDestination,
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                label: const Text('فتح طريقة الدفع الخارجية'),
+              ),
+            ],
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.upload_file_outlined, size: 18),
-              label: const Text('اخترتُ الملف / لقطة الشاشة'),
+              label: const Text('اخترتُ لقطة الشاشة'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
@@ -490,20 +470,14 @@ class _ExternalPaySheet extends StatelessWidget {
 
 class _PaymentsHeader extends StatelessWidget {
   final bool embedded;
-  final VoidCallback onHistory;
 
-  const _PaymentsHeader({
-    required this.embedded,
-    required this.onHistory,
-  });
+  const _PaymentsHeader({required this.embedded});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        top: MediaQuery
-            .paddingOf(context)
-            .top + (embedded ? 4 : 0),
+        top: MediaQuery.paddingOf(context).top + (embedded ? 4 : 0),
         left: 16,
         right: 16,
         bottom: 8,
@@ -527,27 +501,7 @@ class _PaymentsHeader extends StatelessWidget {
               ),
             ),
           ),
-          Material(
-            color: AppColors.secondary,
-            borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-            child: InkWell(
-              onTap: onHistory,
-              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                child: Text(
-                  'سجل',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const SizedBox(width: 40),
         ],
       ),
     );
@@ -756,6 +710,7 @@ class _FilterChip extends StatelessWidget {
 class _PaymentCard extends StatelessWidget {
   final PaymentEntity payment;
   final String studentName;
+  final double walletBalance;
   final bool paying;
   final bool uploadingProof;
   final VoidCallback onPay;
@@ -764,6 +719,7 @@ class _PaymentCard extends StatelessWidget {
   const _PaymentCard({
     required this.payment,
     required this.studentName,
+    required this.walletBalance,
     required this.paying,
     required this.uploadingProof,
     required this.onPay,
@@ -775,8 +731,16 @@ class _PaymentCard extends StatelessWidget {
     final isPaid = payment.status == PaymentStatus.paid;
     final isOverdue = payment.status == PaymentStatus.overdue;
     final awaitingReview = payment.hasProofAwaitingReview;
+    final review = payment.reviewStatus?.trim() ?? '';
+    final isRejected = review == ParentPaymentProofContract.rejected;
+    final isPartial = review == ParentPaymentProofContract.partial;
+    final canPayFromWallet = walletBalance >= payment.amount;
     final accent = isPaid
         ? AppColors.success
+        : isRejected
+        ? AppColors.error
+        : isPartial
+        ? AppColors.warning
         : awaitingReview
         ? AppColors.info
         : isOverdue
@@ -785,6 +749,17 @@ class _PaymentCard extends StatelessWidget {
     final title = '$studentName — ${parentPaymentPeriodLabel(payment.dueDate)}';
     final subtitle = _statusSubtitle(payment);
     final method = payment.method?.trim();
+    final badgeLabel = isPaid
+        ? 'مؤكد'
+        : isRejected
+        ? 'إيصال مرفوض'
+        : isPartial
+        ? 'سداد جزئي'
+        : awaitingReview
+        ? 'قيد المراجعة'
+        : null;
+    final reviewNotes = payment.reviewNotes?.trim() ?? '';
+    final remaining = payment.remainingAmount;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -811,6 +786,10 @@ class _PaymentCard extends StatelessWidget {
                 _StatusIconBox(
                   icon: isPaid
                       ? Icons.check_rounded
+                      : isRejected
+                      ? Icons.report_gmailerrorred_rounded
+                      : isPartial
+                      ? Icons.timelapse_rounded
                       : awaitingReview
                       ? Icons.hourglass_top_rounded
                       : Icons.warning_amber_rounded,
@@ -853,7 +832,7 @@ class _PaymentCard extends StatelessWidget {
                       ),
                       if (method != null &&
                           method.isNotEmpty &&
-                          (isPaid || awaitingReview)) ...[
+                          badgeLabel != null) ...[
                         const SizedBox(height: 2),
                         Text(
                           method == ParentPaymentProofContract.externalMethod
@@ -871,29 +850,28 @@ class _PaymentCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (isPaid || awaitingReview)
+                    if (badgeLabel != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: isPaid
-                              ? AppColors.successBg
-                              : AppColors.info.withValues(alpha: 0.12),
+                          color: accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(
                             AppSizes.radiusFull,
                           ),
                         ),
                         child: Text(
-                          isPaid ? 'مؤكد' : 'قيد المراجعة',
+                          badgeLabel,
                           style: AppTextStyles.labelSmall.copyWith(
-                            color: isPaid ? AppColors.success : AppColors.info,
+                            color: accent,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    if (isPaid || awaitingReview) const SizedBox(height: 6),
+                      const SizedBox(height: 6),
+                    ],
                     Text(
                       parentMoneyLabel(payment.amount),
                       style: AppTextStyles.titleLarge.copyWith(
@@ -909,6 +887,51 @@ class _PaymentCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (!isPaid && (isRejected || isPartial)) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isRejected
+                          ? 'رُفض الإيصال بعد المراجعة — أعد رفع صورة صحيحة'
+                          : 'اعتُمد سداد جزئي بعد المراجعة',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (isPartial && remaining != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'المتبقي: ${parentMoneyLabel(remaining)}',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                    if (reviewNotes.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        reviewNotes,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             if (!isPaid) ...[
               const SizedBox(height: 12),
               Row(
@@ -920,6 +943,8 @@ class _PaymentCard extends StatelessWidget {
                       label: Text(
                         uploadingProof
                             ? 'جاري الرفع...'
+                            : isRejected
+                            ? 'إعادة رفع الإيصال'
                             : awaitingReview
                             ? 'تحديث الإيصال'
                             : 'رفع إيصال',
@@ -930,20 +955,24 @@ class _PaymentCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: paying || uploadingProof ? null : onPay,
-                      icon: const Icon(Icons.account_balance_wallet_outlined,
-                          size: 18),
-                      label: Text(paying ? 'جاري السداد...' : 'سداد الآن'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        foregroundColor: AppColors.textPrimary,
-                        minimumSize: const Size(0, 42),
+                  if (canPayFromWallet) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: paying || uploadingProof ? null : onPay,
+                        icon: const Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 18,
+                        ),
+                        label: Text(paying ? 'جاري السداد...' : 'سداد الآن'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: AppColors.textPrimary,
+                          minimumSize: const Size(0, 42),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -954,6 +983,18 @@ class _PaymentCard extends StatelessWidget {
   }
 
   String _statusSubtitle(PaymentEntity payment) {
+    final review = payment.reviewStatus?.trim() ?? '';
+    if (review == ParentPaymentProofContract.rejected) {
+      return payment.reviewedAt == null
+          ? 'رُفض الإيصال بعد المراجعة'
+          : 'رُفض الإيصال ${formatDateDmy(payment.reviewedAt!)}';
+    }
+    if (review == ParentPaymentProofContract.partial) {
+      final confirmed = payment.amountPaidConfirmed;
+      return confirmed == null
+          ? 'اعتُمد سداد جزئي بعد المراجعة'
+          : 'اعتُمد ${parentMoneyLabel(confirmed)} بعد المراجعة';
+    }
     if (payment.hasProofAwaitingReview) {
       return payment.proofSubmittedAt == null
           ? 'إثبات مرسل — بانتظار اعتماد الإدارة'
@@ -961,9 +1002,9 @@ class _PaymentCard extends StatelessWidget {
     }
     return switch (payment.status) {
       PaymentStatus.paid =>
-      payment.paidAt == null
-          ? 'مدفوع'
-          : 'مدفوع ${formatDateDmy(payment.paidAt!)}',
+        payment.paidAt == null
+            ? 'مدفوع'
+            : 'مدفوع ${formatDateDmy(payment.paidAt!)}',
       PaymentStatus.due => 'مستحق ${formatDateDmy(payment.dueDate)}',
       PaymentStatus.overdue => 'متأخر — لم يُسدّد بعد',
     };
@@ -1017,7 +1058,7 @@ class _UploadReceiptCard extends StatelessWidget {
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
@@ -1035,7 +1076,9 @@ class _UploadReceiptCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'صورة أو PDF، حتى ١٠ ميجا — للمراجعة وليس اعتماداً تلقائياً',
+                'صور فقط (JPG / PNG / WEBP) حتى ١٠ ميجا — يُرسل للمراجعة '
+                'ولا يُعتمد تلقائياً',
+                textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -1044,7 +1087,7 @@ class _UploadReceiptCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onTap,
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('اختيار ملف'),
+                label: const Text('اختيار صورة'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   minimumSize: const Size(0, 40),

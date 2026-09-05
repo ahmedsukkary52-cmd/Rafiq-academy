@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hijri/hijri_calendar.dart';
 
@@ -18,14 +18,21 @@ import '../bloc/parent_state.dart';
 import '../parent_destinations.dart';
 import '../parent_display.dart';
 import '../parent_home_nav.dart';
+import '../parent_supervisor_chat.dart';
 import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_user_avatar.dart';
 
-class ParentDashboardTab extends StatelessWidget {
+class ParentDashboardTab extends StatefulWidget {
   final ValueChanged<int> onSwitchTab;
 
   const ParentDashboardTab({super.key, required this.onSwitchTab});
 
+  @override
+  State<ParentDashboardTab> createState() => _ParentDashboardTabState();
+}
+
+class _ParentDashboardTabState extends State<ParentDashboardTab>
+    with ParentSupervisorChatMixin<ParentDashboardTab> {
   void _reload(BuildContext context) {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
@@ -39,6 +46,17 @@ class ParentDashboardTab extends StatelessWidget {
     final rawName = user?.name.trim() ?? '';
     final parentName = rawName.isEmpty ? 'ولي الأمر' : rawName;
 
+    return wrapParentSupervisorChatListener(
+      currentUid: user?.uid ?? '',
+      child: _buildContent(context, parentName, user?.profileImageUrl),
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    String parentName,
+    String? imageUrl,
+  ) {
     return BlocBuilder<ParentBloc, ParentState>(
       buildWhen: (p, c) =>
           p.childrenStatus != c.childrenStatus ||
@@ -49,7 +67,8 @@ class ParentDashboardTab extends StatelessWidget {
           p.alerts != c.alerts ||
           p.familySummary != c.familySummary,
       builder: (context, state) {
-        final loading = state.childrenStatus == SectionStatus.initial ||
+        final loading =
+            state.childrenStatus == SectionStatus.initial ||
             state.childrenStatus == SectionStatus.loading;
         final failed = state.childrenStatus == SectionStatus.error;
 
@@ -77,12 +96,12 @@ class ParentDashboardTab extends StatelessWidget {
                       children: [
                         _ParentHomeHeader(
                           name: parentName,
-                          imageUrl: user?.profileImageUrl,
+                          imageUrl: imageUrl,
                           childrenCount: state.childrenIds.length,
                           onNotifications: () =>
                               ParentDestinations.notifications(context),
                           onProfile: () =>
-                              onSwitchTab(ParentHomeNav.accountIndex),
+                              widget.onSwitchTab(ParentHomeNav.accountIndex),
                         ),
                         Container(
                           width: double.infinity,
@@ -97,19 +116,21 @@ class ParentDashboardTab extends StatelessWidget {
                               ? const ParentDashboardSkeleton()
                               : failed
                               ? Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 48,
-                            ),
-                            child: AppErrorWidget(
-                              message: state.childrenError ??
-                                  'تعذر تحميل البيانات',
-                              onRetry: () => _reload(context),
-                            ),
-                          )
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 48,
+                                  ),
+                                  child: AppErrorWidget(
+                                    message:
+                                        state.childrenError ??
+                                        'تعذر تحميل البيانات',
+                                    onRetry: () => _reload(context),
+                                  ),
+                                )
                               : _DashboardBody(
-                            state: state,
-                            onSwitchTab: onSwitchTab,
-                          ),
+                                  state: state,
+                                  onSwitchTab: widget.onSwitchTab,
+                                  onSupervisor: startParentSupervisorChat,
+                                ),
                         ),
                       ],
                     ),
@@ -127,10 +148,12 @@ class ParentDashboardTab extends StatelessWidget {
 class _DashboardBody extends StatelessWidget {
   final ParentState state;
   final ValueChanged<int> onSwitchTab;
+  final ValueChanged<ParentChildSnapshot> onSupervisor;
 
   const _DashboardBody({
     required this.state,
     required this.onSwitchTab,
+    required this.onSupervisor,
   });
 
   @override
@@ -152,11 +175,10 @@ class _DashboardBody extends StatelessWidget {
             const _AlertsEmptyCard()
           else
             ...state.alerts.map(
-                  (alert) =>
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _AlertCard(alert: alert),
-                  ),
+              (alert) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _AlertCard(alert: alert),
+              ),
             ),
           const SizedBox(height: 12),
           _SectionTitle(
@@ -170,7 +192,7 @@ class _DashboardBody extends StatelessWidget {
           else
             _ChildrenCarousel(
               snapshots: state.childrenSnapshots,
-              onSupervisor: () => onSwitchTab(ParentHomeNav.messagesIndex),
+              onSupervisor: onSupervisor,
             ),
           const SizedBox(height: 20),
           _FamilyCard(
@@ -215,9 +237,7 @@ class _ParentHomeHeader extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Padding(
         padding: EdgeInsets.only(
-          top: MediaQuery
-              .paddingOf(context)
-              .top + 12,
+          top: MediaQuery.paddingOf(context).top + 12,
           left: 20,
           right: 20,
           bottom: 36,
@@ -286,15 +306,6 @@ class _ParentHomeHeader extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _HeaderSquareButton(
-                            icon: Icons.search_rounded,
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('قريباً')),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
                           _HeaderSquareButton(
                             icon: Icons.notifications_outlined,
                             showDot: unread > 0,
@@ -529,8 +540,9 @@ class _QuickActionsCard extends StatelessWidget {
   ) {
     final state = context.read<ParentBloc>().state;
     final selected = state.selectedChildId?.trim();
-    final fallback =
-    state.childrenIds.isEmpty ? null : state.childrenIds.first.trim();
+    final fallback = state.childrenIds.isEmpty
+        ? null
+        : state.childrenIds.first.trim();
     final id = (selected != null && selected.isNotEmpty) ? selected : fallback;
     if (id == null || id.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -538,11 +550,7 @@ class _QuickActionsCard extends StatelessWidget {
       );
       return;
     }
-    open(
-      context,
-      studentId: id,
-      studentName: state.childDisplayName(id),
-    );
+    open(context, studentId: id, studentName: state.childDisplayName(id));
   }
 }
 
@@ -765,7 +773,7 @@ class _ChildrenEmptyBanner extends StatelessWidget {
 
 class _ChildrenCarousel extends StatelessWidget {
   final List<ParentChildSnapshot> snapshots;
-  final VoidCallback onSupervisor;
+  final ValueChanged<ParentChildSnapshot> onSupervisor;
 
   const _ChildrenCarousel({
     required this.snapshots,
@@ -796,12 +804,9 @@ class _ChildrenCarousel extends StatelessWidget {
 
 class _ChildFollowUpCard extends StatelessWidget {
   final ParentChildSnapshot child;
-  final VoidCallback onSupervisor;
+  final ValueChanged<ParentChildSnapshot> onSupervisor;
 
-  const _ChildFollowUpCard({
-    required this.child,
-    required this.onSupervisor,
-  });
+  const _ChildFollowUpCard({required this.child, required this.onSupervisor});
 
   @override
   Widget build(BuildContext context) {
@@ -809,9 +814,9 @@ class _ChildFollowUpCard extends StatelessWidget {
     final halaqa = child.halaqaName.trim();
     final attendance = parentAttendanceLabel(child.todayAttendanceStatus);
     final payment = parentPaymentLabel(child.paymentStatus);
-    final hasSupervisor = (child.supervisorId ?? '')
-        .trim()
-        .isNotEmpty;
+    // Supervisor is an escalation path — surfaced only for at-risk children.
+    final showSupervisorContact =
+        (child.supervisorId ?? '').trim().isNotEmpty && child.isAtRisk;
     final progress = parentPercentLabel(
       child.overallProgressPercent > 0 ? child.overallProgressPercent : null,
     );
@@ -930,16 +935,16 @@ class _ChildFollowUpCard extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () =>
-                      ParentDestinations.childProfile(
-                        context,
-                        studentId: child.studentId,
-                        studentName: name,
-                      ),
+                  onPressed: () => ParentDestinations.childProfile(
+                    context,
+                    studentId: child.studentId,
+                    studentName: name,
+                  ),
                   style: ElevatedButton.styleFrom(
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadiusGeometry.all(
-                          Radius.circular(8)),
+                        Radius.circular(8),
+                      ),
                     ),
                     backgroundColor: AppColors.primaryGradientMid,
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -953,16 +958,16 @@ class _ChildFollowUpCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () =>
-                      ParentDestinations.reports(
-                        context,
-                        studentId: child.studentId,
-                        studentName: name,
-                      ),
+                  onPressed: () => ParentDestinations.reports(
+                    context,
+                    studentId: child.studentId,
+                    studentName: name,
+                  ),
                   style: OutlinedButton.styleFrom(
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadiusGeometry.all(
-                          Radius.circular(8)),
+                        Radius.circular(8),
+                      ),
                     ),
                     backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                     side: const BorderSide(color: AppColors.border),
@@ -974,18 +979,20 @@ class _ChildFollowUpCard extends StatelessWidget {
                   child: const Text('تقرير'),
                 ),
               ),
-              if (hasSupervisor) ...[
+              if (showSupervisorContact) ...[
                 const SizedBox(width: 6),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: onSupervisor,
+                    onPressed: () => onSupervisor(child),
                     style: OutlinedButton.styleFrom(
                       shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadiusGeometry.all(Radius.circular(
-                            8)),
+                        borderRadius: BorderRadiusGeometry.all(
+                          Radius.circular(8),
+                        ),
                       ),
                       backgroundColor: AppColors.awardWeekly.withValues(
-                          alpha: 0.12),
+                        alpha: 0.12,
+                      ),
                       side: const BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       minimumSize: const Size(0, 42),
@@ -1092,7 +1099,7 @@ class _FamilyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final verses = snapshots.fold<int>(
       0,
-          (sum, child) => sum + child.totalVersesMemorized,
+      (sum, child) => sum + child.totalVersesMemorized,
     );
     final attendance = parentPercentLabel(summary.averageAttendancePercent);
 
@@ -1114,7 +1121,7 @@ class _FamilyCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'أداء العائلة خلال ١٤ يوماً',
+                          'ملخص العائلة',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.headlineMedium.copyWith(
@@ -1159,10 +1166,13 @@ class _FamilyCard extends StatelessWidget {
                     value: parentEasternDigits('${summary.childrenCount}'),
                     label: 'أبناء',
                   ),
-                  _FamilyMetric(value: attendance, label: 'متوسط الحضور'),
+                  _FamilyMetric(
+                    value: attendance,
+                    label: 'متوسط الحضور (١٤ يوماً)',
+                  ),
                   _FamilyMetric(
                     value: parentEasternDigits('$verses'),
-                    label: 'آيات محفوظة',
+                    label: 'إجمالي الآيات',
                   ),
                 ],
               ),

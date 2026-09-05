@@ -13,6 +13,7 @@ import '../bloc/parent_state.dart';
 import '../parent_destinations.dart';
 import '../parent_display.dart';
 import '../parent_home_nav.dart';
+import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_user_avatar.dart';
 
 class ParentProfileTab extends StatelessWidget {
@@ -21,12 +22,6 @@ class ParentProfileTab extends StatelessWidget {
   const ParentProfileTab({super.key, required this.onSwitchTab});
 
   static const _appVersion = '1.0.0';
-
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('قريباً')),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +64,6 @@ class ParentProfileTab extends StatelessWidget {
                         name: name,
                         imageUrl: user?.profileImageUrl,
                         contact: contact.isEmpty ? null : contact,
-                        onEditTap: () => _comingSoon(context),
                       ),
                       Transform.translate(
                         offset: const Offset(0, -28),
@@ -77,7 +71,7 @@ class ParentProfileTab extends StatelessWidget {
                           padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
                           child: BlocBuilder<ParentBloc, ParentState>(
                             buildWhen: (p, c) =>
-                            p.childrenStatus != c.childrenStatus ||
+                                p.childrenStatus != c.childrenStatus ||
                                 p.childrenIds != c.childrenIds ||
                                 p.childrenSnapshots != c.childrenSnapshots ||
                                 p.familySummary != c.familySummary,
@@ -86,19 +80,18 @@ class ParentProfileTab extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   if (state.childrenStatus ==
-                                      SectionStatus.initial ||
+                                          SectionStatus.initial ||
                                       state.childrenStatus ==
                                           SectionStatus.loading)
-                                    const _StatsSkeleton()
+                                    const ParentAccountStatsSkeleton()
                                   else
                                     _StatsCard(state: state),
                                   const SizedBox(height: 12),
                                   _ChildrenCard(
                                     state: state,
-                                    onSeeAll: () =>
-                                        onSwitchTab(
-                                          ParentHomeNav.childrenIndex,
-                                        ),
+                                    onSeeAll: () => onSwitchTab(
+                                      ParentHomeNav.childrenIndex,
+                                    ),
                                   ),
                                   const SizedBox(height: 12),
                                   _SettingsCard(
@@ -110,7 +103,6 @@ class ParentProfileTab extends StatelessWidget {
                                         ParentDestinations.absenceRequests(
                                           context,
                                         ),
-                                    onComingSoon: () => _comingSoon(context),
                                     onLogout: () => confirmAndLogout(context),
                                   ),
                                   const SizedBox(height: 16),
@@ -124,9 +116,7 @@ class ParentProfileTab extends StatelessWidget {
                                   ),
                                   SizedBox(
                                     height:
-                                    MediaQuery
-                                        .paddingOf(context)
-                                        .bottom +
+                                        MediaQuery.paddingOf(context).bottom +
                                         16,
                                   ),
                                 ],
@@ -151,13 +141,11 @@ class _ProfileHeader extends StatelessWidget {
   final String name;
   final String? imageUrl;
   final String? contact;
-  final VoidCallback onEditTap;
 
   const _ProfileHeader({
     required this.name,
     required this.imageUrl,
     required this.contact,
-    required this.onEditTap,
   });
 
   @override
@@ -165,65 +153,35 @@ class _ProfileHeader extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         18,
-        MediaQuery
-            .paddingOf(context)
-            .top + 24,
+        MediaQuery.paddingOf(context).top + 24,
         18,
         52,
       ),
       child: Column(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.onPrimary.withValues(alpha: 0.45),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ParentUserAvatar(
-                  name: name,
-                  imageUrl: imageUrl,
-                  radius: 44,
-                  backgroundColor: AppColors.onPrimary,
-                  foregroundColor: AppColors.primaryDark,
-                ),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.onPrimary.withValues(alpha: 0.45),
+                width: 2,
               ),
-              Positioned(
-                left: 0,
-                bottom: 0,
-                child: Material(
-                  color: AppColors.secondary,
-                  shape: const CircleBorder(
-                    side: BorderSide(color: AppColors.onPrimary, width: 1.5),
-                  ),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: onEditTap,
-                    child: const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Icon(
-                        Icons.edit_rounded,
-                        size: 12,
-                        color: AppColors.onPrimary,
-                      ),
-                    ),
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.14),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: ParentUserAvatar(
+              name: name,
+              imageUrl: imageUrl,
+              radius: 44,
+              backgroundColor: AppColors.onPrimary,
+              foregroundColor: AppColors.primaryDark,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -281,7 +239,7 @@ class _StatsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final verses = state.childrenSnapshots.fold<int>(
       0,
-          (sum, child) => sum + child.totalVersesMemorized,
+      (sum, child) => sum + child.totalVersesMemorized,
     );
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -301,7 +259,8 @@ class _StatsCard extends StatelessWidget {
           Expanded(
             child: _StatCell(
               value: parentEasternDigits(
-                  '${state.familySummary.childrenCount}'),
+                '${state.familySummary.childrenCount}',
+              ),
               label: 'أبناء',
             ),
           ),
@@ -359,21 +318,6 @@ class _StatCell extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
-    );
-  }
-}
-
-class _StatsSkeleton extends StatelessWidget {
-  const _StatsSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 72,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
     );
   }
 }
@@ -496,19 +440,18 @@ class _ChildMiniCard extends StatelessWidget {
     final subtitle = atRisk
         ? 'يحتاج متابعة'
         : ((snapshot?.halaqaName.trim() ?? '').isEmpty
-        ? 'لم تُحدد حلقة'
-        : snapshot!.halaqaName.trim());
+              ? 'لم تُحدد حلقة'
+              : snapshot!.halaqaName.trim());
 
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: () =>
-            ParentDestinations.childProfile(
-              context,
-              studentId: studentId,
-              studentName: name,
-            ),
+        onTap: () => ParentDestinations.childProfile(
+          context,
+          studentId: studentId,
+          studentName: name,
+        ),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
@@ -555,13 +498,11 @@ class _ChildMiniCard extends StatelessWidget {
 class _SettingsCard extends StatelessWidget {
   final VoidCallback onNotifications;
   final VoidCallback onAbsenceRequests;
-  final VoidCallback onComingSoon;
   final VoidCallback onLogout;
 
   const _SettingsCard({
     required this.onNotifications,
     required this.onAbsenceRequests,
-    required this.onComingSoon,
     required this.onLogout,
   });
 
@@ -613,31 +554,6 @@ class _SettingsCard extends StatelessWidget {
             onTap: onAbsenceRequests,
           ),
           const _SettingsDivider(),
-          const _NavRow(
-            icon: Icons.language_rounded,
-            iconBg: Color(0xFFFEF3C7),
-            iconColor: AppColors.secondary,
-            label: 'اللغة',
-            trailing: 'العربية',
-            onTap: null,
-          ),
-          const _SettingsDivider(),
-          _NavRow(
-            icon: Icons.verified_user_outlined,
-            iconBg: const Color(0xFFD1F5E5),
-            iconColor: AppColors.success,
-            label: 'الخصوصية',
-            onTap: onComingSoon,
-          ),
-          const _SettingsDivider(),
-          _NavRow(
-            icon: Icons.help_outline_rounded,
-            iconBg: const Color(0xFFF0EAFF),
-            iconColor: AppColors.awardWeekly,
-            label: 'الدعم والمساعدة',
-            onTap: onComingSoon,
-          ),
-          const _SettingsDivider(),
           _LogoutRow(onTap: onLogout),
         ],
       ),
@@ -650,11 +566,7 @@ class _SettingsDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      height: 0.8,
-      thickness: 0.8,
-      color: Color(0xFFE8EEF0),
-    );
+    return const Divider(height: 0.8, thickness: 0.8, color: Color(0xFFE8EEF0));
   }
 }
 
@@ -663,11 +575,7 @@ class _RoundIcon extends StatelessWidget {
   final Color bg;
   final Color color;
 
-  const _RoundIcon({
-    required this.icon,
-    required this.bg,
-    required this.color,
-  });
+  const _RoundIcon({required this.icon, required this.bg, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -734,7 +642,6 @@ class _NavRow extends StatelessWidget {
   final Color iconBg;
   final Color iconColor;
   final String label;
-  final String? trailing;
   final VoidCallback? onTap;
 
   const _NavRow({
@@ -742,7 +649,6 @@ class _NavRow extends StatelessWidget {
     required this.iconBg,
     required this.iconColor,
     required this.label,
-    this.trailing,
     this.onTap,
   });
 
@@ -767,20 +673,7 @@ class _NavRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailing != null) ...[
-                Text(
-                  trailing!,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textHint,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-              const Icon(
-                Icons.chevron_left_rounded,
-                color: AppColors.textHint,
-              ),
+              const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
             ],
           ),
         ),

@@ -30,15 +30,17 @@ class SelectChildEvent extends ParentEvent {
 
 /// تحميل التقرير الأسبوعي لطالب معيّن في أسبوع معيّن
 class LoadWeeklyReportEvent extends ParentEvent {
+  final String parentId;
   final String studentId;
   final DateTime weekStart;
   const LoadWeeklyReportEvent({
+    required this.parentId,
     required this.studentId,
     required this.weekStart,
   });
 
   @override
-  List<Object?> get props => [studentId, weekStart];
+  List<Object?> get props => [parentId, studentId, weekStart];
 }
 
 /// تحميل سجل المدفوعات والاشتراكات

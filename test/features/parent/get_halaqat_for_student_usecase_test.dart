@@ -9,8 +9,9 @@ import 'package:rafiq_academy/features/parent/domain/usecases/get_halaqat_for_st
 
 class _FakeParentRepository implements ParentRepository {
   final List<String> children;
-  final List<ParentHalaqaOption> halaqat =
-      const [ParentHalaqaOption(id: 'h1', name: 'حلقة')];
+  final List<ParentHalaqaOption> halaqat = const [
+    ParentHalaqaOption(id: 'h1', name: 'حلقة'),
+  ];
   int halaqatCalls = 0;
 
   _FakeParentRepository({this.children = const ['s1']});

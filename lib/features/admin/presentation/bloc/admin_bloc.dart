@@ -19,6 +19,7 @@ import '../../domain/usecases/get_academy_stats_usecase.dart';
 import '../../domain/usecases/get_all_teachers_usecase.dart';
 import '../../domain/usecases/get_complaints_usecase.dart';
 import '../../domain/usecases/get_financial_summary_usecase.dart';
+import '../../domain/usecases/get_payments_usecase.dart';
 import '../../domain/usecases/get_teacher_activity_log_usecase.dart';
 import '../../domain/usecases/respond_to_complaint_usecase.dart';
 import '../../domain/usecases/send_broadcast_notification_usecase.dart';
@@ -36,6 +37,7 @@ import 'admin_state.dart';
 class AdminBloc extends Bloc<AdminEvent, AdminState> {
   final GetAcademyStatsUseCase getAcademyStats;
   final GetFinancialSummaryUseCase getFinancialSummary;
+  final GetPaymentsUseCase getPayments;
   final GetComplaintsUseCase getComplaints;
   final ApproveNewStudentUseCase approveNewStudent;
   final ToggleAccountStatusUseCase toggleAccountStatus;
@@ -61,6 +63,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
   AdminBloc({
     required this.getAcademyStats,
     required this.getFinancialSummary,
+    required this.getPayments,
     required this.getComplaints,
     required this.approveNewStudent,
     required this.toggleAccountStatus,
@@ -85,6 +88,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
   }) : super(AdminState.initial()) {
     on<LoadAcademyStatsEvent>(_onLoadStats);
     on<LoadFinancialSummaryEvent>(_onLoadFinancialSummary);
+    on<LoadPaymentsEvent>(_onLoadPayments);
     on<RefreshAdminDashboardEvent>(_onRefreshDashboard);
     on<LoadComplaintsEvent>(_onLoadComplaints);
     on<ApproveNewStudentEvent>(_onApproveStudent);
@@ -176,6 +180,39 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         state.copyWith(
           financialStatus: SectionStatus.loaded,
           financialSummary: summary,
+        ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // مراجعة المدفوعات (مجموعة payments الحالية)
+  // ══════════════════════════════════════════════════════════════════════
+
+  Future<void> _onLoadPayments(
+    LoadPaymentsEvent event,
+    Emitter<AdminState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        paymentsStatus: SectionStatus.loading,
+        paymentsError: null,
+      ),
+    );
+
+    final result = await getPayments(const NoParams());
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.error,
+          paymentsError: failure.message,
+        ),
+      ),
+      (payments) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.loaded,
+          payments: payments,
         ),
       ),
     );

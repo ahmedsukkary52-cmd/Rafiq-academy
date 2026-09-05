@@ -115,6 +115,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                           displayName: displayName,
                           imageUrl: adminImage,
                           unreadNotifications: unreadCount,
+                          onSearchTap: widget.onSwitchTab == null
+                              ? null
+                              : () => widget.onSwitchTab!(1),
                           onNotificationsTap: () =>
                               context.push(AppRoutes.adminNotifications),
                         ),

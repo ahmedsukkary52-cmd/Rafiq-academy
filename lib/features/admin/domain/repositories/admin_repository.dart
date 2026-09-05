@@ -8,6 +8,7 @@ import '../entities/admin_directory_entity.dart';
 import '../entities/admin_halaqa_roster_entity.dart';
 import '../entities/communication_settings_entity.dart';
 import '../entities/complaint_entity.dart';
+import '../entities/admin_payment_entity.dart';
 import '../entities/financial_summary_entity.dart';
 import '../entities/registration_request_entity.dart';
 import '../entities/teacher_activity_entity.dart';
@@ -16,6 +17,7 @@ import '../entities/teacher_management_entity.dart';
 abstract class AdminRepository {
   Future<Either<Failure, AcademyStatsEntity>> getAcademyStats();
   Future<Either<Failure, FinancialSummaryEntity>> getFinancialSummary();
+  Future<Either<Failure, List<AdminPaymentEntity>>> getPayments();
 
   Future<Either<Failure, Unit>> approveNewStudent({
     required String studentId,

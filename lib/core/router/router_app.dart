@@ -12,6 +12,7 @@ import '../../features/admin/presentation/pages/admin_home_page.dart';
 import '../../features/admin/presentation/pages/admin_internal_chat_page.dart';
 import '../../features/admin/presentation/pages/admin_embedded_pages.dart';
 import '../../features/admin/presentation/pages/admin_misc_pages.dart';
+import '../../features/admin/presentation/pages/admin_oversight_pages.dart';
 import '../../features/admin/presentation/pages/admin_registration_requests_page.dart';
 import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
@@ -135,6 +136,9 @@ class AppRoutes {
       '/admin/communication-settings';
   static const String adminCreateHalaqa = '/admin/create-halaqa';
   static const String adminFinanceDetail = '/admin/finance-detail';
+  static const String adminPayments = '/admin/payments';
+  static const String adminSupervisors = '/admin/supervisors';
+  static const String adminHalaqat = '/admin/halaqat';
   static const String adminStudent = '/admin/student/:studentId';
 
   /// Admin view of [StudentProfilePage]. Pass [halaqaId] when opening from roster.
@@ -542,6 +546,18 @@ class AppRouter {
           GoRoute(
             path: 'finance-detail',
             builder: (_, __) => const AdminFinanceDetailPage(),
+          ),
+          GoRoute(
+            path: 'payments',
+            builder: (_, __) => const AdminPaymentsReviewPage(),
+          ),
+          GoRoute(
+            path: 'supervisors',
+            builder: (_, __) => const AdminSupervisorsPage(),
+          ),
+          GoRoute(
+            path: 'halaqat',
+            builder: (_, __) => const AdminHalaqatPage(),
           ),
         ],
       ),

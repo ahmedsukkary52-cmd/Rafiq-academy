@@ -126,6 +126,11 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                       ),
                       const SizedBox(height: 16),
                       AppButton(
+                        label: 'مراجعة المدفوعات',
+                        onPressed: () => context.push(AppRoutes.adminPayments),
+                      ),
+                      const SizedBox(height: 10),
+                      AppButton(
                         label: 'لوحة مالية تفصيلية',
                         onPressed: () =>
                             context.push(AppRoutes.adminFinanceDetail),

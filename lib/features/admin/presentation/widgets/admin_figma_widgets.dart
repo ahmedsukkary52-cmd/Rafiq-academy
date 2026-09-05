@@ -254,17 +254,13 @@ class AdminRoleHomeHeader extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AdminHeaderCircleButton(
-                  icon: Icons.search_rounded,
-                  onTap:
-                      onSearchTap ??
-                      () {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(const SnackBar(content: Text('قريباً')));
-                      },
-                ),
-                const SizedBox(width: 8),
+                if (onSearchTap != null) ...[
+                  AdminHeaderCircleButton(
+                    icon: Icons.search_rounded,
+                    onTap: onSearchTap,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 AdminHeaderCircleButton(
                   icon: Icons.notifications_outlined,
                   showDot: unreadNotifications > 0,

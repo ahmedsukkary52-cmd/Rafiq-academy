@@ -16,6 +16,7 @@ import '../../domain/entities/admin_directory_entity.dart';
 import '../../domain/entities/admin_halaqa_roster_entity.dart';
 import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
+import '../../domain/entities/admin_payment_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
@@ -100,6 +101,40 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         dueCount: dueCount,
         overdueCount: overdueCount,
       );
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AdminPaymentEntity>> getPayments() async {
+    try {
+      final snap = await firestore
+          .collection(FirestoreCollections.payments)
+          .get();
+
+      final payments = snap.docs.map((doc) {
+        final data = doc.data();
+        final dueRaw = data['dueDate'];
+        final paidRaw = data['paidAt'];
+        return AdminPaymentEntity(
+          id: doc.id,
+          studentId: data['studentId'] as String? ?? '',
+          parentId: data['parentId'] as String? ?? '',
+          amount: (data['amount'] ?? 0).toDouble(),
+          status: data['status'] as String? ?? 'due',
+          dueDate: dueRaw is Timestamp ? dueRaw.toDate() : null,
+          paidAt: paidRaw is Timestamp ? paidRaw.toDate() : null,
+          method: data['method'] as String?,
+        );
+      }).toList();
+
+      payments.sort((a, b) {
+        final aDate = a.dueDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.dueDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+      return payments;
     } catch (e) {
       throw ServerException(e.toString());
     }

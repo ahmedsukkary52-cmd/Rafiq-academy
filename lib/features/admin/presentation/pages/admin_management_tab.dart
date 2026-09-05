@@ -78,6 +78,12 @@ class AdminManagementTab extends StatelessWidget {
           wired: true,
         ),
         _HubTile(
+          icon: Icons.supervisor_account_outlined,
+          label: 'المشرفون',
+          route: AppRoutes.adminSupervisors,
+          wired: true,
+        ),
+        _HubTile(
           icon: Icons.folder_open_outlined,
           label: 'مكتبة المحتوى',
           route: AppRoutes.adminContent,
@@ -112,6 +118,12 @@ class AdminManagementTab extends StatelessWidget {
     _HubSection(
       title: 'الحلقات',
       tiles: [
+        _HubTile(
+          icon: Icons.groups_outlined,
+          label: 'دليل الحلقات',
+          route: AppRoutes.adminHalaqat,
+          wired: true,
+        ),
         _HubTile(
           icon: Icons.add_circle_outline,
           label: 'إنشاء حلقة',

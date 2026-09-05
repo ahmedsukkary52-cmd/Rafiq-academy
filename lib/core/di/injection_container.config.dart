@@ -46,6 +46,8 @@ import 'package:rafiq_academy/features/admin/domain/usecases/get_complaints_usec
     as _i899;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_financial_summary_usecase.dart'
     as _i369;
+import 'package:rafiq_academy/features/admin/domain/usecases/get_payments_usecase.dart'
+    as _i612;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_teacher_activity_log_usecase.dart'
     as _i1063;
 import 'package:rafiq_academy/features/admin/domain/usecases/grant_admin_reward_usecase.dart'
@@ -725,6 +727,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i369.GetFinancialSummaryUseCase>(
       () => _i369.GetFinancialSummaryUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.lazySingleton<_i612.GetPaymentsUseCase>(
+      () => _i612.GetPaymentsUseCase(gh<_i255.AdminRepository>()),
+    );
     gh.lazySingleton<_i1063.GetTeacherActivityLogUseCase>(
       () => _i1063.GetTeacherActivityLogUseCase(gh<_i255.AdminRepository>()),
     );
@@ -830,6 +835,7 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i409.AdminBloc(
         getAcademyStats: gh<_i488.GetAcademyStatsUseCase>(),
         getFinancialSummary: gh<_i369.GetFinancialSummaryUseCase>(),
+        getPayments: gh<_i612.GetPaymentsUseCase>(),
         getComplaints: gh<_i899.GetComplaintsUseCase>(),
         approveNewStudent: gh<_i928.ApproveNewStudentUseCase>(),
         toggleAccountStatus: gh<_i482.ToggleAccountStatusUseCase>(),

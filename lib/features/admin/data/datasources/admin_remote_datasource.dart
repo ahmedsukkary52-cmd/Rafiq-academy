@@ -4,6 +4,7 @@ import '../../domain/entities/admin_directory_entity.dart';
 import '../../domain/entities/admin_halaqa_roster_entity.dart';
 import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
+import '../../domain/entities/admin_payment_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
@@ -12,6 +13,7 @@ import '../../domain/entities/teacher_management_entity.dart';
 abstract class AdminRemoteDatasource {
   Future<AcademyStatsEntity> getAcademyStats();
   Future<FinancialSummaryEntity> getFinancialSummary();
+  Future<List<AdminPaymentEntity>> getPayments();
 
   Future<void> approveNewStudent({
     required String studentId,

@@ -10,6 +10,7 @@ import '../../domain/entities/admin_directory_entity.dart';
 import '../../domain/entities/admin_halaqa_roster_entity.dart';
 import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
+import '../../domain/entities/admin_payment_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
@@ -48,6 +49,10 @@ class AdminRepositoryImpl implements AdminRepository {
   @override
   Future<Either<Failure, FinancialSummaryEntity>> getFinancialSummary() =>
       _guard(remoteDatasource.getFinancialSummary);
+
+  @override
+  Future<Either<Failure, List<AdminPaymentEntity>>> getPayments() =>
+      _guard(remoteDatasource.getPayments);
 
   @override
   Future<Either<Failure, Unit>> approveNewStudent({

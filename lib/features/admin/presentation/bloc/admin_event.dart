@@ -21,6 +21,11 @@ class LoadFinancialSummaryEvent extends AdminEvent {
   const LoadFinancialSummaryEvent();
 }
 
+/// تحميل قائمة المدفوعات للمراجعة
+class LoadPaymentsEvent extends AdminEvent {
+  const LoadPaymentsEvent();
+}
+
 /// تحميل الإحصائيات والملخص المالي معاً (لوحة الإدارة الرئيسية)
 class RefreshAdminDashboardEvent extends AdminEvent {
   const RefreshAdminDashboardEvent();

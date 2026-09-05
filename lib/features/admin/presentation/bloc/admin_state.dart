@@ -4,6 +4,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/admin_directory_entity.dart';
 import '../../domain/entities/admin_halaqa_roster_entity.dart';
+import '../../domain/entities/admin_payment_entity.dart';
 import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
@@ -27,6 +28,11 @@ class AdminState extends Equatable {
   final SectionStatus financialStatus;
   final FinancialSummaryEntity? financialSummary;
   final String? financialError;
+
+  // ── قائمة المدفوعات (مراجعة) ──────────────────────────────────────────
+  final SectionStatus paymentsStatus;
+  final List<AdminPaymentEntity> payments;
+  final String? paymentsError;
 
   // ── الشكاوى ───────────────────────────────────────────────────────────
   final SectionStatus complaintsStatus;
@@ -103,6 +109,9 @@ class AdminState extends Equatable {
     this.financialStatus = SectionStatus.initial,
     this.financialSummary,
     this.financialError,
+    this.paymentsStatus = SectionStatus.initial,
+    this.payments = const [],
+    this.paymentsError,
     this.complaintsStatus = SectionStatus.initial,
     this.complaints = const [],
     this.complaintsError,
@@ -162,6 +171,9 @@ class AdminState extends Equatable {
     SectionStatus? financialStatus,
     Object? financialSummary = _unset,
     Object? financialError = _unset,
+    SectionStatus? paymentsStatus,
+    List<AdminPaymentEntity>? payments,
+    Object? paymentsError = _unset,
     SectionStatus? complaintsStatus,
     List<ComplaintEntity>? complaints,
     Object? complaintsError = _unset,
@@ -226,6 +238,11 @@ class AdminState extends Equatable {
       financialError: identical(financialError, _unset)
           ? this.financialError
           : financialError as String?,
+      paymentsStatus: paymentsStatus ?? this.paymentsStatus,
+      payments: payments ?? this.payments,
+      paymentsError: identical(paymentsError, _unset)
+          ? this.paymentsError
+          : paymentsError as String?,
       complaintsStatus: complaintsStatus ?? this.complaintsStatus,
       complaints: complaints ?? this.complaints,
       complaintsError: identical(complaintsError, _unset)
@@ -341,6 +358,9 @@ class AdminState extends Equatable {
     financialStatus,
     financialSummary,
     financialError,
+    paymentsStatus,
+    payments,
+    paymentsError,
     complaintsStatus,
     complaints,
     complaintsError,

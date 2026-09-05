@@ -10,6 +10,12 @@ import '../models/chat_models.dart';
 abstract class ChatRemoteDatasource {
   Stream<List<ConversationModel>> watchConversations(String uid);
 
+  /// Academy-wide conversation stream for Admin oversight (no participant filter).
+  /// Does not add the Admin to [participantIds].
+  Stream<List<ConversationModel>> watchAllConversations({
+    required String observerUid,
+  });
+
   Stream<List<MessageModel>> watchMessages(String conversationId);
 
   Future<ConversationModel> getOrCreateConversation({
@@ -58,6 +64,33 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
               )
               .toList(),
         );
+  }
+
+  @override
+  Stream<List<ConversationModel>> watchAllConversations({
+    required String observerUid,
+  }) {
+    // No orderBy: docs missing `lastMessageAt` would be excluded from an
+    // ordered query. Sort client-side so Admin oversight sees every thread.
+    return _conversationsRef.snapshots().map((snapshot) {
+      final list = snapshot.docs
+          .map(
+            (doc) => ConversationModel.fromFirestore(
+              doc,
+              currentUid: observerUid,
+            ),
+          )
+          .toList();
+      list.sort((a, b) {
+        final aAt = a.lastMessageAt;
+        final bAt = b.lastMessageAt;
+        if (aAt == null && bAt == null) return 0;
+        if (aAt == null) return 1;
+        if (bAt == null) return -1;
+        return bAt.compareTo(aAt);
+      });
+      return list;
+    });
   }
 
   @override
@@ -135,10 +168,19 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required String text,
   }) async {
     try {
-      final otherUid = ConversationIdGenerator.otherParticipant(
-        conversationId,
-        senderId,
+      final conversationRef = _conversationsRef.doc(conversationId);
+      final convSnap = await conversationRef.get();
+      final convData = convSnap.data() as Map<String, dynamic>? ?? const {};
+      final participantIds = List<String>.from(
+        convData['participantIds'] ?? const <String>[],
       );
+
+      // Admin (or any non-participant) must not write into others' threads.
+      if (!participantIds.contains(senderId)) {
+        throw const ServerException(
+          'غير مسموح بإرسال رسالة في هذه المحادثة',
+        );
+      }
 
       final batch = firestore.batch();
 
@@ -149,17 +191,34 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         'sentAt': FieldValue.serverTimestamp(),
       });
 
-      final conversationRef = _conversationsRef.doc(conversationId);
-      batch.update(conversationRef, {
+      final isGroup = participantIds.length > 2 ||
+          convData['kind'] == 'admin_group';
+
+      final conversationUpdates = <String, dynamic>{
         'lastMessage': text,
         'lastMessageAt': FieldValue.serverTimestamp(),
         'lastMessageSenderId': senderId,
-        // بنزوّد عداد المستلم بس، مش المرسل، لأن المرسل أصلاً شايف رسالته
-        'unreadCounts.$otherUid': FieldValue.increment(1),
-      });
+      };
+
+      if (isGroup) {
+        for (final pid in participantIds) {
+          if (pid != senderId) {
+            conversationUpdates['unreadCounts.$pid'] = FieldValue.increment(1);
+          }
+        }
+      } else {
+        final otherUid = ConversationIdGenerator.otherParticipant(
+          conversationId,
+          senderId,
+        );
+        conversationUpdates['unreadCounts.$otherUid'] = FieldValue.increment(1);
+      }
+
+      batch.update(conversationRef, conversationUpdates);
 
       await batch.commit();
     } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
   }
@@ -170,7 +229,17 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required String uid,
   }) async {
     try {
-      await _conversationsRef.doc(conversationId).update({
+      final conversationRef = _conversationsRef.doc(conversationId);
+      final snap = await conversationRef.get();
+      final data = snap.data() as Map<String, dynamic>? ?? const {};
+      final participantIds = List<String>.from(
+        data['participantIds'] ?? const <String>[],
+      );
+      // Silent Admin oversight: never write unreadCounts for non-participants
+      // (would leak observer presence into the conversation document).
+      if (!participantIds.contains(uid)) return;
+
+      await conversationRef.update({
         'unreadCounts.$uid': 0,
       });
     } catch (e) {

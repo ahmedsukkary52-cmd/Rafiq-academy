@@ -11,6 +11,8 @@ class ChatRouteExtra {
   static const nameKey = 'name';
   static const imageKey = 'image';
   static const imageUrlKey = 'imageUrl';
+  /// When true, Admin (or any) viewer is read-only — no send, no join.
+  static const readOnlyKey = 'readOnly';
 
   static Map<String, String?> parse(Object? extra) {
     if (extra is! Map) return const {};
@@ -23,6 +25,12 @@ class ChatRouteExtra {
     return {
       nameKey: read(nameKey),
       imageKey: read(imageKey) ?? read(imageUrlKey),
+      readOnlyKey: read(readOnlyKey),
     };
+  }
+
+  static bool isReadOnly(Object? extra) {
+    final v = parse(extra)[readOnlyKey]?.toLowerCase();
+    return v == 'true' || v == '1';
   }
 }

@@ -15,19 +15,24 @@ import '../../presentation/bloc/notifications_event.dart';
 import '../../presentation/bloc/notifications_state.dart';
 
 class NotificationsPage extends StatelessWidget {
-  const NotificationsPage({super.key});
+  final bool embeddedInAdmin;
+
+  const NotificationsPage({super.key, this.embeddedInAdmin = false});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: sl<NotificationsBloc>(),
       child: Scaffold(
-        backgroundColor: const Color(0xFFF0F7FA),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              Container(
+        backgroundColor:
+            embeddedInAdmin ? AppColors.background : const Color(0xFFF0F7FA),
+        body: embeddedInAdmin
+            ? const _NotificationsBody()
+            : SafeArea(
+                child: Column(
+                  children: [
+                    // Header
+                    Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 16,
@@ -108,80 +113,84 @@ class NotificationsPage extends StatelessWidget {
                   ],
                 ),
               ),
-              // Body
-              Expanded(
-                child: BlocBuilder<NotificationsBloc, NotificationsState>(
-                  buildWhen: (previous, current) =>
-                      previous.status != current.status ||
-                      previous.notifications != current.notifications ||
-                      previous.error != current.error,
-                  builder: (context, state) {
-                    if (state.status == SectionStatus.loading) {
-                      return const TeacherNotificationsListSkeleton();
-                    }
-                    if (state.status == SectionStatus.error) {
-                      return AppErrorWidget(
-                        message: state.error ?? 'حدث خطأ',
-                        onRetry: () {
-                          final auth = context.read<AuthBloc>().state;
-                          if (auth is! AuthAuthenticated) return;
-                          context.read<NotificationsBloc>().add(
-                            StartWatchingNotificationsEvent(
-                              uid: auth.user.uid,
-                              role: auth.user.role,
-                            ),
-                          );
-                        },
-                      );
-                    }
-                    if (state.notifications.isEmpty) {
-                      return _EmptyNotifications();
-                    }
-
-                    // تجميع الإشعارات بالتاريخ
-                    final grouped = _groupByDate(state.notifications);
-
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                      itemCount: grouped.length,
-                      itemBuilder: (context, i) {
-                        final entry = grouped[i];
-                        final isHeader = entry is String;
-
-                        if (isHeader) {
-                          return _DateHeader(label: entry);
-                        }
-
-                        final notif = entry as NotificationEntity;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _NotificationTile(
-                            notification: notif,
-                            onTap: () {
-                              if (!notif.isRead) {
-                                context.read<NotificationsBloc>().add(
-                                  MarkNotificationAsReadEvent(notif.id),
-                                );
-                              }
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
+                    const Expanded(child: _NotificationsBody()),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
+}
 
-  /// بترجع list فيها String (header) أو NotificationEntity
+class _NotificationsBody extends StatelessWidget {
+  const _NotificationsBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<NotificationsBloc, NotificationsState>(
+      buildWhen: (previous, current) =>
+          previous.status != current.status ||
+          previous.notifications != current.notifications ||
+          previous.error != current.error,
+      builder: (context, state) {
+        if (state.status == SectionStatus.loading) {
+          return const TeacherNotificationsListSkeleton();
+        }
+        if (state.status == SectionStatus.error) {
+          return AppErrorWidget(
+            message: state.error ?? 'حدث خطأ',
+            onRetry: () {
+              final auth = context.read<AuthBloc>().state;
+              if (auth is! AuthAuthenticated) return;
+              context.read<NotificationsBloc>().add(
+                    StartWatchingNotificationsEvent(
+                      uid: auth.user.uid,
+                      role: auth.user.role,
+                    ),
+                  );
+            },
+          );
+        }
+        if (state.notifications.isEmpty) {
+          return _EmptyNotifications();
+        }
+
+        final grouped = _groupByDate(state.notifications);
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+          itemCount: grouped.length,
+          itemBuilder: (context, i) {
+            final entry = grouped[i];
+            final isHeader = entry is String;
+
+            if (isHeader) {
+              return _DateHeader(label: entry);
+            }
+
+            final notif = entry as NotificationEntity;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _NotificationTile(
+                notification: notif,
+                onTap: () {
+                  if (!notif.isRead) {
+                    context.read<NotificationsBloc>().add(
+                          MarkNotificationAsReadEvent(notif.id),
+                        );
+                  }
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   List<Object> _groupByDate(List<NotificationEntity> notifications) {
     final result = <Object>[];
     String? lastLabel;

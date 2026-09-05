@@ -597,8 +597,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     String halaqaName = (profileData?['halaqaName'] as String?)?.trim() ?? '';
     String? teacherId;
     String teacherName = '';
+    String? teacherImageUrl;
     String? supervisorId;
     String supervisorName = '';
+    String? supervisorImageUrl;
 
     if (halaqaId.isNotEmpty) {
       final halaqaDoc = await firestore
@@ -627,8 +629,15 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       );
       for (final doc in staffDocs) {
         final n = (doc.data()?['name'] as String?)?.trim() ?? '';
-        if (doc.id == teacherId) teacherName = n;
-        if (doc.id == supervisorId) supervisorName = n;
+        final image = doc.data()?['profileImageUrl'] as String?;
+        if (doc.id == teacherId) {
+          teacherName = n;
+          teacherImageUrl = image;
+        }
+        if (doc.id == supervisorId) {
+          supervisorName = n;
+          supervisorImageUrl = image;
+        }
       }
     }
 
@@ -700,8 +709,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       halaqaName: halaqaName,
       teacherId: teacherId,
       teacherName: teacherName,
+      teacherProfileImageUrl: teacherImageUrl,
       supervisorId: supervisorId,
       supervisorName: supervisorName,
+      supervisorProfileImageUrl: supervisorImageUrl,
       overallProgressPercent:
           (profileData?['overallProgressPercent'] as num?)?.toDouble() ?? 0,
       totalVersesMemorized:
@@ -726,6 +737,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
           uid: teacherId,
           name: child.teacherName,
           role: AppRoles.teacher,
+          profileImageUrl: child.teacherProfileImageUrl,
         );
       }
       final supervisorId = child.supervisorId?.trim() ?? '';
@@ -734,6 +746,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
           uid: supervisorId,
           name: child.supervisorName,
           role: AppRoles.supervisor,
+          profileImageUrl: child.supervisorProfileImageUrl,
         );
       }
     }
@@ -745,6 +758,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       final snap = await firestore
           .collection(FirestoreCollections.users)
           .where('role', isEqualTo: AppRoles.admin)
+          .limit(20)
           .get();
       return [
         for (final doc in snap.docs)

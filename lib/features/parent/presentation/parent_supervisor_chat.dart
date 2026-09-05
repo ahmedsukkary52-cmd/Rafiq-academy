@@ -37,12 +37,17 @@ mixin ParentSupervisorChatMixin<T extends StatefulWidget> on State<T> {
         break;
       }
     }
-    contact ??= ParentStaffContact(
+    final fallbackName = child.supervisorName.trim().isEmpty
+        ? 'المشرف'
+        : child.supervisorName.trim();
+    contact = ParentStaffContact(
       uid: supervisorId,
-      name: child.supervisorName.trim().isEmpty
-          ? 'المشرف'
-          : child.supervisorName.trim(),
+      name: (contact?.name.trim().isNotEmpty ?? false)
+          ? contact!.name.trim()
+          : fallbackName,
       role: AppRoles.supervisor,
+      profileImageUrl:
+          contact?.profileImageUrl ?? child.supervisorProfileImageUrl,
     );
 
     setState(() => parentSupervisorChatBusy = true);

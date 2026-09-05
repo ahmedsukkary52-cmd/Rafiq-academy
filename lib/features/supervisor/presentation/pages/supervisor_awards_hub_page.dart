@@ -15,7 +15,16 @@ import '../bloc/supervisor_bloc.dart';
 import '../supervisor_destinations.dart';
 import '../widgets/supervisor_loading_skeletons.dart';
 
-const kSupervisorAwardTypeExamples = ['star', 'badge', 'certificate'];
+const kSupervisorAwardTypeOptions = <({String key, String label})>[
+  (key: 'star', label: 'نجمة تميز'),
+  (key: 'badge', label: 'شارة'),
+  (key: 'certificate', label: 'شهادة تقدير'),
+];
+
+/// Backward-compatible keys for grant form submission.
+List<String> get kSupervisorAwardTypeExamples => [
+  for (final o in kSupervisorAwardTypeOptions) o.key,
+];
 
 class _AwardTypeDef {
   final String typeKey;
@@ -161,8 +170,16 @@ class _SupervisorAwardsHubPageState extends State<SupervisorAwardsHubPage> {
   String _typeLabel(AchievementType type) => switch (type) {
     AchievementType.star => 'نجمة تميز',
     AchievementType.badge => 'شارة',
-    AchievementType.certificate => 'شهادة',
-    _ => type.name,
+    AchievementType.certificate => 'شهادة تقدير',
+    AchievementType.completionBadge => 'شارة الإتمام',
+    AchievementType.performanceStars => 'نجوم الأداء',
+    AchievementType.perfectAttendance => 'حضور مثالي',
+    AchievementType.studentOfWeek => 'طالب الأسبوع',
+    AchievementType.attendance => 'حضور',
+    AchievementType.completion => 'إتمام',
+    AchievementType.performance => 'أداء',
+    AchievementType.achievement => 'إنجاز',
+    AchievementType.custom => 'مخصص',
   };
 
   @override

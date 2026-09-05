@@ -268,11 +268,11 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final t in kSupervisorAwardTypeExamples)
+                    for (final o in kSupervisorAwardTypeOptions)
                       ChoiceChip(
-                        label: Text(t),
-                        selected: _type == t,
-                        onSelected: (_) => setState(() => _type = t),
+                        label: Text(o.label),
+                        selected: _type == o.key,
+                        onSelected: (_) => setState(() => _type = o.key),
                       ),
                   ],
                 ),

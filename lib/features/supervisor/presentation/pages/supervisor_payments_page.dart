@@ -681,6 +681,16 @@ class _PaymentsReportPage extends StatelessWidget {
 
   const _PaymentsReportPage({required this.payments, required this.names});
 
+  String _reportReviewLabel(PaymentEntity p) {
+    return switch (p.reviewStatus) {
+      ParentPaymentProofContract.approved => 'مقبول',
+      ParentPaymentProofContract.rejected => 'مرفوض',
+      ParentPaymentProofContract.partial => 'جزئي',
+      ParentPaymentProofContract.pendingReview => 'بانتظار المراجعة',
+      _ => 'مُراجعة',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final reviewed = payments.where((p) => p.hasSupervisorReview).toList();
@@ -743,7 +753,7 @@ class _PaymentsReportPage extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${p.reviewStatus} · ${(p.amountPaidConfirmed ?? p.amount).toStringAsFixed(0)} ر.س',
+                        '${_reportReviewLabel(p)} · ${(p.amountPaidConfirmed ?? p.amount).toStringAsFixed(0)} ر.س',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.textSecondary,
                         ),

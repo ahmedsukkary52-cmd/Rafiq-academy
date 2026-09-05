@@ -12,7 +12,6 @@ import 'pages/supervisor_halaqa_detail_page.dart';
 import 'pages/supervisor_halaqat_page.dart';
 import 'pages/supervisor_payments_page.dart';
 import 'pages/supervisor_register_page.dart';
-import 'pages/supervisor_reports_page.dart';
 import 'pages/supervisor_teachers_page.dart';
 import 'pages/supervisor_transfer_page.dart';
 
@@ -116,11 +115,5 @@ class SupervisorDestinations {
 
   static Future<void> teachers(BuildContext context) {
     return _push(context, const SupervisorTeachersPage());
-  }
-
-  /// Opens the reports tab compose sheet — prefer [onSwitchTab] to reports index.
-  @Deprecated('Use reports tab with compose action instead')
-  static Future<void> reportsQuick(BuildContext context) {
-    return _push(context, const SupervisorReportsPage(quickCompose: true));
   }
 }

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../parent/domain/absence_request_projection.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
+import '../supervisor_destinations.dart';
 import 'supervisor_loading_skeletons.dart';
 
 /// Read-only استئذان context for supervised halaqat (W7 Rule 2).
@@ -118,13 +117,11 @@ class SupervisorAbsenceRequestsSection extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton(
-                        onPressed: () => context.push(
-                          AppRoutes.teacherAttend.replaceFirst(
-                            ':halaqaId',
-                            request.halaqaId,
-                          ),
+                        onPressed: () => SupervisorDestinations.attendance(
+                          context,
+                          halaqaId: request.halaqaId,
                         ),
-                        child: const Text('توجيه لسجل الحضور'),
+                        child: const Text('عرض الحضور'),
                       ),
                     ),
                   ],

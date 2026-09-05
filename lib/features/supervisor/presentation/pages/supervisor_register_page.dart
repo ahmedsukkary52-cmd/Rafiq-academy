@@ -134,7 +134,7 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'معرّف الطالب',
-                    hintText: 'studentId',
+                    hintText: 'أدخل معرّف الطالب الموجود',
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),
                   onChanged: (_) {

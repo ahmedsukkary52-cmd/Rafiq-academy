@@ -16,6 +16,7 @@ import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
 import '../../../teacher/domain/repositories/teacher_repository.dart';
 import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
+import '../../domain/repositories/parent_repository.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
@@ -209,6 +210,23 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
       'follow_up': 'متابعة',
     };
 
+    final teacherIds = <String>{
+      for (final h in halaqat)
+        if (h.teacherId.trim().isNotEmpty) h.teacherId.trim(),
+    }.toList()..sort();
+
+    var teacherNames = <String, String>{};
+    if (teacherIds.isNotEmpty) {
+      final namesResult = await sl<SupervisorRepository>().getUserDisplayNames(
+        teacherIds,
+      );
+      namesResult.fold((_) {}, (map) => teacherNames = map);
+    }
+    if (!context.mounted) {
+      contentCtrl.dispose();
+      return;
+    }
+
     final submitted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -226,11 +244,6 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
           ),
           child: StatefulBuilder(
             builder: (context, setSheetState) {
-              final teacherIds = <String>{
-                for (final h in halaqat)
-                  if (h.teacherId.trim().isNotEmpty) h.teacherId.trim(),
-              }.toList()..sort();
-
               return SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -295,7 +308,10 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
                         for (final id in teacherIds)
                           DropdownMenuItem<String?>(
                             value: id,
-                            child: Text(id, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              teacherNames[id] ?? id,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                       ],
                       onChanged: (v) => setSheetState(() => teacherId = v),

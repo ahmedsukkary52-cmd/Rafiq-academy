@@ -1034,7 +1034,9 @@ class _AlertsSection extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: _AlertTile(
                 title: 'استئذان غياب',
-                subtitle: reason.isEmpty ? 'طلب استئذان يحتاج مراجعة' : reason,
+                subtitle: reason.isEmpty
+                    ? 'طلب استئذان — العرض فقط (قرار المعلم)'
+                    : reason,
                 icon: Icons.event_busy_outlined,
                 iconColor: AppColors.warning,
                 actionLabel: 'عرض',

@@ -13,30 +13,20 @@ import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_state.dart';
 import '../widgets/teacher_home_figma_cards.dart';
 
-/// Teacher Profile & Settings — Figma `1:2035` Phase 1 UI.
+/// Teacher Profile & Settings — Figma `1:2035`.
 ///
 /// Real data only (Auth + TeacherBloc halaqat + AppPreferences).
-/// No AI assistant. Unsupported Figma fields are marked Coming Soon.
+/// Unsupported Figma-only fields without backend contracts are omitted.
 class TeacherProfileTab extends StatelessWidget {
   const TeacherProfileTab({super.key});
 
   static const _appVersion = '1.0.0';
 
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('قريباً')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final authState = context
-        .watch<AuthBloc>()
-        .state;
+    final authState = context.watch<AuthBloc>().state;
     final user = authState is AuthAuthenticated ? authState.user : null;
-    final displayName = user?.name
-        .trim()
-        .isNotEmpty == true
+    final displayName = user?.name.trim().isNotEmpty == true
         ? 'أ. ${user!.name.trim()}'
         : 'المعلم';
     final phone = user?.phone.trim() ?? '';
@@ -72,7 +62,6 @@ class TeacherProfileTab extends StatelessWidget {
                         name: displayName,
                         imageUrl: user?.profileImageUrl,
                         contact: contact,
-                        onEditTap: () => _comingSoon(context),
                       ),
                       Transform.translate(
                         offset: const Offset(0, -28),
@@ -85,12 +74,12 @@ class TeacherProfileTab extends StatelessWidget {
                               ),
                               child: BlocBuilder<TeacherBloc, TeacherState>(
                                 buildWhen: (p, c) =>
-                                p.halaqatStatus != c.halaqatStatus ||
+                                    p.halaqatStatus != c.halaqatStatus ||
                                     p.halaqat != c.halaqat ||
                                     p.halaqatError != c.halaqatError,
                                 builder: (context, state) {
                                   if (state.halaqatStatus ==
-                                      SectionStatus.initial ||
+                                          SectionStatus.initial ||
                                       state.halaqatStatus ==
                                           SectionStatus.loading) {
                                     return const _StatsSkeleton();
@@ -98,7 +87,8 @@ class TeacherProfileTab extends StatelessWidget {
                                   if (state.halaqatStatus ==
                                       SectionStatus.error) {
                                     return _StatsError(
-                                      message: state.halaqatError ??
+                                      message:
+                                          state.halaqatError ??
                                           'تعذر تحميل الإحصاءات',
                                     );
                                   }
@@ -121,15 +111,14 @@ class TeacherProfileTab extends StatelessWidget {
                                 children: [
                                   _SettingsCard(
                                     onExcusesTap: () =>
-                                        context.push(
-                                          AppRoutes.teacherExcuses,
-                                        ),
+                                        context.push(AppRoutes.teacherExcuses),
+                                    onNotificationsTap: () =>
+                                        context.push(AppRoutes.teacherNotifs),
                                     onLogoutTap: () {
                                       context.read<AuthBloc>().add(
                                         const LogoutEvent(),
                                       );
                                     },
-                                    onComingSoon: () => _comingSoon(context),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
@@ -142,9 +131,7 @@ class TeacherProfileTab extends StatelessWidget {
                                   ),
                                   SizedBox(
                                     height:
-                                    MediaQuery
-                                        .paddingOf(context)
-                                        .bottom +
+                                        MediaQuery.paddingOf(context).bottom +
                                         16,
                                   ),
                                 ],
@@ -180,19 +167,18 @@ class _HeaderAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: 44,
       backgroundColor: AppColors.onPrimary,
-      backgroundImage:
-      imageUrl != null && imageUrl!.trim().isNotEmpty
+      backgroundImage: imageUrl != null && imageUrl!.trim().isNotEmpty
           ? NetworkImage(imageUrl!)
           : null,
       child: imageUrl == null || imageUrl!.trim().isEmpty
           ? Text(
-        initial,
-        style: AppTextStyles.displayLarge.copyWith(
-          color: AppColors.primaryDark,
-          fontWeight: FontWeight.w800,
-          fontSize: 34,
-        ),
-      )
+              initial,
+              style: AppTextStyles.displayLarge.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w800,
+                fontSize: 34,
+              ),
+            )
           : null,
     );
   }
@@ -202,69 +188,37 @@ class _ProfileHeader extends StatelessWidget {
   final String name;
   final String? imageUrl;
   final String? contact;
-  final VoidCallback onEditTap;
 
   const _ProfileHeader({
     required this.name,
     required this.imageUrl,
     required this.contact,
-    required this.onEditTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery
-        .paddingOf(context)
-        .top;
+    final top = MediaQuery.paddingOf(context).top;
     return Padding(
       padding: EdgeInsets.fromLTRB(18, top + 24, 18, 52),
       child: Column(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.onPrimary.withValues(alpha: 0.45),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: _HeaderAvatar(name: name, imageUrl: imageUrl),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.onPrimary.withValues(alpha: 0.45),
+                width: 2,
               ),
-              Positioned(
-                left: 0,
-                bottom: 0,
-                child: Material(
-                  color: AppColors.secondary,
-                  shape: const CircleBorder(
-                    side: BorderSide(color: AppColors.onPrimary, width: 1.5),
-                  ),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: onEditTap,
-                    child: const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Icon(
-                        Icons.edit_rounded,
-                        size: 12,
-                        color: AppColors.onPrimary,
-                      ),
-                    ),
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.14),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: _HeaderAvatar(name: name, imageUrl: imageUrl),
           ),
           const SizedBox(height: 12),
           Text(
@@ -292,23 +246,14 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            contact ?? 'سنوات الخبرة · قريباً',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.onPrimary.withValues(alpha: 0.65),
-              fontSize: 12,
-            ),
-          ),
-          if (contact != null) ...[
-            const SizedBox(height: 4),
+          if (contact != null && contact!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
             Text(
-              'سنوات الخبرة · قريباً',
+              contact!,
               textAlign: TextAlign.center,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.onPrimary.withValues(alpha: 0.5),
-                fontSize: 11,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.onPrimary.withValues(alpha: 0.65),
+                fontSize: 12,
               ),
             ),
           ],
@@ -324,10 +269,7 @@ class _StatsCard extends StatelessWidget {
   final int halaqaCount;
   final int studentCount;
 
-  const _StatsCard({
-    required this.halaqaCount,
-    required this.studentCount,
-  });
+  const _StatsCard({required this.halaqaCount, required this.studentCount});
 
   @override
   Widget build(BuildContext context) {
@@ -359,14 +301,6 @@ class _StatsCard extends StatelessWidget {
               label: 'طالب',
             ),
           ),
-          Container(width: 0.8, height: 36, color: const Color(0xFFE8EEF0)),
-          const Expanded(
-            child: _StatCell(
-              value: '—',
-              label: 'رضا الأهالي',
-              valueHint: true,
-            ),
-          ),
         ],
       ),
     );
@@ -376,13 +310,8 @@ class _StatsCard extends StatelessWidget {
 class _StatCell extends StatelessWidget {
   final String value;
   final String label;
-  final bool valueHint;
 
-  const _StatCell({
-    required this.value,
-    required this.label,
-    this.valueHint = false,
-  });
+  const _StatCell({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -391,7 +320,7 @@ class _StatCell extends StatelessWidget {
         Text(
           value,
           style: AppTextStyles.headlineMedium.copyWith(
-            color: valueHint ? AppColors.textHint : AppColors.primaryDark,
+            color: AppColors.primaryDark,
             fontWeight: FontWeight.w900,
             fontSize: 18,
           ),
@@ -407,14 +336,6 @@ class _StatCell extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        if (valueHint)
-          Text(
-            'قريباً',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textHint,
-              fontSize: 9,
-            ),
-          ),
       ],
     );
   }
@@ -438,11 +359,11 @@ class _StatsSkeletonState extends State<_StatsSkeleton>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )
-      ..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.4, end: 0.85).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(
+      begin: 0.4,
+      end: 0.85,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -457,15 +378,14 @@ class _StatsSkeletonState extends State<_StatsSkeleton>
       animation: _pulse,
       builder: (context, _) {
         final bone = AppColors.border.withValues(alpha: _pulse.value);
-        Widget bar(double w, double h) =>
-            Container(
-              width: w,
-              height: h,
-              decoration: BoxDecoration(
-                color: bone,
-                borderRadius: BorderRadius.circular(6),
-              ),
-            );
+        Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: bone,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        );
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
           decoration: BoxDecoration(
@@ -475,7 +395,7 @@ class _StatsSkeletonState extends State<_StatsSkeleton>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              for (var i = 0; i < 3; i++)
+              for (var i = 0; i < 2; i++)
                 Column(
                   children: [
                     bar(28, 16),
@@ -520,13 +440,13 @@ class _StatsError extends StatelessWidget {
 
 class _SettingsCard extends StatelessWidget {
   final VoidCallback onExcusesTap;
+  final VoidCallback onNotificationsTap;
   final VoidCallback onLogoutTap;
-  final VoidCallback onComingSoon;
 
   const _SettingsCard({
     required this.onExcusesTap,
+    required this.onNotificationsTap,
     required this.onLogoutTap,
-    required this.onComingSoon,
   });
 
   @override
@@ -562,12 +482,12 @@ class _SettingsCard extends StatelessWidget {
             },
           ),
           const _SettingsDivider(),
-          _ComingSoonRow(
+          _NavRow(
             icon: Icons.notifications_rounded,
             iconBg: const Color(0xFFD6F6F8),
             iconColor: AppColors.primaryDark,
             label: 'الإشعارات',
-            onTap: onComingSoon,
+            onTap: onNotificationsTap,
           ),
           const _SettingsDivider(),
           const _NavRow(
@@ -577,22 +497,6 @@ class _SettingsCard extends StatelessWidget {
             label: 'اللغة',
             trailing: 'العربية',
             onTap: null,
-          ),
-          const _SettingsDivider(),
-          _ComingSoonRow(
-            icon: Icons.verified_user_outlined,
-            iconBg: const Color(0xFFD1F5E5),
-            iconColor: AppColors.success,
-            label: 'الخصوصية',
-            onTap: onComingSoon,
-          ),
-          const _SettingsDivider(),
-          _ComingSoonRow(
-            icon: Icons.help_outline_rounded,
-            iconBg: const Color(0xFFF0EAFF),
-            iconColor: AppColors.awardWeekly,
-            label: 'المساعدة والدعم',
-            onTap: onComingSoon,
           ),
           const _SettingsDivider(),
           _NavRow(
@@ -624,11 +528,7 @@ class _RoundIcon extends StatelessWidget {
   final Color bg;
   final Color color;
 
-  const _RoundIcon({
-    required this.icon,
-    required this.bg,
-    required this.color,
-  });
+  const _RoundIcon({required this.icon, required this.bg, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -747,64 +647,6 @@ class _NavRow extends StatelessWidget {
                   size: 18,
                   color: AppColors.textHint,
                 ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ComingSoonRow extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ComingSoonRow({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          child: Row(
-            children: [
-              _RoundIcon(icon: icon, bg: iconBg, color: iconColor),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  textAlign: TextAlign.right,
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              Text(
-                'قريباً',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textHint,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_left_rounded,
-                size: 16,
-                color: AppColors.textHint,
-              ),
             ],
           ),
         ),

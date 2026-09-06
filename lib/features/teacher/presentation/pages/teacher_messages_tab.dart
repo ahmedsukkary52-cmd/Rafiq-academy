@@ -19,10 +19,11 @@ import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../bloc/teacher_bloc.dart';
 
-/// Teacher Messages inbox — Figma 09 (`1:1314`) Phase 1 UI.
+/// Teacher Messages inbox — Figma 09 (`1:1314`).
 ///
-/// Filters are presentation-only over existing conversations. Parent tab does
-/// **not** enable teacher↔parent messaging ([ChatPermissionPolicy] unchanged).
+/// Filters are presentation-only over existing conversations. Parent chats are
+/// allowed by [ChatPermissionPolicy] and usually started from roster/profile
+/// via [contactStudentParent]; the inbox filter surfaces those threads.
 class TeacherMessagesTab extends StatefulWidget {
   const TeacherMessagesTab({super.key});
 
@@ -218,7 +219,7 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                           ? 'لا محادثات مع أولياء الأمور'
                           : 'لا نتائج',
                       subtitle: _filter == _InboxFilter.parents
-                          ? 'التواصل مع ولي الأمر غير متاح في هذه المرحلة'
+                          ? 'ابدأ التواصل من ملف الطالب عبر «تواصل مع الأهل»'
                           : 'جرّب بحثاً أو تصنيفاً آخر',
                     );
                   }
@@ -749,7 +750,8 @@ class _MessagesListSkeletonState extends State<_MessagesListSkeleton>
 }
 
 /// Policy-filtered contacts for teacher `+` (students + supervisors of halaqat).
-/// Parents are never listed — [ChatPermissionPolicy] rejects teacher↔parent.
+/// Parents are opened from roster/profile ([contactStudentParent]), not listed
+/// here as a free-form directory (ownership / known student link only).
 class _NewChatPickerSheet extends StatefulWidget {
   final String teacherUid;
   final String teacherRole;

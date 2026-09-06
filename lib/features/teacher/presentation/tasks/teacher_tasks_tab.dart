@@ -72,16 +72,16 @@ class _TeacherTasksTabState extends State<TeacherTasksTab> {
   void _openDetail(HalaqaActivityUi activity) {
     Navigator.of(context)
         .push(
-      MaterialPageRoute<void>(
-        builder: (_) => TeacherActivityDetailPage(
-          halaqaId: widget.halaqaId,
-          activityId: activity.id,
-        ),
-      ),
-    )
+          MaterialPageRoute<void>(
+            builder: (_) => TeacherActivityDetailPage(
+              halaqaId: widget.halaqaId,
+              activityId: activity.id,
+            ),
+          ),
+        )
         .then((_) {
-      if (mounted) _reload();
-    });
+          if (mounted) _reload();
+        });
   }
 
   @override
@@ -166,10 +166,7 @@ class _TeacherTasksTabState extends State<TeacherTasksTab> {
           if (_status == ActivityListLoadState.loading)
             const TeacherTasksListSkeleton()
           else if (_status == ActivityListLoadState.error)
-            AppErrorWidget(
-              message: _error ?? 'حدث خطأ',
-              onRetry: _reload,
-            )
+            AppErrorWidget(message: _error ?? 'حدث خطأ', onRetry: _reload)
           else if (_activities.isEmpty)
             const _TasksEmptyState()
           else
@@ -224,10 +221,7 @@ class _ActivityHistoryCard extends StatelessWidget {
   final HalaqaActivityUi activity;
   final VoidCallback onTap;
 
-  const _ActivityHistoryCard({
-    required this.activity,
-    required this.onTap,
-  });
+  const _ActivityHistoryCard({required this.activity, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -286,10 +280,7 @@ class _ActivityHistoryCard extends StatelessWidget {
                 icon: Icons.forum_outlined,
                 label: '${activity.responseCount} ردود',
               ),
-              _MetaChip(
-                icon: Icons.tune_rounded,
-                label: types,
-              ),
+              _MetaChip(icon: Icons.tune_rounded, label: types),
               if (deadline != null)
                 _MetaChip(
                   icon: Icons.event_outlined,
@@ -314,11 +305,7 @@ class _MetaChip extends StatelessWidget {
   final String label;
   final Color? accent;
 
-  const _MetaChip({
-    required this.icon,
-    required this.label,
-    this.accent,
-  });
+  const _MetaChip({required this.icon, required this.label, this.accent});
 
   @override
   Widget build(BuildContext context) {

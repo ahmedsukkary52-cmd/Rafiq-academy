@@ -117,11 +117,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
     final now = DateTime.now();
     final from = now.subtract(const Duration(days: 30));
     final result = await sl<GetHalaqaAnalyticsUseCase>()(
-      HalaqaAnalyticsParams(
-        halaqaId: widget.halaqaId,
-        from: from,
-        to: now,
-      ),
+      HalaqaAnalyticsParams(halaqaId: widget.halaqaId, from: from, to: now),
     );
     if (!mounted) return;
     result.fold(
@@ -254,8 +250,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                     previous.studentsHalaqaId != current.studentsHalaqaId)) ||
             (previous.attendanceSubmissionStatus !=
                     current.attendanceSubmissionStatus &&
-                current.attendanceSubmissionStatus ==
-                    SubmissionStatus.success),
+                current.attendanceSubmissionStatus == SubmissionStatus.success),
         listener: (context, state) {
           if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
             _loadHeaderStats();
@@ -277,7 +272,8 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
           final title = halaqa?.name.trim().isNotEmpty == true
               ? halaqa!.name.trim()
               : 'الحلقة';
-          final studentCount = state.studentsStatus == SectionStatus.loaded &&
+          final studentCount =
+              state.studentsStatus == SectionStatus.loaded &&
                   state.studentsHalaqaId == widget.halaqaId
               ? state.students.length
               : (halaqa?.studentIds.length ?? 0);
@@ -348,13 +344,13 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                                       indicatorWeight: 3,
                                       labelStyle: AppTextStyles.labelLarge
                                           .copyWith(
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                       unselectedLabelStyle: AppTextStyles
                                           .labelLarge
                                           .copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                       tabs: [
                                         for (final t in _tabs) Tab(text: t),
                                       ],
@@ -387,9 +383,9 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                                           canWrite: canWrite,
                                           onOpenLessonAssignment: () =>
                                               _openSendAssignmentSheet(
-                                            context,
-                                            studentCount: studentCount,
-                                          ),
+                                                context,
+                                                studentCount: studentCount,
+                                              ),
                                         ),
                                         PostsListPage(
                                           halaqaId: widget.halaqaId,
@@ -492,10 +488,7 @@ class _ClassDetailHeader extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _StatChip(
-                    value: studentCountLabel,
-                    label: 'طالب',
-                  ),
+                  child: _StatChip(value: studentCountLabel, label: 'طالب'),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -778,8 +771,8 @@ class _StudentCard extends StatelessWidget {
     final attendanceDot = attendancePct >= 80
         ? AppColors.success
         : attendancePct >= 60
-            ? AppColors.warning
-            : AppColors.error;
+        ? AppColors.warning
+        : AppColors.error;
     final lastEval = student.lastGradeLabel;
     final lastEvalColor = switch (lastEval) {
       'ممتاز' || 'جيد جداً' => AppColors.gradeExcellent,
@@ -810,11 +803,13 @@ class _StudentCard extends StatelessWidget {
               CircleAvatar(
                 radius: 24,
                 backgroundColor: _avatarBg,
-                backgroundImage: student.profileImageUrl != null &&
+                backgroundImage:
+                    student.profileImageUrl != null &&
                         student.profileImageUrl!.trim().isNotEmpty
                     ? NetworkImage(student.profileImageUrl!)
                     : null,
-                child: student.profileImageUrl == null ||
+                child:
+                    student.profileImageUrl == null ||
                         student.profileImageUrl!.trim().isEmpty
                     ? Text(
                         initial,
@@ -849,8 +844,9 @@ class _StudentCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.error.withValues(alpha: 0.12),
-                              borderRadius:
-                                  BorderRadius.circular(AppSizes.radiusFull),
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusFull,
+                              ),
                             ),
                             child: Text(
                               'في خطر',
@@ -873,8 +869,9 @@ class _StudentCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: _avatarBg,
-                            borderRadius:
-                                BorderRadius.circular(AppSizes.radiusFull),
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusFull,
+                            ),
                           ),
                           child: Text(
                             'المستوى ${teacherHomeEasternDigits('${student.level}')}',
@@ -1119,10 +1116,7 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
     final memorization = _memorizationCtrl.text.trim();
     final review = _reviewCtrl.text.trim();
     if (memorization.isEmpty && review.isEmpty) {
-      AppSnackBar.showError(
-        context,
-        'أدخل نطاق الحفظ أو المراجعة على الأقل',
-      );
+      AppSnackBar.showError(context, 'أدخل نطاق الحفظ أو المراجعة على الأقل');
       return;
     }
     final authState = context.read<AuthBloc>().state;
@@ -1151,8 +1145,7 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
         if (state.assignmentSubmissionStatus == SubmissionStatus.success) {
           Navigator.pop(context);
           AppSnackBar.showSuccess(context, 'تم إرسال التكليف');
-        } else if (state.assignmentSubmissionStatus ==
-            SubmissionStatus.error) {
+        } else if (state.assignmentSubmissionStatus == SubmissionStatus.error) {
           AppSnackBar.showError(
             context,
             state.assignmentSubmissionError ?? 'فشل إرسال التكليف',
@@ -1211,7 +1204,8 @@ class _SendAssignmentSheetState extends State<_SendAssignmentSheet> {
                       p.assignmentSubmissionStatus !=
                       c.assignmentSubmissionStatus,
                   builder: (context, state) {
-                    final loading = state.assignmentSubmissionStatus ==
+                    final loading =
+                        state.assignmentSubmissionStatus ==
                         SubmissionStatus.submitting;
                     return SizedBox(
                       height: 48,

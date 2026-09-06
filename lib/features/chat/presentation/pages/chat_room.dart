@@ -24,6 +24,7 @@ class ChatRoomPage extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
   final String? otherUserImage;
+
   /// Silent oversight: hide composer; do not join as participant.
   final bool readOnly;
 
@@ -92,13 +93,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   (String, String?) _resolvePeer(ChatParticipantEntity? peer) {
     final extraName = widget.otherUserName.trim();
     final peerName = peer?.name.trim() ?? '';
-    final name = extraName.isNotEmpty &&
-        extraName != 'محادثة' &&
-        extraName != 'المعلم'
+    final name =
+        extraName.isNotEmpty && extraName != 'محادثة' && extraName != 'المعلم'
         ? extraName
         : (peerName.isNotEmpty
-        ? peerName
-        : (extraName.isNotEmpty ? extraName : 'محادثة'));
+              ? peerName
+              : (extraName.isNotEmpty ? extraName : 'محادثة'));
 
     final extraImage = widget.otherUserImage?.trim();
     final image = (extraImage != null && extraImage.isNotEmpty)
@@ -145,7 +145,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                   Expanded(
                     child: BlocConsumer<ChatRoomBloc, ChatRoomState>(
                       listenWhen: (p, c) =>
-                      p.messages.length != c.messages.length ||
+                          p.messages.length != c.messages.length ||
                           p.sendStatus != c.sendStatus,
                       listener: (context, state) {
                         if (state.messages.length > _lastMessageCount) {
@@ -162,7 +162,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         }
                       },
                       buildWhen: (p, c) =>
-                      p.messages != c.messages ||
+                          p.messages != c.messages ||
                           p.messagesStatus != c.messagesStatus ||
                           p.messagesError != c.messagesError,
                       builder: (context, state) {
@@ -174,11 +174,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         if (state.messagesStatus == SectionStatus.error) {
                           return AppErrorWidget(
                             message:
-                            state.messagesError ?? 'تعذر تحميل الرسائل',
-                            onRetry: () =>
-                                _chatBloc.add(
-                                  const WatchMessagesStartedEvent(),
-                                ),
+                                state.messagesError ?? 'تعذر تحميل الرسائل',
+                            onRetry: () => _chatBloc.add(
+                              const WatchMessagesStartedEvent(),
+                            ),
                           );
                         }
 
@@ -190,8 +189,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                                 Icon(
                                   Icons.chat_bubble_outline_rounded,
                                   size: 52,
-                                  color: AppColors.textHint
-                                      .withValues(alpha: 0.45),
+                                  color: AppColors.textHint.withValues(
+                                    alpha: 0.45,
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
@@ -206,9 +206,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         }
 
                         final messages = state.messages;
-                        final auth = context
-                            .read<AuthBloc>()
-                            .state;
+                        final auth = context.read<AuthBloc>().state;
                         final uid = auth is AuthAuthenticated
                             ? auth.user.uid
                             : _currentUid;
@@ -219,21 +217,19 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                           itemBuilder: (context, i) {
                             final msg = messages[i];
                             final isMine = msg.isMine(uid);
-                            final showDate = i == 0 ||
-                                !_sameDay(
-                                  messages[i - 1].sentAt,
-                                  msg.sentAt,
-                                );
+                            final showDate =
+                                i == 0 ||
+                                !_sameDay(messages[i - 1].sentAt, msg.sentAt);
 
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 if (showDate) _DateChip(date: msg.sentAt),
                                 Align(
-                                  alignment: ChatMessageAlignment
-                                      .bubbleAlignment(
-                                    isMine: isMine,
-                                  ),
+                                  alignment:
+                                      ChatMessageAlignment.bubbleAlignment(
+                                        isMine: isMine,
+                                      ),
                                   child: _MessageBubble(
                                     message: msg,
                                     isMine: isMine,
@@ -316,9 +312,7 @@ class _ChatRoomHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery
-        .paddingOf(context)
-        .top;
+    final top = MediaQuery.paddingOf(context).top;
     return Container(
       padding: EdgeInsets.fromLTRB(12, top + 8, 12, 12),
       decoration: const BoxDecoration(
@@ -360,14 +354,7 @@ class _ChatRoomHeader extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: null,
-            icon: Icon(
-              Icons.more_vert_rounded,
-              color: AppColors.textHint.withValues(alpha: 0.5),
-            ),
-            tooltip: 'قريباً',
-          ),
+          const SizedBox(width: 40),
         ],
       ),
     );
@@ -382,9 +369,7 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = name
-        .trim()
-        .isEmpty ? '?' : name.trim()[0];
+    final initial = name.trim().isEmpty ? '?' : name.trim()[0];
     final url = imageUrl?.trim();
     return CircleAvatar(
       radius: 20,
@@ -392,12 +377,12 @@ class _HeaderAvatar extends StatelessWidget {
       backgroundImage: url != null && url.isNotEmpty ? NetworkImage(url) : null,
       child: url == null || url.isEmpty
           ? Text(
-        initial,
-        style: AppTextStyles.titleMedium.copyWith(
-          color: const Color(0xFF92400E),
-          fontWeight: FontWeight.w800,
-        ),
-      )
+              initial,
+              style: AppTextStyles.titleMedium.copyWith(
+                color: const Color(0xFF92400E),
+                fontWeight: FontWeight.w800,
+              ),
+            )
           : null,
     );
   }
@@ -415,9 +400,7 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final time = formatTimeHm12Ar(message.sentAt);
     final maxWidth = ChatMessageAlignment.maxBubbleWidth(
-      MediaQuery
-          .sizeOf(context)
-          .width,
+      MediaQuery.sizeOf(context).width,
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -528,9 +511,7 @@ class _ComposerBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: const BoxDecoration(
           color: AppColors.surface,
-          border: Border(
-            top: BorderSide(color: Color(0xFFE8EEF0), width: 0.8),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFE8EEF0), width: 0.8)),
         ),
         child: Row(
           children: [
@@ -637,11 +618,11 @@ class _MessagesSkeletonState extends State<_MessagesSkeleton>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )
-      ..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.35, end: 0.8).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(
+      begin: 0.35,
+      end: 0.8,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override

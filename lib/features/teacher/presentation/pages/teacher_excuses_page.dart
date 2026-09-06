@@ -1,26 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hijri/hijri_calendar.dart';
 
+import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/attendance_policy.dart';
+import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../domain/entities/halaqa_students_summary_entity.dart';
+import '../bloc/teacher_bloc.dart';
+import '../bloc/teacher_event.dart';
+import '../bloc/teacher_state.dart';
+import '../utils/teacher_workflow_ownership.dart';
 import '../widgets/excuses/teacher_excuse_list_item_data.dart';
 import '../widgets/excuses/teacher_excuse_request_card.dart';
-import '../widgets/excuses/teacher_excuses_form_section.dart';
 import '../widgets/excuses/teacher_excuses_history_skeleton.dart';
+import '../widgets/teacher_pending_absence_section.dart';
 
-/// Teacher Excuses / Absence Requests — Figma B1 (`1:2155`).
+/// Teacher استئذان inbox — reviews parent requests for owned halaqat.
 ///
-/// Phase 1: presentation only. No TeacherBloc / use-case / Firestore wiring.
-/// Optional [previewItems] / [previewHalaqaOptions] / [previewLoading] are for
-/// the isolated preview layer only — production route leaves them unset.
+/// Preview args remain for isolated UI previews only.
 class TeacherExcusesPage extends StatefulWidget {
-  /// Preview-only history rows. Production must pass `null` (empty list).
   final List<TeacherExcuseListItemData>? previewItems;
-
-  /// Preview-only halaqa names for the form dropdown.
   final List<String>? previewHalaqaOptions;
-
-  /// Preview-only: force history skeleton.
   final bool previewLoading;
 
   const TeacherExcusesPage({
@@ -35,40 +40,78 @@ class TeacherExcusesPage extends StatefulWidget {
 }
 
 class _TeacherExcusesPageState extends State<TeacherExcusesPage> {
-  final _reasonController = TextEditingController();
-  final _formKey = GlobalKey();
   late DateTime _selectedDate;
-  String? _selectedHalaqa;
-  bool _formVisible = true;
+  String? _selectedHalaqaId;
+
+  bool get _isPreview =>
+      widget.previewItems != null ||
+      widget.previewHalaqaOptions != null ||
+      widget.previewLoading;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
-    final options = widget.previewHalaqaOptions ?? const <String>[];
-    if (options.isNotEmpty) {
-      _selectedHalaqa = options.first;
+    _selectedDate = AttendancePolicy.dayStart(DateTime.now());
+    if (_isPreview) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _bootstrap();
+    });
+  }
+
+  String? _teacherUid() {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is AuthAuthenticated) return auth.user.uid;
+    return null;
+  }
+
+  void _bootstrap() {
+    final teacherId = _teacherUid();
+    if (teacherId == null || teacherId.isEmpty) return;
+    final bloc = context.read<TeacherBloc>();
+    if (bloc.state.halaqat.isEmpty) {
+      bloc.add(LoadTeacherHalaqatEvent(teacherId));
     }
+    _syncSelection(bloc.state);
   }
 
-  @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
+  void _syncSelection(TeacherState state) {
+    if (state.halaqat.isEmpty) return;
+    final current = _selectedHalaqaId;
+    final stillValid =
+        current != null && state.halaqat.any((h) => h.id == current);
+    final nextId = stillValid ? current : state.halaqat.first.id;
+    if (_selectedHalaqaId != nextId) {
+      setState(() => _selectedHalaqaId = nextId);
+    }
+    _loadPending(nextId);
   }
 
-  List<String> get _halaqaOptions =>
-      widget.previewHalaqaOptions ?? const <String>[];
+  void _loadPending(String halaqaId) {
+    final teacherId = _teacherUid();
+    if (teacherId == null || teacherId.isEmpty) return;
+    final bloc = context.read<TeacherBloc>();
+    bloc.add(LoadHalaqaStudentsEvent(halaqaId));
+    bloc.add(
+      LoadPendingAbsenceRequestsEvent(
+        teacherId: teacherId,
+        halaqaId: halaqaId,
+        date: _selectedDate,
+      ),
+    );
+  }
 
-  List<TeacherExcuseListItemData> get _items =>
-      widget.previewItems ?? const <TeacherExcuseListItemData>[];
-
-  bool get _isLoading => widget.previewLoading;
-
-  String _hijriLabel(DateTime date, {bool withYear = false}) {
-    HijriCalendar.setLocal('ar');
-    final h = HijriCalendar.fromDate(date);
-    return withYear ? h.toFormat('dd MMMM yyyy') : h.toFormat('dd MMMM');
+  String _studentNameFor(
+    String studentId,
+    List<HalaqaStudentSummaryEntity> students,
+  ) {
+    for (final s in students) {
+      if (s.uid == studentId) {
+        final name = s.name.trim();
+        if (name.isNotEmpty) return name;
+      }
+    }
+    return 'طالب';
   }
 
   Future<void> _pickDate() async {
@@ -78,33 +121,15 @@ class _TeacherExcusesPageState extends State<TeacherExcusesPage> {
       firstDate: DateTime.now().subtract(const Duration(days: 30)),
       lastDate: DateTime.now().add(const Duration(days: 60)),
     );
-    if (picked != null && mounted) {
-      setState(() => _selectedDate = picked);
-    }
+    if (picked == null || !mounted) return;
+    setState(() => _selectedDate = AttendancePolicy.dayStart(picked));
+    final halaqaId = _selectedHalaqaId;
+    if (halaqaId != null) _loadPending(halaqaId);
   }
 
-  void _onNewRequest() {
-    setState(() => _formVisible = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _formKey.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOut,
-          alignment: 0,
-        );
-      }
-    });
-  }
-
-  void _onSubmit() {
-    // Phase 1: UI only — no domain / Firestore submit.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('واجهة فقط — ربط الإرسال في المرحلة التالية'),
-      ),
-    );
+  String _hijriLabel(DateTime date) {
+    HijriCalendar.setLocal('ar');
+    return HijriCalendar.fromDate(date).toFormat('dd MMMM yyyy');
   }
 
   void _onBack() {
@@ -115,78 +140,158 @@ class _TeacherExcusesPageState extends State<TeacherExcusesPage> {
     }
   }
 
+  void _onAbsenceReviewStatusChanged(TeacherState state) {
+    if (state.absenceReviewStatus == SubmissionStatus.success) {
+      AppSnackBar.showSuccess(context, 'تم تحديث طلب الاستئذان');
+      context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
+    } else if (state.absenceReviewStatus == SubmissionStatus.error &&
+        state.absenceReviewError != null) {
+      AppSnackBar.showError(context, state.absenceReviewError!);
+      context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
+    }
+  }
+
+  void _review(AbsenceRequestEntity request, AbsenceRequestStatus decision) {
+    if (!TeacherWorkflowOwnership.canExecute(context)) return;
+    final teacherId = _teacherUid();
+    final halaqaId = _selectedHalaqaId;
+    if (teacherId == null || teacherId.isEmpty || halaqaId == null) {
+      AppSnackBar.showError(context, 'تعذر تحديد الحلقة أو هوية المعلم');
+      return;
+    }
+    context.read<TeacherBloc>().add(
+      ReviewAbsenceRequestEvent(
+        requestId: request.id,
+        halaqaId: halaqaId,
+        teacherId: teacherId,
+        decision: decision,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isPreview) return _previewScaffold();
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: MultiBlocListener(
+        listeners: [
+          BlocListener<TeacherBloc, TeacherState>(
+            listenWhen: (p, c) => p.halaqat != c.halaqat,
+            listener: (_, state) => _syncSelection(state),
+          ),
+          BlocListener<TeacherBloc, TeacherState>(
+            listenWhen: (p, c) =>
+                p.absenceReviewStatus != c.absenceReviewStatus,
+            listener: (_, state) => _onAbsenceReviewStatusChanged(state),
+          ),
+        ],
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF5FAFB),
+          body: Column(
+            children: [
+              _ExcusesHeader(onBack: _onBack),
+              Expanded(child: _liveBody()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _liveBody() {
+    return BlocBuilder<TeacherBloc, TeacherState>(
+      buildWhen: (p, c) =>
+          p.halaqat != c.halaqat ||
+          p.halaqatStatus != c.halaqatStatus ||
+          p.halaqatError != c.halaqatError ||
+          p.students != c.students ||
+          p.studentsHalaqaId != c.studentsHalaqaId ||
+          p.pendingAbsenceRequests != c.pendingAbsenceRequests ||
+          p.pendingAbsenceRequestsStatus != c.pendingAbsenceRequestsStatus ||
+          p.pendingAbsenceRequestsError != c.pendingAbsenceRequestsError ||
+          p.absenceReviewStatus != c.absenceReviewStatus,
+      builder: (context, state) {
+        if (state.halaqatStatus == SectionStatus.loading ||
+            state.halaqatStatus == SectionStatus.initial) {
+          return const Padding(
+            padding: EdgeInsets.all(14),
+            child: TeacherExcusesHistorySkeleton(),
+          );
+        }
+        if (state.halaqatStatus == SectionStatus.error) {
+          return AppErrorWidget(
+            message: state.halaqatError ?? 'تعذر تحميل الحلقات',
+            onRetry: _bootstrap,
+          );
+        }
+        if (state.halaqat.isEmpty) {
+          return const Center(child: Text('لا توجد حلقات مسندة'));
+        }
+
+        final halaqaId = _selectedHalaqaId ?? state.halaqat.first.id;
+        final canWrite = TeacherWorkflowOwnership.canExecute(context);
+        final roster = state.studentsHalaqaId == halaqaId
+            ? state.students
+            : const <HalaqaStudentSummaryEntity>[];
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+          children: [
+            _DateHalaqaBar(
+              dateLabel: _hijriLabel(_selectedDate),
+              halaqaNames: {for (final h in state.halaqat) h.id: h.name},
+              selectedHalaqaId: halaqaId,
+              onDateTap: _pickDate,
+              onHalaqaChanged: (id) {
+                setState(() => _selectedHalaqaId = id);
+                _loadPending(id);
+              },
+            ),
+            const SizedBox(height: 16),
+            TeacherPendingAbsenceSection(
+              status: state.pendingAbsenceRequestsStatus,
+              requests: state.pendingAbsenceRequestsHalaqaId == halaqaId
+                  ? state.pendingAbsenceRequests
+                  : const [],
+              error: state.pendingAbsenceRequestsError,
+              canReview: canWrite,
+              reviewing:
+                  state.absenceReviewStatus == SubmissionStatus.submitting,
+              studentName: (id) => _studentNameFor(id, roster),
+              onRetry: () => _loadPending(halaqaId),
+              onReview: _review,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _previewScaffold() {
+    final items = widget.previewItems ?? const <TeacherExcuseListItemData>[];
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5FAFB),
         body: Column(
           children: [
-            _ExcusesHeader(onBack: _onBack, onNewRequest: _onNewRequest),
+            _ExcusesHeader(onBack: _onBack),
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final maxW = constraints.maxWidth > 600
-                      ? 560.0
-                      : constraints.maxWidth;
-                  return Align(
-                    alignment: Alignment.topCenter,
-                    child: SizedBox(
-                      width: maxW,
-                      child: CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          if (_formVisible)
-                            SliverToBoxAdapter(
-                              child: KeyedSubtree(
-                                key: _formKey,
-                                child: TeacherExcusesFormSection(
-                                  halaqaOptions: _halaqaOptions,
-                                  selectedHalaqa: _selectedHalaqa,
-                                  dateLabel: _hijriLabel(_selectedDate),
-                                  reasonController: _reasonController,
-                                  onHalaqaChanged: (v) =>
-                                      setState(() => _selectedHalaqa = v),
-                                  onDateTap: _pickDate,
-                                  onSubmit: _onSubmit,
-                                  submitEnabled: true,
-                                ),
-                              ),
-                            ),
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-                            sliver: SliverList(
-                              delegate: SliverChildListDelegate([
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    'السجل السابق',
-                                    style: AppTextStyles.labelMedium.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                      color: AppColors.textHint,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                if (_isLoading)
-                                  const TeacherExcusesHistorySkeleton()
-                                else if (_items.isEmpty)
-                                  const _EmptyHistory()
-                                else
-                                  for (var i = 0; i < _items.length; i++) ...[
-                                    if (i > 0) const SizedBox(height: 10),
-                                    TeacherExcuseRequestCard(item: _items[i]),
-                                  ],
-                              ]),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+                children: [
+                  if (widget.previewLoading)
+                    const TeacherExcusesHistorySkeleton()
+                  else if (items.isEmpty)
+                    const Text('لا توجد طلبات')
+                  else
+                    for (final item in items) ...[
+                      TeacherExcuseRequestCard(item: item),
+                      const SizedBox(height: 10),
+                    ],
+                ],
               ),
             ),
           ],
@@ -198,9 +303,8 @@ class _TeacherExcusesPageState extends State<TeacherExcusesPage> {
 
 class _ExcusesHeader extends StatelessWidget {
   final VoidCallback onBack;
-  final VoidCallback onNewRequest;
 
-  const _ExcusesHeader({required this.onBack, required this.onNewRequest});
+  const _ExcusesHeader({required this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +318,6 @@ class _ExcusesHeader extends StatelessWidget {
             bottom: BorderSide(color: Color(0xFFE8EEF0), width: 0.8),
           ),
         ),
-        // RTL Row: first child sits on the right (back), last on the left (+).
         child: Row(
           children: [
             Material(
@@ -244,40 +347,7 @@ class _ExcusesHeader extends StatelessWidget {
                 ),
               ),
             ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.32),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onNewRequest,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    child: Text(
-                      '+ طلب جديد',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.onPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(width: 36),
           ],
         ),
       ),
@@ -285,39 +355,55 @@ class _ExcusesHeader extends StatelessWidget {
   }
 }
 
-class _EmptyHistory extends StatelessWidget {
-  const _EmptyHistory();
+class _DateHalaqaBar extends StatelessWidget {
+  final String dateLabel;
+  final Map<String, String> halaqaNames;
+  final String selectedHalaqaId;
+  final VoidCallback onDateTap;
+  final ValueChanged<String> onHalaqaChanged;
+
+  const _DateHalaqaBar({
+    required this.dateLabel,
+    required this.halaqaNames,
+    required this.selectedHalaqaId,
+    required this.onDateTap,
+    required this.onHalaqaChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return AppCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            Icons.event_busy_outlined,
-            size: 40,
-            color: AppColors.textHint.withValues(alpha: 0.6),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'لا توجد طلبات بعد',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
+          InkWell(
+            onTap: onDateTap,
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    dateLabel,
+                    textAlign: TextAlign.right,
+                    style: AppTextStyles.titleMedium,
+                  ),
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final e in halaqaNames.entries)
+                ChoiceChip(
+                  label: Text(e.value),
+                  selected: e.key == selectedHalaqaId,
+                  onSelected: (_) => onHalaqaChanged(e.key),
+                ),
+            ],
           ),
         ],
       ),

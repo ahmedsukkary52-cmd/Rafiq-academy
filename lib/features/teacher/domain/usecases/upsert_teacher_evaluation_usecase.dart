@@ -7,6 +7,7 @@ import '../../../../shared/domain/evaluation_policy.dart';
 import '../../../../shared/domain/evaluation_service.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../repositories/teacher_repository.dart';
+import '../teacher_halaqa_ownership.dart';
 
 class UpsertTeacherEvaluationParams {
   final EvaluationIdentity identity;
@@ -40,7 +41,17 @@ class UpsertTeacherEvaluationUseCase
   UpsertTeacherEvaluationUseCase(this.repository, this.evaluationService);
 
   @override
-  Future<Either<Failure, Unit>> call(UpsertTeacherEvaluationParams params) {
+  Future<Either<Failure, Unit>> call(
+    UpsertTeacherEvaluationParams params,
+  ) async {
+    final ownership = await ensureTeacherOwnsHalaqa(
+      repository: repository,
+      teacherId: params.teacherId,
+      halaqaId: params.identity.halaqaId,
+    );
+    final blocked = ownership.fold<Failure?>((l) => l, (_) => null);
+    if (blocked != null) return Left(blocked);
+
     final plan = evaluationService.planUpsert(
       identity: params.identity,
       records: params.existingRecords,

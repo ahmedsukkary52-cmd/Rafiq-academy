@@ -40,9 +40,7 @@ class CreateHalaqaActivitySheet extends StatefulWidget {
 
 class _CreateHalaqaActivitySheetState extends State<CreateHalaqaActivitySheet> {
   final _promptCtrl = TextEditingController();
-  final _selectedTypes = <ActivityResponseTypeUi>{
-    ActivityResponseTypeUi.text,
-  };
+  final _selectedTypes = <ActivityResponseTypeUi>{ActivityResponseTypeUi.text};
   DateTime? _deadline;
   bool _shareToPosts = false;
   String? _promptError;
@@ -149,9 +147,8 @@ class _CreateHalaqaActivitySheetState extends State<CreateHalaqaActivitySheet> {
         setState(() => _submitting = false);
         final created = loaded.fold(
           (_) => null,
-          (items) => items.isEmpty
-              ? null
-              : HalaqaActivityUiMapper.toUi(items.first),
+          (items) =>
+              items.isEmpty ? null : HalaqaActivityUiMapper.toUi(items.first),
         );
         AppSnackBar.showSuccess(
           context,
@@ -254,7 +251,9 @@ class _CreateHalaqaActivitySheetState extends State<CreateHalaqaActivitySheet> {
               const SizedBox(height: 6),
               Text(
                 _typesError!,
-                style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.error,
+                ),
                 textAlign: TextAlign.right,
               ),
             ],

@@ -24,9 +24,10 @@ class _TeacherPulseState extends State<TeacherPulse>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     )..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.4, end: 0.9).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _pulse = Tween<double>(
+      begin: 0.4,
+      end: 0.9,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -216,7 +217,11 @@ class TeacherStudentsRosterSkeleton extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          teacherSkeletonBar(bone: bone, width: 140, height: 14),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 140,
+                            height: 14,
+                          ),
                           const SizedBox(height: 8),
                           teacherSkeletonBar(bone: bone, width: 90, height: 11),
                         ],
@@ -345,9 +350,17 @@ class TeacherAwardsDashboardSkeleton extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          teacherSkeletonBar(bone: bone, width: 150, height: 14),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 150,
+                            height: 14,
+                          ),
                           const SizedBox(height: 8),
-                          teacherSkeletonBar(bone: bone, width: 100, height: 11),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 100,
+                            height: 11,
+                          ),
                         ],
                       ),
                     ),
@@ -635,11 +648,19 @@ class TeacherStudentProfileSkeleton extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          teacherSkeletonBar(bone: bone, width: 120, height: 14),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 120,
+                            height: 14,
+                          ),
                           const SizedBox(height: 14),
                           teacherSkeletonBar(bone: bone, height: 12),
                           const SizedBox(height: 10),
-                          teacherSkeletonBar(bone: bone, width: 180, height: 12),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 180,
+                            height: 12,
+                          ),
                         ],
                       ),
                     ),

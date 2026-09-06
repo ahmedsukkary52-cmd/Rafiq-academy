@@ -198,11 +198,11 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
 
     final enabled = <String, bool>{};
     for (final h in halaqat) {
-      final days = _sessionsMapper.mapTodayOperationalDays(
-        [halaqaScheduleSourceFromEntity(h)],
-        now: now,
-      );
-      final sessionEnded = days.isNotEmpty &&
+      final days = _sessionsMapper.mapTodayOperationalDays([
+        halaqaScheduleSourceFromEntity(h),
+      ], now: now);
+      final sessionEnded =
+          days.isNotEmpty &&
           days.first.session.status == ClassSessionStatus.ended;
       enabled[h.id] = sessionEnded && awaitingReviewIds.contains(h.id);
     }
@@ -210,15 +210,13 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
     setState(() => _evaluationEnabledById = enabled);
   }
 
-  bool _canEvaluate(HalaqaEntity h) =>
-      _evaluationEnabledById[h.id] ?? false;
+  bool _canEvaluate(HalaqaEntity h) => _evaluationEnabledById[h.id] ?? false;
 
   String _evaluationDisabledMessage(HalaqaEntity h) {
     final days = _sessionsMapper.mapTodayOperationalDays([
       halaqaScheduleSourceFromEntity(h),
     ]);
-    if (days.isEmpty ||
-        days.first.session.status != ClassSessionStatus.ended) {
+    if (days.isEmpty || days.first.session.status != ClassSessionStatus.ended) {
       return 'التقييم متاح بعد انتهاء جلسة اليوم';
     }
     return 'لا يوجد تسميع بانتظار التقييم';
@@ -229,7 +227,9 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.radiusL)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSizes.radiusL),
+        ),
       ),
       builder: (ctx) {
         return Directionality(
@@ -287,11 +287,13 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
                       for (final e in _weekdayOptions)
                         ChoiceChip(
                           label: Text(e.label),
-                          selected: _filter == _ClassesFilter.dayOfWeek &&
+                          selected:
+                              _filter == _ClassesFilter.dayOfWeek &&
                               _weekdayFilter == e.weekday,
                           selectedColor: AppColors.primaryLight,
                           labelStyle: AppTextStyles.labelMedium.copyWith(
-                            color: _filter == _ClassesFilter.dayOfWeek &&
+                            color:
+                                _filter == _ClassesFilter.dayOfWeek &&
                                     _weekdayFilter == e.weekday
                                 ? AppColors.primaryDark
                                 : AppColors.textPrimary,
@@ -475,15 +477,15 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
                             vm: vm,
                             evaluateEnabled: canEval,
                             onView: () {
-                              context
-                                  .read<TeacherBloc>()
-                                  .add(SelectHalaqaEvent(halaqa.id));
+                              context.read<TeacherBloc>().add(
+                                SelectHalaqaEvent(halaqa.id),
+                              );
                               context.push('/teacher/halaqa/${halaqa.id}');
                             },
                             onEvaluate: canEval
                                 ? () => context.push(
-                                      '/teacher/halaqa/${halaqa.id}/evaluations',
-                                    )
+                                    '/teacher/halaqa/${halaqa.id}/evaluations',
+                                  )
                                 : () {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -589,10 +591,7 @@ class _ClassesHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              _HeaderIconButton(
-                icon: Icons.tune_rounded,
-                onTap: onFilter,
-              ),
+              _HeaderIconButton(icon: Icons.tune_rounded, onTap: onFilter),
             ],
           ),
           if (searchOpen) ...[
@@ -822,8 +821,9 @@ class _ClassCard extends StatelessWidget {
                             color: vm.isActive
                                 ? AppColors.primaryLight
                                 : AppColors.surfaceGrey,
-                            borderRadius:
-                                BorderRadius.circular(AppSizes.radiusFull),
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusFull,
+                            ),
                           ),
                           child: Text(
                             vm.statusLabel,
@@ -984,10 +984,7 @@ class _EmptyHalaqat extends StatelessWidget {
             color: AppColors.textHint.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
-          Text(
-            'لا توجد حلقات مسندة إليك',
-            style: AppTextStyles.bodyMedium,
-          ),
+          Text('لا توجد حلقات مسندة إليك', style: AppTextStyles.bodyMedium),
         ],
       ),
     );

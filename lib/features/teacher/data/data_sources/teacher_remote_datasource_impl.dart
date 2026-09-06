@@ -68,12 +68,13 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         docs.addAll(usersSnap.docs);
       }
 
-      final bases =
-          docs.map(HalaqaStudentSummaryModel.fromFirestore).toList();
+      final bases = docs.map(HalaqaStudentSummaryModel.fromFirestore).toList();
 
       final now = DateTime.now();
       final from = now.subtract(
-        const Duration(days: HalaqaStudentSummaryProjector.attendanceWindowDays),
+        const Duration(
+          days: HalaqaStudentSummaryProjector.attendanceWindowDays,
+        ),
       );
 
       final parallel = await Future.wait([
@@ -89,10 +90,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         _loadProgressByStudentId(studentIds),
       ]);
 
-      final attendanceSnap =
-          parallel[0] as QuerySnapshot<Map<String, dynamic>>;
-      final recitationSnap =
-          parallel[1] as QuerySnapshot<Map<String, dynamic>>;
+      final attendanceSnap = parallel[0] as QuerySnapshot<Map<String, dynamic>>;
+      final recitationSnap = parallel[1] as QuerySnapshot<Map<String, dynamic>>;
       final progressById = parallel[2] as Map<String, double>;
 
       final marks = attendanceSnap.docs.map((doc) {
@@ -207,9 +206,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         final normalizedDay = AttendancePolicy.dayStart(record.date);
         final sessionId = record.sessionId.trim();
         if (sessionId.isEmpty) {
-          throw const ServerException(
-            'sessionId مطلوب لكل سجل حضور جديد',
-          );
+          throw const ServerException('sessionId مطلوب لكل سجل حضور جديد');
         }
         final docId = AttendancePolicy.documentId(
           sessionId: sessionId,

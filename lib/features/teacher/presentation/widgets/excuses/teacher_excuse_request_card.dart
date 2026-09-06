@@ -4,17 +4,29 @@ import '../../../../../shared/theme/app_theme.dart';
 import 'teacher_excuse_list_item_data.dart';
 import 'teacher_excuse_status_chip.dart';
 
-/// Figma B1 history card for one excuse / absence request.
+/// Figma B1 history / pending card for one استئذان request.
 class TeacherExcuseRequestCard extends StatelessWidget {
   final TeacherExcuseListItemData item;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  final bool reviewing;
 
-  const TeacherExcuseRequestCard({super.key, required this.item});
+  const TeacherExcuseRequestCard({
+    super.key,
+    required this.item,
+    this.onApprove,
+    this.onReject,
+    this.reviewing = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final canReview = onApprove != null || onReject != null;
+    final subtitle = item.subtitle?.trim() ?? '';
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 22),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
@@ -54,6 +66,17 @@ class TeacherExcuseRequestCard extends StatelessWidget {
                       ),
                       textAlign: TextAlign.right,
                     ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          fontSize: 11,
+                          color: AppColors.textHint,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -71,6 +94,66 @@ class TeacherExcuseRequestCard extends StatelessWidget {
             ),
             textAlign: TextAlign.right,
           ),
+          if (canReview) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: reviewing ? null : onReject,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: BorderSide(
+                        color: AppColors.error.withValues(alpha: 0.45),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: Text(
+                      'رفض',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: reviewing ? null : onApprove,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: reviewing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.onPrimary,
+                            ),
+                          )
+                        : Text(
+                            'قبول',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              color: AppColors.onPrimary,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

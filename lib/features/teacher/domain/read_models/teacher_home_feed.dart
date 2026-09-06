@@ -8,10 +8,7 @@ class TeacherHomeFeed extends Equatable {
   final TeacherDayAgenda agenda;
   final List<TeacherRecentActivity> recentActivities;
 
-  const TeacherHomeFeed({
-    required this.agenda,
-    required this.recentActivities,
-  });
+  const TeacherHomeFeed({required this.agenda, required this.recentActivities});
 
   static const empty = TeacherHomeFeed(
     agenda: TeacherDayAgenda.empty,

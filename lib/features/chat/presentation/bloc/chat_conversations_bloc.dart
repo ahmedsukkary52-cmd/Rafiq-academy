@@ -14,6 +14,7 @@ import 'chat_conversations_state.dart';
 class ChatConversationsBloc
     extends Bloc<ChatConversationsEvent, ChatConversationsState> {
   final WatchConversationsUseCase watchConversations;
+  final WatchAllConversationsUseCase watchAllConversations;
   final GetOrCreateConversationUseCase getOrCreateConversation;
 
   /// Cleared on logout so stale conversation snapshots are ignored (H1).
@@ -22,10 +23,15 @@ class ChatConversationsBloc
 
   ChatConversationsBloc({
     required this.watchConversations,
+    required this.watchAllConversations,
     required this.getOrCreateConversation,
   }) : super(ChatConversationsState.initial()) {
     on<StartWatchingConversationsEvent>(
       _onStartWatching,
+      transformer: restartable(),
+    );
+    on<StartWatchingAllConversationsEvent>(
+      _onStartWatchingAll,
       transformer: restartable(),
     );
     on<StartConversationEvent>(_onStartConversation);
@@ -65,6 +71,47 @@ class ChatConversationsBloc
       watchConversations(ChatUidParams(event.uid)),
       onData: (either) {
         if (_currentUid != event.uid || generation != _sessionGeneration) {
+          return state;
+        }
+        return either.fold(
+          (failure) => state.copyWith(
+            conversationsStatus: SectionStatus.error,
+            conversationsError: failure.message,
+          ),
+          (conversations) => state.copyWith(
+            conversationsStatus: SectionStatus.loaded,
+            conversations: conversations,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _onStartWatchingAll(
+    StartWatchingAllConversationsEvent event,
+    Emitter<ChatConversationsState> emit,
+  ) async {
+    final identityChanged =
+        _currentUid != null && _currentUid != event.observerUid;
+    _currentUid = event.observerUid;
+    final generation = _sessionGeneration;
+
+    emit(
+      identityChanged
+          ? ChatConversationsState.initial().copyWith(
+              conversationsStatus: SectionStatus.loading,
+            )
+          : state.copyWith(
+              conversationsStatus: SectionStatus.loading,
+              conversationsError: null,
+            ),
+    );
+
+    await emit.forEach(
+      watchAllConversations(ChatUidParams(event.observerUid)),
+      onData: (either) {
+        if (_currentUid != event.observerUid ||
+            generation != _sessionGeneration) {
           return state;
         }
         return either.fold(

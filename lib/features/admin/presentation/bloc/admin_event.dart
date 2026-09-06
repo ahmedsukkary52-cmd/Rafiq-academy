@@ -1,5 +1,9 @@
 import 'package:equatable/equatable.dart';
 
+import '../../domain/admin_grant_reward_params.dart';
+import '../../domain/entities/communication_settings_entity.dart';
+import '../../domain/repositories/admin_repository.dart';
+
 abstract class AdminEvent extends Equatable {
   const AdminEvent();
 
@@ -15,6 +19,11 @@ class LoadAcademyStatsEvent extends AdminEvent {
 /// تحميل الملخص المالي
 class LoadFinancialSummaryEvent extends AdminEvent {
   const LoadFinancialSummaryEvent();
+}
+
+/// تحميل قائمة المدفوعات للمراجعة
+class LoadPaymentsEvent extends AdminEvent {
+  const LoadPaymentsEvent();
 }
 
 /// تحميل الإحصائيات والملخص المالي معاً (لوحة الإدارة الرئيسية)
@@ -155,4 +164,125 @@ class LoadTeacherActivityLogEvent extends AdminEvent {
 /// Clear projection on logout so the next identity cannot inherit state (H1).
 class ClearAdminSessionEvent extends AdminEvent {
   const ClearAdminSessionEvent();
+}
+
+class LoadStudentRosterEvent extends AdminEvent {
+  const LoadStudentRosterEvent();
+}
+
+class LoadRegistrationRequestsEvent extends AdminEvent {
+  const LoadRegistrationRequestsEvent();
+}
+
+class LoadAdminDirectoryEvent extends AdminEvent {
+  const LoadAdminDirectoryEvent();
+}
+
+class RejectRegistrationRequestEvent extends AdminEvent {
+  final String studentId;
+  const RejectRegistrationRequestEvent({required this.studentId});
+
+  @override
+  List<Object?> get props => [studentId];
+}
+
+class ApproveRegistrationRequestEvent extends AdminEvent {
+  final String studentId;
+  final String halaqaId;
+  final String? teacherId;
+  final String? supervisorId;
+
+  const ApproveRegistrationRequestEvent({
+    required this.studentId,
+    required this.halaqaId,
+    this.teacherId,
+    this.supervisorId,
+  });
+
+  @override
+  List<Object?> get props => [studentId, halaqaId, teacherId, supervisorId];
+}
+
+class ResetRegistrationActionEvent extends AdminEvent {
+  const ResetRegistrationActionEvent();
+}
+
+class UpdateComplaintEvent extends AdminEvent {
+  final String complaintId;
+  final String? status;
+  final String? priority;
+  final String? assigneeId;
+  final String? assigneeRole;
+  final String? response;
+
+  const UpdateComplaintEvent({
+    required this.complaintId,
+    this.status,
+    this.priority,
+    this.assigneeId,
+    this.assigneeRole,
+    this.response,
+  });
+
+  @override
+  List<Object?> get props => [
+    complaintId,
+    status,
+    priority,
+    assigneeId,
+    assigneeRole,
+    response,
+  ];
+}
+
+class ResetUpdateComplaintEvent extends AdminEvent {
+  const ResetUpdateComplaintEvent();
+}
+
+class LoadCommunicationSettingsEvent extends AdminEvent {
+  const LoadCommunicationSettingsEvent();
+}
+
+class SaveCommunicationSettingsEvent extends AdminEvent {
+  final CommunicationSettingsEntity settings;
+  const SaveCommunicationSettingsEvent({required this.settings});
+
+  @override
+  List<Object?> get props => [settings];
+}
+
+class ResetCommunicationSettingsEvent extends AdminEvent {
+  const ResetCommunicationSettingsEvent();
+}
+
+class GrantAdminRewardEvent extends AdminEvent {
+  final AdminGrantRewardParams params;
+  const GrantAdminRewardEvent({required this.params});
+
+  @override
+  List<Object?> get props => [params];
+}
+
+class ResetGrantRewardEvent extends AdminEvent {
+  const ResetGrantRewardEvent();
+}
+
+class CreateHalaqaEvent extends AdminEvent {
+  final CreateHalaqaParams params;
+  const CreateHalaqaEvent({required this.params});
+
+  @override
+  List<Object?> get props => [params];
+}
+
+class ResetCreateHalaqaEvent extends AdminEvent {
+  const ResetCreateHalaqaEvent();
+}
+
+class EnsureAdminInternalChatEvent extends AdminEvent {
+  final String adminUid;
+  const EnsureAdminInternalChatEvent({required this.adminUid});
+
+  @override
+  List<Object?> get props => [adminUid];
 }

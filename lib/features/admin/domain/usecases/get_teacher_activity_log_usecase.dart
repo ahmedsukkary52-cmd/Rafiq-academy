@@ -14,11 +14,10 @@ class GetTeacherActivityLogUseCase
 
   @override
   Future<Either<Failure, TeacherActivityEntity>> call(
-      TeacherActivityParams params,
-      ) =>
-      repository.getTeacherActivityLog(
-        teacherId: params.teacherId,
-        from: params.from,
-        to: params.to,
-      );
+    TeacherActivityParams params,
+  ) => repository.getTeacherActivityLog(
+    teacherId: params.teacherId,
+    from: params.from,
+    to: params.to,
+  );
 }

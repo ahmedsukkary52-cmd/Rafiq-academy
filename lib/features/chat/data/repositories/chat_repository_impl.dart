@@ -45,6 +45,28 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
+    required String observerUid,
+  }) {
+    return remoteDatasource
+        .watchAllConversations(observerUid: observerUid)
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleData: (list, sink) => sink.add(
+              Right<Failure, List<ConversationEntity>>(
+                List<ConversationEntity>.from(list),
+              ),
+            ),
+            handleError: (error, stackTrace, sink) => sink.add(
+              Left<Failure, List<ConversationEntity>>(
+                ServerFailure(error.toString()),
+              ),
+            ),
+          ),
+        );
+  }
+
+  @override
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(
     String conversationId,
   ) {

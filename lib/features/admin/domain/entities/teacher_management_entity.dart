@@ -7,6 +7,7 @@ class TeacherManagementEntity extends Equatable {
   final List<String> halaqatIds;
   final double? performanceRating;
   final int weeklyQuota;
+  final bool isActive;
 
   const TeacherManagementEntity({
     required this.uid,
@@ -15,6 +16,7 @@ class TeacherManagementEntity extends Equatable {
     required this.halaqatIds,
     this.performanceRating,
     required this.weeklyQuota,
+    this.isActive = true,
   });
 
   @override
@@ -25,5 +27,6 @@ class TeacherManagementEntity extends Equatable {
     halaqatIds,
     performanceRating,
     weeklyQuota,
+    isActive,
   ];
 }

@@ -2,80 +2,112 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../admin_grant_reward_params.dart';
 import '../entities/academy_stats_entity.dart';
+import '../entities/admin_directory_entity.dart';
+import '../entities/admin_halaqa_roster_entity.dart';
+import '../entities/communication_settings_entity.dart';
 import '../entities/complaint_entity.dart';
+import '../entities/admin_payment_entity.dart';
 import '../entities/financial_summary_entity.dart';
+import '../entities/registration_request_entity.dart';
 import '../entities/teacher_activity_entity.dart';
 import '../entities/teacher_management_entity.dart';
 
-/// ملخص بيانات معلم لشاشة "إدارة شؤون المعلمين" - بتجمع بين بيانات
-/// users (الاسم) وteacherProfiles (النصاب والتقييم) في entity واحدة،
-/// عشان شاشة الإدارة تعرض القائمة من غير ما تعمل دمج بنفسها.
-
-/// سجل نشاط معلم خلال فترة معيّنة، مبني على الأيام اللي سجّل فيها
-/// حضور لطلابه فعلياً. دي بيانات **مُستنتجة** (derived) من سجلات
-/// attendanceRecords الموجودة أصلاً، مش مصدر بيانات منفصل بنكتبه إحنا.
-///
-/// ملاحظة مهمة لأحمد: ده مؤشر غير مباشر على حضور المعلم ("سجّل حضور
-/// إذن كان موجود")، مش تسجيل دخول/حضور صريح للمعلم نفسه. لو التصميم
-/// لاحقاً طلب "تشييك إن" صريح للمعلم، هنحتاج نضيف collection جديدة
-/// مخصصة لده، الحل ده بديل عملي مؤقت من البيانات المتاحة حالياً.
-
 abstract class AdminRepository {
-  /// إحصائيات عامة للأكاديمية
   Future<Either<Failure, AcademyStatsEntity>> getAcademyStats();
-
-  /// ملخص مالي
   Future<Either<Failure, FinancialSummaryEntity>> getFinancialSummary();
+  Future<Either<Failure, List<AdminPaymentEntity>>> getPayments();
 
-  /// قبول طالب جديد وتوزيعه على حلقة
   Future<Either<Failure, Unit>> approveNewStudent({
     required String studentId,
     required String halaqaId,
   });
 
-  /// تفعيل أو تعطيل حساب
   Future<Either<Failure, Unit>> toggleAccountStatus({
     required String uid,
     required bool isActive,
   });
 
-  /// الشكاوى الواردة
   Future<Either<Failure, List<ComplaintEntity>>> getComplaints();
 
-  /// الرد على شكوى
   Future<Either<Failure, Unit>> respondToComplaint({
     required String complaintId,
     required String response,
   });
 
-  /// إرسال إشعار موحّد لفئة معينة أو الكل
+  Future<Either<Failure, Unit>> updateComplaint({
+    required String complaintId,
+    String? status,
+    String? priority,
+    String? assigneeId,
+    String? assigneeRole,
+    String? response,
+  });
+
   Future<Either<Failure, Unit>> sendBroadcastNotification({
     required String title,
     required String body,
-    required String targetRole, // أو 'all'
+    required String targetRole,
   });
 
-  /// قائمة كل المعلمين مع بيانات النصاب والتقييم - لشاشة إدارة المعلمين
   Future<Either<Failure, List<TeacherManagementEntity>>> getAllTeachers();
 
-  /// تحديث تقييم أداء معلم
   Future<Either<Failure, Unit>> updateTeacherPerformance({
     required String teacherId,
     required double rating,
   });
 
-  /// تحديد نصاب الحصص الأسبوعي لمعلم
   Future<Either<Failure, Unit>> updateTeacherQuota({
     required String teacherId,
     required int weeklyQuota,
   });
 
-  /// سجل نشاط معلم (الأيام اللي سجّل فيها حضور لطلابه) خلال فترة معيّنة
   Future<Either<Failure, TeacherActivityEntity>> getTeacherActivityLog({
     required String teacherId,
     required DateTime from,
     required DateTime to,
+  });
+
+  Future<Either<Failure, List<AdminHalaqaRosterEntity>>>
+  getAcademyStudentRoster();
+
+  Future<Either<Failure, List<RegistrationRequestEntity>>>
+  getRegistrationRequests();
+
+  Future<Either<Failure, Unit>> rejectRegistrationRequest({
+    required String studentId,
+  });
+
+  Future<Either<Failure, Unit>> approveRegistrationRequest({
+    required String studentId,
+    required String halaqaId,
+    String? teacherId,
+    String? supervisorId,
+  });
+
+  Future<Either<Failure, List<AdminHalaqaSummaryEntity>>> getAllHalaqat();
+
+  Future<Either<Failure, List<AdminStaffSummaryEntity>>> getAllSupervisors();
+
+  Future<Either<Failure, CommunicationSettingsEntity>>
+  getCommunicationSettings();
+
+  Future<Either<Failure, Unit>> saveCommunicationSettings(
+    CommunicationSettingsEntity settings,
+  );
+
+  Future<Either<Failure, Unit>> grantReward(AdminGrantRewardParams params);
+
+  Future<Either<Failure, String>> createHalaqa({
+    required String name,
+    required String teacherId,
+    required String supervisorId,
+    String meetingLink,
+  });
+
+  Future<Either<Failure, String>> ensureAdminInternalChat({
+    required String adminUid,
   });
 }
 
@@ -110,6 +142,34 @@ class RespondComplaintParams extends Equatable {
 
   @override
   List<Object?> get props => [complaintId, response];
+}
+
+class UpdateComplaintParams extends Equatable {
+  final String complaintId;
+  final String? status;
+  final String? priority;
+  final String? assigneeId;
+  final String? assigneeRole;
+  final String? response;
+
+  const UpdateComplaintParams({
+    required this.complaintId,
+    this.status,
+    this.priority,
+    this.assigneeId,
+    this.assigneeRole,
+    this.response,
+  });
+
+  @override
+  List<Object?> get props => [
+    complaintId,
+    status,
+    priority,
+    assigneeId,
+    assigneeRole,
+    response,
+  ];
 }
 
 class BroadcastParams extends Equatable {
@@ -166,4 +226,56 @@ class TeacherActivityParams extends Equatable {
 
   @override
   List<Object?> get props => [teacherId, from, to];
+}
+
+class ApproveRegistrationParams extends Equatable {
+  final String studentId;
+  final String halaqaId;
+  final String? teacherId;
+  final String? supervisorId;
+
+  const ApproveRegistrationParams({
+    required this.studentId,
+    required this.halaqaId,
+    this.teacherId,
+    this.supervisorId,
+  });
+
+  @override
+  List<Object?> get props => [studentId, halaqaId, teacherId, supervisorId];
+}
+
+class RejectRegistrationParams extends Equatable {
+  final String studentId;
+
+  const RejectRegistrationParams({required this.studentId});
+
+  @override
+  List<Object?> get props => [studentId];
+}
+
+class CreateHalaqaParams extends Equatable {
+  final String name;
+  final String teacherId;
+  final String supervisorId;
+  final String meetingLink;
+
+  const CreateHalaqaParams({
+    required this.name,
+    required this.teacherId,
+    required this.supervisorId,
+    this.meetingLink = '',
+  });
+
+  @override
+  List<Object?> get props => [name, teacherId, supervisorId, meetingLink];
+}
+
+class EnsureAdminInternalChatParams extends Equatable {
+  final String adminUid;
+
+  const EnsureAdminInternalChatParams({required this.adminUid});
+
+  @override
+  List<Object?> get props => [adminUid];
 }

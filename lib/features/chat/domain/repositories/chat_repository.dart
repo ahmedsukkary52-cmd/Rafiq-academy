@@ -7,6 +7,11 @@ abstract class ChatRepository {
   /// Stream لقائمة كل محادثات المستخدم الحالي، مرتبة بآخر رسالة (الأحدث أولاً)
   Stream<Either<Failure, List<ConversationEntity>>> watchConversations(String uid);
 
+  /// Admin oversight: all academy conversations without joining as participant.
+  Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
+    required String observerUid,
+  });
+
   /// Stream لرسائل محادثة معيّنة، بترتيب زمني تصاعدي
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(String conversationId);
 

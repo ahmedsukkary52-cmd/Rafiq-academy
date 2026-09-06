@@ -16,9 +16,9 @@ class ParentDestinations {
   ParentDestinations._();
 
   static Future<void> _push(BuildContext context, Widget page) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
+    return Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   static Future<void> childProfile(
@@ -28,10 +28,7 @@ class ParentDestinations {
   }) {
     return _push(
       context,
-      ParentChildProfilePage(
-        studentId: studentId,
-        studentName: studentName,
-      ),
+      ParentChildProfilePage(studentId: studentId, studentName: studentName),
     );
   }
 

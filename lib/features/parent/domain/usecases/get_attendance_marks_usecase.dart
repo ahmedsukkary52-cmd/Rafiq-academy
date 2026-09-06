@@ -45,7 +45,10 @@ class GetAttendanceMarksUseCase
     }
 
     final childrenEither = await repository.getChildrenIds(parentId);
-    final childrenFailure = childrenEither.fold<Failure?>((l) => l, (_) => null);
+    final childrenFailure = childrenEither.fold<Failure?>(
+      (l) => l,
+      (_) => null,
+    );
     if (childrenFailure != null) return Left(childrenFailure);
 
     final children = childrenEither

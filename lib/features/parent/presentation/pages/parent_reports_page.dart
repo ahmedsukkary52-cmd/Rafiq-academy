@@ -13,6 +13,7 @@ import '../../domain/parent_performance.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
+import '../parent_child_access.dart';
 import '../parent_display.dart';
 import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_subpage_scaffold.dart';
@@ -32,6 +33,7 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
   int _axisIndex = 0;
   List<RecitationRecordEntity> _records = const [];
   bool _recordsLoading = false;
+  String? _accessError;
 
   @override
   void initState() {
@@ -47,7 +49,21 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
   }
 
   Future<void> _loadRecords(String studentId) async {
-    setState(() => _recordsLoading = true);
+    final parentState = context.read<ParentBloc>().state;
+    if (parentState.childrenIds.isNotEmpty &&
+        !ParentChildAccess.owns(state: parentState, studentId: studentId)) {
+      setState(() {
+        _recordsLoading = false;
+        _records = const [];
+        _accessError = ParentChildAccess.deniedMessage;
+      });
+      return;
+    }
+
+    setState(() {
+      _recordsLoading = true;
+      _accessError = null;
+    });
     final result = await sl<GetRecitationRecordsUseCase>()(
       StudentUidParams(studentId),
     );
@@ -64,30 +80,6 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
 
     return ParentSubpageScaffold(
       title: 'التقارير',
-      actions: [
-        Material(
-          color: AppColors.secondary,
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          child: InkWell(
-            onTap: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('تصدير PDF قريباً')));
-            },
-            borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(
-                'تصدير PDF',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
       body: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (p, c) => p.selectedChildId != c.selectedChildId,
         listener: (context, state) {
@@ -140,10 +132,19 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (state.reportStatus == SectionStatus.initial ||
+              if (_accessError != null)
+                ParentEmptyState(
+                  icon: Icons.lock_outline_rounded,
+                  title: _accessError!,
+                )
+              else if (state.reportStatus == SectionStatus.initial ||
                   state.reportStatus == SectionStatus.loading ||
                   _recordsLoading)
-                const SizedBox(height: 220, child: ParentListCardsSkeleton())
+                const ParentListCardsSkeleton(
+                  itemCount: 2,
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                )
               else if (state.reportStatus == SectionStatus.error)
                 AppErrorWidget(
                   message: state.reportError ?? 'تعذر تحميل التقرير',
@@ -195,7 +196,8 @@ class _ReportBody extends StatelessWidget {
     final period = report == null
         ? ''
         : parentPaymentPeriodLabel(report!.weekStart);
-    final verses = report?.totalVersesMemorized ?? 0;
+    // Weekly report stores the count of Supervisor-reviewed docs here.
+    final reviewedCount = report?.totalVersesMemorized ?? 0;
     final attendance = report == null || report!.totalSessions == 0
         ? null
         : report!.attendancePercent;
@@ -231,8 +233,10 @@ class _ReportBody extends StatelessWidget {
               Row(
                 children: [
                   _MiniStat(
-                    value: verses > 0 ? parentEasternDigits('$verses') : '—',
-                    label: 'آية محفوظة',
+                    value: reviewedCount > 0
+                        ? parentEasternDigits('$reviewedCount')
+                        : '—',
+                    label: 'تقييمات معتمدة',
                     color: AppColors.primaryLight,
                   ),
                   const SizedBox(width: 8),

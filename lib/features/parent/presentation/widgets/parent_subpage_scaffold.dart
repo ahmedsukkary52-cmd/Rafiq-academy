@@ -179,14 +179,18 @@ class ParentFilterChip extends StatelessWidget {
             children: [
               if (selected) ...[
                 const Icon(
-                    Icons.check_rounded, size: 14, color: AppColors.onPrimary),
+                  Icons.check_rounded,
+                  size: 14,
+                  color: AppColors.onPrimary,
+                ),
                 const SizedBox(width: 4),
               ],
               Text(
                 label,
                 style: AppTextStyles.labelMedium.copyWith(
-                  color: selected ? AppColors.onPrimary : AppColors
-                      .textSecondary,
+                  color: selected
+                      ? AppColors.onPrimary
+                      : AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),

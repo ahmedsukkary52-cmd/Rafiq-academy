@@ -64,9 +64,7 @@ class _ParentSchedulePageState extends State<ParentSchedulePage> {
       });
       return;
     }
-    final parentState = context
-        .read<ParentBloc>()
-        .state;
+    final parentState = context.read<ParentBloc>().state;
     if (!ParentChildAccess.owns(state: parentState, studentId: studentId)) {
       setState(() {
         _loading = false;
@@ -99,8 +97,8 @@ class _ParentSchedulePageState extends State<ParentSchedulePage> {
       }),
       (sessions) => setState(() {
         _loading = false;
-        _sessions =
-        [...sessions]..sort((a, b) => a.startAt.compareTo(b.startAt));
+        _sessions = [...sessions]
+          ..sort((a, b) => a.startAt.compareTo(b.startAt));
       }),
     );
   }
@@ -124,7 +122,8 @@ class _ParentSchedulePageState extends State<ParentSchedulePage> {
   String _dayLabel(DateTime date) {
     final name = _weekdays[date.weekday];
     final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month &&
+    if (date.year == now.year &&
+        date.month == now.month &&
         date.day == now.day) {
       return '$name — اليوم';
     }
@@ -155,59 +154,56 @@ class _ParentSchedulePageState extends State<ParentSchedulePage> {
               onRetry: () => _load(_studentId, snapshot),
             )
           : ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          if (state.childrenIds.length > 1)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final id in state.childrenIds) ...[
-                    ParentFilterChip(
-                      label: state.childDisplayName(id),
-                      selected: _studentId == id,
-                      onTap: () {
-                        setState(() => _studentId = id);
-                        _load(id, state.snapshotFor(id));
-                      },
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                if (state.childrenIds.length > 1)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final id in state.childrenIds) ...[
+                          ParentFilterChip(
+                            label: state.childDisplayName(id),
+                            selected: _studentId == id,
+                            onTap: () {
+                              setState(() => _studentId = id);
+                              _load(id, state.snapshotFor(id));
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-            ),
-          if (state.childrenIds.length > 1) const SizedBox(height: 12),
-          if (_sessions.isEmpty)
-            const SizedBox(
-              height: 280,
-              child: ParentEmptyState(
-                icon: Icons.calendar_month_outlined,
-                title: 'جدول الأسبوع الحالي',
-                message: 'لا توجد جلسات من جدول الحلقة لهذا الأسبوع.',
-              ),
-            )
-          else
-            ...[
-              if (featured != null) _TodayCard(
-                  session: featured, snapshot: snapshot),
-              const SizedBox(height: 12),
-              for (final session in _sessions)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _SessionRow(
-                    session: session,
-                    dayLabel: _dayLabel(session.startAt),
-                    statusLabel: _statusLabel(session),
-                    teacher: session.teacherName
-                        .trim()
-                        .isNotEmpty
-                        ? session.teacherName
-                        : (snapshot?.teacherName ?? ''),
                   ),
-                ),
-            ],
-        ],
-      ),
+                if (state.childrenIds.length > 1) const SizedBox(height: 12),
+                if (_sessions.isEmpty)
+                  const SizedBox(
+                    height: 280,
+                    child: ParentEmptyState(
+                      icon: Icons.calendar_month_outlined,
+                      title: 'جدول الأسبوع الحالي',
+                      message: 'لا توجد جلسات من جدول الحلقة لهذا الأسبوع.',
+                    ),
+                  )
+                else ...[
+                  if (featured != null)
+                    _TodayCard(session: featured, snapshot: snapshot),
+                  const SizedBox(height: 12),
+                  for (final session in _sessions)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _SessionRow(
+                        session: session,
+                        dayLabel: _dayLabel(session.startAt),
+                        statusLabel: _statusLabel(session),
+                        teacher: session.teacherName.trim().isNotEmpty
+                            ? session.teacherName
+                            : (snapshot?.teacherName ?? ''),
+                      ),
+                    ),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -247,9 +243,7 @@ class _TodayCard extends StatelessWidget {
             ),
           ),
           Text(
-            session.topic
-                ?.trim()
-                .isNotEmpty == true
+            session.topic?.trim().isNotEmpty == true
                 ? session.topic!.trim()
                 : session.title,
             style: AppTextStyles.titleLarge.copyWith(
@@ -330,7 +324,9 @@ class _SessionRow extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(AppSizes.radiusFull),

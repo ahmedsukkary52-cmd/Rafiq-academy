@@ -36,6 +36,9 @@ class SupervisorState extends Equatable {
   final SubmissionStatus transferStudentStatus;
   final String? transferStudentError;
 
+  final SubmissionStatus registerStudentStatus;
+  final String? registerStudentError;
+
   final SectionStatus paymentsStatus;
   final List<PaymentEntity> payments;
   final String? paymentsError;
@@ -61,6 +64,8 @@ class SupervisorState extends Equatable {
     this.admitStudentError,
     this.transferStudentStatus = SubmissionStatus.idle,
     this.transferStudentError,
+    this.registerStudentStatus = SubmissionStatus.idle,
+    this.registerStudentError,
     this.paymentsStatus = SectionStatus.initial,
     this.payments = const [],
     this.paymentsError,
@@ -88,6 +93,8 @@ class SupervisorState extends Equatable {
     Object? admitStudentError = _unset,
     SubmissionStatus? transferStudentStatus,
     Object? transferStudentError = _unset,
+    SubmissionStatus? registerStudentStatus,
+    Object? registerStudentError = _unset,
     SectionStatus? paymentsStatus,
     List<PaymentEntity>? payments,
     Object? paymentsError = _unset,
@@ -129,6 +136,11 @@ class SupervisorState extends Equatable {
       transferStudentError: identical(transferStudentError, _unset)
           ? this.transferStudentError
           : transferStudentError as String?,
+      registerStudentStatus:
+          registerStudentStatus ?? this.registerStudentStatus,
+      registerStudentError: identical(registerStudentError, _unset)
+          ? this.registerStudentError
+          : registerStudentError as String?,
       paymentsStatus: paymentsStatus ?? this.paymentsStatus,
       payments: payments ?? this.payments,
       paymentsError: identical(paymentsError, _unset)
@@ -160,6 +172,8 @@ class SupervisorState extends Equatable {
     admitStudentError,
     transferStudentStatus,
     transferStudentError,
+    registerStudentStatus,
+    registerStudentError,
     paymentsStatus,
     payments,
     paymentsError,

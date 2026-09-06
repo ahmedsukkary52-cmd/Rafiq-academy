@@ -129,7 +129,7 @@ class ParentRepositoryImpl implements ParentRepository {
   Stream<Either<Failure, List<String>>> watchChildrenAssignments(
     String parentId,
   ) {
-    // TODO: implement real-time stream لما نحتاجه في الـ UI
+    // Realtime children stream is unused by current Parent UI (pull-to-refresh).
     return const Stream.empty();
   }
 

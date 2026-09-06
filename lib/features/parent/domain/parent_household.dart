@@ -29,8 +29,10 @@ class ParentChildSnapshot extends Equatable {
   final String halaqaName;
   final String? teacherId;
   final String teacherName;
+  final String? teacherProfileImageUrl;
   final String? supervisorId;
   final String supervisorName;
+  final String? supervisorProfileImageUrl;
   final double overallProgressPercent;
   final int totalVersesMemorized;
   final int streakDays;
@@ -49,8 +51,10 @@ class ParentChildSnapshot extends Equatable {
     this.halaqaName = '',
     this.teacherId,
     this.teacherName = '',
+    this.teacherProfileImageUrl,
     this.supervisorId,
     this.supervisorName = '',
+    this.supervisorProfileImageUrl,
     this.overallProgressPercent = 0,
     this.totalVersesMemorized = 0,
     this.streakDays = 0,
@@ -76,8 +80,10 @@ class ParentChildSnapshot extends Equatable {
       halaqaName: halaqaName,
       teacherId: teacherId,
       teacherName: teacherName,
+      teacherProfileImageUrl: teacherProfileImageUrl,
       supervisorId: supervisorId,
       supervisorName: supervisorName,
+      supervisorProfileImageUrl: supervisorProfileImageUrl,
       overallProgressPercent: overallProgressPercent,
       totalVersesMemorized: totalVersesMemorized,
       streakDays: streakDays,
@@ -99,8 +105,10 @@ class ParentChildSnapshot extends Equatable {
     halaqaName,
     teacherId,
     teacherName,
+    teacherProfileImageUrl,
     supervisorId,
     supervisorName,
+    supervisorProfileImageUrl,
     overallProgressPercent,
     totalVersesMemorized,
     streakDays,
@@ -300,7 +308,10 @@ class ParentHouseholdAssembler {
     return result;
   }
 
-  static PaymentStatus? _worsePayment(PaymentStatus? current, PaymentStatus next) {
+  static PaymentStatus? _worsePayment(
+    PaymentStatus? current,
+    PaymentStatus next,
+  ) {
     if (current == null) return next;
     const rank = {
       PaymentStatus.paid: 0,

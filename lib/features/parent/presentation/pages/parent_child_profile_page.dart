@@ -87,28 +87,31 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
     final achievementsResult = await sl<GetAchievementsUseCase>()(uid);
     if (!mounted) return;
 
-    profileResult.fold((f) {
-      setState(() {
-        _loading = false;
-        _error = f.message;
-      });
-    }, (profile) {
-      final records = recitationsResult.getOrElse(
-        (_) => const <RecitationRecordEntity>[],
-      );
+    profileResult.fold(
+      (f) {
+        setState(() {
+          _loading = false;
+          _error = f.message;
+        });
+      },
+      (profile) {
+        final records = recitationsResult.getOrElse(
+          (_) => const <RecitationRecordEntity>[],
+        );
         final reviewed = records.where((r) => !r.isPendingReview).toList()
           ..sort((a, b) => b.date.compareTo(a.date));
         setState(() {
-        _loading = false;
-        _profile = profile;
-        _latest = pickLatestStudentProfileEvaluation(records);
-        _performance = ParentPerformance.averagePercent(records);
-        _achievements = achievementsResult.getOrElse(
-          (_) => const <AchievementEntity>[],
-        );
+          _loading = false;
+          _profile = profile;
+          _latest = pickLatestStudentProfileEvaluation(records);
+          _performance = ParentPerformance.averagePercent(records);
+          _achievements = achievementsResult.getOrElse(
+            (_) => const <AchievementEntity>[],
+          );
           _reviewedRecitations = reviewed;
         });
-    });
+      },
+    );
   }
 
   Future<void> _startTeacherChat(ParentChildSnapshot? snapshot) async {
@@ -238,10 +241,11 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
     final level = _profile?.level ?? 1;
     final teacher = snapshot?.teacherName.trim() ?? '';
     final supervisor = snapshot?.supervisorName.trim() ?? '';
-    final progress = (_profile?.overallProgressPercent ??
-        snapshot?.overallProgressPercent ??
-        0)
-        .clamp(0.0, 100.0);
+    final progress =
+        (_profile?.overallProgressPercent ??
+                snapshot?.overallProgressPercent ??
+                0)
+            .clamp(0.0, 100.0);
     final verses =
         _profile?.totalVersesMemorized ?? snapshot?.totalVersesMemorized ?? 0;
     final attendanceLabel = parentPercentLabel(
@@ -258,12 +262,10 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
       child: BlocListener<ChatConversationsBloc, ChatConversationsState>(
         bloc: sl<ChatConversationsBloc>(),
         listenWhen: (p, c) =>
-        p.startConversationStatus != c.startConversationStatus,
+            p.startConversationStatus != c.startConversationStatus,
         listener: (context, state) async {
           if (!_startingChat) return;
-          final auth = context
-              .read<AuthBloc>()
-              .state;
+          final auth = context.read<AuthBloc>().state;
           final uid = auth is AuthAuthenticated ? auth.user.uid : '';
           if (state.startConversationStatus == SubmissionStatus.error) {
             setState(() => _startingChat = false);
@@ -296,76 +298,72 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
         child: Scaffold(
           backgroundColor: const Color(0xFFF5FAFB),
           body: _loading
-              ? const ParentDashboardSkeleton()
+              ? const ParentChildProfileSkeleton()
               : _error != null
               ? AppErrorWidget(message: _error!, onRetry: _load)
               : CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _ProfileHero(
-                  name: name,
-                  imageUrl:
-                  _profile?.profileImageUrl ??
-                      snapshot?.profileImageUrl,
-                  halaqa: halaqa,
-                  level: level,
-                  teacher: teacher,
-                  supervisor: supervisor,
-                  performance: performanceLabel,
-                  attendance: attendanceLabel,
-                  verses: parentEasternDigits('$verses'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _ProfileHero(
+                        name: name,
+                        imageUrl:
+                            _profile?.profileImageUrl ??
+                            snapshot?.profileImageUrl,
+                        halaqa: halaqa,
+                        level: level,
+                        teacher: teacher,
+                        supervisor: supervisor,
+                        performance: performanceLabel,
+                        attendance: attendanceLabel,
+                        verses: parentEasternDigits('$verses'),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          _ActionsGrid(
+                            onEvaluations: () => ParentDestinations.evaluations(
+                              context,
+                              studentId: widget.studentId,
+                              studentName: name,
+                            ),
+                            onReports: () => ParentDestinations.reports(
+                              context,
+                              studentId: widget.studentId,
+                              studentName: name,
+                            ),
+                            onSchedule: () => ParentDestinations.schedule(
+                              context,
+                              studentId: widget.studentId,
+                              studentName: name,
+                            ),
+                            onContact: _startingChat
+                                ? null
+                                : () => _startTeacherChat(snapshot),
+                          ),
+                          const SizedBox(height: 20),
+                          _MemorizationSection(
+                            progressPercent: progress,
+                            memorizedVerses: verses,
+                          ),
+                          const SizedBox(height: 18),
+                          _NotesSection(teacherNote: teacherNote),
+                          const SizedBox(height: 18),
+                          _ActivitiesSection(
+                            items: activities,
+                            onSeeAll: () => ParentDestinations.achievements(
+                              context,
+                              studentId: widget.studentId,
+                              studentName: name,
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _ActionsGrid(
-                      onEvaluations: () =>
-                          ParentDestinations.evaluations(
-                            context,
-                            studentId: widget.studentId,
-                            studentName: name,
-                          ),
-                      onReports: () =>
-                          ParentDestinations.reports(
-                            context,
-                            studentId: widget.studentId,
-                            studentName: name,
-                          ),
-                      onSchedule: () =>
-                          ParentDestinations.schedule(
-                            context,
-                            studentId: widget.studentId,
-                            studentName: name,
-                          ),
-                      onContact: _startingChat
-                          ? null
-                          : () => _startTeacherChat(snapshot),
-                    ),
-                    const SizedBox(height: 20),
-                    _MemorizationSection(
-                      progressPercent: progress,
-                      memorizedVerses: verses,
-                    ),
-                    const SizedBox(height: 18),
-                    _NotesSection(teacherNote: teacherNote),
-                    const SizedBox(height: 18),
-                    _ActivitiesSection(
-                      items: activities,
-                      onSeeAll: () =>
-                          ParentDestinations.achievements(
-                            context,
-                            studentId: widget.studentId,
-                            studentName: name,
-                          ),
-                    ),
-                  ]),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -755,7 +753,8 @@ class _ActionButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: radius,
             border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.45)),
+              color: AppColors.primary.withValues(alpha: 0.45),
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -791,9 +790,7 @@ class _MemorizationSection extends StatelessWidget {
     final pct = progressPercent.round().clamp(0, 100);
     // Remaining verses for *current surah* are not stored as a separate field.
     // Do not invent: show dash unless progress is complete (0 remaining).
-    final remainingLabel = pct >= 100
-        ? parentEasternDigits('0')
-        : '—';
+    final remainingLabel = pct >= 100 ? parentEasternDigits('0') : '—';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -953,7 +950,7 @@ class _NotesSection extends StatelessWidget {
           iconColor: AppColors.secondaryDeep,
           background: AppColors.secondaryBg,
           body:
-          'لا توجد ملاحظات مشرف محفوظة في النظام بعد — ستظهر هنا عند توفر مصدرها.',
+              'لا توجد ملاحظات مشرف محفوظة في النظام بعد — ستظهر هنا عند توفر مصدرها.',
         ),
       ],
     );
@@ -1018,10 +1015,7 @@ class _ActivitiesSection extends StatelessWidget {
   final List<_ActivityItem> items;
   final VoidCallback onSeeAll;
 
-  const _ActivitiesSection({
-    required this.items,
-    required this.onSeeAll,
-  });
+  const _ActivitiesSection({required this.items, required this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -1082,10 +1076,7 @@ class _ActivitiesSection extends StatelessWidget {
             child: Column(
               children: [
                 for (var i = 0; i < items.length; i++)
-                  _TimelineRow(
-                    item: items[i],
-                    isLast: i == items.length - 1,
-                  ),
+                  _TimelineRow(item: items[i], isLast: i == items.length - 1),
               ],
             ),
           ),

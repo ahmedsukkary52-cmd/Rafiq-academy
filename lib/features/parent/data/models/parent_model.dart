@@ -32,15 +32,19 @@ class PaymentModel extends PaymentEntity {
     final data = doc.data() as Map<String, dynamic>;
     final submitted = data[ParentPaymentProofContract.proofSubmittedAtField];
     final reviewed = data[ParentPaymentProofContract.reviewedAtField];
+    final rawDue = data['dueDate'];
+    final rawPaid = data['paidAt'];
     return PaymentModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
       parentId: data['parentId'] ?? '',
       amount: (data['amount'] ?? 0).toDouble(),
-      dueDate: (data['dueDate'] as Timestamp).toDate(),
-      paidAt: data['paidAt'] != null
-          ? (data['paidAt'] as Timestamp).toDate()
-          : null,
+      dueDate: rawDue is Timestamp
+          ? rawDue.toDate()
+          : (rawDue is DateTime ? rawDue : DateTime.now()),
+      paidAt: rawPaid is Timestamp
+          ? rawPaid.toDate()
+          : (rawPaid is DateTime ? rawPaid : null),
       status: _statusFromString(data['status'] ?? ''),
       method: data['method'] as String?,
       proofStoragePath:

@@ -109,6 +109,24 @@ class ResetTransferStudentEvent extends SupervisorEvent {
   const ResetTransferStudentEvent();
 }
 
+/// تسجيل ملتحق جديد في حلقة
+class RegisterNewStudentEvent extends SupervisorEvent {
+  final String halaqaId;
+  final String studentId;
+
+  const RegisterNewStudentEvent({
+    required this.halaqaId,
+    required this.studentId,
+  });
+
+  @override
+  List<Object?> get props => [halaqaId, studentId];
+}
+
+class ResetRegisterStudentEvent extends SupervisorEvent {
+  const ResetRegisterStudentEvent();
+}
+
 class ClearSupervisorSessionEvent extends SupervisorEvent {
   const ClearSupervisorSessionEvent();
 }

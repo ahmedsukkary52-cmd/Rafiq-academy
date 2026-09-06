@@ -9,6 +9,7 @@ import '../../domain/usecases/get_supervised_halaqat_usecase.dart';
 import '../../domain/usecases/get_supervisor_day_board_usecase.dart';
 import '../../domain/usecases/issue_achievement_usecase.dart';
 import '../../domain/usecases/payment_review_usecases.dart';
+import '../../domain/usecases/register_new_student_usecase.dart';
 import '../../domain/usecases/submit_supervisor_report_usecase.dart';
 import '../../domain/usecases/transfer_student_between_halaqat_usecase.dart';
 import 'supervisor_event.dart';
@@ -25,6 +26,7 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
   final TransferStudentBetweenHalaqatUseCase transferStudentBetweenHalaqat;
   final GetSupervisedPaymentsUseCase getSupervisedPayments;
   final ReviewPaymentProofUseCase reviewPaymentProof;
+  final RegisterNewStudentUseCase registerNewStudent;
 
   String? _supervisorId;
 
@@ -38,6 +40,7 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     required this.transferStudentBetweenHalaqat,
     required this.getSupervisedPayments,
     required this.reviewPaymentProof,
+    required this.registerNewStudent,
   }) : super(SupervisorState.initial()) {
     on<LoadSupervisedHalaqatEvent>(_onLoadHalaqat);
     on<LoadSupervisorDayBoardEvent>(_onLoadDayBoard);
@@ -53,6 +56,8 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<LoadSupervisedPaymentsEvent>(_onLoadPayments);
     on<ReviewPaymentProofEvent>(_onReviewPayment);
     on<ResetReviewPaymentEvent>(_onResetReviewPayment);
+    on<RegisterNewStudentEvent>(_onRegisterStudent);
+    on<ResetRegisterStudentEvent>(_onResetRegisterStudent);
     on<ClearSupervisorSessionEvent>(_onClearSession);
   }
 
@@ -413,6 +418,48 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       state.copyWith(
         reviewPaymentStatus: SubmissionStatus.idle,
         reviewPaymentError: null,
+      ),
+    );
+  }
+
+  Future<void> _onRegisterStudent(
+    RegisterNewStudentEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        registerStudentStatus: SubmissionStatus.submitting,
+        registerStudentError: null,
+      ),
+    );
+
+    final result = await registerNewStudent(
+      RegisterStudentParams(
+        halaqaId: event.halaqaId,
+        studentId: event.studentId,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          registerStudentStatus: SubmissionStatus.error,
+          registerStudentError: failure.message,
+        ),
+      ),
+      (_) =>
+          emit(state.copyWith(registerStudentStatus: SubmissionStatus.success)),
+    );
+  }
+
+  void _onResetRegisterStudent(
+    ResetRegisterStudentEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        registerStudentStatus: SubmissionStatus.idle,
+        registerStudentError: null,
       ),
     );
   }

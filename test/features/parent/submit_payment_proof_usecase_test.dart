@@ -139,32 +139,111 @@ void main() {
   });
 
   group('PaymentProofStatusX', () {
-    test('hasProofAwaitingReview when path set and not paid', () {
-      final due = DateTime(2026, 1, 1);
-      final withProof = PaymentEntity(
+    final due = DateTime(2026, 1, 1);
+
+    PaymentEntity payment({
+      PaymentStatus status = PaymentStatus.due,
+      String? reviewStatus,
+      String? proofStoragePath = 'payment_proofs/p1/pay1/1.jpg',
+      DateTime? proofSubmittedAt,
+      double? remainingAmount,
+      String? reviewNotes,
+    }) {
+      return PaymentEntity(
         id: 'pay1',
         studentId: 's1',
         parentId: 'p1',
         amount: 100,
         dueDate: due,
-        status: PaymentStatus.due,
-        proofStoragePath: 'payment_proofs/p1/pay1/1.jpg',
-        proofSubmittedAt: due,
+        status: status,
         method: ParentPaymentProofContract.externalMethod,
+        proofStoragePath: proofStoragePath,
+        proofSubmittedAt: proofSubmittedAt,
+        reviewStatus: reviewStatus,
+        reviewNotes: reviewNotes,
+        remainingAmount: remainingAmount,
       );
-      final paid = PaymentEntity(
-        id: 'pay2',
-        studentId: 's1',
-        parentId: 'p1',
-        amount: 100,
-        dueDate: due,
-        status: PaymentStatus.paid,
-        proofStoragePath: 'payment_proofs/p1/pay2/1.jpg',
-      );
+    }
+
+    test('hasProofAwaitingReview when path set and not paid', () {
+      final withProof = payment(proofSubmittedAt: due);
+      final paid = payment(status: PaymentStatus.paid);
 
       expect(withProof.hasProofAwaitingReview, isTrue);
+      expect(withProof.hasSupervisorReview, isFalse);
       expect(paid.hasProofAwaitingReview, isFalse);
       expect(withProof.status, isNot(PaymentStatus.paid));
+    });
+
+    test('pending_review still awaits Supervisor review', () {
+      final pending = payment(
+        reviewStatus: ParentPaymentProofContract.pendingReview,
+        proofSubmittedAt: due,
+      );
+
+      expect(pending.hasProofAwaitingReview, isTrue);
+      expect(pending.hasSupervisorReview, isFalse);
+    });
+
+    test('pending_review awaits review even without a stored proof path', () {
+      final pending = payment(
+        reviewStatus: ParentPaymentProofContract.pendingReview,
+        proofStoragePath: null,
+      );
+
+      expect(pending.hasProofAwaitingReview, isTrue);
+    });
+
+    test('rejected is reviewed and no longer awaiting', () {
+      final rejected = payment(
+        reviewStatus: ParentPaymentProofContract.rejected,
+        proofSubmittedAt: due,
+        reviewNotes: 'الصورة غير واضحة',
+      );
+
+      expect(rejected.hasProofAwaitingReview, isFalse);
+      expect(rejected.hasSupervisorReview, isTrue);
+      expect(rejected.status, isNot(PaymentStatus.paid));
+    });
+
+    test('partial is reviewed and no longer awaiting', () {
+      final partial = payment(
+        reviewStatus: ParentPaymentProofContract.partial,
+        proofSubmittedAt: due,
+        remainingAmount: 40,
+      );
+
+      expect(partial.hasProofAwaitingReview, isFalse);
+      expect(partial.hasSupervisorReview, isTrue);
+      expect(partial.remainingAmount, 40);
+    });
+
+    test('approved is reviewed and no longer awaiting', () {
+      final approved = payment(
+        reviewStatus: ParentPaymentProofContract.approved,
+        proofSubmittedAt: due,
+      );
+
+      expect(approved.hasProofAwaitingReview, isFalse);
+      expect(approved.hasSupervisorReview, isTrue);
+    });
+
+    test('paid never awaits review regardless of reviewStatus', () {
+      final paid = payment(status: PaymentStatus.paid);
+      final paidPending = payment(
+        status: PaymentStatus.paid,
+        reviewStatus: ParentPaymentProofContract.pendingReview,
+      );
+
+      expect(paid.hasProofAwaitingReview, isFalse);
+      expect(paidPending.hasProofAwaitingReview, isFalse);
+    });
+
+    test('no proof and no review is not awaiting', () {
+      final clean = payment(proofStoragePath: null);
+
+      expect(clean.hasProofAwaitingReview, isFalse);
+      expect(clean.hasSupervisorReview, isFalse);
     });
   });
 }

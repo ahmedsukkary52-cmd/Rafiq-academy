@@ -50,7 +50,10 @@ void main() {
           ),
         ],
       );
-      expect(overdue.any((a) => a.kind == ParentAlertKind.overduePayment), isTrue);
+      expect(
+        overdue.any((a) => a.kind == ParentAlertKind.overduePayment),
+        isTrue,
+      );
 
       final paid = ParentHouseholdAssembler.alerts(
         children: const [child],
@@ -65,7 +68,10 @@ void main() {
           ),
         ],
       );
-      expect(paid.any((a) => a.kind == ParentAlertKind.overduePayment), isFalse);
+      expect(
+        paid.any((a) => a.kind == ParentAlertKind.overduePayment),
+        isFalse,
+      );
     });
 
     test('attaches worst payment status per child', () {

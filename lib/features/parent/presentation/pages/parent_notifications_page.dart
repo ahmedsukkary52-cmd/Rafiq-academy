@@ -52,7 +52,8 @@ class ParentNotificationsPage extends StatelessWidget {
               p.notifications != c.notifications ||
               p.error != c.error,
           builder: (context, state) {
-            if (state.status == SectionStatus.loading) {
+            if (state.status == SectionStatus.initial ||
+                state.status == SectionStatus.loading) {
               return const ParentListCardsSkeleton();
             }
             if (state.status == SectionStatus.error) {

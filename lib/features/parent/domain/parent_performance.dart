@@ -20,7 +20,9 @@ class ParentPerformance {
     return total / count;
   }
 
-  static Map<String, int> gradeCounts(Iterable<RecitationRecordEntity> records) {
+  static Map<String, int> gradeCounts(
+    Iterable<RecitationRecordEntity> records,
+  ) {
     final counts = {
       for (final key in AnalyticsRecitationHonesty.distributionBucketOrder)
         key: 0,

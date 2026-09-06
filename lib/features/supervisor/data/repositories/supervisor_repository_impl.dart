@@ -61,6 +61,26 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> admitStudentToHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+    required String studentId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.admitStudentToHalaqa(
+        supervisorId: supervisorId,
+        halaqaId: halaqaId,
+        studentId: studentId,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  @override
   Future<Either<Failure, Unit>> registerNewStudent({
     required String halaqaId,
     required String studentId,
@@ -70,6 +90,26 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
       await remoteDatasource.registerNewStudent(
         halaqaId: halaqaId,
         studentId: studentId,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  Future<Either<Failure, Unit>> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.transferStudentBetweenHalaqat(
+        supervisorId: supervisorId,
+        studentId: studentId,
+        sourceHalaqaId: sourceHalaqaId,
+        targetHalaqaId: targetHalaqaId,
       );
       return const Right(unit);
     } on ServerException catch (e) {

@@ -17,19 +17,31 @@ abstract class SupervisorRepository {
 
   Future<Either<Failure, Unit>> submitReport(SupervisorReportEntity report);
 
+  /// Academy Admission entry for an existing student into a supervised halaqa.
+  Future<Either<Failure, Unit>> admitStudentToHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+    required String studentId,
+  });
+
+  Future<Either<Failure, Unit>> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  });
+
+  /// Compat register path — membership via Academy Admission.
   Future<Either<Failure, Unit>> registerNewStudent({
     required String halaqaId,
     required String studentId,
   });
 
   /// Display names for [userIds] from `users` (W6 D-W6-4).
-  ///
-  /// Missing users are omitted from the map — callers fall back in presentation.
   Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
     List<String> userIds,
   );
 
-  /// Read-only استئذان docs for [halaqaIds] on [date] (W7 Rule 2 projection).
   Future<Either<Failure, List<AbsenceRequestEntity>>>
   getAbsenceRequestsForHalaqatOnDate({
     required List<String> halaqaIds,
@@ -52,6 +64,43 @@ class SupervisorIdParams extends Equatable {
 
   @override
   List<Object?> get props => [supervisorId];
+}
+
+class AdmitStudentParams extends Equatable {
+  final String supervisorId;
+  final String halaqaId;
+  final String studentId;
+
+  const AdmitStudentParams({
+    required this.supervisorId,
+    required this.halaqaId,
+    required this.studentId,
+  });
+
+  @override
+  List<Object?> get props => [supervisorId, halaqaId, studentId];
+}
+
+class TransferStudentParams extends Equatable {
+  final String supervisorId;
+  final String studentId;
+  final String sourceHalaqaId;
+  final String targetHalaqaId;
+
+  const TransferStudentParams({
+    required this.supervisorId,
+    required this.studentId,
+    required this.sourceHalaqaId,
+    required this.targetHalaqaId,
+  });
+
+  @override
+  List<Object?> get props => [
+    supervisorId,
+    studentId,
+    sourceHalaqaId,
+    targetHalaqaId,
+  ];
 }
 
 class RegisterStudentParams extends Equatable {

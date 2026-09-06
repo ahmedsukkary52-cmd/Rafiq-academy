@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
+import '../../../../shared/data/academy_admission_firestore.dart';
 import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../parent/data/models/parent_model.dart';
@@ -37,15 +38,17 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   @override
   Future<void> issueAchievement(AchievementIssueEntity data) async {
     try {
-      await firestore.collection(FirestoreCollections.achievements).add(
-        AchievementsFirestoreContract.supervisorIssueFields(
-          studentId: data.studentId,
-          type: data.type,
-          title: data.title,
-          issuedBy: data.issuedBy,
-          halaqaId: data.halaqaId,
-        ),
-      );
+      await firestore
+          .collection(FirestoreCollections.achievements)
+          .add(
+            AchievementsFirestoreContract.supervisorIssueFields(
+              studentId: data.studentId,
+              type: data.type,
+              title: data.title,
+              issuedBy: data.issuedBy,
+              halaqaId: data.halaqaId,
+            ),
+          );
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -69,24 +72,94 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   }
 
   @override
+  Future<void> admitStudentToHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+    required String studentId,
+  }) async {
+    try {
+      await _assertSupervisedHalaqa(
+        supervisorId: supervisorId,
+        halaqaId: halaqaId,
+      );
+      await AcademyAdmissionFirestore.establishMembership(
+        firestore: firestore,
+        studentId: studentId,
+        halaqaId: halaqaId,
+      );
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  @override
   Future<void> registerNewStudent({
     required String halaqaId,
     required String studentId,
   }) async {
     try {
-      await firestore
-          .collection(FirestoreCollections.halaqat)
-          .doc(halaqaId)
-          .update({
-            'studentIds': FieldValue.arrayUnion([studentId]),
-          });
-
-      await firestore
-          .collection(FirestoreCollections.studentProfiles)
-          .doc(studentId)
-          .update({'halaqaId': halaqaId});
+      await AcademyAdmissionFirestore.establishMembership(
+        firestore: firestore,
+        studentId: studentId,
+        halaqaId: halaqaId,
+      );
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
+    }
+  }
+
+  Future<void> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  }) async {
+    try {
+      await _assertSupervisedHalaqa(
+        supervisorId: supervisorId,
+        halaqaId: sourceHalaqaId,
+      );
+      await _assertSupervisedHalaqa(
+        supervisorId: supervisorId,
+        halaqaId: targetHalaqaId,
+      );
+      await AcademyAdmissionFirestore.transferMembership(
+        firestore: firestore,
+        studentId: studentId,
+        sourceHalaqaId: sourceHalaqaId,
+        targetHalaqaId: targetHalaqaId,
+      );
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  Future<void> _assertSupervisedHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+  }) async {
+    final sid = supervisorId.trim();
+    final hid = halaqaId.trim();
+    if (sid.isEmpty || hid.isEmpty) {
+      throw const ServerException('معرّف المشرف أو الحلقة غير صالح');
+    }
+    final snap = await firestore
+        .collection(FirestoreCollections.halaqat)
+        .doc(hid)
+        .get();
+    if (!snap.exists) {
+      throw const ServerException('الحلقة غير موجودة');
+    }
+    final owner = (snap.data()?['supervisorId'] as String?)?.trim() ?? '';
+    if (owner != sid) {
+      throw const ServerException('الحلقة ليست ضمن نطاق إشرافك');
     }
   }
 

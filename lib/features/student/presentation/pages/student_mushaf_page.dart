@@ -4,17 +4,21 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../widgets/student_loading_skeletons.dart';
 import 'student_recitation_page.dart';
 
 enum MushafMode { reading, recitation }
@@ -1523,54 +1527,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
           children: [
             ListTile(
               leading: const Icon(
-                Icons.favorite_border,
-                color: AppColors.textHint,
-              ),
-              title: const Text(
-                'إضافة للمفضلة',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              trailing: Text(
-                'Coming Soon',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.bookmark_border,
-                color: AppColors.textHint,
-              ),
-              title: const Text(
-                'حفظ إشارة مرجعية',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              trailing: Text(
-                'Coming Soon',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.share_outlined,
-                color: AppColors.textHint,
-              ),
-              title: const Text(
-                'مشاركة السورة',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              trailing: Text(
-                'Coming Soon',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
                 Icons.settings_outlined,
                 color: AppColors.primary,
               ),
@@ -1780,23 +1736,33 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   void _submitRecitation() {
     if (_recordedFilePath == null) return;
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('رفع التسجيل', textAlign: TextAlign.right),
-        content: const Text(
-          'رفع التسجيل غير متاح حالياً حتى يتم تفعيل خدمة رفع الملفات.',
-          textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('حسناً'),
+    if (!AppCapabilities.audioUploadsEnabled) {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+          content: const Text(
+            'إرسال التسجيل من المصحف غير مفعّل حالياً. استخدم واجب التسميع من صفحة واجباتي عندما يكون متاحاً.',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                context.push(AppRoutes.studentHomework);
+              },
+              child: const Text('فتح واجباتي'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إغلاق'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
   }
 
   String _toArabicDigits(int n) {
@@ -1920,9 +1886,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   Widget _buildAyahsBody(Color textColor, Color iconColor) {
     if (_isLoadingData) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
+      return const Center(child: StudentListPageSkeleton(itemCount: 8));
     }
 
     if (_errorLoading.isNotEmpty && _ayahs.isEmpty) {
@@ -2472,7 +2436,9 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 children: [
                   Expanded(
                     child: AppButton(
-                      label: 'رفع التسجيل — Coming Soon',
+                      label: AppCapabilities.audioUploadsEnabled
+                          ? 'رفع التسجيل'
+                          : 'إرسال عبر الواجبات',
                       onPressed: _submitRecitation,
                     ),
                   ),

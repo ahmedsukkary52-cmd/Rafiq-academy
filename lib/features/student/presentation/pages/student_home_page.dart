@@ -27,6 +27,7 @@ import '../../domain/entities/halaqa_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
+import '../widgets/student_loading_skeletons.dart';
 import 'student_badges_page.dart';
 import 'student_mushaf_dashboard.dart';
 
@@ -171,7 +172,7 @@ class _StudentHomeTab extends StatelessWidget {
                 state.profileStatus == SectionStatus.loading);
 
         if (waitingForProfile) {
-          return const AppLoadingWidget();
+          return const StudentHomeBodySkeleton();
         }
 
         if (state.profileStatus == SectionStatus.error &&
@@ -370,7 +371,7 @@ class _StudentHomeTab extends StatelessWidget {
         const SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-            child: SizedBox(height: 120, child: AppLoadingWidget()),
+            child: SizedBox(height: 120, child: StudentHomeBodySkeleton()),
           ),
         ),
       ];
@@ -474,50 +475,113 @@ class _StudentHomeTab extends StatelessWidget {
   }
 }
 
-/// Adventure map is not backed by real progress data yet — keep the tab slot.
+/// Journey / progress tab — real profile stats only (no invented map schema).
 class _StudentMapTab extends StatelessWidget {
   const _StudentMapTab();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('خريطتي')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingL),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return BlocBuilder<StudentBloc, StudentState>(
+      buildWhen: (p, c) =>
+          p.profile != c.profile || p.profileStatus != c.profileStatus,
+      builder: (context, state) {
+        if (state.profileStatus == SectionStatus.loading ||
+            state.profileStatus == SectionStatus.initial) {
+          return const Scaffold(
+            backgroundColor: AppColors.background,
+            body: StudentHomeBodySkeleton(),
+          );
+        }
+        if (state.profileStatus == SectionStatus.error) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(title: const Text('خريطتي')),
+            body: AppErrorWidget(
+              message: state.profileError ?? 'تعذر تحميل التقدم',
+              onRetry: () {
+                final auth = context.read<AuthBloc>().state;
+                if (auth is AuthAuthenticated) {
+                  context.read<StudentBloc>().add(
+                    LoadStudentProfileEvent(auth.user.uid),
+                  );
+                }
+              },
+            ),
+          );
+        }
+
+        final profile = state.profile;
+        final progress = (profile?.overallProgressPercent ?? 0)
+            .clamp(0, 100)
+            .toInt();
+        final plan = profile?.currentPlanName.trim() ?? '';
+        final streak = profile?.streakDays ?? 0;
+        final completedSurahs = profile?.completedSurahs ?? 0;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('خريطتي')),
+          body: ListView(
+            padding: const EdgeInsets.all(AppSizes.paddingL),
             children: [
-              const Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: AppColors.textHint,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'خريطة المغامرة',
-                style: AppTextStyles.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Coming Soon',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'تقدم رحلتك',
+                      style: AppTextStyles.headlineMedium.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$progress% مكتمل',
+                      style: AppTextStyles.titleLarge.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                    if (plan.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'الخطة الحالية: $plan',
+                        style: AppTextStyles.bodyMedium,
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'سور مكتملة: $completedSurahs · سلسلة الأيام: $streak',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              AppButton(
+                label: 'تقريري الشهري',
+                onPressed: () => context.push(AppRoutes.studentProgressReport),
               ),
               const SizedBox(height: 8),
-              Text(
-                'ستظهر خريطة التقدم عند تفعيل خطة الحفظ',
-                style: AppTextStyles.bodyMedium,
-                textAlign: TextAlign.center,
+              OutlinedButton(
+                onPressed: () => context.push(AppRoutes.studentMushaf),
+                child: const Text('افتح المصحف'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => context.push(AppRoutes.studentReviewSchedule),
+                child: const Text('جدول المراجعة'),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -744,16 +808,6 @@ class _StudentProfileTab extends StatelessWidget {
                           label: 'الإعدادات',
                           onTap: () => context.push(AppRoutes.studentSettings),
                         ),
-                        const _ProfileMenuItem(
-                          icon: Icons.family_restroom_rounded,
-                          label: 'حساب ولي الأمر',
-                          trailing: 'Coming Soon',
-                        ),
-                        const _ProfileMenuItem(
-                          icon: Icons.help_outline_rounded,
-                          label: 'المساعدة والدعم',
-                          trailing: 'Coming Soon',
-                        ),
                       ],
                     ),
 
@@ -854,14 +908,12 @@ class _ProfileMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final bool isDestructive;
-  final String? trailing;
 
   const _ProfileMenuItem({
     required this.icon,
     required this.label,
     this.onTap,
     this.isDestructive = false,
-    this.trailing,
   });
 
   @override
@@ -876,13 +928,6 @@ class _ProfileMenuItem extends StatelessWidget {
       title: Text(label, style: AppTextStyles.bodyLarge.copyWith(color: color)),
       trailing: isDestructive
           ? null
-          : trailing != null
-          ? Text(
-              trailing!,
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.textHint,
-              ),
-            )
           : const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
     );
   }

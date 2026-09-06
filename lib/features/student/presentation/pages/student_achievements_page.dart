@@ -14,6 +14,7 @@ import '../../domain/entities/achievement_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
+import '../widgets/student_loading_skeletons.dart';
 
 /// إنجازات الطالب — مصدر واحد: Firestore عبر StudentBloc.
 class StudentAchievementsPage extends StatefulWidget {
@@ -62,7 +63,7 @@ class _StudentAchievementsPageState extends State<StudentAchievementsPage> {
               if (state.achievementsStatus == SectionStatus.initial ||
                   (state.achievementsStatus == SectionStatus.loading &&
                       state.achievements.isEmpty)) {
-                return const AppLoadingWidget();
+                return const StudentListPageSkeleton();
               }
 
               if (state.achievementsStatus == SectionStatus.error &&
@@ -374,14 +375,10 @@ class _AchievementRow extends StatelessWidget {
     AchievementType.star => '⭐',
     AchievementType.badge => '🎖️',
     AchievementType.certificate => '📜',
-    AchievementType.completionBadge ||
-    AchievementType.completion => '✅',
-    AchievementType.performanceStars ||
-    AchievementType.performance => '🌟',
-    AchievementType.perfectAttendance ||
-    AchievementType.attendance => '📅',
-    AchievementType.studentOfWeek ||
-    AchievementType.achievement => '🏆',
+    AchievementType.completionBadge || AchievementType.completion => '✅',
+    AchievementType.performanceStars || AchievementType.performance => '🌟',
+    AchievementType.perfectAttendance || AchievementType.attendance => '📅',
+    AchievementType.studentOfWeek || AchievementType.achievement => '🏆',
     AchievementType.custom => '🎖️',
   };
 

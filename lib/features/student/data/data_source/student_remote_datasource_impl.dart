@@ -104,7 +104,9 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
   @override
   Future<List<AchievementModel>> getAchievements(String studentId) async {
     try {
-      final collection = firestore.collection(FirestoreCollections.achievements);
+      final collection = firestore.collection(
+        FirestoreCollections.achievements,
+      );
       final results = await Future.wait([
         collection.where('studentId', isEqualTo: studentId).get(),
         collection

@@ -13,6 +13,7 @@ import '../../domain/student_awards_stats.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
+import '../widgets/student_loading_skeletons.dart';
 
 /// Student center-tab Awards — receive/view only. No grant controls.
 class StudentBadgesPage extends StatefulWidget {
@@ -45,21 +46,20 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
         body: SafeArea(
           child: BlocBuilder<StudentBloc, StudentState>(
             buildWhen: (previous, current) =>
-            previous.achievements != current.achievements ||
+                previous.achievements != current.achievements ||
                 previous.achievementsStatus != current.achievementsStatus ||
                 previous.achievementsError != current.achievementsError,
             builder: (context, state) {
               if (state.achievementsStatus == SectionStatus.initial ||
                   (state.achievementsStatus == SectionStatus.loading &&
                       state.achievements.isEmpty)) {
-                return const AppLoadingWidget();
+                return const StudentListPageSkeleton();
               }
 
               if (state.achievementsStatus == SectionStatus.error &&
                   state.achievements.isEmpty) {
                 return AppErrorWidget(
-                  message:
-                  state.achievementsError ?? 'تعذر تحميل الجوائز',
+                  message: state.achievementsError ?? 'تعذر تحميل الجوائز',
                   onRetry: _reload,
                 );
               }
@@ -274,10 +274,7 @@ class _StudentAwardTypeCard extends StatelessWidget {
   final AwardType type;
   final bool earned;
 
-  const _StudentAwardTypeCard({
-    required this.type,
-    required this.earned,
-  });
+  const _StudentAwardTypeCard({required this.type, required this.earned});
 
   Color get _color => switch (type) {
     AwardType.completionBadge ||
@@ -293,8 +290,7 @@ class _StudentAwardTypeCard extends StatelessWidget {
   IconData get _icon => switch (type) {
     AwardType.completionBadge || AwardType.completion => Icons.verified_rounded,
     AwardType.performanceStars || AwardType.performance => Icons.star_rounded,
-    AwardType.perfectAttendance ||
-    AwardType.attendance => Icons.person_rounded,
+    AwardType.perfectAttendance || AwardType.attendance => Icons.person_rounded,
     AwardType.studentOfWeek ||
     AwardType.achievement => Icons.emoji_events_rounded,
     AwardType.custom => Icons.workspace_premium_outlined,

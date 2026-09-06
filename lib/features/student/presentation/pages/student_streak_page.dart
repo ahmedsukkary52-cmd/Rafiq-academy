@@ -9,6 +9,7 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
+import '../widgets/student_loading_skeletons.dart';
 
 class StudentStreakPage extends StatefulWidget {
   const StudentStreakPage({super.key});
@@ -49,7 +50,7 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
                     state.profileStatus == SectionStatus.loading);
 
             if (waitingForProfile) {
-              return const AppLoadingWidget();
+              return const StudentHomeBodySkeleton();
             }
 
             if (state.profileStatus == SectionStatus.error &&

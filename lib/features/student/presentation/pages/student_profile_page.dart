@@ -31,11 +31,7 @@ class StudentProfilePage extends StatefulWidget {
   final String studentId;
   final String? halaqaId;
 
-  const StudentProfilePage({
-    super.key,
-    required this.studentId,
-    this.halaqaId,
-  });
+  const StudentProfilePage({super.key, required this.studentId, this.halaqaId});
 
   @override
   State<StudentProfilePage> createState() => _StudentProfilePageState();
@@ -199,10 +195,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   Future<void> _contactParent() {
-    return contactStudentParent(
-      context: context,
-      studentId: widget.studentId,
-    );
+    return contactStudentParent(context: context, studentId: widget.studentId);
   }
 
   void _goBack() {
@@ -239,8 +232,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   Widget _buildScaffold() {
-    if (_status == SectionStatus.loading ||
-        _status == SectionStatus.initial) {
+    if (_status == SectionStatus.loading || _status == SectionStatus.initial) {
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: TeacherStudentProfileSkeleton(),
@@ -278,15 +270,17 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     final versesLabel = teacherHomeEasternDigits(
       '${profile.totalVersesMemorized}',
     );
-    final progressPercent =
-        profile.overallProgressPercent.clamp(0.0, 100.0).toDouble();
+    final progressPercent = profile.overallProgressPercent
+        .clamp(0.0, 100.0)
+        .toDouble();
     final joinDate = _formatJoinMonthYear(profile.createdAt);
     final phone = nonEmptyTrimmed(profile.phone);
     final guardianValue = !_hasLinkedGuardian
         ? 'غير مرتبط'
         : (_guardianName ?? 'ولي الأمر');
-    final displayName =
-        profile.name.trim().isEmpty ? 'طالب' : profile.name.trim();
+    final displayName = profile.name.trim().isEmpty
+        ? 'طالب'
+        : profile.name.trim();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -787,8 +781,7 @@ class _ProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final versesLabel =
-        '${teacherHomeEasternDigits('$versesMemorized')} آية';
+    final versesLabel = '${teacherHomeEasternDigits('$versesMemorized')} آية';
     final percentLabel =
         '${teacherHomeEasternDigits('${progressPercent.round()}')}٪';
 
@@ -823,10 +816,7 @@ class _ProgressCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  versesLabel,
-                  style: AppTextStyles.titleMedium,
-                ),
+                child: Text(versesLabel, style: AppTextStyles.titleMedium),
               ),
               Text(
                 percentLabel,
@@ -861,7 +851,8 @@ class _LatestEvaluationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latest = evaluation;
-    final overall = latest?.memorizationGrade ??
+    final overall =
+        latest?.memorizationGrade ??
         latest?.reviewGrade ??
         latest?.behaviorGrade;
 
@@ -977,8 +968,7 @@ class _EvaluationBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = grade == null ? AppColors.surfaceGrey : _gradeTint(grade!);
-    final color =
-        grade == null ? AppColors.textSecondary : _gradeColor(grade!);
+    final color = grade == null ? AppColors.textSecondary : _gradeColor(grade!);
     final value = grade?.label ?? '—';
 
     return Container(

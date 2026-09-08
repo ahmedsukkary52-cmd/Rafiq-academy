@@ -15,6 +15,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../../student/presentation/pages/student_recitation_page.dart';
+import '../../../student/presentation/widgets/student_loading_skeletons.dart';
 import '../../domain/entities/homework_entity.dart';
 import '../bloc/homework_bloc.dart';
 
@@ -146,9 +147,7 @@ class _HomeworkView extends StatelessWidget {
           builder: (context, state) {
             if (state.status == SectionStatus.loading ||
                 state.status == SectionStatus.initial) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              );
+              return const StudentListPageSkeleton();
             }
 
             if (state.status == SectionStatus.error) {

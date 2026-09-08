@@ -44,8 +44,7 @@ class AssignmentEntity extends Equatable {
   });
 
   /// نص العرض الموحّد لكارت درس اليوم وصفحة الواجبات
-  String get displayTitle =>
-      title.isNotEmpty ? title : newMemorizationRange;
+  String get displayTitle => title.isNotEmpty ? title : newMemorizationRange;
 
   @override
   List<Object?> get props => [
@@ -82,16 +81,14 @@ class AssignmentTaskEntity extends Equatable {
     this.recitationRecordId,
   });
 
-  Map<String, dynamic> toMap() =>
-      {
-        'id': id,
-        'title': title,
-        'points': points,
-        'isCompleted': isCompleted,
-        'kind': kind,
-        if (recitationRecordId != null)
-          'recitationRecordId': recitationRecordId,
-      };
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'title': title,
+    'points': points,
+    'isCompleted': isCompleted,
+    'kind': kind,
+    if (recitationRecordId != null) 'recitationRecordId': recitationRecordId,
+  };
 
   factory AssignmentTaskEntity.fromMap(Map<String, dynamic> map) {
     return AssignmentTaskEntity(
@@ -105,8 +102,14 @@ class AssignmentTaskEntity extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, title, points, isCompleted, kind, recitationRecordId];
+  List<Object?> get props => [
+    id,
+    title,
+    points,
+    isCompleted,
+    kind,
+    recitationRecordId,
+  ];
 }
 
 class AssignmentVoiceNoteEntity extends Equatable {
@@ -120,12 +123,11 @@ class AssignmentVoiceNoteEntity extends Equatable {
     required this.durationSeconds,
   });
 
-  Map<String, dynamic> toMap() =>
-      {
-        'teacherName': teacherName,
-        'audioUrl': audioUrl,
-        'durationSeconds': durationSeconds,
-      };
+  Map<String, dynamic> toMap() => {
+    'teacherName': teacherName,
+    'audioUrl': audioUrl,
+    'durationSeconds': durationSeconds,
+  };
 
   factory AssignmentVoiceNoteEntity.fromMap(Map<String, dynamic> map) {
     return AssignmentVoiceNoteEntity(
@@ -152,13 +154,12 @@ class AssignmentAttachmentEntity extends Equatable {
     required this.sizeLabel,
   });
 
-  Map<String, dynamic> toMap() =>
-      {
-        'id': id,
-        'name': name,
-        'url': url,
-        'sizeLabel': sizeLabel,
-      };
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'url': url,
+    'sizeLabel': sizeLabel,
+  };
 
   factory AssignmentAttachmentEntity.fromMap(Map<String, dynamic> map) {
     return AssignmentAttachmentEntity(

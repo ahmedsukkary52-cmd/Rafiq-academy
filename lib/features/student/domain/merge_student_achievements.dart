@@ -9,6 +9,5 @@ List<AchievementEntity> mergeStudentAchievements(
     if (achievement.id.isEmpty) continue;
     byId[achievement.id] = achievement;
   }
-  return byId.values.toList()
-    ..sort((a, b) => b.date.compareTo(a.date));
+  return byId.values.toList()..sort((a, b) => b.date.compareTo(a.date));
 }

@@ -56,27 +56,6 @@ class SettingsPage extends StatelessWidget {
           ),
 
           const SizedBox(height: AppSizes.paddingM),
-          const _SectionLabel('قريباً'),
-          const _ComingSoonTile(
-            icon: Icons.notifications_rounded,
-            iconBg: AppColors.secondaryBg,
-            iconColor: AppColors.secondary,
-            label: 'تفضيلات الإشعارات',
-          ),
-          const _ComingSoonTile(
-            icon: Icons.lock_outline_rounded,
-            iconBg: AppColors.surfaceGrey,
-            iconColor: AppColors.textSecondary,
-            label: 'الخصوصية والأمان',
-          ),
-          const _ComingSoonTile(
-            icon: Icons.description_outlined,
-            iconBg: AppColors.surfaceGrey,
-            iconColor: AppColors.textSecondary,
-            label: 'الشروط والأحكام',
-          ),
-
-          const SizedBox(height: AppSizes.paddingM),
           const _SectionLabel('عن التطبيق'),
           const _LinkTile(
             icon: Icons.info_outline_rounded,
@@ -175,32 +154,6 @@ class _LinkTile extends StatelessWidget {
       trailing: trailing == null
           ? null
           : Text(trailing!, style: AppTextStyles.labelMedium),
-    );
-  }
-}
-
-class _ComingSoonTile extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String label;
-
-  const _ComingSoonTile({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: _RoundIcon(icon: icon, bg: iconBg, color: iconColor),
-      title: Text(label, style: AppTextStyles.bodyLarge),
-      trailing: Text(
-        'Coming Soon',
-        style: AppTextStyles.labelMedium.copyWith(color: AppColors.textHint),
-      ),
     );
   }
 }

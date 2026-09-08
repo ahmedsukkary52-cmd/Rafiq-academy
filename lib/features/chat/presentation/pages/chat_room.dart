@@ -354,6 +354,7 @@ class _ChatRoomHeader extends StatelessWidget {
               ),
             ),
           ),
+          // Visual balance after removing unsupported header overflow menu.
           const SizedBox(width: 40),
         ],
       ),

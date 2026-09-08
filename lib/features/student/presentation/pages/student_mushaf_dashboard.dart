@@ -396,15 +396,6 @@ class _MemorizationPlanPlaceholder extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Coming Soon',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
             'ستظهر سور خطتك هنا بعد أن يعيّنها المعلم.\nيمكنك القراءة الآن من «مصحف حر كامل».',
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,

@@ -36,6 +36,13 @@ class PaymentEntity extends Equatable {
   final double? amountPaidConfirmed;
   final double? remainingAmount;
 
+  /// C4 / WA-5 — server invoice snapshot (immutable after create).
+  final String? pricingRuleId;
+  final int? pricingRuleVersion;
+  final DateTime? issuedAt;
+  final String? periodKey;
+  final String? currency;
+
   const PaymentEntity({
     required this.id,
     required this.studentId,
@@ -56,6 +63,11 @@ class PaymentEntity extends Equatable {
     this.reviewNotes,
     this.amountPaidConfirmed,
     this.remainingAmount,
+    this.pricingRuleId,
+    this.pricingRuleVersion,
+    this.issuedAt,
+    this.periodKey,
+    this.currency,
   });
 
   @override
@@ -79,6 +91,11 @@ class PaymentEntity extends Equatable {
     reviewNotes,
     amountPaidConfirmed,
     remainingAmount,
+    pricingRuleId,
+    pricingRuleVersion,
+    issuedAt,
+    periodKey,
+    currency,
   ];
 }
 

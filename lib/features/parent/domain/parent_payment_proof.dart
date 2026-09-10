@@ -53,8 +53,9 @@ class ParentPaymentProofContract {
   /// Max proof size (matches Parent UI copy: ١٠ ميجا).
   static const int maxBytes = 10 * 1024 * 1024;
 
-  /// Product-configured Vodafone Cash destination (phone / deep link).
-  /// Empty ⇒ instructions-only UI (no invented academy number).
+  /// Legacy empty constant — Vodafone destination is loaded from
+  /// `academySettings/paymentPublic` (C3). Do not hard-code a number here.
+  @Deprecated('Use academySettings/paymentPublic via Parent datasource')
   static const String transferDestination = '';
 }
 

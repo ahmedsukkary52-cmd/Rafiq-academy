@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
@@ -11,6 +12,8 @@ import '../../domain/usecases/get_absence_requests_usecase.dart';
 import '../../domain/usecases/get_children_ids_usecase.dart';
 import '../../domain/usecases/get_halaqat_for_student_usecase.dart';
 import '../../domain/usecases/get_parent_household_usecase.dart';
+import '../../domain/usecases/get_payment_access_usecase.dart';
+import '../../domain/usecases/get_payment_public_settings_usecase.dart';
 import '../../domain/usecases/get_payments_usecase.dart';
 import '../../domain/usecases/get_wallet_usecase.dart';
 import '../../domain/usecases/get_weekly_report_usecase.dart';
@@ -29,6 +32,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   final GetChildrenIdsUseCase getChildrenIds;
   final GetWeeklyReportUseCase getWeeklyReport;
   final GetPaymentsUseCase getPayments;
+  final GetPaymentPublicSettingsUseCase getPaymentPublicSettings;
+  final GetPaymentAccessUseCase getPaymentAccess;
   final GetAbsenceRequestsUseCase getAbsenceRequests;
   final GetHalaqatForStudentUseCase getHalaqatForStudent;
   final SubmitAbsenceRequestUseCase submitAbsenceRequest;
@@ -42,6 +47,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     required this.getChildrenIds,
     required this.getWeeklyReport,
     required this.getPayments,
+    required this.getPaymentPublicSettings,
+    required this.getPaymentAccess,
     required this.getAbsenceRequests,
     required this.getHalaqatForStudent,
     required this.submitAbsenceRequest,
@@ -264,12 +271,22 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     );
 
     final result = await getPayments(ParentIdParams(event.parentId));
+    final publicResult = await getPaymentPublicSettings(const NoParams());
+    final accessResult = await getPaymentAccess(ParentIdParams(event.parentId));
+
+    final destination = publicResult.fold(
+      (_) => '',
+      (s) => s.vodafoneCashDestination,
+    );
+    final access = accessResult.fold((_) => null, (a) => a);
 
     result.fold(
       (failure) => emit(
         state.copyWith(
           paymentsStatus: SectionStatus.error,
           paymentsError: failure.message,
+          vodafoneCashDestination: destination,
+          paymentAccess: access,
         ),
       ),
       (payments) {
@@ -290,6 +307,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
               children: hydrated,
               payments: payments,
             ),
+            vodafoneCashDestination: destination,
+            paymentAccess: access,
           ),
         );
       },

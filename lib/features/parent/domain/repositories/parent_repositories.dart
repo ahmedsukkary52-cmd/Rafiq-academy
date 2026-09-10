@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
+import '../../../../shared/domain/payment_access_entity.dart';
 import '../entities/parent_entities.dart';
 import '../parent_household.dart';
 import '../parent_wallet.dart';
@@ -27,6 +29,15 @@ abstract class ParentRepository {
 
   /// سجل المدفوعات والاشتراكات
   Future<Either<Failure, List<PaymentEntity>>> getPayments(String parentId);
+
+  /// C3 — Parent-readable Vodafone destination.
+  Future<Either<Failure, PaymentPublicSettingsEntity>>
+  getPaymentPublicSettings();
+
+  /// C2 — own paymentAccess (null if not created yet).
+  Future<Either<Failure, PaymentAccessEntity?>> getPaymentAccess(
+    String parentId,
+  );
 
   /// تقديم طلب استئذان عن حصة
   Future<Either<Failure, Unit>> submitAbsenceRequest(

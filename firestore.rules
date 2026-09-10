@@ -185,7 +185,12 @@ service cloud.firestore {
           'overdueAt',
           'dueDate',
           'parentId',
-          'studentId'
+          'studentId',
+          'pricingRuleId',
+          'pricingRuleVersion',
+          'issuedAt',
+          'periodKey',
+          'currency'
         ])
         && (
           !('reviewStatus' in request.resource.data)
@@ -213,7 +218,7 @@ service cloud.firestore {
       );
     }
 
-    // C2 — clients never write paymentAccess
+    // C2 — clients never write paymentAccess; Teacher/Student cannot read
     match /paymentAccess/{parentId} {
       allow read: if isAdmin()
         || isSupervisor()
@@ -221,18 +226,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // C4 — pricing rules Admin only
+    // C4 — pricing rules Admin only (Parent never reads overrides)
     match /pricingRules/{ruleId} {
       allow read: if isAdmin();
       allow write: if isAdmin();
     }
 
-    // C3 — academy settings
+    // C3 — academy settings (WAVE_A: Parent read paymentPublic only; Admin RW)
     match /academySettings/{docId} {
-      allow read: if signedIn() && (
-        isAdmin()
-        || (docId == 'paymentPublic' && (isParent() || isSupervisor()))
-      );
+      allow read: if isAdmin()
+        || (docId == 'paymentPublic' && isParent());
       allow write: if isAdmin();
     }
 

@@ -4,6 +4,8 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
+import '../../../../shared/domain/payment_access_entity.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_wallet.dart';
@@ -68,6 +70,29 @@ class ParentRepositoryImpl implements ParentRepository {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       return Right(await remoteDatasource.getPayments(parentId));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PaymentPublicSettingsEntity>>
+  getPaymentPublicSettings() async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getPaymentPublicSettings());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PaymentAccessEntity?>> getPaymentAccess(
+    String parentId,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getPaymentAccess(parentId));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

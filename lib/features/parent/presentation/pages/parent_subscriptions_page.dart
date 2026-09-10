@@ -63,7 +63,13 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
           top: Radius.circular(AppSizes.radiusXL),
         ),
       ),
-      builder: (ctx) => _ExternalPaySheet(payment: payment),
+      builder: (ctx) => _ExternalPaySheet(
+        payment: payment,
+        vodafoneCashDestination: context
+            .read<ParentBloc>()
+            .state
+            .vodafoneCashDestination,
+      ),
     );
     if (proceed != true || !mounted) return;
     await _pickAndSubmitProof(payment);
@@ -365,11 +371,15 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
 
 class _ExternalPaySheet extends StatelessWidget {
   final PaymentEntity payment;
+  final String vodafoneCashDestination;
 
-  const _ExternalPaySheet({required this.payment});
+  const _ExternalPaySheet({
+    required this.payment,
+    required this.vodafoneCashDestination,
+  });
 
   Future<void> _openDestination() async {
-    final dest = ParentPaymentProofContract.transferDestination.trim();
+    final dest = vodafoneCashDestination.trim();
     if (dest.isEmpty) return;
     final tel = dest.startsWith('tel:') ? dest : 'tel:$dest';
     final uri = Uri.tryParse(tel);
@@ -380,9 +390,7 @@ class _ExternalPaySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amount = parentMoneyLabel(payment.amount);
-    final hasDestination = ParentPaymentProofContract.transferDestination
-        .trim()
-        .isNotEmpty;
+    final hasDestination = vodafoneCashDestination.trim().isNotEmpty;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -441,6 +449,13 @@ class _ExternalPaySheet extends StatelessWidget {
             ),
             if (hasDestination) ...[
               const SizedBox(height: 12),
+              SelectableText(
+                'رقم فودافون كاش: ${vodafoneCashDestination.trim()}',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _openDestination,
                 icon: const Icon(Icons.open_in_new_rounded, size: 18),

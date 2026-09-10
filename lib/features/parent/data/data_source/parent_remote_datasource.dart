@@ -2,6 +2,8 @@ import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_wallet.dart';
 import '../models/parent_model.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
+import '../../../../shared/domain/payment_access_entity.dart';
 
 abstract class ParentRemoteDatasource {
   Future<List<String>> getChildrenIds(String parentId);
@@ -19,6 +21,12 @@ abstract class ParentRemoteDatasource {
     required DateTime weekStart,
   });
   Future<List<PaymentModel>> getPayments(String parentId);
+
+  /// C3 — Parent-safe Vodafone destination from academySettings/paymentPublic.
+  Future<PaymentPublicSettingsEntity> getPaymentPublicSettings();
+
+  /// C2 — own paymentAccess doc (null if none yet).
+  Future<PaymentAccessEntity?> getPaymentAccess(String parentId);
 
   /// تقديم طلب استئذان (contextual only — never writes attendance).
   ///

@@ -3,6 +3,7 @@ import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
 import '../../domain/entities/teacher_management_entity.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AdminRemoteDatasource
@@ -59,5 +60,38 @@ abstract class AdminRemoteDatasource {
     required String role,
     String? phone,
     bool isActive = true,
+  });
+
+  /// C3 / WA-4 — Admin RW academySettings/paymentPublic.
+  Future<PaymentPublicSettingsEntity> getPaymentPublicSettings();
+  Future<void> updatePaymentPublicSettings({
+    required String vodafoneCashDestination,
+  });
+
+  /// C3 / WA-4 — Admin-only pricingDefaults.
+  Future<PricingDefaultsEntity> getPricingDefaults();
+  Future<void> updatePricingDefaults({
+    required int gracePeriodDays,
+    required String defaultCurrency,
+    required String defaultBillingPeriod,
+  });
+
+  /// C4 / WA-5 — Admin pricing rules.
+  Future<List<PricingRuleEntity>> listPricingRules();
+  Future<void> upsertPricingRule(PricingRuleEntity rule);
+
+  /// C4 / WA-5 — invoke system invoice issuer via callable (Admin ops only).
+  /// Amount comes from pricingRules server-side; never from the client.
+  Future<String> generateInvoice({
+    required String studentId,
+    String? parentId,
+    String? periodKey,
+    String? pricingRuleId,
+  });
+
+  /// C2 / WA-3 — Admin reinstate paymentAccess (callable).
+  Future<void> reinstatePaymentAccess({
+    required String parentId,
+    String? reason,
   });
 }

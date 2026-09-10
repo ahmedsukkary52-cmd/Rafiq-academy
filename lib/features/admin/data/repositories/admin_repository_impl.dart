@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
@@ -205,6 +206,123 @@ class AdminRepositoryImpl implements AdminRepository {
           isActive: isActive,
         ),
       );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PaymentPublicSettingsEntity>>
+  getPaymentPublicSettings() async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getPaymentPublicSettings());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> updatePaymentPublicSettings({
+    required String vodafoneCashDestination,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.updatePaymentPublicSettings(
+        vodafoneCashDestination: vodafoneCashDestination,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PricingDefaultsEntity>> getPricingDefaults() async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.getPricingDefaults());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> updatePricingDefaults({
+    required int gracePeriodDays,
+    required String defaultCurrency,
+    required String defaultBillingPeriod,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.updatePricingDefaults(
+        gracePeriodDays: gracePeriodDays,
+        defaultCurrency: defaultCurrency,
+        defaultBillingPeriod: defaultBillingPeriod,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<PricingRuleEntity>>> listPricingRules() async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(await remoteDatasource.listPricingRules());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> upsertPricingRule(
+    PricingRuleEntity rule,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.upsertPricingRule(rule);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> generateInvoice({
+    required String studentId,
+    String? parentId,
+    String? periodKey,
+    String? pricingRuleId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.generateInvoice(
+          studentId: studentId,
+          parentId: parentId,
+          periodKey: periodKey,
+          pricingRuleId: pricingRuleId,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> reinstatePaymentAccess({
+    required String parentId,
+    String? reason,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.reinstatePaymentAccess(
+        parentId: parentId,
+        reason: reason,
+      );
+      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

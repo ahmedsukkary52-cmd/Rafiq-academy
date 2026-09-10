@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_payment_proof.dart';
+import '../../../../shared/domain/pricing_rules_contract.dart';
 
 export '../../../../shared/data/absence_request_model.dart';
 
@@ -26,6 +27,11 @@ class PaymentModel extends PaymentEntity {
     super.reviewNotes,
     super.amountPaidConfirmed,
     super.remainingAmount,
+    super.pricingRuleId,
+    super.pricingRuleVersion,
+    super.issuedAt,
+    super.periodKey,
+    super.currency,
   });
 
   factory PaymentModel.fromFirestore(DocumentSnapshot doc) {
@@ -34,6 +40,7 @@ class PaymentModel extends PaymentEntity {
     final reviewed = data[ParentPaymentProofContract.reviewedAtField];
     final rawDue = data['dueDate'];
     final rawPaid = data['paidAt'];
+    final rawIssued = data[PricingRulesContract.issuedAtField];
     return PaymentModel(
       id: doc.id,
       studentId: data['studentId'] ?? '',
@@ -67,6 +74,14 @@ class PaymentModel extends PaymentEntity {
       remainingAmount:
           (data[ParentPaymentProofContract.remainingAmountField] as num?)
               ?.toDouble(),
+      pricingRuleId: data[PricingRulesContract.pricingRuleIdField] as String?,
+      pricingRuleVersion:
+          (data[PricingRulesContract.pricingRuleVersionField] as num?)?.toInt(),
+      issuedAt: rawIssued is Timestamp
+          ? rawIssued.toDate()
+          : (rawIssued is DateTime ? rawIssued : null),
+      periodKey: data[PricingRulesContract.periodKeyField] as String?,
+      currency: data[PricingRulesContract.paymentCurrencyField] as String?,
     );
   }
 

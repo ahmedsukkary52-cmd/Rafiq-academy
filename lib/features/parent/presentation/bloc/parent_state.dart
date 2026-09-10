@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/payment_access_entity.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_wallet.dart';
@@ -35,6 +36,12 @@ class ParentState extends Equatable {
   final SectionStatus paymentsStatus;
   final List<PaymentEntity> payments;
   final String? paymentsError;
+
+  /// C3 — from academySettings/paymentPublic (never hard-coded).
+  final String vodafoneCashDestination;
+
+  /// C2 — own paymentAccess read model (null if absent).
+  final PaymentAccessEntity? paymentAccess;
 
   // ── قائمة طلبات الاستئذان (W7 Slice 1) ────────────────────────────────
   final SectionStatus absenceRequestsStatus;
@@ -83,6 +90,8 @@ class ParentState extends Equatable {
     this.paymentsStatus = SectionStatus.initial,
     this.payments = const [],
     this.paymentsError,
+    this.vodafoneCashDestination = '',
+    this.paymentAccess,
     this.absenceRequestsStatus = SectionStatus.initial,
     this.absenceRequests = const [],
     this.absenceRequestsError,
@@ -135,6 +144,8 @@ class ParentState extends Equatable {
     SectionStatus? paymentsStatus,
     List<PaymentEntity>? payments,
     Object? paymentsError = _unset,
+    String? vodafoneCashDestination,
+    Object? paymentAccess = _unset,
     SectionStatus? absenceRequestsStatus,
     List<AbsenceRequestEntity>? absenceRequests,
     Object? absenceRequestsError = _unset,
@@ -183,6 +194,11 @@ class ParentState extends Equatable {
       paymentsError: identical(paymentsError, _unset)
           ? this.paymentsError
           : paymentsError as String?,
+      vodafoneCashDestination:
+          vodafoneCashDestination ?? this.vodafoneCashDestination,
+      paymentAccess: identical(paymentAccess, _unset)
+          ? this.paymentAccess
+          : paymentAccess as PaymentAccessEntity?,
       absenceRequestsStatus:
           absenceRequestsStatus ?? this.absenceRequestsStatus,
       absenceRequests: absenceRequests ?? this.absenceRequests,
@@ -251,6 +267,8 @@ class ParentState extends Equatable {
     paymentsStatus,
     payments,
     paymentsError,
+    vodafoneCashDestination,
+    paymentAccess,
     absenceRequestsStatus,
     absenceRequests,
     absenceRequestsError,

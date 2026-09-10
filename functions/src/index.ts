@@ -14,3 +14,7 @@ admin.initializeApp();
 
 export { adminProvisionUser } from "./admin/adminProvisionUser";
 export { adminMigrateUserPhones } from "./admin/adminMigrateUserPhones";
+export {
+  adminGenerateInvoice,
+  adminReinstatePaymentAccess,
+} from "./admin/adminBilling";

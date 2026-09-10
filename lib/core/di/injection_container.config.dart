@@ -206,8 +206,14 @@ import 'package:rafiq_academy/features/parent/domain/usecases/get_parent_househo
     as _i281;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_payments_usecase.dart'
     as _i817;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_payment_access_usecase.dart'
+    as _iPayAccess;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_payment_public_settings_usecase.dart'
+    as _iPayPublic;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_wallet_usecase.dart'
     as _i957;
+import 'package:rafiq_academy/features/admin/domain/usecases/admin_billing_usecases.dart'
+    as _iAdminBilling;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_weekly_report_usecase.dart'
     as _i379;
 import 'package:rafiq_academy/features/parent/domain/usecases/initiate_payment_usecase.dart'
@@ -695,6 +701,40 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_iProvisionUser.ProvisionUserUseCase>(
       () => _iProvisionUser.ProvisionUserUseCase(gh<_i255.AdminRepository>()),
     );
+    gh.lazySingleton<_iAdminBilling.GetAdminPaymentPublicSettingsUseCase>(
+      () => _iAdminBilling.GetAdminPaymentPublicSettingsUseCase(
+        gh<_i255.AdminRepository>(),
+      ),
+    );
+    gh.lazySingleton<_iAdminBilling.UpdatePaymentPublicSettingsUseCase>(
+      () => _iAdminBilling.UpdatePaymentPublicSettingsUseCase(
+        gh<_i255.AdminRepository>(),
+      ),
+    );
+    gh.lazySingleton<_iAdminBilling.GetPricingDefaultsUseCase>(
+      () =>
+          _iAdminBilling.GetPricingDefaultsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_iAdminBilling.UpdatePricingDefaultsUseCase>(
+      () => _iAdminBilling.UpdatePricingDefaultsUseCase(
+        gh<_i255.AdminRepository>(),
+      ),
+    );
+    gh.lazySingleton<_iAdminBilling.ListPricingRulesUseCase>(
+      () => _iAdminBilling.ListPricingRulesUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_iAdminBilling.UpsertPricingRuleUseCase>(
+      () =>
+          _iAdminBilling.UpsertPricingRuleUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_iAdminBilling.GenerateInvoiceUseCase>(
+      () => _iAdminBilling.GenerateInvoiceUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_iAdminBilling.ReinstatePaymentAccessUseCase>(
+      () => _iAdminBilling.ReinstatePaymentAccessUseCase(
+        gh<_i255.AdminRepository>(),
+      ),
+    );
     gh.lazySingleton<_i488.GetAcademyStatsUseCase>(
       () => _i488.GetAcademyStatsUseCase(gh<_i255.AdminRepository>()),
     );
@@ -859,6 +899,14 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i817.GetPaymentsUseCase>(
       () => _i817.GetPaymentsUseCase(gh<_i493.ParentRepository>()),
     );
+    gh.lazySingleton<_iPayPublic.GetPaymentPublicSettingsUseCase>(
+      () => _iPayPublic.GetPaymentPublicSettingsUseCase(
+        gh<_i493.ParentRepository>(),
+      ),
+    );
+    gh.lazySingleton<_iPayAccess.GetPaymentAccessUseCase>(
+      () => _iPayAccess.GetPaymentAccessUseCase(gh<_i493.ParentRepository>()),
+    );
     gh.lazySingleton<_i957.GetWalletUseCase>(
       () => _i957.GetWalletUseCase(gh<_i493.ParentRepository>()),
     );
@@ -947,6 +995,9 @@ extension GetItInjectableX on _i174.GetIt {
         getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
         getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
         getPayments: gh<_i817.GetPaymentsUseCase>(),
+        getPaymentPublicSettings:
+            gh<_iPayPublic.GetPaymentPublicSettingsUseCase>(),
+        getPaymentAccess: gh<_iPayAccess.GetPaymentAccessUseCase>(),
         getAbsenceRequests: gh<_i1044.GetAbsenceRequestsUseCase>(),
         getHalaqatForStudent: gh<_i242.GetHalaqatForStudentUseCase>(),
         submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),

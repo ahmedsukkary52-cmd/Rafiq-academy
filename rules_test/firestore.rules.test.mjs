@@ -313,3 +313,155 @@ test('unauthenticated cannot read users', async () => {
   const db = testEnv.unauthenticatedContext().firestore();
   await assertFails(db.doc('users/student1').get());
 });
+
+// ── WA-3 → WA-5 ────────────────────────────────────────────────────────────
+
+test('WA-3 Teacher cannot write paymentAccess', async () => {
+  const db = authed('teacher1');
+  await assertFails(
+    db.doc('paymentAccess/parent1').update({ status: 'ok' }),
+  );
+});
+
+test('WA-3 Student cannot write paymentAccess', async () => {
+  const db = authed('student1');
+  await assertFails(
+    db.doc('paymentAccess/parent1').set({ status: 'ok', parentId: 'parent1' }),
+  );
+});
+
+test('WA-3 Supervisor cannot write paymentAccess', async () => {
+  const db = authed('supervisor1');
+  await assertFails(
+    db.doc('paymentAccess/parent1').update({ status: 'ok' }),
+  );
+});
+
+test('WA-3 Parent can read own paymentAccess', async () => {
+  const db = authed('parent1');
+  await assertSucceeds(db.doc('paymentAccess/parent1').get());
+});
+
+test('WA-3 Teacher cannot read paymentAccess', async () => {
+  const db = authed('teacher1');
+  await assertFails(db.doc('paymentAccess/parent1').get());
+});
+
+test('WA-4 Supervisor cannot write paymentPublic', async () => {
+  const db = authed('supervisor1');
+  await assertFails(
+    db.doc('academySettings/paymentPublic').update({
+      vodafoneCashDestination: 'x',
+    }),
+  );
+});
+
+test('WA-4 Supervisor cannot read paymentPublic (Parent-only per WAVE_A)', async () => {
+  const db = authed('supervisor1');
+  await assertFails(db.doc('academySettings/paymentPublic').get());
+});
+
+test('WA-4 Student cannot write paymentPublic', async () => {
+  const db = authed('student1');
+  await assertFails(
+    db.doc('academySettings/paymentPublic').update({
+      vodafoneCashDestination: 'x',
+    }),
+  );
+});
+
+test('WA-4 non-Admin cannot write pricingDefaults', async () => {
+  const db = authed('parent1');
+  await assertFails(
+    db.doc('academySettings/pricingDefaults').set({
+      gracePeriodDays: 99,
+    }),
+  );
+});
+
+test('WA-4 Parent cannot read pricingDefaults', async () => {
+  const db = authed('parent1');
+  await assertFails(db.doc('academySettings/pricingDefaults').get());
+});
+
+test('WA-4 Admin can manage paymentPublic and pricingDefaults', async () => {
+  const db = authed('admin1');
+  await assertSucceeds(
+    db.doc('academySettings/paymentPublic').set({
+      vodafoneCashDestination: '01012345678',
+      updatedBy: 'admin1',
+    }),
+  );
+  await assertSucceeds(
+    db.doc('academySettings/pricingDefaults').set({
+      gracePeriodDays: 7,
+      defaultCurrency: 'EGP',
+    }),
+  );
+});
+
+test('WA-5 Parent cannot create arbitrary invoice', async () => {
+  const db = authed('parent1');
+  await assertFails(
+    db.doc('payments/forged').set({
+      parentId: 'parent1',
+      studentId: 'student1',
+      amount: 1,
+      status: 'due',
+    }),
+  );
+});
+
+test('WA-5 Parent cannot set pricingRuleId/version', async () => {
+  const db = authed('parent1');
+  await assertFails(
+    db.doc('payments/pay1').update({
+      pricingRuleId: 'hack',
+      pricingRuleVersion: 99,
+    }),
+  );
+});
+
+test('WA-5 Parent cannot set paid / privileged status', async () => {
+  const db = authed('parent1');
+  await assertFails(db.doc('payments/pay1').update({ status: 'paid' }));
+  await assertFails(db.doc('payments/pay1').update({ amount: 1 }));
+});
+
+test('WA-5 Parent cannot read pricingRules', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('pricingRules/r1').set({
+      scope: 'academy_default',
+      amount: 200,
+      active: true,
+      version: 1,
+    });
+  });
+  const db = authed('parent1');
+  await assertFails(db.doc('pricingRules/r1').get());
+});
+
+test('WA-5 Teacher cannot write pricingRules', async () => {
+  const db = authed('teacher1');
+  await assertFails(
+    db.doc('pricingRules/r1').set({
+      scope: 'academy_default',
+      amount: 1,
+      active: true,
+      version: 1,
+    }),
+  );
+});
+
+test('WA-5 Admin can write pricingRules', async () => {
+  const db = authed('admin1');
+  await assertSucceeds(
+    db.doc('pricingRules/r1').set({
+      scope: 'academy_default',
+      amount: 250,
+      currency: 'EGP',
+      active: true,
+      version: 1,
+    }),
+  );
+});

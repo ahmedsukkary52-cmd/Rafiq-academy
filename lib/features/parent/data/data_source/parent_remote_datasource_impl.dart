@@ -9,6 +9,10 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/absence_request_firestore_reads.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
+import '../../../../shared/domain/academy_payment_settings_contract.dart';
+import '../../../../shared/domain/payment_access_contract.dart';
+import '../../../../shared/domain/payment_access_entity.dart';
 import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../analytics/domain/analytics_recitation_honesty.dart';
@@ -183,6 +187,70 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
       return snapshot.docs.map(PaymentModel.fromFirestore).toList();
     } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<PaymentPublicSettingsEntity> getPaymentPublicSettings() async {
+    try {
+      final doc = await firestore
+          .collection(FirestoreCollections.academySettings)
+          .doc(AcademyPaymentSettingsContract.paymentPublicDocId)
+          .get();
+      final data = doc.data() ?? const <String, dynamic>{};
+      final updated = data[AcademyPaymentSettingsContract.updatedAtField];
+      return PaymentPublicSettingsEntity(
+        vodafoneCashDestination:
+            (data[AcademyPaymentSettingsContract.vodafoneCashDestinationField]
+                    as String?)
+                ?.trim() ??
+            '',
+        updatedAt: updated is Timestamp ? updated.toDate() : null,
+        updatedBy:
+            data[AcademyPaymentSettingsContract.updatedByField] as String?,
+      );
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<PaymentAccessEntity?> getPaymentAccess(String parentId) async {
+    try {
+      final doc = await firestore
+          .collection(FirestoreCollections.paymentAccess)
+          .doc(parentId)
+          .get();
+      if (!doc.exists) return null;
+      final data = doc.data() ?? const <String, dynamic>{};
+      DateTime? ts(dynamic v) => v is Timestamp ? v.toDate() : null;
+      final status =
+          (data[PaymentAccessContract.statusField] as String?)?.trim() ??
+          PaymentAccessContract.statusOk;
+      if (!PaymentAccessContract.isValidStatus(status)) {
+        throw const ServerException('حالة صلاحية الدفع غير صالحة');
+      }
+      final affected =
+          data[PaymentAccessContract.affectedStudentIdsField] as List?;
+      return PaymentAccessEntity(
+        parentId: parentId,
+        status: status,
+        reason: data[PaymentAccessContract.reasonField] as String?,
+        primaryInvoiceId:
+            data[PaymentAccessContract.primaryInvoiceIdField] as String?,
+        affectedStudentIds:
+            affected?.map((e) => e.toString()).toList() ?? const [],
+        graceEndsAt: ts(data[PaymentAccessContract.graceEndsAtField]),
+        suspendedAt: ts(data[PaymentAccessContract.suspendedAtField]),
+        warningIssuedAt: ts(data[PaymentAccessContract.warningIssuedAtField]),
+        lastReminderAt: ts(data[PaymentAccessContract.lastReminderAtField]),
+        reinstatedAt: ts(data[PaymentAccessContract.reinstatedAtField]),
+        reinstatedBy: data[PaymentAccessContract.reinstatedByField] as String?,
+        updatedAt: ts(data[PaymentAccessContract.updatedAtField]),
+      );
+    } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
   }

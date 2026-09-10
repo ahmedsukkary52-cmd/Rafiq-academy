@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../shared/domain/academy_billing_entities.dart';
 import '../entities/academy_stats_entity.dart';
 import '../entities/complaint_entity.dart';
 import '../entities/financial_summary_entity.dart';
@@ -86,6 +87,37 @@ abstract class AdminRepository {
     required String role,
     String? phone,
     bool isActive,
+  });
+
+  Future<Either<Failure, PaymentPublicSettingsEntity>>
+  getPaymentPublicSettings();
+
+  Future<Either<Failure, Unit>> updatePaymentPublicSettings({
+    required String vodafoneCashDestination,
+  });
+
+  Future<Either<Failure, PricingDefaultsEntity>> getPricingDefaults();
+
+  Future<Either<Failure, Unit>> updatePricingDefaults({
+    required int gracePeriodDays,
+    required String defaultCurrency,
+    required String defaultBillingPeriod,
+  });
+
+  Future<Either<Failure, List<PricingRuleEntity>>> listPricingRules();
+
+  Future<Either<Failure, Unit>> upsertPricingRule(PricingRuleEntity rule);
+
+  Future<Either<Failure, String>> generateInvoice({
+    required String studentId,
+    String? parentId,
+    String? periodKey,
+    String? pricingRuleId,
+  });
+
+  Future<Either<Failure, Unit>> reinstatePaymentAccess({
+    required String parentId,
+    String? reason,
   });
 }
 

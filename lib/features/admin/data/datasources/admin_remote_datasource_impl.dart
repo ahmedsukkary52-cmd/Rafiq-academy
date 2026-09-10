@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
@@ -15,8 +16,12 @@ import 'admin_remote_datasource.dart';
 @LazySingleton(as: AdminRemoteDatasource)
 class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   final FirebaseFirestore firestore;
+  final FirebaseFunctions functions;
 
-  const AdminRemoteDatasourceImpl({required this.firestore});
+  const AdminRemoteDatasourceImpl({
+    required this.firestore,
+    required this.functions,
+  });
 
   @override
   Future<AcademyStatsEntity> getAcademyStats() async {
@@ -299,6 +304,39 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         activeDates: sortedDates,
       );
     } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<String> provisionUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String? phone,
+    bool isActive = true,
+  }) async {
+    try {
+      final callable = functions.httpsCallable('adminProvisionUser');
+      final result = await callable.call(<String, dynamic>{
+        'email': email.trim(),
+        'password': password,
+        'name': name.trim(),
+        'role': role.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        'isActive': isActive,
+      });
+      final data = result.data;
+      if (data is Map) {
+        final uid = data['uid'];
+        if (uid is String && uid.isNotEmpty) return uid;
+      }
+      throw const ServerException('تعذر إنشاء الحساب: رد غير متوقع');
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
   }

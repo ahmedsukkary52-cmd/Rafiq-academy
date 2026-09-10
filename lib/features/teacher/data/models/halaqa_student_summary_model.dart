@@ -25,6 +25,17 @@ class HalaqaStudentSummaryModel extends HalaqaStudentSummaryEntity {
     );
   }
 
+  /// Roster identity from `studentProfiles` (WA-2 / D16 — avoid users.phone).
+  factory HalaqaStudentSummaryModel.fromStudentProfile(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? const {};
+    return HalaqaStudentSummaryModel(
+      uid: doc.id,
+      name: (data['name'] as String?) ?? '',
+      profileImageUrl: data['profileImageUrl'] as String?,
+      level: (data['level'] as num?)?.toInt() ?? 1,
+    );
+  }
+
   factory HalaqaStudentSummaryModel.fromEntity(
     HalaqaStudentSummaryEntity entity,
   ) {

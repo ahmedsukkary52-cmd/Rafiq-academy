@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../bloc/auth_bloc.dart';
@@ -221,25 +219,10 @@ class _LoginPageState extends State<LoginPage> {
 
                       const SizedBox(height: 16),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'ليس لديك حساب؟',
-                            style: AppTextStyles.labelSmall,
-                          ),
-                          TextButton(
-                            onPressed: () => context.push(AppRoutes.register),
-                            child: const Text(
-                              'إنشاء حساب',
-                              style: TextStyle(
-                                fontFamily: 'NotoNaskhArabic',
-                                fontSize: 13,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'إنشاء الحساب يتم بواسطة إدارة الأكاديمية فقط',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.labelSmall,
                       ),
 
                       const SizedBox(height: 24),

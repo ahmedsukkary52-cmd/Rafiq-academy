@@ -29,11 +29,11 @@ class UserModel extends UserEntity {
     );
   }
 
+  /// Public identity fields only — phone lives in [FirestoreCollections.userPrivate].
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
       'role': role,
-      'phone': phone,
       if (email != null) 'email': email,
       if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
       'isActive': isActive,

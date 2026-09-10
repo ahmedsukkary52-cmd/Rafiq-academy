@@ -58,22 +58,26 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
 
       if (studentIds.isEmpty) return [];
 
-      // Firestore whereIn max 30 — chunk so large rosters do not hard-fail (H5).
+      // Firestore whereIn max 30 — use studentProfiles (not users) so D16
+      // phone-bearing legacy users docs do not break roster queries (WA-2).
       final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
       for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
-        final usersSnap = await firestore
-            .collection(FirestoreCollections.users)
+        final profilesSnap = await firestore
+            .collection(FirestoreCollections.studentProfiles)
             .where(FieldPath.documentId, whereIn: chunk)
             .get();
-        docs.addAll(usersSnap.docs);
+        docs.addAll(profilesSnap.docs);
       }
 
-      final bases =
-          docs.map(HalaqaStudentSummaryModel.fromFirestore).toList();
+      final bases = docs
+          .map(HalaqaStudentSummaryModel.fromStudentProfile)
+          .toList();
 
       final now = DateTime.now();
       final from = now.subtract(
-        const Duration(days: HalaqaStudentSummaryProjector.attendanceWindowDays),
+        const Duration(
+          days: HalaqaStudentSummaryProjector.attendanceWindowDays,
+        ),
       );
 
       final parallel = await Future.wait([
@@ -89,10 +93,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         _loadProgressByStudentId(studentIds),
       ]);
 
-      final attendanceSnap =
-          parallel[0] as QuerySnapshot<Map<String, dynamic>>;
-      final recitationSnap =
-          parallel[1] as QuerySnapshot<Map<String, dynamic>>;
+      final attendanceSnap = parallel[0] as QuerySnapshot<Map<String, dynamic>>;
+      final recitationSnap = parallel[1] as QuerySnapshot<Map<String, dynamic>>;
       final progressById = parallel[2] as Map<String, double>;
 
       final marks = attendanceSnap.docs.map((doc) {
@@ -207,9 +209,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         final normalizedDay = AttendancePolicy.dayStart(record.date);
         final sessionId = record.sessionId.trim();
         if (sessionId.isEmpty) {
-          throw const ServerException(
-            'sessionId مطلوب لكل سجل حضور جديد',
-          );
+          throw const ServerException('sessionId مطلوب لكل سجل حضور جديد');
         }
         final docId = AttendancePolicy.documentId(
           sessionId: sessionId,

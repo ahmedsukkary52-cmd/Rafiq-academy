@@ -16,10 +16,16 @@ class FirestoreCollections {
   const FirestoreCollections._();
 
   static const String users = 'users';
+
+  /// D16 phone vault — Admin + self read; CF write only (WA-1/WA-2).
+  static const String userPrivate = 'userPrivate';
   static const String studentProfiles = 'studentProfiles';
   static const String parentProfiles = 'parentProfiles';
   static const String teacherProfiles = 'teacherProfiles';
   static const String supervisorProfiles = 'supervisorProfiles';
+  static const String academySettings = 'academySettings';
+  static const String paymentAccess = 'paymentAccess';
+  static const String auditLogs = 'auditLogs';
   static const String halaqat = 'halaqat';
   static const String reviewSchedules = 'reviewSchedules';
   static const String recitationRecords = 'recitationRecords';

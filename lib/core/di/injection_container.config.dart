@@ -30,6 +30,8 @@ import 'package:rafiq_academy/features/admin/domain/repositories/admin_repositor
     as _i255;
 import 'package:rafiq_academy/features/admin/domain/usecases/approve_new_student_usecase.dart'
     as _i928;
+import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usecase.dart'
+    as _iProvisionUser;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_academy_stats_usecase.dart'
     as _i488;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_all_teachers_usecase.dart'
@@ -472,6 +474,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i543.AdminRemoteDatasource>(
       () => _i775.AdminRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+        functions: gh<_i809.FirebaseFunctions>(),
       ),
     );
     gh.lazySingleton<_i283.ContentLibraryRepository>(
@@ -688,6 +691,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i928.ApproveNewStudentUseCase>(
       () => _i928.ApproveNewStudentUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_iProvisionUser.ProvisionUserUseCase>(
+      () => _iProvisionUser.ProvisionUserUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i488.GetAcademyStatsUseCase>(
       () => _i488.GetAcademyStatsUseCase(gh<_i255.AdminRepository>()),

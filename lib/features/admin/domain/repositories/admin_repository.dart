@@ -77,6 +77,16 @@ abstract class AdminRepository {
     required DateTime from,
     required DateTime to,
   });
+
+  /// C1 — Admin provisions Auth + users + profile via Cloud Function.
+  Future<Either<Failure, String>> provisionUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String? phone,
+    bool isActive,
+  });
 }
 
 class ApproveStudentParams extends Equatable {
@@ -166,4 +176,25 @@ class TeacherActivityParams extends Equatable {
 
   @override
   List<Object?> get props => [teacherId, from, to];
+}
+
+class ProvisionUserParams extends Equatable {
+  final String email;
+  final String password;
+  final String name;
+  final String role;
+  final String? phone;
+  final bool isActive;
+
+  const ProvisionUserParams({
+    required this.email,
+    required this.password,
+    required this.name,
+    required this.role,
+    this.phone,
+    this.isActive = true,
+  });
+
+  @override
+  List<Object?> get props => [email, password, name, role, phone, isActive];
 }

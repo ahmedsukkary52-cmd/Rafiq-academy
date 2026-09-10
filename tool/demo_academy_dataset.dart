@@ -1,4 +1,4 @@
-/// Demo Academy permanent development dataset — called from [seed_firestore.dart].
+﻿/// Demo Academy permanent development dataset — called from [seed_firestore.dart].
 ///
 /// Idempotent: fixed document IDs under `demo_*` / stable Auth emails.
 /// Safe to re-run; overwrites the same docs.
@@ -189,6 +189,11 @@ Future<Map<String, User>> ensureAllDemoAuthUsers(
   return out;
 }
 
+/// Demo / local seed helper ONLY — not a production Auth path (D1 / WA-1).
+///
+/// Uses client `createUserWithEmailAndPassword` for emulator/dev seeding.
+/// Production accounts must be created via `adminProvisionUser` Cloud Function.
+/// Do not call this from the Flutter app product surfaces.
 Future<User> ensureAuthUser(
   FirebaseAuth auth, {
   required String email,

@@ -6,7 +6,8 @@
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test:unit": "node --test test/wa1_provision_gate.test.mjs"
   },
   "engines": {
     "node": "20"

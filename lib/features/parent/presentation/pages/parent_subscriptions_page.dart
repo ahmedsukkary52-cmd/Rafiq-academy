@@ -12,6 +12,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_payment_proof.dart';
+import '../../domain/parent_wallet.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
@@ -734,7 +735,8 @@ class _PaymentCard extends StatelessWidget {
     final review = payment.reviewStatus?.trim() ?? '';
     final isRejected = review == ParentPaymentProofContract.rejected;
     final isPartial = review == ParentPaymentProofContract.partial;
-    final canPayFromWallet = walletBalance >= payment.amount;
+    final canPayFromWallet =
+        ParentWalletContract.enabled && walletBalance >= payment.amount;
     final accent = isPaid
         ? AppColors.success
         : isRejected

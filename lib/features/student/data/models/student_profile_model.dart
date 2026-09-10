@@ -49,7 +49,8 @@ class StudentProfileModel extends StudentProfileEntity {
       uid: uid,
       name: user['name'] ?? '',
       profileImageUrl: user['profileImageUrl'] as String?,
-      phone: _readNonEmptyString(user['phone']),
+      // D16 — never hydrate phone from users; resolve via userPrivate when allowed.
+      phone: null,
       halaqaId: profile['halaqaId'] as String?,
       halaqaName: _readNonEmptyString(profile['halaqaName']) ?? halaqaName,
       currentPlanName: profile['currentPlanName'] ?? '',

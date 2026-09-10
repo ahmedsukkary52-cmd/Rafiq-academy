@@ -120,8 +120,8 @@ class AdminRepositoryImpl implements AdminRepository {
   }
 
   @override
-  Future<
-      Either<Failure, List<TeacherManagementEntity>>> getAllTeachers() async {
+  Future<Either<Failure, List<TeacherManagementEntity>>>
+  getAllTeachers() async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       return Right(await remoteDatasource.getAllTeachers());
@@ -172,11 +172,39 @@ class AdminRepositoryImpl implements AdminRepository {
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      return Right(await remoteDatasource.getTeacherActivityLog(
-        teacherId: teacherId,
-        from: from,
-        to: to,
-      ));
+      return Right(
+        await remoteDatasource.getTeacherActivityLog(
+          teacherId: teacherId,
+          from: from,
+          to: to,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> provisionUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String? phone,
+    bool isActive = true,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.provisionUser(
+          email: email,
+          password: password,
+          name: name,
+          role: role,
+          phone: phone,
+          isActive: isActive,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

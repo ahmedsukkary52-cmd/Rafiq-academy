@@ -181,20 +181,50 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   @override
   Future<ChatParticipantModel> getParticipant(String uid) async {
     try {
-      final doc = await firestore
+      // Prefer users when phone-free; fall back to role profiles (WA-2 / D16).
+      final userDoc = await firestore
           .collection(FirestoreCollections.users)
           .doc(uid)
           .get();
-      if (!doc.exists) {
-        throw const ServerException('المستخدم غير موجود');
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        return ChatParticipantModel(
+          uid: userDoc.id,
+          name: data['name'] as String? ?? '',
+          role: data['role'] as String? ?? '',
+          profileImageUrl: data['profileImageUrl'] as String?,
+        );
       }
-      final data = doc.data() as Map<String, dynamic>;
-      return ChatParticipantModel(
-        uid: doc.id,
-        name: data['name'] as String? ?? '',
-        role: data['role'] as String? ?? '',
-        profileImageUrl: data['profileImageUrl'] as String?,
-      );
+
+      final studentDoc = await firestore
+          .collection(FirestoreCollections.studentProfiles)
+          .doc(uid)
+          .get();
+      if (studentDoc.exists) {
+        final data = studentDoc.data() as Map<String, dynamic>;
+        return ChatParticipantModel(
+          uid: studentDoc.id,
+          name: data['name'] as String? ?? '',
+          role: AppRoles.student,
+          profileImageUrl: data['profileImageUrl'] as String?,
+        );
+      }
+
+      final teacherDoc = await firestore
+          .collection(FirestoreCollections.teacherProfiles)
+          .doc(uid)
+          .get();
+      if (teacherDoc.exists) {
+        final data = teacherDoc.data() as Map<String, dynamic>;
+        return ChatParticipantModel(
+          uid: teacherDoc.id,
+          name: data['name'] as String? ?? '',
+          role: AppRoles.teacher,
+          profileImageUrl: data['profileImageUrl'] as String?,
+        );
+      }
+
+      throw const ServerException('المستخدم غير موجود');
     } on ServerException {
       rethrow;
     } catch (e) {

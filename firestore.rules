@@ -1,21 +1,342 @@
 rules_version = '2';
 
-// Exported from live release (2026-07-06):
-//   projects/rafiq-academy/rulesets/76dd27d7-1127-499c-91a0-b3c0f02c5d09
-// Previous console "test mode" rules (expired 2026-08-05 UTC):
-//   match /{document=**} {
-//     allow read, write: if request.time < timestamp.date(2026, 8, 5);
-//   }
-// That expiry caused permission-denied on users/{uid} after Auth succeeded.
+// WA-2 authorization foundation (C1–C4, C10, C16; D1, D2, D14, D16).
+// Wired in firebase.json for versioning/emulator — do NOT deploy until
+// B-BILLING Verified and phone migration plan acknowledged.
 //
-// Interim: require a signed-in Firebase Auth user (closes anonymous access).
-// Full role/ownership rules remain Category B (B-R1 hardening) — do not loosen
-// this back to a time-boxed open world.
+// Self-phone: own-read of userPrivate allowed (freeze recommendation).
+// Absolute Admin-only self-phone remains IMPORTANT TBD — not reinvented here.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid()))
+        && userDoc().role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isSupervisor() {
+      return hasRole('supervisor');
+    }
+
+    function isParent() {
+      return hasRole('parent');
+    }
+
+    function isSelf(userId) {
+      return signedIn() && uid() == userId;
+    }
+
+    function hasExposedPhone(data) {
+      return 'phone' in data
+        && data.phone is string
+        && data.phone.size() > 0;
+    }
+
+    function roleUnchanged() {
+      return !('role' in request.resource.data)
+        || request.resource.data.role == resource.data.role;
+    }
+
+    function isActiveUnchanged() {
+      return !('isActive' in request.resource.data)
+        || request.resource.data.isActive == resource.data.isActive;
+    }
+
+    // ── users (identity; phone must live in userPrivate) ───────────────
+    match /users/{userId} {
+      allow get: if signedIn() && (
+        isAdmin()
+        || isSelf(userId)
+        || !hasExposedPhone(resource.data)
+      );
+
+      allow list: if signedIn() && (
+        isAdmin()
+        || !hasExposedPhone(resource.data)
+      );
+
+      allow create: if false;
+      allow delete: if false;
+
+      allow update: if signedIn() && (
+        (
+          isSelf(userId)
+          && roleUnchanged()
+          && isActiveUnchanged()
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['role', 'isActive', 'phone', 'createdAt'])
+          && !hasExposedPhone(request.resource.data)
+        )
+        || (
+          isAdmin()
+          && roleUnchanged()
+          && !hasExposedPhone(request.resource.data)
+        )
+      );
+    }
+
+    // ── Admin-only / self phone vault (D16) ────────────────────────────
+    match /userPrivate/{userId} {
+      allow read: if isAdmin() || isSelf(userId);
+      allow write: if false;
+    }
+
+    // ── Profiles ───────────────────────────────────────────────────────
+    match /parentProfiles/{parentId} {
+      allow read: if signedIn();
+      allow create, delete: if false;
+      allow update: if signedIn()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['childrenIds', 'phone'])
+        && !hasExposedPhone(request.resource.data);
+    }
+
+    match /studentProfiles/{studentId} {
+      allow read: if signedIn();
+      allow create: if false;
+      allow delete: if false;
+      // D16: never allow phone on profile projections via client writes.
+      allow update: if signedIn()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['phone'])
+        && !hasExposedPhone(request.resource.data);
+    }
+
+    match /teacherProfiles/{teacherId} {
+      allow read: if signedIn();
+      allow create: if false;
+      allow delete: if false;
+      allow update: if signedIn()
+        && (isAdmin() || isSelf(teacherId))
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['phone'])
+        && !hasExposedPhone(request.resource.data);
+    }
+
+    // Legacy / OUT — quarantine writes (D24)
+    match /supervisorProfiles/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Halaqat ────────────────────────────────────────────────────────
+    match /halaqat/{halaqaId} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if signedIn() && (
+        isAdmin()
+        || isSupervisor()
+        || !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['studentIds'])
+      );
+    }
+
+    // ── Payments ───────────────────────────────────────────────────────
+    function paymentParentOwned() {
+      return resource.data.parentId == uid();
+    }
+
+    function paymentAmountUnchanged() {
+      return request.resource.data.amount == resource.data.amount;
+    }
+
+    function paymentStatusUnchanged() {
+      return request.resource.data.status == resource.data.status;
+    }
+
+    function paymentIdentityUnchanged() {
+      return request.resource.data.parentId == resource.data.parentId
+        && (
+          !('studentId' in resource.data)
+          || request.resource.data.studentId == resource.data.studentId
+        );
+    }
+
+    function parentProofOnlyUpdate() {
+      // Parent may set proof fields + pending_review and clear prior review
+      // fields (FieldValue.delete → field absent on request.resource), but must
+      // never set paid/overdue/amount or reviewer conclusion fields.
+      return isParent()
+        && paymentParentOwned()
+        && paymentAmountUnchanged()
+        && paymentStatusUnchanged()
+        && paymentIdentityUnchanged()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'amount',
+          'status',
+          'paidAt',
+          'overdueAt',
+          'dueDate',
+          'parentId',
+          'studentId'
+        ])
+        && (
+          !('reviewStatus' in request.resource.data)
+          || request.resource.data.reviewStatus == 'pending_review'
+        )
+        && !('reviewedBy' in request.resource.data)
+        && !('reviewedAt' in request.resource.data)
+        && !('reviewNotes' in request.resource.data)
+        && !('amountPaidConfirmed' in request.resource.data)
+        && !('remainingAmount' in request.resource.data);
+    }
+
+    match /payments/{paymentId} {
+      allow read: if signedIn() && (
+        isAdmin()
+        || isSupervisor()
+        || resource.data.parentId == uid()
+      );
+      allow create: if false;
+      allow delete: if false;
+      allow update: if signedIn() && (
+        isAdmin()
+        || isSupervisor()
+        || parentProofOnlyUpdate()
+      );
+    }
+
+    // C2 — clients never write paymentAccess
+    match /paymentAccess/{parentId} {
+      allow read: if isAdmin()
+        || isSupervisor()
+        || (isParent() && parentId == uid());
+      allow write: if false;
+    }
+
+    // C4 — pricing rules Admin only
+    match /pricingRules/{ruleId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // C3 — academy settings
+    match /academySettings/{docId} {
+      allow read: if signedIn() && (
+        isAdmin()
+        || (docId == 'paymentPublic' && (isParent() || isSupervisor()))
+      );
+      allow write: if isAdmin();
+    }
+
+    // D2 OUT — wallet client writes denied
+    match /wallets/{walletId} {
+      allow read: if isAdmin() || (signedIn() && walletId == uid());
+      allow write: if false;
+
+      match /ledger/{entryId} {
+        allow read: if isAdmin() || (signedIn() && walletId == uid());
+        allow write: if false;
+      }
+    }
+
+    // C16 — audit logs
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Operational collections — authenticated RW until later Waves tighten.
+    match /attendanceRecords/{id} {
+      allow read, write: if signedIn();
+    }
+    match /recitationRecords/{id} {
+      allow read, write: if signedIn();
+    }
+    match /absenceRequests/{id} {
+      allow read, write: if signedIn();
+    }
+    match /achievements/{id} {
+      allow read, write: if signedIn();
+    }
+    match /assignments/{id} {
+      allow read, write: if signedIn();
+    }
+    match /notifications/{id} {
+      allow read, write: if signedIn();
+    }
+    match /complaints/{id} {
+      allow read, write: if signedIn();
+    }
+    match /supervisorReports/{id} {
+      allow read, write: if signedIn();
+    }
+    match /posts/{id} {
+      allow read, write: if signedIn();
+      match /comments/{commentId} {
+        allow read, write: if signedIn();
+      }
+    }
+    match /calendarEvents/{id} {
+      allow read, write: if signedIn();
+    }
+    match /contentLibrary/{id} {
+      allow read, write: if signedIn();
+    }
+    match /reciters/{id} {
+      allow read, write: if signedIn();
+    }
+    match /surahAudios/{id} {
+      allow read, write: if signedIn();
+    }
+    match /listeningProgress/{id} {
+      allow read, write: if signedIn();
+    }
+    match /reviewSchedules/{id} {
+      allow read, write: if signedIn();
+    }
+    match /halaqaActivity/{id} {
+      allow read, write: if signedIn();
+      match /activityResponses/{responseId} {
+        allow read, write: if signedIn();
+      }
+    }
+
+    // Chat — relationship hardening is later Wave (WA-11).
+    match /conversations/{conversationId} {
+      allow read, write: if signedIn();
+      match /messages/{messageId} {
+        allow read, write: if signedIn();
+      }
+    }
+
+    // Future Wave collections — deny client writes by default
+    match /sessions/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /studentSearch/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /fcmTokens/{userId} {
+      allow read: if isAdmin() || isSelf(userId);
+      allow write: if isSelf(userId);
+      match /devices/{deviceId} {
+        allow read, write: if isAdmin() || isSelf(userId);
+      }
+    }
+
+    // Default deny — no catch-all signed-in RW
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

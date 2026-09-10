@@ -264,24 +264,10 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
 
   @override
   Future<PaymentInitiationEntity> initiatePayment(String paymentId) async {
-    throw const ServerException('الدفع الإلكتروني غير متاح حالياً'); // try {
-    //   final callable = functions.httpsCallable('createPaymentIntention');
-    //   final result = await callable.call<Map<String, dynamic>>({
-    //     'paymentId': paymentId,
-    //   });
-    //
-    //   final data = result.data;
-    //   return PaymentInitiationEntity(
-    //     clientSecret: data['clientSecret'] as String,
-    //     publicKey: data['publicKey'] as String,
-    //   );
-    // } on FirebaseFunctionsException catch (e) {
-    //   // رسائل الـ HttpsError اللي بعتناها من الـ Cloud Function (زي
-    //   // "تم سداد هذه الدفعة بالفعل") بتوصل هنا في e.message.
-    //   throw ServerException(e.message ?? 'تعذر بدء عملية الدفع');
-    // } catch (e) {
-    //         throw ServerException(e.toString());
-    // }
+    // D2 OUT — Paymob / gateway intentionally unavailable.
+    throw const ServerException(
+      'الدفع عبر بوابة إلكترونية غير متاح. استخدم فودافون كاش مع إرفاق إثبات الدفع',
+    );
   }
 
   @override
@@ -400,6 +386,13 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     required String parentId,
     required String paymentId,
   }) async {
+    // D2 / WA-2 — wallet pay quarantined (Vodafone Cash + proof only).
+    if (!ParentWalletContract.enabled) {
+      throw const ServerException(
+        'الدفع من المحفظة غير متاح. استخدم فودافون كاش مع إرفاق إثبات الدفع',
+      );
+    }
+
     final pid = parentId.trim();
     final payId = paymentId.trim();
     if (pid.isEmpty || payId.isEmpty) {

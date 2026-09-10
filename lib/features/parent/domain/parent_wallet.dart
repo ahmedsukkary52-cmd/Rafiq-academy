@@ -1,19 +1,19 @@
 import 'package:equatable/equatable.dart';
 
-/// Parent wallet contract (Sprint 2).
+/// Parent wallet contract — **D2 OUT** (Vodafone Cash + screenshot only).
 ///
 /// Collection: `wallets/{parentId}`
 /// Fields: `balance` (num), `updatedAt` (timestamp)
 /// Ledger: `wallets/{parentId}/ledger/{id}`
 ///   `{ type: debit|credit, amount, paymentId, createdAt }`
 ///
-/// Missing wallet document ⇒ balance 0 (no auto-create on read).
-/// Parent UI does not top-up. Academy credit is out of this feature.
-/// Pay: Firestore transaction — if `balance >= amount` and payment is not
-/// already `paid`, decrement balance, write ledger debit, set payment
-/// `status: paid`, `method: wallet`, `paidAt`.
+/// WA-2: [enabled] is false — client wallet pay path must not set `status: paid`.
+/// Firestore Rules deny wallet writes. Historical code retained for quarantine.
 class ParentWalletContract {
   const ParentWalletContract._();
+
+  /// Product lock D2 — wallet payment is not a production payment path.
+  static const bool enabled = false;
 
   static const String collection = 'wallets';
   static const String ledgerSubcollection = 'ledger';

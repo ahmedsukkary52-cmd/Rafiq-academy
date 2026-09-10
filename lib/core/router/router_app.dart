@@ -6,7 +6,6 @@ import '../../features/analytics/presentation/pages/analytics_dashboard_page.dar
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 // Awards
 import '../../features/awards/presentation/pages/awards_page.dart';
@@ -51,6 +50,9 @@ class AppRoutes {
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
+
+  /// D1 / WA-1 — public self-registration removed. Path kept only so deep links
+  /// redirect to login (no RegisterPage route).
   static const String register = '/register';
 
   // Student
@@ -173,16 +175,18 @@ class AppRouter {
       // سيبه فيها - هي بتعرض حالة التحميل والخطأ بنفسها، ومفيش داعي
       // نوديه لصفحة Splash اللي مفيهاش أي تعامل مع حالة الخطأ)
       if (authState is AuthInitial || authState is AuthLoading) {
-        if (currentPath == AppRoutes.login || currentPath == AppRoutes.register)
-          return null;
+        if (currentPath == AppRoutes.login) return null;
         return currentPath == AppRoutes.splash ? null : AppRoutes.splash;
       }
 
-      // غير مسجّل → Login أو Register مسموحين بس
+      // غير مسجّل → Login فقط (التسجيل العام مغلق — D1)
       if (authState is AuthUnauthenticated) {
-        if (currentPath == AppRoutes.login ||
-            currentPath == AppRoutes.register) {
+        if (currentPath == AppRoutes.login) {
           return null;
+        }
+        // Legacy /register deep link → login
+        if (currentPath == AppRoutes.register) {
+          return AppRoutes.login;
         }
         return AppRoutes.login;
       }
@@ -190,7 +194,9 @@ class AppRouter {
       // مسجّل → وجّهه لنافذته لو في صفحة auth
       if (authState is AuthAuthenticated) {
         final roleRoute = _routeForRole(authState.user.role);
-        if (currentPath == AppRoutes.splash || currentPath == AppRoutes.login) {
+        if (currentPath == AppRoutes.splash ||
+            currentPath == AppRoutes.login ||
+            currentPath == AppRoutes.register) {
           return roleRoute;
         }
         // حماية: لو المستخدم حاول يدخل route مش بتاعه
@@ -210,10 +216,7 @@ class AppRouter {
       ),
       GoRoute(path: AppRoutes.splash, builder: (_, __) => const SplashPage()),
       GoRoute(path: AppRoutes.login, builder: (_, __) => const LoginPage()),
-      GoRoute(
-        path: AppRoutes.register,
-        builder: (_, __) => const RegisterPage(),
-      ),
+      // WA-1: /register intentionally omitted — redirects to login above.
 
       // ── Student ───────────────────────────────────────────────
       GoRoute(

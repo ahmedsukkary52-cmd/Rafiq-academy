@@ -57,76 +57,11 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
     required String phone,
     required String role,
   }) async {
-    try {
-      // 1. Create user in Firebase Auth
-      final credential = await firebaseAuth
-          .createUserWithEmailAndPassword(email: email, password: password)
-          .timeout(_authRequestTimeout);
-
-      final uid = credential.user?.uid;
-      if (uid == null) throw const AuthException('فشل إنشاء الحساب');
-
-      // 2. Create user document in Firestore (هنا هنكون الكولكشن تلقائياً!)
-      final newUser = UserModel(
-        uid: uid,
-        name: name,
-        role: role,
-        phone: phone,
-        email: email,
-        isActive: true,
-        createdAt: DateTime.now(),
-      );
-
-      await firestore
-          .collection(FirestoreCollections.users)
-          .doc(uid)
-          .set(newUser.toFirestore())
-          .timeout(_firestoreTimeout);
-
-      // 3. If registering a student, also create a student profile
-      if (role == AppRoles.student) {
-        await _createStudentProfile(uid, name);
-      }
-
-      return newUser;
-    } on TimeoutException {
-      throw const AuthException(
-        'انتهت مهلة الاتصال، تحقق من الشبكة وحاول مرة أخرى',
-      );
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(_mapFirebaseAuthError(e.code));
-    } on FirebaseException catch (e) {
-      throw AuthException(_mapFirebaseError(e.code));
-    } catch (e) {
-      throw AuthException('خطأ في إنشاء الحساب: ${e.toString()}');
-    }
-  }
-
-  Future<void> _createStudentProfile(String uid, String name) async {
-    // Create a default student profile in studentProfiles collection
-    final studentData = {
-      'uid': uid,
-      'name': name,
-      'avatarId': 'fox',
-      'level': 1,
-      'coins': 0,
-      'totalStars': 0,
-      'streakDays': 0,
-      'halaqaId': null,
-      'halaqaName': null,
-      'currentPlanName': null,
-      'overallProgressPercent': 0,
-      'totalVersesMemorized': 0,
-      'completedJuz': 0,
-      'completedSurahs': 0,
-      'createdAt': Timestamp.fromDate(DateTime.now()),
-    };
-
-    await firestore
-        .collection('studentProfiles')
-        .doc(uid)
-        .set(studentData)
-        .timeout(_firestoreTimeout);
+    // D1 / C1 / WA-1 — public self-registration removed.
+    // Accounts are Admin-provisioned via Cloud Function `adminProvisionUser`.
+    throw const AuthException(
+      'التسجيل العام غير متاح. يتم إنشاء الحسابات بواسطة الإدارة فقط',
+    );
   }
 
   @override
@@ -177,7 +112,22 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
         throw const AuthException('لم يتم العثور على بيانات المستخدم');
       }
 
-      final user = UserModel.fromFirestore(doc);
+      var user = UserModel.fromFirestore(doc);
+
+      // D16: prefer userPrivate phone (self); fall back to legacy users.phone.
+      final privatePhone = await _readOwnPrivatePhone(uid);
+      if (privatePhone != null && privatePhone.isNotEmpty) {
+        user = UserModel(
+          uid: user.uid,
+          name: user.name,
+          role: user.role,
+          phone: privatePhone,
+          email: user.email,
+          profileImageUrl: user.profileImageUrl,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+        );
+      }
 
       if (!user.isActive) {
         throw const AuthException('هذا الحساب موقوف، يرجى التواصل مع الإدارة');
@@ -190,6 +140,20 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
       );
     } on FirebaseException catch (e) {
       throw AuthException(_mapFirebaseError(e.code));
+    }
+  }
+
+  Future<String?> _readOwnPrivatePhone(String uid) async {
+    try {
+      final snap = await firestore
+          .collection(FirestoreCollections.userPrivate)
+          .doc(uid)
+          .get()
+          .timeout(_firestoreTimeout);
+      final raw = snap.data()?['phone'];
+      return raw is String ? raw.trim() : null;
+    } catch (_) {
+      return null;
     }
   }
 

@@ -1,4 +1,3 @@
-
 import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
@@ -13,15 +12,21 @@ abstract class AdminRemoteDatasource {
   Future<AcademyStatsEntity> getAcademyStats();
   Future<FinancialSummaryEntity> getFinancialSummary();
 
-  Future<void> approveNewStudent(
-      {required String studentId, required String halaqaId});
+  Future<void> approveNewStudent({
+    required String studentId,
+    required String halaqaId,
+  });
 
-  Future<void> toggleAccountStatus(
-      {required String uid, required bool isActive});
+  Future<void> toggleAccountStatus({
+    required String uid,
+    required bool isActive,
+  });
   Future<List<ComplaintEntity>> getComplaints();
 
-  Future<void> respondToComplaint(
-      {required String complaintId, required String response});
+  Future<void> respondToComplaint({
+    required String complaintId,
+    required String response,
+  });
   Future<void> sendBroadcastNotification({
     required String title,
     required String body,
@@ -44,5 +49,15 @@ abstract class AdminRemoteDatasource {
     required String teacherId,
     required DateTime from,
     required DateTime to,
+  });
+
+  /// C1 / WA-1 — Admin-provisioned Auth user via callable `adminProvisionUser`.
+  Future<String> provisionUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String? phone,
+    bool isActive = true,
   });
 }

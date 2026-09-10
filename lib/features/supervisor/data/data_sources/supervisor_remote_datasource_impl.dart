@@ -34,15 +34,17 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   @override
   Future<void> issueAchievement(AchievementIssueEntity data) async {
     try {
-      await firestore.collection(FirestoreCollections.achievements).add(
-        AchievementsFirestoreContract.supervisorIssueFields(
-          studentId: data.studentId,
-          type: data.type,
-          title: data.title,
-          issuedBy: data.issuedBy,
-          halaqaId: data.halaqaId,
-        ),
-      );
+      await firestore
+          .collection(FirestoreCollections.achievements)
+          .add(
+            AchievementsFirestoreContract.supervisorIssueFields(
+              studentId: data.studentId,
+              type: data.type,
+              title: data.title,
+              issuedBy: data.issuedBy,
+              halaqaId: data.halaqaId,
+            ),
+          );
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -99,11 +101,38 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
 
       final names = <String, String>{};
       for (final chunk in FirestoreInQuery.chunkIds(unique)) {
-        final snap = await firestore
-            .collection(FirestoreCollections.users)
+        // Prefer studentProfiles / teacherProfiles to avoid users.phone (D16).
+        final studentSnap = await firestore
+            .collection(FirestoreCollections.studentProfiles)
             .where(FieldPath.documentId, whereIn: chunk)
             .get();
-        for (final doc in snap.docs) {
+        for (final doc in studentSnap.docs) {
+          final name = (doc.data()['name'] as String?)?.trim() ?? '';
+          if (name.isNotEmpty) names[doc.id] = name;
+        }
+
+        final missing = chunk.where((id) => !names.containsKey(id)).toList();
+        if (missing.isEmpty) continue;
+
+        final teacherSnap = await firestore
+            .collection(FirestoreCollections.teacherProfiles)
+            .where(FieldPath.documentId, whereIn: missing)
+            .get();
+        for (final doc in teacherSnap.docs) {
+          final name = (doc.data()['name'] as String?)?.trim() ?? '';
+          if (name.isNotEmpty) names[doc.id] = name;
+        }
+
+        final stillMissing = missing
+            .where((id) => !names.containsKey(id))
+            .toList();
+        if (stillMissing.isEmpty) continue;
+
+        final usersSnap = await firestore
+            .collection(FirestoreCollections.users)
+            .where(FieldPath.documentId, whereIn: stillMissing)
+            .get();
+        for (final doc in usersSnap.docs) {
           final raw = doc.data()['name'];
           final name = raw is String ? raw.trim() : '';
           if (name.isNotEmpty) names[doc.id] = name;

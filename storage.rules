@@ -1,0 +1,101 @@
+rules_version = '2';
+
+// WA-2 / C10 — remove catch-all Storage access.
+// Payment proofs path frozen. Chat/profile paths bound to auth ownership
+// without pulling full chat media UX into this batch.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.role == 'admin';
+    }
+
+    function isSupervisor() {
+      return signedIn()
+        && firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.role == 'supervisor';
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function underMaxProofSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    function isConversationParticipant(conversationId) {
+      return signedIn()
+        && firestore.exists(
+          /databases/(default)/documents/conversations/$(conversationId)
+        )
+        && request.auth.uid in firestore.get(
+          /databases/(default)/documents/conversations/$(conversationId)
+        ).data.participantIds;
+    }
+
+    // C10 — payment_proofs/{parentId}/{paymentId}/{fileName}
+    match /payment_proofs/{parentId}/{paymentId}/{fileName} {
+      allow read: if signedIn() && (
+        request.auth.uid == parentId || isAdmin() || isSupervisor()
+      );
+      allow create: if signedIn()
+        && request.auth.uid == parentId
+        && isImage()
+        && underMaxProofSize();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // C10 — profile_images/{uid}/{fileName}
+    match /profile_images/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.auth.uid == userId
+        && isImage()
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // C10 — chat media: participants (+ Admin monitor) only
+    match /chat_media/{conversationId}/{messageId}/{fileName} {
+      allow read: if isAdmin() || isConversationParticipant(conversationId);
+      allow create: if isConversationParticipant(conversationId)
+        && isImage()
+        && request.resource.size < 10 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    match /chat_voice/{conversationId}/{messageId}/{fileName} {
+      allow read: if isAdmin() || isConversationParticipant(conversationId);
+      allow create: if isConversationParticipant(conversationId)
+        && request.resource.contentType.matches('audio/.*')
+        && request.resource.size < 20 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    match /chat_attachments/{conversationId}/{messageId}/{fileName} {
+      allow read: if isAdmin() || isConversationParticipant(conversationId);
+      allow create: if isConversationParticipant(conversationId)
+        && request.resource.size < 10 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    // Recitation audio gated — deny until audioUploadsEnabled product reopen
+    match /recitations/{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Default deny — no catch-all
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -18,3 +18,4 @@ export {
   adminGenerateInvoice,
   adminReinstatePaymentAccess,
 } from "./admin/adminBilling";
+export { processPaymentOverdueGrace } from "./billing/processOverdueGrace";

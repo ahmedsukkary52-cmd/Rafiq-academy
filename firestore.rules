@@ -320,10 +320,49 @@ service cloud.firestore {
       }
     }
 
-    // Future Wave collections — deny client writes by default
+    // C6 / WA-8 — sessions SSOT: create via CF only; status updates by
+    // Teacher of session or Admin. Identity / snapshot fields immutable.
     match /sessions/{id} {
+      function sessionTeacher() {
+        return signedIn()
+          && resource.data.teacherId is string
+          && resource.data.teacherId == uid();
+      }
+
+      function sessionStatusOk() {
+        return request.resource.data.status in
+          ['scheduled', 'in_progress', 'completed', 'cancelled'];
+      }
+
+      // Defense in depth: only status/updatedAt may change; snapshot identity
+      // fields (including optional supervisorId) must remain byte-equal.
+      function sessionSnapshotFrozen() {
+        return request.resource.data.halaqaId == resource.data.halaqaId
+          && request.resource.data.slotId == resource.data.slotId
+          && request.resource.data.date == resource.data.date
+          && request.resource.data.startAt == resource.data.startAt
+          && request.resource.data.endAt == resource.data.endAt
+          && request.resource.data.teacherId == resource.data.teacherId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.get('supervisorId', null)
+              == resource.data.get('supervisorId', null)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny([
+                'halaqaId', 'slotId', 'date', 'startAt', 'endAt',
+                'teacherId', 'supervisorId', 'createdAt', 'createdBy'
+              ]);
+      }
+
       allow read: if signedIn();
-      allow write: if false;
+      allow create: if false;
+      allow delete: if false;
+      allow update: if signedIn()
+        && (isAdmin() || sessionTeacher())
+        && sessionStatusOk()
+        && sessionSnapshotFrozen()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt']);
     }
     match /studentSearch/{id} {
       allow read: if signedIn();

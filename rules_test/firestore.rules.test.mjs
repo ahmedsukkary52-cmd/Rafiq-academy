@@ -465,3 +465,124 @@ test('WA-5 Admin can write pricingRules', async () => {
     }),
   );
 });
+
+test('WA-8 client cannot create sessions', async () => {
+  const db = authed('teacher1');
+  await assertFails(
+    db.doc('sessions/sess_x').set({
+      halaqaId: 'h1',
+      slotId: 'slot-1',
+      date: '2026-09-13',
+      status: 'scheduled',
+      teacherId: 'teacher1',
+      createdBy: 'teacher1',
+    }),
+  );
+});
+
+test('WA-8 Teacher of session can update status only', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('sessions/sess_1').set({
+      halaqaId: 'h1',
+      slotId: 'slot-1',
+      date: '2026-09-13',
+      startAt: new Date('2026-09-13T13:00:00Z'),
+      endAt: new Date('2026-09-13T14:00:00Z'),
+      status: 'scheduled',
+      teacherId: 'teacher1',
+      supervisorId: 'supervisor1',
+      createdAt: new Date('2026-09-01T00:00:00Z'),
+      createdBy: 'teacher1',
+      updatedAt: new Date('2026-09-01T00:00:00Z'),
+    });
+  });
+  const db = authed('teacher1');
+  await assertSucceeds(
+    db.doc('sessions/sess_1').update({
+      status: 'in_progress',
+      updatedAt: new Date(),
+    }),
+  );
+
+  const forbidden = [
+    { teacherId: 'other' },
+    { supervisorId: 'other-sv' },
+    { halaqaId: 'h2' },
+    { slotId: 'slot-x' },
+    { date: '2026-09-20' },
+    { startAt: new Date('2026-09-13T15:00:00Z') },
+    { endAt: new Date('2026-09-13T16:00:00Z') },
+    { createdAt: new Date('2026-01-01T00:00:00Z') },
+    { createdBy: 'forged' },
+  ];
+  for (const patch of forbidden) {
+    await assertFails(
+      db.doc('sessions/sess_1').update({
+        ...patch,
+        status: 'completed',
+        updatedAt: new Date(),
+      }),
+    );
+  }
+});
+
+test('WA-8 Admin cannot mutate session identity via status update', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('sessions/sess_admin').set({
+      halaqaId: 'h1',
+      slotId: 'slot-1',
+      date: '2026-09-13',
+      startAt: new Date('2026-09-13T13:00:00Z'),
+      endAt: new Date('2026-09-13T14:00:00Z'),
+      status: 'scheduled',
+      teacherId: 'teacher1',
+      createdAt: new Date('2026-09-01T00:00:00Z'),
+      createdBy: 'teacher1',
+      updatedAt: new Date('2026-09-01T00:00:00Z'),
+    });
+  });
+  const db = authed('admin1');
+  await assertSucceeds(
+    db.doc('sessions/sess_admin').update({
+      status: 'cancelled',
+      updatedAt: new Date(),
+    }),
+  );
+  await assertFails(
+    db.doc('sessions/sess_admin').update({
+      teacherId: 'admin1',
+      status: 'cancelled',
+      updatedAt: new Date(),
+    }),
+  );
+});
+
+test('WA-8 other Teacher cannot update session status', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('users/teacher2').set({
+      name: 'T2',
+      role: 'teacher',
+      email: 't2@test.com',
+      isActive: true,
+    });
+    await ctx.firestore().doc('sessions/sess_2').set({
+      halaqaId: 'h1',
+      slotId: 'slot-1',
+      date: '2026-09-13',
+      startAt: new Date('2026-09-13T13:00:00Z'),
+      endAt: new Date('2026-09-13T14:00:00Z'),
+      status: 'scheduled',
+      teacherId: 'teacher1',
+      createdAt: new Date('2026-09-01T00:00:00Z'),
+      createdBy: 'teacher1',
+      updatedAt: new Date('2026-09-01T00:00:00Z'),
+    });
+  });
+  const db = authed('teacher2');
+  await assertFails(
+    db.doc('sessions/sess_2').update({
+      status: 'cancelled',
+      updatedAt: new Date(),
+    }),
+  );
+});

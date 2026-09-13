@@ -55,8 +55,13 @@ class AttendancePolicy {
   static bool isSameCalendarDay(DateTime a, DateTime b) =>
       dayStart(a) == dayStart(b);
 
-  /// Operational teaching-session id — same shape as evaluations / W3 agenda:
-  /// `{halaqaId}_yyyyMMdd`.
+  /// Operational teaching-session id — **legacy / historical compatibility**.
+  ///
+  /// Format: `{halaqaId}_yyyyMMdd`.
+  ///
+  /// C6 / WA-8: new attendance/evaluation writes must use real
+  /// `sessions/{sessionId}` document ids from materialization. This synthetic
+  /// day id remains for dual-read of historical docs only — not production SSOT.
   static String sessionIdForDay({
     required String halaqaId,
     required DateTime day,
@@ -66,6 +71,15 @@ class AttendancePolicy {
     final m = d.month.toString().padLeft(2, '0');
     final dayNum = d.day.toString().padLeft(2, '0');
     return '${halaqaId.trim()}_$y$m$dayNum';
+  }
+
+  /// True when [sessionId] matches the legacy synthetic day-id shape.
+  ///
+  /// Does not prove the halaqa exists — only identifies historical dual-read keys.
+  static bool isLegacySyntheticSessionId(String? sessionId) {
+    final s = (sessionId ?? '').trim();
+    if (s.isEmpty) return false;
+    return RegExp(r'^.+_\d{8}$').hasMatch(s);
   }
 
   /// Deterministic doc id — Evaluation-parity session identity.

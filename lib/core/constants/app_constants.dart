@@ -51,6 +51,9 @@ class FirestoreCollections {
   static const String reciters = 'reciters';
   static const String surahAudios = 'surahAudios';
   static const String listeningProgress = 'listeningProgress';
+
+  /// C6 / WA-8 — first-class session occurrences (SSOT).
+  static const String sessions = 'sessions';
 }
 
 /// أنواع التقييمات في سجل التسميع

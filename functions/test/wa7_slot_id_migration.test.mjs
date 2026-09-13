@@ -145,7 +145,8 @@ test("index exports adminMigrateHalaqaSlotIds", async () => {
   );
   const src = readFileSync(root, "utf8");
   assert.match(src, /adminMigrateHalaqaSlotIds/);
-  assert.doesNotMatch(src, /sessions\//);
+  // Paymob remains quarantined (WA-0 / D2).
+  assert.doesNotMatch(src, /^export \{ createPaymentIntention/m);
 });
 
 test("sequential second pass is no-op (idempotent)", () => {

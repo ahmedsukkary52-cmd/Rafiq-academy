@@ -76,6 +76,10 @@ class MessageEntity extends Equatable {
   final String senderId;
   final String text;
   final DateTime sentAt;
+  final DateTime? editedAt;
+  final bool deleted;
+  final DateTime? deletedAt;
+  final String? deletedBy;
 
   const MessageEntity({
     required this.id,
@@ -83,12 +87,28 @@ class MessageEntity extends Equatable {
     required this.senderId,
     required this.text,
     required this.sentAt,
+    this.editedAt,
+    this.deleted = false,
+    this.deletedAt,
+    this.deletedBy,
   });
 
   /// هل الرسالة دي مبعوتة من المستخدم الحالي؟ بيُستخدم في الـ UI عشان
   /// يحدد محاذاة فقاعة الرسالة (يمين/شمال).
   bool isMine(String currentUid) => senderId == currentUid;
 
+  bool get isEdited => editedAt != null && !deleted;
+
   @override
-  List<Object?> get props => [id, conversationId, senderId, text, sentAt];
+  List<Object?> get props => [
+    id,
+    conversationId,
+    senderId,
+    text,
+    sentAt,
+    editedAt,
+    deleted,
+    deletedAt,
+    deletedBy,
+  ];
 }

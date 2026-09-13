@@ -42,6 +42,12 @@ class _FakeChatRepository implements ChatRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> softDeleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async => const Right(unit);
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -55,6 +61,7 @@ void main() {
       WatchMessagesUseCase(repo),
       SendMessageUseCase(repo),
       MarkConversationAsReadUseCase(repo),
+      SoftDeleteChatMessageUseCase(repo),
       'c1',
       't1',
     );

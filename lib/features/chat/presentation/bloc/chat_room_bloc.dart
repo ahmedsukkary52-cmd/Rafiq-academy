@@ -25,22 +25,25 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
   final WatchMessagesUseCase watchMessages;
   final SendMessageUseCase sendMessage;
   final MarkConversationAsReadUseCase markConversationAsRead;
+  final SoftDeleteChatMessageUseCase softDeleteMessage;
 
   final String conversationId;
   final String currentUserId;
 
   ChatRoomBloc(
-      this.watchMessages,
-      this.sendMessage,
-      this.markConversationAsRead,
-      @factoryParam this.conversationId,
-      @factoryParam this.currentUserId,
-      ) : super(ChatRoomState.initial()) {
+    this.watchMessages,
+    this.sendMessage,
+    this.markConversationAsRead,
+    this.softDeleteMessage,
+    @factoryParam this.conversationId,
+    @factoryParam this.currentUserId,
+  ) : super(ChatRoomState.initial()) {
     on<WatchMessagesStartedEvent>(
       _onWatchMessagesStarted,
       transformer: restartable(),
     );
     on<SendMessageRequestedEvent>(_onSendMessage);
+    on<SoftDeleteMessageRequestedEvent>(_onSoftDeleteMessage);
 
     add(const WatchMessagesStartedEvent());
 
@@ -53,9 +56,9 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
   }
 
   Future<void> _onWatchMessagesStarted(
-      WatchMessagesStartedEvent event,
-      Emitter<ChatRoomState> emit,
-      ) async {
+    WatchMessagesStartedEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
     emit(state.copyWith(
       messagesStatus: SectionStatus.loading,
       messagesError: null,
@@ -64,11 +67,11 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     await emit.forEach(
       watchMessages(ConversationIdParams(conversationId)),
       onData: (either) => either.fold(
-            (failure) => state.copyWith(
+        (failure) => state.copyWith(
           messagesStatus: SectionStatus.error,
           messagesError: failure.message,
         ),
-            (messages) => state.copyWith(
+        (messages) => state.copyWith(
           messagesStatus: SectionStatus.loaded,
           messages: messages,
         ),
@@ -77,9 +80,9 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
   }
 
   Future<void> _onSendMessage(
-      SendMessageRequestedEvent event,
-      Emitter<ChatRoomState> emit,
-      ) async {
+    SendMessageRequestedEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
     emit(state.copyWith(sendStatus: SubmissionStatus.submitting, sendError: null));
 
     final result = await sendMessage(SendMessageParams(
@@ -89,14 +92,34 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     ));
 
     result.fold(
-          (failure) => emit(state.copyWith(
+      (failure) => emit(state.copyWith(
         sendStatus: SubmissionStatus.error,
         sendError: failure.message,
       )),
       // مفيش داعي نضيف الرسالة يدوياً للـ state هنا: الـ Stream
       // (emit.forEach في _onWatchMessagesStarted) هيستقبلها تلقائياً
       // أول ما تتكتب في Firestore، فمنعملش الرسالة "تظهر مرتين".
-          (_) => emit(state.copyWith(sendStatus: SubmissionStatus.success)),
+      (_) => emit(state.copyWith(sendStatus: SubmissionStatus.success)),
+    );
+  }
+
+  Future<void> _onSoftDeleteMessage(
+    SoftDeleteMessageRequestedEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    emit(state.copyWith(sendStatus: SubmissionStatus.submitting, sendError: null));
+    final result = await softDeleteMessage(
+      SoftDeleteChatMessageParams(
+        conversationId: conversationId,
+        messageId: event.messageId,
+      ),
+    );
+    result.fold(
+      (failure) => emit(state.copyWith(
+        sendStatus: SubmissionStatus.error,
+        sendError: failure.message,
+      )),
+      (_) => emit(state.copyWith(sendStatus: SubmissionStatus.success)),
     );
   }
 }

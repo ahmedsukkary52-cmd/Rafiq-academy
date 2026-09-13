@@ -21,3 +21,12 @@ class SendMessageRequestedEvent extends ChatRoomEvent {
   @override
   List<Object?> get props => [text];
 }
+
+/// Soft-delete عبر CF (C9 / WA-11).
+class SoftDeleteMessageRequestedEvent extends ChatRoomEvent {
+  final String messageId;
+  const SoftDeleteMessageRequestedEvent(this.messageId);
+
+  @override
+  List<Object?> get props => [messageId];
+}

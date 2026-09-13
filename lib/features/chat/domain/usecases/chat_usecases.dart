@@ -46,10 +46,8 @@ class WatchMessagesUseCase
 // GetOrCreateConversationUseCase
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// هنا بالظبط بنطبّق قاعدة الصلاحيات [ChatPermissionPolicy] قبل ما نوصل
-/// أصلاً لأي قراءة أو كتابة في Firestore. لو الدورين مش مسموح لهم
-/// يتواصلوا، بنرجّع [ValidationFailure] فوراً من غير ما نكلّف نفسنا
-/// نعمل أي network call.
+/// UX role-pair pre-filter only. Authoritative D14 relationship checks run
+/// on the server (`createDirectConversation`). Do not treat this as security.
 @lazySingleton
 class GetOrCreateConversationUseCase
     extends UseCase<ConversationEntity, GetOrCreateConversationParams> {
@@ -138,6 +136,42 @@ class GetChatParticipantUseCase
   }
 }
 
+@lazySingleton
+class SoftDeleteChatMessageUseCase
+    extends UseCase<Unit, SoftDeleteChatMessageParams> {
+  final ChatRepository repository;
+  SoftDeleteChatMessageUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, Unit>> call(SoftDeleteChatMessageParams params) {
+    return repository.softDeleteMessage(
+      conversationId: params.conversationId,
+      messageId: params.messageId,
+    );
+  }
+}
+
+@lazySingleton
+class EditChatMessageUseCase extends UseCase<Unit, EditChatMessageParams> {
+  final ChatRepository repository;
+  EditChatMessageUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, Unit>> call(EditChatMessageParams params) {
+    final trimmed = params.text.trim();
+    if (trimmed.isEmpty) {
+      return Future.value(
+        const Left(ValidationFailure('لا يمكن حفظ رسالة فارغة')),
+      );
+    }
+    return repository.editMessage(
+      conversationId: params.conversationId,
+      messageId: params.messageId,
+      text: trimmed,
+    );
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Params
 // ══════════════════════════════════════════════════════════════════════════════
@@ -194,4 +228,32 @@ class MarkAsReadParams extends Equatable {
 
   @override
   List<Object?> get props => [conversationId, uid];
+}
+
+class SoftDeleteChatMessageParams extends Equatable {
+  final String conversationId;
+  final String messageId;
+
+  const SoftDeleteChatMessageParams({
+    required this.conversationId,
+    required this.messageId,
+  });
+
+  @override
+  List<Object?> get props => [conversationId, messageId];
+}
+
+class EditChatMessageParams extends Equatable {
+  final String conversationId;
+  final String messageId;
+  final String text;
+
+  const EditChatMessageParams({
+    required this.conversationId,
+    required this.messageId,
+    required this.text,
+  });
+
+  @override
+  List<Object?> get props => [conversationId, messageId, text];
 }

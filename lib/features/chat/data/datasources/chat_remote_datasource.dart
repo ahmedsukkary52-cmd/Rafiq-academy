@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../domain/entities/chat_entities.dart';
-import '../../domain/policies/chat_permission_policy.dart';
 import '../models/chat_models.dart';
 
 abstract class ChatRemoteDatasource {
@@ -28,6 +28,17 @@ abstract class ChatRemoteDatasource {
     required String uid,
   });
 
+  Future<void> softDeleteMessage({
+    required String conversationId,
+    required String messageId,
+  });
+
+  Future<void> editMessage({
+    required String conversationId,
+    required String messageId,
+    required String text,
+  });
+
   /// قراءة بيانات مستخدم من `users/{uid}` لبناء طرف محادثة
   Future<ChatParticipantModel> getParticipant(String uid);
 }
@@ -35,8 +46,12 @@ abstract class ChatRemoteDatasource {
 @LazySingleton(as: ChatRemoteDatasource)
 class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   final FirebaseFirestore firestore;
+  final FirebaseFunctions functions;
 
-  const ChatRemoteDatasourceImpl({required this.firestore});
+  const ChatRemoteDatasourceImpl({
+    required this.firestore,
+    required this.functions,
+  });
 
   CollectionReference get _conversationsRef =>
       firestore.collection(FirestoreCollections.conversations);
@@ -83,46 +98,41 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required ChatParticipantEntity otherUser,
   }) async {
     try {
-      final conversationId = ConversationIdGenerator.generate(
-        currentUser.uid,
-        otherUser.uid,
-      );
-
-      final docRef = _conversationsRef.doc(conversationId);
-      final existingDoc = await docRef.get();
-
-      if (existingDoc.exists) {
-        return ConversationModel.fromFirestore(
-          existingDoc,
-          currentUid: currentUser.uid,
-        );
+      // WA-11 — relationship-checked create via CF (authoritative).
+      final callable = functions.httpsCallable('createDirectConversation');
+      final result = await callable.call(<String, dynamic>{
+        'otherUid': otherUser.uid.trim(),
+      });
+      final data = result.data;
+      if (data is! Map) {
+        throw const ServerException('تعذر إنشاء المحادثة: رد غير متوقع');
+      }
+      final conversationId = data['conversationId']?.toString() ?? '';
+      if (conversationId.isEmpty) {
+        throw const ServerException('تعذر إنشاء المحادثة');
       }
 
-      final participants = [
-        ChatParticipantModel.fromEntity(currentUser),
-        ChatParticipantModel.fromEntity(otherUser),
-      ];
+      final doc = await _conversationsRef.doc(conversationId).get();
+      if (doc.exists) {
+        return ConversationModel.fromFirestore(doc, currentUid: currentUser.uid);
+      }
 
-      await docRef.set({
-        'participantIds': [currentUser.uid, otherUser.uid],
-        'participants': participants.map((p) => p.toMap()).toList(),
-        'lastMessage': null,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'lastMessageSenderId': null,
-        'unreadCounts': {currentUser.uid: 0, otherUser.uid: 0},
-      });
-
-      // بنرجّع الموديل مباشرة من البيانات اللي إحنا أصلاً كاتبينها،
-      // بدل ما نعمل قراءة تانية فوراً لنفس الـ document (توفير قراءة
-      // واحدة من Firestore في كل أول محادثة).
+      // Rare race: CF wrote but read missed — return local projection.
       return ConversationModel(
         id: conversationId,
-        participants: List<ChatParticipantEntity>.from(participants),
+        participants: [
+          ChatParticipantModel.fromEntity(currentUser),
+          ChatParticipantModel.fromEntity(otherUser),
+        ],
         lastMessage: null,
         lastMessageAt: DateTime.now(),
         lastMessageSenderId: null,
         unreadCount: 0,
       );
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -135,30 +145,45 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required String text,
   }) async {
     try {
-      final otherUid = ConversationIdGenerator.otherParticipant(
-        conversationId,
-        senderId,
-      );
+      final conversationRef = _conversationsRef.doc(conversationId);
+      final convSnap = await conversationRef.get();
+      if (!convSnap.exists) {
+        throw const ServerException('المحادثة غير موجودة');
+      }
+      final convData = convSnap.data() as Map<String, dynamic>? ?? {};
+      final participantIds = (convData['participantIds'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .where((id) => id.isNotEmpty)
+          .toList();
+      if (!participantIds.contains(senderId)) {
+        throw const ServerException('لست مشاركاً في هذه المحادثة');
+      }
 
       final batch = firestore.batch();
-
       final messageRef = _messagesRef(conversationId).doc();
       batch.set(messageRef, {
         'senderId': senderId,
         'text': text,
         'sentAt': FieldValue.serverTimestamp(),
+        'deleted': false,
       });
 
-      final conversationRef = _conversationsRef.doc(conversationId);
-      batch.update(conversationRef, {
+      final updates = <String, dynamic>{
         'lastMessage': text,
         'lastMessageAt': FieldValue.serverTimestamp(),
         'lastMessageSenderId': senderId,
-        // بنزوّد عداد المستلم بس، مش المرسل، لأن المرسل أصلاً شايف رسالته
-        'unreadCounts.$otherUid': FieldValue.increment(1),
-      });
+      };
 
+      // Increment unread for every other participant (1:1 and halaqa groups).
+      for (final uid in participantIds) {
+        if (uid == senderId) continue;
+        updates['unreadCounts.$uid'] = FieldValue.increment(1);
+      }
+
+      batch.update(conversationRef, updates);
       await batch.commit();
+    } on ServerException {
+      rethrow;
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -173,6 +198,44 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
       await _conversationsRef.doc(conversationId).update({
         'unreadCounts.$uid': 0,
       });
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> softDeleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    try {
+      final callable = functions.httpsCallable('softDeleteChatMessage');
+      await callable.call(<String, dynamic>{
+        'conversationId': conversationId.trim(),
+        'messageId': messageId.trim(),
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> editMessage({
+    required String conversationId,
+    required String messageId,
+    required String text,
+  }) async {
+    try {
+      final callable = functions.httpsCallable('editChatMessage');
+      await callable.call(<String, dynamic>{
+        'conversationId': conversationId.trim(),
+        'messageId': messageId.trim(),
+        'text': text.trim(),
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } catch (e) {
       throw ServerException(e.toString());
     }

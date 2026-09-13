@@ -25,3 +25,8 @@ export {
   adminSyncHalaqaGroup,
   syncHalaqaGroupOnWrite,
 } from "./chat/halaqaGroupSyncFunctions";
+export {
+  createDirectConversation,
+  softDeleteChatMessage,
+  editChatMessage,
+} from "./chat/chatAuthFunctions";

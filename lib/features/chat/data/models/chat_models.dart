@@ -99,6 +99,10 @@ class MessageModel extends MessageEntity {
     required super.senderId,
     required super.text,
     required super.sentAt,
+    super.editedAt,
+    super.deleted,
+    super.deletedAt,
+    super.deletedBy,
   });
 
   factory MessageModel.fromFirestore(DocumentSnapshot doc, {
@@ -124,6 +128,10 @@ class MessageModel extends MessageEntity {
       // Server timestamps are null on the local optimistic snapshot. Using
       // now() keeps the stream alive and shows the bubble immediately.
       sentAt: dateTimeFromFirestore(data['sentAt']) ?? DateTime.now(),
+      editedAt: dateTimeFromFirestore(data['editedAt']),
+      deleted: data['deleted'] == true,
+      deletedAt: dateTimeFromFirestore(data['deletedAt']),
+      deletedBy: _stringFrom(data['deletedBy']),
     );
   }
 }

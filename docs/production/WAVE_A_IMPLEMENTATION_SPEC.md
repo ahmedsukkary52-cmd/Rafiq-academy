@@ -470,8 +470,9 @@ Do **not** unbounded-copy full student roster onto session by default
 | **Delete** | Soft-delete only; retention days **TBD — NON-BLOCKING** |
 | **Admin UI** | Spec requires My vs Monitored — may stub data layer in A; full UI Wave F |
 | **Deps** | WA-10 for groups; D12 childrenIds writer (membership CF — early A/B) |
-| **Done when:** unauthorized GetOrCreate fails in emulator; soft-delete tombstone works |
+| **Done when:** unauthorized GetOrCreate fails via CF relationship check; soft-delete tombstone fields + CF path work; Rules deny client create/update/delete of messages and conversation creates |
 | **Non-goals:** Hard delete; media upload UI (WA-12 paths only) |
+| **Implementation notes (WA-11):** `createDirectConversation` / `softDeleteChatMessage` / `editChatMessage` callables; client `ChatPermissionPolicy` is UX-only; conversation create Rules = false; message update/delete Rules = false |
 
 ---
 

@@ -233,6 +233,13 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                                   child: _MessageBubble(
                                     message: msg,
                                     isMine: isMine,
+                                    onSoftDelete: isMine && !msg.deleted
+                                        ? () => _chatBloc.add(
+                                              SoftDeleteMessageRequestedEvent(
+                                                msg.id,
+                                              ),
+                                            )
+                                        : null,
                                   ),
                                 ),
                               ],
@@ -389,8 +396,13 @@ class _HeaderAvatar extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   final MessageEntity message;
   final bool isMine;
+  final VoidCallback? onSoftDelete;
 
-  const _MessageBubble({required this.message, required this.isMine});
+  const _MessageBubble({
+    required this.message,
+    required this.isMine,
+    this.onSoftDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -410,32 +422,74 @@ class _MessageBubble extends StatelessWidget {
             isMine: isMine,
           ),
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isMine ? AppColors.primary : AppColors.surface,
-                borderRadius: ChatMessageAlignment.bubbleBorderRadius(
-                  isMine: isMine,
-                ).resolve(Directionality.of(context)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Text(
-                message.text,
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: isMine ? AppColors.onPrimary : AppColors.textPrimary,
-                  fontSize: 14,
-                  height: 1.45,
+            GestureDetector(
+              onLongPress: onSoftDelete == null
+                  ? null
+                  : () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('حذف الرسالة'),
+                          content: const Text(
+                            'سيتم حذف الرسالة من المحادثة (حذف ناعم).',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('إلغاء'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('حذف'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) onSoftDelete!();
+                    },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isMine ? AppColors.primary : AppColors.surface,
+                  borderRadius: ChatMessageAlignment.bubbleBorderRadius(
+                    isMine: isMine,
+                  ).resolve(Directionality.of(context)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.start,
-                softWrap: true,
+                child: Text(
+                  message.deleted
+                      ? 'تم حذف هذه الرسالة'
+                      : message.text,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color:
+                        isMine ? AppColors.onPrimary : AppColors.textPrimary,
+                    fontSize: 14,
+                    height: 1.45,
+                    fontStyle:
+                        message.deleted ? FontStyle.italic : FontStyle.normal,
+                  ),
+                  textAlign: TextAlign.start,
+                  softWrap: true,
+                ),
               ),
             ),
+            if (message.isEdited && !message.deleted) ...[
+              const SizedBox(height: 2),
+              Text(
+                'تم التعديل',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.textHint,
+                  fontSize: 9,
+                ),
+              ),
+            ],
             const SizedBox(height: 4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),

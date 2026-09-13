@@ -30,9 +30,13 @@ void main() {
       );
     });
 
-    test('student may only chat with teacher', () {
+    test('student may chat with teacher or supervisor (UX only)', () {
       expect(
         ChatPermissionPolicy.canChat(AppRoles.student, AppRoles.teacher),
+        isTrue,
+      );
+      expect(
+        ChatPermissionPolicy.canChat(AppRoles.student, AppRoles.supervisor),
         isTrue,
       );
       expect(

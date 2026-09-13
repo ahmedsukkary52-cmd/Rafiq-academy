@@ -130,4 +130,40 @@ class ChatRepositoryImpl implements ChatRepository {
       return Left(ServerFailure(e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, Unit>> softDeleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.softDeleteMessage(
+        conversationId: conversationId,
+        messageId: messageId,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> editMessage({
+    required String conversationId,
+    required String messageId,
+    required String text,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.editMessage(
+        conversationId: conversationId,
+        messageId: messageId,
+        text: text,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
 }

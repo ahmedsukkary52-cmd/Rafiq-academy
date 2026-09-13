@@ -14,12 +14,14 @@ import '../../../../core/constants/app_constants.dart';
 /// ملاحظة لأحمد: السبسيفيكيشن متقولش صراحة لو المشرف والإدارة يقدروا
 /// يتكلموا مع بعض، افترضت إنه مسموح لأنهم الاتنين "staff"، لو حابب
 /// تمنعه غيّر القائمة تحت بس.
+/// UX pre-filter only. Authoritative D14 graph checks run on the server
+/// (`createDirectConversation`). Do not treat this as security.
 class ChatPermissionPolicy {
   const ChatPermissionPolicy._();
 
   static const Map<String, Set<String>> _allowedPairs = {
-    // الطالب يتواصل مع معلمه فقط
-    AppRoles.student: {AppRoles.teacher},
+    // الطالب: معلمه أو مشرفه (التحقق من العلاقة على السيرفر)
+    AppRoles.student: {AppRoles.teacher, AppRoles.supervisor},
     AppRoles.teacher: {
       AppRoles.student,
       AppRoles.supervisor,
@@ -27,7 +29,12 @@ class ChatPermissionPolicy {
       AppRoles.parent,
     },
     AppRoles.parent: {AppRoles.teacher, AppRoles.supervisor, AppRoles.admin},
-    AppRoles.supervisor: {AppRoles.teacher, AppRoles.parent, AppRoles.admin},
+    AppRoles.supervisor: {
+      AppRoles.teacher,
+      AppRoles.parent,
+      AppRoles.admin,
+      AppRoles.student,
+    },
     AppRoles.admin: {AppRoles.teacher, AppRoles.parent, AppRoles.supervisor},
   };
 

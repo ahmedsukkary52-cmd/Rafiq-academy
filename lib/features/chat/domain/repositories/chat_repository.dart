@@ -32,4 +32,17 @@ abstract class ChatRepository {
   });
 
   Future<Either<Failure, ChatParticipantEntity>> getParticipant(String uid);
+
+  /// C9 soft-delete via server callable.
+  Future<Either<Failure, Unit>> softDeleteMessage({
+    required String conversationId,
+    required String messageId,
+  });
+
+  /// C9 edit own message via server callable.
+  Future<Either<Failure, Unit>> editMessage({
+    required String conversationId,
+    required String messageId,
+    required String text,
+  });
 }

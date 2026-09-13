@@ -498,6 +498,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i164.ChatRemoteDatasource>(
       () => _i164.ChatRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
+        functions: gh<_i809.FirebaseFunctions>(),
       ),
     );
     gh.lazySingleton<_i888.AwardsRepository>(
@@ -859,6 +860,12 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i337.GetChatParticipantUseCase>(
       () => _i337.GetChatParticipantUseCase(gh<_i194.ChatRepository>()),
     );
+    gh.lazySingleton<_i337.SoftDeleteChatMessageUseCase>(
+      () => _i337.SoftDeleteChatMessageUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.EditChatMessageUseCase>(
+      () => _i337.EditChatMessageUseCase(gh<_i194.ChatRepository>()),
+    );
     gh.factory<_i999.AnalyticsBloc>(
       () => _i999.AnalyticsBloc(
         getHalaqaAnalytics: gh<_i1010.GetHalaqaAnalyticsUseCase>(),
@@ -1013,6 +1020,7 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i337.WatchMessagesUseCase>(),
         gh<_i337.SendMessageUseCase>(),
         gh<_i337.MarkConversationAsReadUseCase>(),
+        gh<_i337.SoftDeleteChatMessageUseCase>(),
         conversationId,
         currentUserId,
       ),

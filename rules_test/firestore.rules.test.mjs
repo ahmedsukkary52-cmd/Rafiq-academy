@@ -661,3 +661,144 @@ test('WA-10 client cannot delete halaqa_group conversation', async () => {
   const db = authed('admin1');
   await assertFails(db.doc('conversations/halaqa_group_h1').delete());
 });
+
+// ── WA-11 chat authorization + soft-delete ───────────────────────────────────
+
+test('WA-11 client cannot create arbitrary 1:1 conversation', async () => {
+  const db = authed('student1');
+  await assertFails(
+    db.doc('conversations/student1_teacher2').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher2'],
+      createdAt: new Date(),
+    }),
+  );
+});
+
+test('WA-11 unauthorized user cannot read conversation', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+    });
+  });
+  const stranger = authed('parent1');
+  await assertFails(stranger.doc('conversations/student1_teacher1').get());
+});
+
+test('WA-11 participant can read conversation; Admin can monitor', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+    });
+  });
+  await assertSucceeds(
+    authed('student1').doc('conversations/student1_teacher1').get(),
+  );
+  await assertSucceeds(
+    authed('teacher1').doc('conversations/student1_teacher1').get(),
+  );
+  await assertSucceeds(
+    authed('admin1').doc('conversations/student1_teacher1').get(),
+  );
+});
+
+test('WA-11 participantIds cannot be client-mutated on direct chat', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      createdBy: 'student1',
+    });
+  });
+  const db = authed('student1');
+  await assertFails(
+    db.doc('conversations/student1_teacher1').update({
+      participantIds: ['student1', 'teacher1', 'parent1'],
+    }),
+  );
+});
+
+test('WA-11 group participant can write message; non-member cannot', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/halaqa_group_h1').set({
+      kind: 'halaqa_group',
+      halaqaId: 'h1',
+      participantIds: ['teacher1', 'student1'],
+    });
+  });
+  await assertSucceeds(
+    authed('teacher1')
+      .doc('conversations/halaqa_group_h1/messages/m1')
+      .set({
+        senderId: 'teacher1',
+        text: 'hello',
+        sentAt: new Date(),
+        deleted: false,
+      }),
+  );
+  await assertFails(
+    authed('parent1')
+      .doc('conversations/halaqa_group_h1/messages/m2')
+      .set({
+        senderId: 'parent1',
+        text: 'sneak',
+        sentAt: new Date(),
+        deleted: false,
+      }),
+  );
+});
+
+test('WA-11 unauthorized cannot create message in foreign conversation', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+    });
+  });
+  await assertFails(
+    authed('parent1')
+      .doc('conversations/student1_teacher1/messages/x1')
+      .set({
+        senderId: 'parent1',
+        text: 'nope',
+        sentAt: new Date(),
+      }),
+  );
+});
+
+test('WA-11 client cannot update/delete message docs (soft-delete via CF)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+    });
+    await ctx
+      .firestore()
+      .doc('conversations/student1_teacher1/messages/m1')
+      .set({
+        senderId: 'student1',
+        text: 'hi',
+        sentAt: new Date(),
+        deleted: false,
+      });
+  });
+  const db = authed('student1');
+  await assertFails(
+    db.doc('conversations/student1_teacher1/messages/m1').update({
+      deleted: true,
+      deletedBy: 'student1',
+      deletedAt: new Date(),
+      text: '',
+    }),
+  );
+  await assertFails(
+    db.doc('conversations/student1_teacher1/messages/m1').delete(),
+  );
+  // Participant can still read the message document.
+  await assertSucceeds(
+    db.doc('conversations/student1_teacher1/messages/m1').get(),
+  );
+});

@@ -79,15 +79,25 @@ void main() {
       expect(model.sentAt, isA<DateTime>());
     });
 
-    test('reads Timestamp sentAt', () {
-      final sent = DateTime(2026, 8, 14, 15, 30);
+    test('reads soft-delete and edit metadata', () {
+      final edited = DateTime(2026, 8, 14, 16);
+      final deletedAt = DateTime(2026, 8, 14, 17);
       final model = MessageModel.fromMap('m1', {
-        'senderId': 's1',
-        'text': 'hi',
-        'sentAt': Timestamp.fromDate(sent),
+        'senderId': 't1',
+        'text': '',
+        'sentAt': Timestamp.fromDate(DateTime(2026, 8, 14, 15)),
+        'editedAt': Timestamp.fromDate(edited),
+        'deleted': true,
+        'deletedAt': Timestamp.fromDate(deletedAt),
+        'deletedBy': 't1',
       }, conversationId: 'c1');
 
-      expect(model.sentAt, sent);
+      expect(model.deleted, isTrue);
+      expect(model.deletedAt, deletedAt);
+      expect(model.deletedBy, 't1');
+      expect(model.editedAt, edited);
+      expect(model.isEdited, isFalse);
+      expect(model.text, isEmpty);
     });
   });
 }

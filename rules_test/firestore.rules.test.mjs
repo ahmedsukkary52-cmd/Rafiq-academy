@@ -601,3 +601,63 @@ test('WA-9 client cannot write sessionConflictLocks', async () => {
     }),
   );
 });
+
+test('WA-10 client cannot create halaqa_group conversation', async () => {
+  const db = authed('teacher1');
+  await assertFails(
+    db.doc('conversations/halaqa_group_h1').set({
+      kind: 'halaqa_group',
+      halaqaId: 'h1',
+      participantIds: ['teacher1', 'student1'],
+    }),
+  );
+  await assertFails(
+    db.doc('conversations/random_id').set({
+      kind: 'halaqa_group',
+      halaqaId: 'h1',
+      participantIds: ['teacher1'],
+    }),
+  );
+});
+
+test('WA-10 client cannot mutate group participantIds', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/halaqa_group_h1').set({
+      kind: 'halaqa_group',
+      halaqaId: 'h1',
+      participantIds: ['teacher1', 'student1'],
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      createdBy: 'system',
+    });
+  });
+  const db = authed('teacher1');
+  await assertFails(
+    db.doc('conversations/halaqa_group_h1').update({
+      participantIds: ['teacher1', 'student1', 'parent1'],
+    }),
+  );
+  await assertFails(
+    db.doc('conversations/halaqa_group_h1').update({
+      participantIds: ['teacher1'],
+    }),
+  );
+  // Non-membership fields (e.g. lastMessage) remain updatable for messaging.
+  await assertSucceeds(
+    db.doc('conversations/halaqa_group_h1').update({
+      lastMessage: 'مرحبا',
+      lastMessageAt: new Date(),
+    }),
+  );
+});
+
+test('WA-10 client cannot delete halaqa_group conversation', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/halaqa_group_h1').set({
+      kind: 'halaqa_group',
+      halaqaId: 'h1',
+      participantIds: ['teacher1'],
+    });
+  });
+  const db = authed('admin1');
+  await assertFails(db.doc('conversations/halaqa_group_h1').delete());
+});

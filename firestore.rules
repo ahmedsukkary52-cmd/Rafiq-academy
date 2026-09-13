@@ -312,9 +312,45 @@ service cloud.firestore {
       }
     }
 
-    // Chat — relationship hardening is later Wave (WA-11).
+    // Chat — WA-10 group membership is CF-only; 1:1 relationship hardening is WA-11.
     match /conversations/{conversationId} {
-      allow read, write: if signedIn();
+      function isHalaqaGroupId() {
+        return conversationId.matches('halaqa_group_.*');
+      }
+
+      function isHalaqaGroupDoc() {
+        return resource.data.get('kind', '') == 'halaqa_group';
+      }
+
+      function creatingHalaqaGroup() {
+        return isHalaqaGroupId()
+          || request.resource.data.get('kind', '') == 'halaqa_group';
+      }
+
+      function groupMembershipFrozen() {
+        return request.resource.data.participantIds == resource.data.participantIds
+          && request.resource.data.kind == resource.data.kind
+          && request.resource.data.halaqaId == resource.data.halaqaId
+          && request.resource.data.get('createdAt', resource.data.createdAt)
+              == resource.data.createdAt
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['participantIds', 'kind', 'halaqaId', 'createdAt', 'createdBy']);
+      }
+
+      allow read: if signedIn();
+
+      // Clients may create 1:1 only — never halaqa_group_* (CF ensure/sync).
+      allow create: if signedIn() && !creatingHalaqaGroup();
+
+      allow update: if signedIn() && (
+        !(isHalaqaGroupId() || isHalaqaGroupDoc())
+        || groupMembershipFrozen()
+      );
+
+      allow delete: if signedIn()
+        && !isHalaqaGroupId()
+        && !isHalaqaGroupDoc();
+
       match /messages/{messageId} {
         allow read, write: if signedIn();
       }

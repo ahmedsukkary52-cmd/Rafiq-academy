@@ -21,3 +21,7 @@ export {
 export { processPaymentOverdueGrace } from "./billing/processOverdueGrace";
 export { adminMigrateHalaqaSlotIds } from "./admin/adminMigrateHalaqaSlotIds";
 export { materializeSession } from "./sessions/materializeSession";
+export {
+  adminSyncHalaqaGroup,
+  syncHalaqaGroupOnWrite,
+} from "./chat/halaqaGroupSyncFunctions";

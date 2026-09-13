@@ -19,3 +19,4 @@ export {
   adminReinstatePaymentAccess,
 } from "./admin/adminBilling";
 export { processPaymentOverdueGrace } from "./billing/processOverdueGrace";
+export { adminMigrateHalaqaSlotIds } from "./admin/adminMigrateHalaqaSlotIds";

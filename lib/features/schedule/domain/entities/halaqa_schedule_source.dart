@@ -8,14 +8,18 @@ class HalaqaScheduleSlot extends Equatable {
   final String startTime;
   final String endTime;
 
+  /// C6 / WA-7 — stable UUID on the slot object (optional until migrated).
+  final String? slotId;
+
   const HalaqaScheduleSlot({
     required this.day,
     required this.startTime,
     required this.endTime,
+    this.slotId,
   });
 
   @override
-  List<Object?> get props => [day, startTime, endTime];
+  List<Object?> get props => [day, startTime, endTime, slotId];
 }
 
 class HalaqaScheduleSource extends Equatable {

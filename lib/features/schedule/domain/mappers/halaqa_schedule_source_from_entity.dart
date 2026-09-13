@@ -15,6 +15,7 @@ HalaqaScheduleSource halaqaScheduleSourceFromEntity(HalaqaEntity h) {
             day: s.day,
             startTime: s.startTime,
             endTime: s.endTime,
+            slotId: s.slotId,
           ),
         )
         .toList(),

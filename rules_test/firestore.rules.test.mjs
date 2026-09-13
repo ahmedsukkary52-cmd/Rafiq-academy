@@ -586,3 +586,18 @@ test('WA-8 other Teacher cannot update session status', async () => {
     }),
   );
 });
+
+test('WA-9 client cannot write sessionConflictLocks', async () => {
+  const db = authed('admin1');
+  await assertFails(
+    db.doc('sessionConflictLocks/cairo_2026-09-13').set({
+      date: '2026-09-13',
+    }),
+  );
+  const teacherDb = authed('teacher1');
+  await assertFails(
+    teacherDb.doc('sessionConflictLocks/cairo_2026-09-13').set({
+      date: '2026-09-13',
+    }),
+  );
+});

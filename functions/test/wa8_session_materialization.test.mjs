@@ -540,7 +540,7 @@ test("materializeSession enforces production gate + auth + ignores client staff 
   assert.match(src, /FieldValue\.serverTimestamp/);
   assert.match(src, /الحلقة غير موجودة/);
   assert.match(src, /halaqaRaw\.teacherId/);
-  assert.match(src, /Ignored if present/);
+  assert.match(src, /Client roster\/staff fields are ignored/);
   // Must not assign snapshot teacher from request payload.
   assert.doesNotMatch(src, /teacherId:\s*data\.teacherId/);
   assert.doesNotMatch(src, /supervisorId:\s*data\.supervisorId/);

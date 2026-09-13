@@ -364,6 +364,12 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt']);
     }
+
+    // C7 / WA-9 — Cairo-day conflict serialization locks (CF-only).
+    match /sessionConflictLocks/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
     match /studentSearch/{id} {
       allow read: if signedIn();
       allow write: if false;

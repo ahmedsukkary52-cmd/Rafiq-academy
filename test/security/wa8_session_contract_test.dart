@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/shared/data/models/academy_session_model.dart';
+import 'package:rafiq_academy/shared/domain/session_conflict_contract.dart';
 import 'package:rafiq_academy/shared/domain/session_contract.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 
@@ -53,6 +54,27 @@ void main() {
       expect(AttendancePolicy.isLegacySyntheticSessionId(id), isTrue);
       expect(
         AttendancePolicy.isLegacySyntheticSessionId('sess_deadbeef'),
+        isFalse,
+      );
+    });
+  });
+
+  group('WA-9 conflict contract', () {
+    test('participant statuses match C7 filter', () {
+      expect(
+        SessionConflictContract.participatesInConflicts('scheduled'),
+        isTrue,
+      );
+      expect(
+        SessionConflictContract.participatesInConflicts('in_progress'),
+        isTrue,
+      );
+      expect(
+        SessionConflictContract.participatesInConflicts('cancelled'),
+        isFalse,
+      );
+      expect(
+        SessionConflictContract.participatesInConflicts('completed'),
         isFalse,
       );
     });

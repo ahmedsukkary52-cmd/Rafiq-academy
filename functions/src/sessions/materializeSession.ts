@@ -1,8 +1,8 @@
 /**
- * WA-8 / C6 — materialize first-class Session occurrence.
+ * WA-8 + WA-9 — materialize Session with C7 conflict enforcement.
  *
- * Idempotent + concurrent-safe via deterministic doc id + Firestore transaction.
- * Snapshots occurrence fields at create; never rewrites existing identity.
+ * Idempotent create-or-reuse (WA-8) + half-open hard-conflict gate (WA-9).
+ * Cairo-day lock document serializes creates for the same business date (C7.3).
  */
 
 import * as admin from "firebase-admin";
@@ -15,16 +15,23 @@ import {
   decideMaterialize,
   deterministicSessionId,
   type ExistingSessionDoc,
-} from "../sessions/sessionMaterialization";
+} from "./sessionMaterialization";
+import {
+  cairoDayConflictLockId,
+  evaluateSessionConflicts,
+  normalizeStudentIds,
+  type ConflictCandidate,
+} from "./sessionConflict";
 
 interface MaterializeRequest {
   halaqaId?: unknown;
   slotId?: unknown;
   /** Cairo calendar date YYYY-MM-DD */
   date?: unknown;
-  /** Ignored if present — teacher/supervisor come from halaqa only. */
+  /** Ignored — teacher/supervisor/roster come from halaqa only. */
   teacherId?: unknown;
   supervisorId?: unknown;
+  studentIds?: unknown;
 }
 
 function requireString(raw: unknown, field: string): string {
@@ -72,6 +79,40 @@ async function assertCanMaterialize(params: {
   };
 }
 
+function toDate(raw: unknown): Date | null {
+  if (raw instanceof Timestamp) return raw.toDate();
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  return null;
+}
+
+function candidateFromDoc(
+  id: string,
+  data: Record<string, unknown>,
+): ConflictCandidate | null {
+  const startAt = toDate(data.startAt);
+  const endAt = toDate(data.endAt);
+  if (!startAt || !endAt) return null;
+  const halaqaId =
+    typeof data.halaqaId === "string" ? data.halaqaId.trim() : "";
+  const teacherId =
+    typeof data.teacherId === "string" ? data.teacherId.trim() : "";
+  if (!halaqaId || !teacherId) return null;
+  const supervisorId =
+    typeof data.supervisorId === "string" && data.supervisorId.trim()
+      ? data.supervisorId.trim()
+      : null;
+  const status = typeof data.status === "string" ? data.status : "";
+  return {
+    sessionId: id,
+    halaqaId,
+    teacherId,
+    supervisorId,
+    status,
+    startAt,
+    endAt,
+  };
+}
+
 function mapMaterializeError(err: unknown): never {
   if (err instanceof HttpsError) throw err;
   const message = err instanceof Error ? err.message : String(err);
@@ -96,7 +137,8 @@ function mapMaterializeError(err: unknown): never {
   }
   if (
     message.includes("times are invalid") ||
-    message.includes("endAt must be after")
+    message.includes("endAt must be after") ||
+    message.includes("invalid interval")
   ) {
     throw new HttpsError("failed-precondition", "أوقات الموعد غير صالحة");
   }
@@ -113,7 +155,7 @@ function mapMaterializeError(err: unknown): never {
 }
 
 /**
- * WA-8 — Create-or-reuse `sessions/{sessionId}` for one slot occurrence.
+ * Materialize Session occurrence with WA-9 conflict gate.
  * Gated by WA-0 production backend gate.
  */
 export const materializeSession = onCall(
@@ -128,9 +170,9 @@ export const materializeSession = onCall(
 
     const data = (request.data ?? {}) as MaterializeRequest;
     const halaqaId = requireString(data.halaqaId, "halaqaId");
-    // Missing slotId must fail — never invent a replacement (WA-7 owns ids).
     const slotId = requireString(data.slotId, "slotId");
     const date = requireCairoDate(data.date);
+    // Client roster/staff fields are ignored (authoritative halaqa only).
 
     const db = admin.firestore();
     const halaqaRef = db.collection("halaqat").doc(halaqaId);
@@ -147,10 +189,14 @@ export const materializeSession = onCall(
     }
 
     const authz = await assertCanMaterialize({ uid, teacherId });
+    const requestStudentIds = normalizeStudentIds(halaqaRaw.studentIds);
 
     const identity = { halaqaId, slotId, date };
     const sessionId = deterministicSessionId(identity);
     const sessionRef = db.collection("sessions").doc(sessionId);
+    const lockRef = db
+      .collection("sessionConflictLocks")
+      .doc(cairoDayConflictLockId(date));
 
     type TxResult = {
       sessionId: string;
@@ -187,18 +233,8 @@ export const materializeSession = onCall(
 
         if (decision.action === "reuse") {
           const ex = decision.existing;
-          const startAt =
-            ex.startAt instanceof Timestamp
-              ? ex.startAt.toDate()
-              : ex.startAt instanceof Date
-                ? ex.startAt
-                : null;
-          const endAt =
-            ex.endAt instanceof Timestamp
-              ? ex.endAt.toDate()
-              : ex.endAt instanceof Date
-                ? ex.endAt
-                : null;
+          const startAt = toDate(ex.startAt);
+          const endAt = toDate(ex.endAt);
           return {
             sessionId: decision.sessionId,
             created: false,
@@ -218,6 +254,72 @@ export const materializeSession = onCall(
         }
 
         const fields = decision.fields;
+        const endTs = Timestamp.fromDate(fields.endAt);
+
+        // C7.3 — serialize creates for this Cairo day (read before writes).
+        await tx.get(lockRef);
+
+        // Scoped candidate query: same Cairo date, startAt before requested end.
+        const candidateQuery = db
+          .collection("sessions")
+          .where("date", "==", date)
+          .where("startAt", "<", endTs);
+        const candidateSnap = await tx.get(candidateQuery);
+
+        const candidates: ConflictCandidate[] = [];
+        const otherHalaqaIds = new Set<string>();
+        for (const doc of candidateSnap.docs) {
+          const cand = candidateFromDoc(
+            doc.id,
+            doc.data() as Record<string, unknown>,
+          );
+          if (!cand) continue;
+          candidates.push(cand);
+          if (cand.halaqaId !== halaqaId) {
+            otherHalaqaIds.add(cand.halaqaId);
+          }
+        }
+
+        const rosterByHalaqaId = new Map<string, string[]>();
+        for (const otherId of otherHalaqaIds) {
+          const otherRef = db.collection("halaqat").doc(otherId);
+          const otherSnap = await tx.get(otherRef);
+          if (!otherSnap.exists) {
+            rosterByHalaqaId.set(otherId, []);
+            continue;
+          }
+          rosterByHalaqaId.set(
+            otherId,
+            normalizeStudentIds(otherSnap.data()?.studentIds),
+          );
+        }
+
+        const evaluation = evaluateSessionConflicts({
+          request: {
+            sessionId,
+            halaqaId: fields.halaqaId,
+            teacherId: fields.teacherId,
+            supervisorId: fields.supervisorId ?? null,
+            startAt: fields.startAt,
+            endAt: fields.endAt,
+            studentIds: requestStudentIds,
+          },
+          candidates,
+          rosterByHalaqaId,
+        });
+
+        if (!evaluation.ok) {
+          const top = evaluation.conflicts[0];
+          throw new HttpsError(
+            "failed-precondition",
+            `تعارض في الجلسة: ${top.reason}`,
+            {
+              code: "session_conflict",
+              conflicts: evaluation.conflicts,
+            },
+          );
+        }
+
         const createPayload: Record<string, unknown> = {
           halaqaId: fields.halaqaId,
           slotId: fields.slotId,
@@ -234,7 +336,17 @@ export const materializeSession = onCall(
           createPayload.supervisorId = fields.supervisorId;
         }
 
-        // set() + transaction retry: concurrent creators converge on one doc.
+        tx.set(
+          lockRef,
+          {
+            date,
+            updatedAt: FieldValue.serverTimestamp(),
+            lastSessionId: sessionId,
+            lastHalaqaId: fields.halaqaId,
+            lastTeacherId: fields.teacherId,
+          },
+          { merge: true },
+        );
         tx.set(sessionRef, createPayload);
 
         return {

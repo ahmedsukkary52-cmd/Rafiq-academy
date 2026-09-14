@@ -486,10 +486,11 @@ Do **not** unbounded-copy full student roster onto session by default
 | Voice | `chat_voice/{conversationId}/{messageId}/{file}` | participant | same | same |
 | Recitation | `recitations/{studentId}/{assignmentId}/…` | own if flag | teacher | gated false |
 
-**Rules plan:** remove `/{allPaths=**}` catch-all  
-**Deps:** WA-0 for production media scale  
-**Done when:** path matrix documented + Rules test plan; catch-all removal on Rules checklist  
+**Rules plan:** remove authenticated catch-all; default DENY for unspecified paths
+**Deps:** WA-0 for production media scale
+**Done when:** path matrix documented + Rules tests; catch-all removal on Rules checklist
 **Non-goals:** Enabling `audioUploadsEnabled`
+**Implementation notes (WA-12):** C10 paths hardened (payment ownership, chat participantIds + Admin read, awards grantor lock, recitations deny-all). Active app paths authorized without catch-all: `posts/{authorId}` create=owner; `content/{uploadedBy}` create/delete=owner; `halaqa_activities/.../images` create=student on `assignments`+halaqa roster (audio folder denied while capability OFF). Terminal Storage fallback deny-only. `firebase.json` → `storage.rules`. Dart: `StoragePathsContract`.
 
 ---
 

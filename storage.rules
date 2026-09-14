@@ -1,8 +1,7 @@
 rules_version = '2';
 
-// WA-2 / C10 — remove catch-all Storage access.
-// Payment proofs path frozen. Chat/profile paths bound to auth ownership
-// without pulling full chat media UX into this batch.
+// WA-12 / C10 — Storage path ownership. Default DENY for unspecified paths.
+// No authenticated catch-all. Chat media uses WA-11 conversation.participantIds.
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -10,18 +9,30 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userDoc() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(uid())
+      );
+    }
+
     function isAdmin() {
-      return signedIn()
-        && firestore.get(
-          /databases/(default)/documents/users/$(request.auth.uid)
-        ).data.role == 'admin';
+      return signedIn() && userDoc().data.role == 'admin';
     }
 
     function isSupervisor() {
-      return signedIn()
-        && firestore.get(
-          /databases/(default)/documents/users/$(request.auth.uid)
-        ).data.role == 'supervisor';
+      return signedIn() && userDoc().data.role == 'supervisor';
+    }
+
+    function isParentRole() {
+      return signedIn() && userDoc().data.role == 'parent';
+    }
+
+    function nonEmpty(s) {
+      return s is string && s.size() > 0;
     }
 
     function isImage() {
@@ -32,68 +43,262 @@ service firebase.storage {
       return request.resource.size < 10 * 1024 * 1024;
     }
 
-    function isConversationParticipant(conversationId) {
-      return signedIn()
-        && firestore.exists(
-          /databases/(default)/documents/conversations/$(conversationId)
-        )
-        && request.auth.uid in firestore.get(
-          /databases/(default)/documents/conversations/$(conversationId)
-        ).data.participantIds;
+    function underProfileImageSize() {
+      return request.resource.size < 5 * 1024 * 1024;
     }
 
-    // C10 — payment_proofs/{parentId}/{paymentId}/{fileName}
-    match /payment_proofs/{parentId}/{paymentId}/{fileName} {
-      allow read: if signedIn() && (
-        request.auth.uid == parentId || isAdmin() || isSupervisor()
+    function underChatImageSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    function underChatVoiceSize() {
+      return request.resource.size < 20 * 1024 * 1024;
+    }
+
+    function underAwardImageSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    /// Payment must exist and belong to path parentId (authoritative Firestore).
+    function paymentOwnedByParent(parentId, paymentId) {
+      return nonEmpty(parentId)
+        && nonEmpty(paymentId)
+        && firestore.exists(
+          /databases/(default)/documents/payments/$(paymentId)
+        )
+        && firestore.get(
+          /databases/(default)/documents/payments/$(paymentId)
+        ).data.parentId == parentId;
+    }
+
+    function conversationDoc(conversationId) {
+      return firestore.get(
+        /databases/(default)/documents/conversations/$(conversationId)
       );
+    }
+
+    function conversationExists(conversationId) {
+      return nonEmpty(conversationId)
+        && firestore.exists(
+          /databases/(default)/documents/conversations/$(conversationId)
+        );
+    }
+
+    /// WA-11: membership from conversations.participantIds (not client claims).
+    function isConversationParticipant(conversationId) {
+      return signedIn()
+        && conversationExists(conversationId)
+        && conversationDoc(conversationId).data.participantIds is list
+        && uid() in conversationDoc(conversationId).data.participantIds;
+    }
+
+    function canAccessConversationMedia(conversationId) {
+      return isAdmin() || isConversationParticipant(conversationId);
+    }
+
+    // ── C10 payment_proofs/{parentId}/{paymentId}/{fileName} ───────────────
+    match /payment_proofs/{parentId}/{paymentId}/{fileName} {
+      allow read: if signedIn()
+        && nonEmpty(parentId)
+        && nonEmpty(paymentId)
+        && nonEmpty(fileName)
+        && (
+          (uid() == parentId && isParentRole())
+          || isAdmin()
+          || isSupervisor()
+        );
+
       allow create: if signedIn()
-        && request.auth.uid == parentId
+        && isParentRole()
+        && uid() == parentId
+        && nonEmpty(fileName)
+        && paymentOwnedByParent(parentId, paymentId)
         && isImage()
         && underMaxProofSize();
+
       allow update: if false;
       allow delete: if false;
     }
 
-    // C10 — profile_images/{uid}/{fileName}
+    // ── C10 profile_images/{uid}/{fileName} ────────────────────────────────
     match /profile_images/{userId}/{fileName} {
-      allow read: if signedIn();
-      allow write: if signedIn()
-        && request.auth.uid == userId
+      // Product visibility: authenticated profile photo URLs (no phone fields).
+      allow read: if signedIn()
+        && nonEmpty(userId)
+        && nonEmpty(fileName);
+
+      allow create, update: if signedIn()
+        && uid() == userId
+        && nonEmpty(fileName)
         && isImage()
-        && request.resource.size < 5 * 1024 * 1024;
+        && underProfileImageSize();
+
+      allow delete: if signedIn()
+        && uid() == userId
+        && nonEmpty(fileName);
     }
 
-    // C10 — chat media: participants (+ Admin monitor) only
+    // ── C10 chat_media ─────────────────────────────────────────────────────
     match /chat_media/{conversationId}/{messageId}/{fileName} {
-      allow read: if isAdmin() || isConversationParticipant(conversationId);
+      allow read: if canAccessConversationMedia(conversationId)
+        && nonEmpty(messageId)
+        && nonEmpty(fileName);
+
       allow create: if isConversationParticipant(conversationId)
+        && nonEmpty(messageId)
+        && nonEmpty(fileName)
         && isImage()
-        && request.resource.size < 10 * 1024 * 1024;
+        && underChatImageSize();
+
       allow update, delete: if false;
     }
 
+    // ── C10 chat_voice ─────────────────────────────────────────────────────
     match /chat_voice/{conversationId}/{messageId}/{fileName} {
-      allow read: if isAdmin() || isConversationParticipant(conversationId);
+      allow read: if canAccessConversationMedia(conversationId)
+        && nonEmpty(messageId)
+        && nonEmpty(fileName);
+
       allow create: if isConversationParticipant(conversationId)
+        && nonEmpty(messageId)
+        && nonEmpty(fileName)
         && request.resource.contentType.matches('audio/.*')
-        && request.resource.size < 20 * 1024 * 1024;
+        && underChatVoiceSize();
+
       allow update, delete: if false;
     }
 
+    // ── C10 chat_attachments (same conversation auth; types IMPLEMENTATION) ─
     match /chat_attachments/{conversationId}/{messageId}/{fileName} {
-      allow read: if isAdmin() || isConversationParticipant(conversationId);
+      allow read: if canAccessConversationMedia(conversationId)
+        && nonEmpty(messageId)
+        && nonEmpty(fileName);
+
       allow create: if isConversationParticipant(conversationId)
-        && request.resource.size < 10 * 1024 * 1024;
+        && nonEmpty(messageId)
+        && nonEmpty(fileName)
+        && underChatImageSize();
+
       allow update, delete: if false;
     }
 
-    // Recitation audio gated — deny until audioUploadsEnabled product reopen
+    // ── C10 awards/{teacherId}/{file} — grantor staff path lock ─────────────
+    match /awards/{teacherId}/{fileName} {
+      allow read: if signedIn()
+        && nonEmpty(teacherId)
+        && nonEmpty(fileName);
+
+      allow create: if signedIn()
+        && uid() == teacherId
+        && nonEmpty(fileName)
+        && isImage()
+        && underAwardImageSize();
+
+      allow update, delete: if false;
+    }
+
+    // ── WA-12 posts/{authorId}/{fileName} ──────────────────────────────────
+    // Upload precedes posts/{postId}; ownership is path authorId only.
+    // Create is create-only: existing objects cannot be overwritten via create.
+    match /posts/{authorId}/{fileName} {
+      allow read: if signedIn()
+        && nonEmpty(authorId)
+        && nonEmpty(fileName);
+
+      allow create: if signedIn()
+        && resource == null
+        && uid() == authorId
+        && nonEmpty(fileName);
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── WA-12 content/{uploadedBy}/{fileName} ──────────────────────────────
+    // Upload precedes contentLibrary/{id}; delete is path-owner only.
+    match /content/{uploadedBy}/{fileName} {
+      allow read: if signedIn()
+        && nonEmpty(uploadedBy)
+        && nonEmpty(fileName);
+
+      allow create: if signedIn()
+        && resource == null
+        && uid() == uploadedBy
+        && nonEmpty(fileName);
+
+      allow update: if false;
+
+      allow delete: if signedIn()
+        && uid() == uploadedBy
+        && nonEmpty(fileName);
+    }
+
+    // ── WA-12 halaqa_activities/{activityId}/{studentId}/{folder}/{file} ───
+    // Live SSOT: assignments/{activityId} + halaqat/{halaqaId}.studentIds.
+    // Never authorize via legacy collection name "halaqaActivity".
+    // audioUploadsEnabled is OFF — audio folder create denied in Rules.
+    function assignmentExists(activityId) {
+      return nonEmpty(activityId)
+        && firestore.exists(
+          /databases/(default)/documents/assignments/$(activityId)
+        );
+    }
+
+    function assignmentData(activityId) {
+      return firestore.get(
+        /databases/(default)/documents/assignments/$(activityId)
+      ).data;
+    }
+
+    /// Fail closed when halaqaId is missing — do not read undefined fields.
+    function assignmentHasHalaqaId(activityId) {
+      return assignmentExists(activityId)
+        && assignmentData(activityId).keys().hasAll(['halaqaId'])
+        && assignmentData(activityId).halaqaId is string
+        && nonEmpty(assignmentData(activityId).halaqaId);
+    }
+
+    function assignmentHalaqaId(activityId) {
+      return assignmentData(activityId).halaqaId;
+    }
+
+    function studentOnAssignmentHalaqa(activityId, studentId) {
+      return assignmentHasHalaqaId(activityId)
+        && firestore.exists(
+          /databases/(default)/documents/halaqat/$(assignmentHalaqaId(activityId))
+        )
+        && firestore.get(
+          /databases/(default)/documents/halaqat/$(assignmentHalaqaId(activityId))
+        ).data.studentIds is list
+        && studentId in firestore.get(
+          /databases/(default)/documents/halaqat/$(assignmentHalaqaId(activityId))
+        ).data.studentIds;
+    }
+
+    match /halaqa_activities/{activityId}/{studentId}/{folder}/{fileName} {
+      allow read: if signedIn()
+        && nonEmpty(activityId)
+        && nonEmpty(studentId)
+        && nonEmpty(fileName)
+        && (folder == 'images' || folder == 'audio');
+
+      allow create: if signedIn()
+        && resource == null
+        && uid() == studentId
+        && folder == 'images'
+        && nonEmpty(fileName)
+        && studentOnAssignmentHalaqa(activityId, studentId);
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── Recitations gated OFF (audioUploadsEnabled = false) ────────────────
     match /recitations/{allPaths=**} {
       allow read, write: if false;
     }
 
-    // Default deny — no catch-all
+    // Default DENY — unspecified paths remain fail-closed.
     match /{allPaths=**} {
       allow read, write: if false;
     }

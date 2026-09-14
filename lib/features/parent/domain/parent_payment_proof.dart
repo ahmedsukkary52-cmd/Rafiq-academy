@@ -1,3 +1,4 @@
+import '../../../shared/domain/storage_paths_contract.dart';
 import 'entities/parent_entities.dart';
 
 /// Parent payment-proof + Supervisor review contract (external pay + screenshot).
@@ -47,7 +48,11 @@ class ParentPaymentProofContract {
     required String paymentId,
     required String fileName,
   }) {
-    return 'payment_proofs/$parentId/$paymentId/$fileName';
+    return StoragePathsContract.paymentProof(
+      parentId: parentId,
+      paymentId: paymentId,
+      fileName: fileName,
+    );
   }
 
   /// Max proof size (matches Parent UI copy: ١٠ ميجا).

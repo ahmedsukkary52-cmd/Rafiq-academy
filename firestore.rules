@@ -113,9 +113,12 @@ service cloud.firestore {
       allow create: if false;
       allow delete: if false;
       // D16: never allow phone on profile projections via client writes.
+      // C14 / WA-15: `lifecycle` is a privileged operational state. No client
+      // may write it — not even Admin — so archive/unarchive can only happen
+      // through adminSetStudentLifecycle, which audits every transition.
       allow update: if signedIn()
         && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['phone'])
+            .hasAny(['phone', 'lifecycle'])
         && !hasExposedPhone(request.resource.data);
     }
 

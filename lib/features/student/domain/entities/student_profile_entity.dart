@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../shared/domain/student_lifecycle_contract.dart';
+
 class StudentProfileEntity extends Equatable {
   final String uid;
   final String name;
@@ -7,6 +9,11 @@ class StudentProfileEntity extends Equatable {
   final String? phone;
   final String? halaqaId;
   final String halaqaName; // denormalized - ظهر في التصميم "حلقة المتقدمين"
+
+  /// C14 / WA-15 — operational lifecycle, server-owned. A missing value reads
+  /// as [StudentLifecycle.active]. Independent of login, payment, and halaqa
+  /// membership; never write it from the client.
+  final StudentLifecycle lifecycle;
   final String currentPlanName;
 
   /// نسبة تقدم السورة الحالية فقط:
@@ -53,6 +60,7 @@ class StudentProfileEntity extends Equatable {
     this.phone,
     this.halaqaId,
     this.halaqaName = '',
+    this.lifecycle = StudentLifecycle.active,
     required this.currentPlanName,
     required this.overallProgressPercent,
     this.totalVersesMemorized = 0,
@@ -85,6 +93,7 @@ class StudentProfileEntity extends Equatable {
       phone: phone,
       halaqaId: halaqaId,
       halaqaName: halaqaName,
+      lifecycle: lifecycle,
       currentPlanName: currentPlanName,
       overallProgressPercent: overallProgressPercent,
       totalVersesMemorized: totalVersesMemorized,
@@ -110,6 +119,7 @@ class StudentProfileEntity extends Equatable {
     phone,
     halaqaId,
     halaqaName,
+    lifecycle,
     currentPlanName,
     overallProgressPercent,
     totalVersesMemorized,

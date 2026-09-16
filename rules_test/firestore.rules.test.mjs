@@ -1122,3 +1122,107 @@ test('WA-14 a client cannot add itself to visibleTo to widen its scope', async (
       .set(searchDoc({ visibleTo: ['student1'] })),
   );
 });
+
+// ── WA-15 / C14 — studentProfiles.lifecycle is server-owned ────────────────
+
+async function seedLifecycle(value) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await seed(ctx.firestore(), 'studentProfiles/student1', {
+      uid: 'student1',
+      name: 'Student',
+      overallProgressPercent: 0,
+      lifecycle: value,
+    });
+  });
+}
+
+test('WA-15 no client role can write studentProfiles.lifecycle', async () => {
+  await seedLifecycle('active');
+
+  for (const uid of ['student1', 'parent1', 'teacher1', 'supervisor1', 'admin1']) {
+    const db = authed(uid);
+    await assertFails(
+      db.doc('studentProfiles/student1').update({ lifecycle: 'archived' }),
+    );
+    await assertFails(
+      db.doc('studentProfiles/student1').set({ lifecycle: 'archived' }, { merge: true }),
+    );
+  }
+});
+
+test('WA-15 a client cannot unarchive itself back to active', async () => {
+  await seedLifecycle('archived');
+
+  for (const uid of ['student1', 'parent1', 'admin1']) {
+    await assertFails(
+      authed(uid).doc('studentProfiles/student1').update({ lifecycle: 'active' }),
+    );
+  }
+});
+
+test('WA-15 lifecycle cannot ride along with an otherwise legal profile update', async () => {
+  await seedLifecycle('active');
+
+  await assertFails(
+    authed('teacher1').doc('studentProfiles/student1').update({
+      points: 10,
+      lifecycle: 'archived',
+    }),
+  );
+});
+
+test('WA-15 an unrelated profile field still updates normally', async () => {
+  await seedLifecycle('active');
+
+  await assertSucceeds(
+    authed('teacher1').doc('studentProfiles/student1').update({ points: 10 }),
+  );
+});
+
+test('WA-15 unauthenticated lifecycle writes are denied', async () => {
+  await seedLifecycle('active');
+  const db = testEnv.unauthenticatedContext().firestore();
+
+  await assertFails(
+    db.doc('studentProfiles/student1').update({ lifecycle: 'archived' }),
+  );
+});
+
+test('WA-15 the privileged Admin CF path bypasses Rules and writes lifecycle', async () => {
+  await seedLifecycle('active');
+
+  // adminSetStudentLifecycle runs on the Admin SDK, which is what the
+  // rules-disabled context models here.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await assertSucceeds(
+      ctx.firestore().doc('studentProfiles/student1').update({ lifecycle: 'archived' }),
+    );
+  });
+
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const snap = await ctx.firestore().doc('studentProfiles/student1').get();
+    assert.equal(snap.data().lifecycle, 'archived');
+  });
+});
+
+test('WA-15 phone privacy on studentProfiles is unchanged', async () => {
+  await seedLifecycle('active');
+
+  await assertFails(
+    authed('teacher1').doc('studentProfiles/student1').update({ phone: '01099999999' }),
+  );
+  await assertFails(
+    authed('admin1').doc('studentProfiles/student1').update({ phone: '01099999999' }),
+  );
+});
+
+test('WA-15 studentProfiles create and delete remain closed to clients', async () => {
+  await seedLifecycle('active');
+
+  for (const uid of ['admin1', 'teacher1', 'student1']) {
+    await assertFails(
+      authed(uid).doc('studentProfiles/newStudent').set({ uid: 'newStudent', lifecycle: 'active' }),
+    );
+    await assertFails(authed(uid).doc('studentProfiles/student1').delete());
+  }
+});

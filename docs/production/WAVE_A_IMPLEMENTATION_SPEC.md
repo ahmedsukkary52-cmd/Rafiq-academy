@@ -531,14 +531,28 @@ Do **not** unbounded-copy full student roster onto session by default
 |-----------|---------|
 | Login | `users.isActive` |
 | Payment | `paymentAccess.status` |
-| Halaqa | `studentProfiles.halaqaId` empty ⇒ no_halaqa |
+| Halaqa | `halaqat.studentIds` (membership SSOT). `studentProfiles.halaqaId` is the display pointer only and is never membership authority |
 | Lifecycle | `studentProfiles.lifecycle` = `active`\|`archived` (**CF/Admin**) |
 
-Compose labels in Admin Student Profile (full actions Wave B/D). Wave A: field + Rules deny client `lifecycle` write.
+**Composed display labels** (presentation only — never persisted, never in `studentSearch`). First match wins:
+
+| Precedence | Condition | Label |
+|-----------|-----------|-------|
+| 1 | `lifecycle == archived` | مؤرشف |
+| 2 | `users.isActive == false` | معطّل |
+| 3 | `paymentAccess.status == suspended` | موقوف دفع |
+| 4 | no membership in any `halaqat.studentIds` | بانتظار حلقة |
+| 5 | otherwise | نشط |
+
+`معطّل` closes the disabled-account gap in the original four-label table; it is the Login dimension and must never be conflated with `archived`. A dimension the viewer cannot read (e.g. Teacher and `paymentAccess`) is skipped, not assumed.
+
+Transitions go through the Admin-only `adminSetStudentLifecycle` callable; clients cannot write `lifecycle` at all. Missing `lifecycle` reads as `active`, so no migration is required.
+
+**DEFERRED INTEGRATION (D21 roster cascade):** archiving does **not** remove the student from `halaqat.studentIds`. That cascade touches the WA-14 `studentSearch` projection, WA-10 group membership sync, and live rosters, so it is deferred to a dedicated membership/archive integration wave.
 
 **Deps:** WA-3  
-**Done when:** archived ≠ payment suspended ≠ no_halaqa in data model tests  
-**Non-goals:** Overloading roster with many actions (D18)
+**Done when:** archived ≠ payment suspended ≠ no_halaqa ≠ login disabled in data model tests  
+**Non-goals:** Overloading roster with many actions (D18); Halaqa roster cascade
 
 ---
 

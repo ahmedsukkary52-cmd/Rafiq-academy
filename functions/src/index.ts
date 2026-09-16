@@ -39,3 +39,7 @@ export {
   projectStudentSearchOnProfileWrite,
   projectStudentSearchOnUserWrite,
 } from "./search/studentSearchFunctions";
+export {
+  adminBackfillStudentLifecycle,
+  adminSetStudentLifecycle,
+} from "./lifecycle/studentLifecycleFunctions";

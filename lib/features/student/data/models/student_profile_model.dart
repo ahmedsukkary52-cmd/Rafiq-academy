@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../shared/domain/student_lifecycle_contract.dart';
 import '../../domain/entities/student_profile_entity.dart';
 
 class StudentProfileModel extends StudentProfileEntity {
@@ -10,6 +11,7 @@ class StudentProfileModel extends StudentProfileEntity {
     super.phone,
     super.halaqaId,
     super.halaqaName,
+    super.lifecycle,
     required super.currentPlanName,
     required super.overallProgressPercent,
     super.totalVersesMemorized,
@@ -53,6 +55,10 @@ class StudentProfileModel extends StudentProfileEntity {
       phone: null,
       halaqaId: profile['halaqaId'] as String?,
       halaqaName: _readNonEmptyString(profile['halaqaName']) ?? halaqaName,
+      // C14 / WA-15 — absent lifecycle reads as active (no migration needed).
+      lifecycle: StudentLifecycleContract.parse(
+        profile[StudentLifecycleContract.field],
+      ),
       currentPlanName: profile['currentPlanName'] ?? '',
       overallProgressPercent: (profile['overallProgressPercent'] ?? 0)
           .toDouble(),

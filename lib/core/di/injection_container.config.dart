@@ -317,6 +317,14 @@ import 'package:rafiq_academy/features/student/presentation/bloc/student_bloc.da
     as _i303;
 import 'package:rafiq_academy/features/student/presentation/pages/student_audio_library_page.dart'
     as _i519;
+import 'package:rafiq_academy/features/student_search/data/datasources/student_search_remote_datasource.dart'
+    as _i86;
+import 'package:rafiq_academy/features/student_search/data/repositories/student_search_repository_impl.dart'
+    as _i240;
+import 'package:rafiq_academy/features/student_search/domain/repositories/student_search_repository.dart'
+    as _i107;
+import 'package:rafiq_academy/features/student_search/domain/usecases/student_search_usecases.dart'
+    as _i462;
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource.dart'
     as _i65;
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource_impl.dart'
@@ -572,6 +580,11 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i582.SupervisorRepositoryImpl(
         remoteDatasource: gh<_i65.SupervisorRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i86.StudentSearchRemoteDatasource>(
+      () => _i86.StudentSearchRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.lazySingleton<_i937.FcmTokenRemoteDatasource>(
@@ -839,6 +852,12 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i429.DeleteCalendarEventUseCase>(
       () => _i429.DeleteCalendarEventUseCase(gh<_i669.CalendarRepository>()),
     );
+    gh.lazySingleton<_i107.StudentSearchRepository>(
+      () => _i240.StudentSearchRepositoryImpl(
+        remoteDatasource: gh<_i86.StudentSearchRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
     gh.factory<_i81.GetLatestHomeworkUseCase>(
       () => _i81.GetLatestHomeworkUseCase(gh<_i951.HomeworkRepository>()),
     );
@@ -1038,6 +1057,24 @@ extension GetItInjectableX on _i174.GetIt {
         getMonthEvents: gh<_i429.GetMonthEventsUseCase>(),
         addCalendarEvent: gh<_i429.AddCalendarEventUseCase>(),
         deleteCalendarEvent: gh<_i429.DeleteCalendarEventUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i462.SearchStudentsInScopeUseCase>(
+      () => _i462.SearchStudentsInScopeUseCase(
+        gh<_i107.StudentSearchRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i462.SearchAllStudentsUseCase>(
+      () => _i462.SearchAllStudentsUseCase(gh<_i107.StudentSearchRepository>()),
+    );
+    gh.lazySingleton<_i462.SearchStudentsInHalaqaUseCase>(
+      () => _i462.SearchStudentsInHalaqaUseCase(
+        gh<_i107.StudentSearchRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i462.GetStudentSearchEntryUseCase>(
+      () => _i462.GetStudentSearchEntryUseCase(
+        gh<_i107.StudentSearchRepository>(),
       ),
     );
     gh.singleton<_i303.StudentBloc>(

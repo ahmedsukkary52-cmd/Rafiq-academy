@@ -959,3 +959,166 @@ test('WA-13 client cannot forge server-owned push fields on notifications', asyn
       .update({ delivery: { status: 'sent' } }),
   );
 });
+
+// ── WA-14 / C13 — studentSearch role-scoped directory projection ───────────
+
+function searchDoc(overrides = {}) {
+  return {
+    studentId: 'student1',
+    fullName: 'أحمد',
+    fullNameNormalized: 'احمد',
+    halaqaId: 'h1',
+    halaqaName: 'H1',
+    halaqaIds: ['h1'],
+    visibleTo: ['teacher1', 'supervisor1'],
+    normalizationVersion: 1,
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** student1 is in teacher1/supervisor1 scope; student2 is in nobody's. */
+async function seedStudentSearch() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db.doc('studentSearch/student1').set(searchDoc());
+    await db.doc('studentSearch/student2').set(
+      searchDoc({
+        studentId: 'student2',
+        fullName: 'بلال',
+        fullNameNormalized: 'بلال',
+        halaqaId: 'h2',
+        halaqaName: 'H2',
+        halaqaIds: ['h2'],
+        visibleTo: ['teacherOther', 'supervisorOther'],
+      }),
+    );
+  });
+}
+
+function scopedQuery(db, uid) {
+  return db
+    .collection('studentSearch')
+    .where('visibleTo', 'array-contains', uid)
+    .orderBy('fullNameNormalized')
+    .limit(25);
+}
+
+test('WA-14 admin reads any studentSearch document and the whole directory', async () => {
+  await seedStudentSearch();
+  const db = authed('admin1');
+
+  await assertSucceeds(db.doc('studentSearch/student1').get());
+  await assertSucceeds(db.doc('studentSearch/student2').get());
+  await assertSucceeds(
+    db.collection('studentSearch').orderBy('fullNameNormalized').limit(25).get(),
+  );
+});
+
+test('WA-14 authorized teacher reads only students inside visibleTo', async () => {
+  await seedStudentSearch();
+  const db = authed('teacher1');
+
+  await assertSucceeds(db.doc('studentSearch/student1').get());
+
+  const scoped = await assertSucceeds(scopedQuery(db, 'teacher1').get());
+  assert.deepEqual(
+    scoped.docs.map((d) => d.id),
+    ['student1'],
+  );
+});
+
+test('WA-14 authorized supervisor reads only students inside visibleTo', async () => {
+  await seedStudentSearch();
+  const db = authed('supervisor1');
+
+  await assertSucceeds(db.doc('studentSearch/student1').get());
+  await assertSucceeds(scopedQuery(db, 'supervisor1').get());
+});
+
+test('WA-14 teacher outside visibleTo is denied', async () => {
+  await seedStudentSearch();
+  const db = authed('teacher1');
+
+  await assertFails(db.doc('studentSearch/student2').get());
+  await assertFails(
+    db.collection('studentSearch').where('halaqaIds', 'array-contains', 'h2').get(),
+  );
+});
+
+test('WA-14 supervisor outside visibleTo is denied', async () => {
+  await seedStudentSearch();
+  await assertFails(authed('supervisor1').doc('studentSearch/student2').get());
+});
+
+test('WA-14 an unscoped or spoofed-scope staff query is denied', async () => {
+  await seedStudentSearch();
+  const db = authed('teacher1');
+
+  // No scope filter — student2 is not readable, so the query fails.
+  await assertFails(db.collection('studentSearch').get());
+  await assertFails(
+    db.collection('studentSearch').orderBy('fullNameNormalized').limit(25).get(),
+  );
+  // Scoping to somebody else's uid does not grant their scope.
+  await assertFails(scopedQuery(db, 'teacherOther').get());
+  await assertFails(scopedQuery(db, 'admin1').get());
+});
+
+test('WA-14 parent has no studentSearch access, even for their own child', async () => {
+  await seedStudentSearch();
+  const db = authed('parent1');
+
+  await assertFails(db.doc('studentSearch/student1').get());
+  await assertFails(db.collection('studentSearch').get());
+
+  // A parent uid is never written into visibleTo, so the only query shape a
+  // parent can run resolves to zero rows — no directory row is reachable.
+  const scoped = await scopedQuery(db, 'parent1').get();
+  assert.equal(scoped.size, 0);
+});
+
+test('WA-14 student has no studentSearch access, not even their own row', async () => {
+  await seedStudentSearch();
+  const db = authed('student1');
+
+  await assertFails(db.doc('studentSearch/student1').get());
+  await assertFails(db.collection('studentSearch').get());
+});
+
+test('WA-14 unauthenticated studentSearch access is denied', async () => {
+  await seedStudentSearch();
+  const db = testEnv.unauthenticatedContext().firestore();
+
+  await assertFails(db.doc('studentSearch/student1').get());
+  await assertFails(db.collection('studentSearch').get());
+  await assertFails(db.doc('studentSearch/student1').set(searchDoc()));
+});
+
+test('WA-14 every client write to studentSearch is denied', async () => {
+  await seedStudentSearch();
+
+  for (const uid of ['admin1', 'teacher1', 'supervisor1', 'parent1', 'student1']) {
+    const db = authed(uid);
+    await assertFails(db.doc('studentSearch/forged').set(searchDoc()));
+    await assertFails(
+      db.doc('studentSearch/student1').update({ fullName: 'مزور' }),
+    );
+    await assertFails(db.doc('studentSearch/student1').delete());
+  }
+});
+
+test('WA-14 a client cannot add itself to visibleTo to widen its scope', async () => {
+  await seedStudentSearch();
+
+  await assertFails(
+    authed('teacher1')
+      .doc('studentSearch/student2')
+      .update({ visibleTo: ['teacher1'] }),
+  );
+  await assertFails(
+    authed('student1')
+      .doc('studentSearch/student1')
+      .set(searchDoc({ visibleTo: ['student1'] })),
+  );
+});

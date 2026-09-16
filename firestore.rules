@@ -461,8 +461,19 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
-    match /studentSearch/{id} {
-      allow read: if signedIn();
+    // C13 / WA-14 — safe student directory projection. Carries stable ids and
+    // display text only; phone/private contact never appears here (D16).
+    //
+    // Scope is roster-derived: `visibleTo` holds the teacher/supervisor uids of
+    // every halaqa whose `studentIds` contains the student. The client-writable
+    // `studentProfiles.halaqaId` pointer is NEVER consulted for authorization,
+    // so a forged pointer cannot widen who may read a student.
+    //
+    // Parent and Student have no directory scope (C13.3). A list query must
+    // carry `visibleTo array-contains <caller>` or it fails on the first row.
+    match /studentSearch/{studentId} {
+      allow read: if isAdmin()
+        || (signedIn() && uid() in resource.data.get('visibleTo', []));
       allow write: if false;
     }
     // C11 / WA-13 — FCM device tokens: own uid only, never exposed to others.

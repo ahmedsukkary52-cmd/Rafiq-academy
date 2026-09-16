@@ -33,3 +33,9 @@ export {
 export {
   notifyParentsOnEvaluation,
 } from "./notifications/evaluationNotificationFunctions";
+export {
+  adminBackfillStudentSearch,
+  projectStudentSearchOnHalaqaWrite,
+  projectStudentSearchOnProfileWrite,
+  projectStudentSearchOnUserWrite,
+} from "./search/studentSearchFunctions";

@@ -131,6 +131,22 @@
         { "fieldPath": "date", "order": "ASCENDING" },
         { "fieldPath": "startAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "studentSearch",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visibleTo", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "fullNameNormalized", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studentSearch",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "halaqaIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "fullNameNormalized", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

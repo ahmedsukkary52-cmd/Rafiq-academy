@@ -7,7 +7,8 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test:unit": "node --test test/wa1_provision_gate.test.mjs"
+    "test:unit": "node --test test/wa1_provision_gate.test.mjs",
+    "test:wa13": "node --test test/wa13_fcm_send_chain.test.mjs"
   },
   "engines": {
     "node": "20"

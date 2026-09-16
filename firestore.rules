@@ -272,8 +272,21 @@ service cloud.firestore {
     match /assignments/{id} {
       allow read, write: if signedIn();
     }
+    // C11 / WA-13 — in-app cards stay client-writable (W4/W5 fan-out), but the
+    // server-owned push/deep-link fields cannot be forged by a client.
     match /notifications/{id} {
-      allow read, write: if signedIn();
+      function serverOwnedNotificationFields() {
+        return ['data', 'delivery', 'push', 'pushedAt', 'deliveredAt'];
+      }
+
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && !request.resource.data.keys()
+            .hasAny(serverOwnedNotificationFields());
+      allow update: if signedIn()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(serverOwnedNotificationFields());
+      allow delete: if signedIn();
     }
     match /complaints/{id} {
       allow read, write: if signedIn();
@@ -452,12 +465,51 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if false;
     }
+    // C11 / WA-13 — FCM device tokens: own uid only, never exposed to others.
+    // Admin/service access goes through the Admin SDK (trusted CF), not Rules.
     match /fcmTokens/{userId} {
-      allow read: if isAdmin() || isSelf(userId);
-      allow write: if isSelf(userId);
-      match /devices/{deviceId} {
-        allow read, write: if isAdmin() || isSelf(userId);
+      function deviceClientFields() {
+        return ['token', 'platform', 'createdAt', 'updatedAt', 'disabled'];
       }
+
+      // Reads through get() defaults — a missing field must fail closed
+      // without raising an evaluation error.
+      function deviceShapeValid() {
+        return request.resource.data.get('token', '') is string
+          && request.resource.data.get('token', '').size() > 0
+          && request.resource.data.get('token', '').size() <= 4096
+          && request.resource.data.get('platform', '')
+              in ['android', 'ios', 'web']
+          && request.resource.data.get('disabled', '') is bool;
+      }
+
+      allow read: if isSelf(userId);
+      allow write: if false;
+
+      match /devices/{deviceId} {
+        allow read: if isSelf(userId);
+
+        allow create: if isSelf(userId)
+          && request.resource.data.keys().hasOnly(deviceClientFields())
+          && request.resource.data.keys()
+              .hasAll(['token', 'platform', 'disabled'])
+          && deviceShapeValid();
+
+        // Server-owned fields (disabledReason/disabledAt/lastSendAt/
+        // lastErrorCode) stay unwritable by the client.
+        allow update: if isSelf(userId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(deviceClientFields())
+          && deviceShapeValid();
+
+        allow delete: if isSelf(userId);
+      }
+    }
+
+    // C11 / WA-13 — send-state claims (CF-only; proof a push was authorized).
+    match /notificationDeliveries/{notificationId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Default deny — no catch-all signed-in RW

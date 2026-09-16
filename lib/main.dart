@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,6 +15,7 @@ import 'features/teacher/presentation/bloc/teacher_bloc.dart';
 import 'features/parent/presentation/bloc/parent_bloc.dart';
 import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
+import 'features/notifications/data/services/fcm_token_registrar.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/analytics/presentation/bloc/analytics_bloc.dart';
@@ -72,11 +75,21 @@ class MyApp extends StatelessWidget {
       ],
       child: BlocListener<AuthBloc, AuthState>(
         listenWhen: (previous, current) =>
-            current is AuthUnauthenticated && previous is! AuthUnauthenticated,
+            (current is AuthUnauthenticated &&
+                previous is! AuthUnauthenticated) ||
+            (current is AuthAuthenticated &&
+                (previous is! AuthAuthenticated ||
+                    previous.user.uid != current.user.uid)),
         listener: (context, state) {
+          if (state is AuthAuthenticated) {
+            // WA-13 / C11: the app's single FCM registration point.
+            unawaited(sl<FcmTokenRegistrar>().onSignedIn(state.user.uid));
+            return;
+          }
           // H1 / A-H1: singleton role & capability projections must not
           // survive logout on shared devices.
           clearSessionProjections(context);
+          unawaited(sl<FcmTokenRegistrar>().onSignedOut());
         },
         child: AppPreferencesScope(
           controller: appPreferences,

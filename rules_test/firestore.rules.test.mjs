@@ -802,3 +802,160 @@ test('WA-11 client cannot update/delete message docs (soft-delete via CF)', asyn
     db.doc('conversations/student1_teacher1/messages/m1').get(),
   );
 });
+
+// ── WA-13 / C11 — FCM tokens + server-owned notification send state ────────
+
+function deviceDoc(overrides = {}) {
+  return {
+    token: 'tok-1',
+    platform: 'android',
+    disabled: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+async function seedParentDevice() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .doc('fcmTokens/parent1/devices/dev_a')
+      .set(deviceDoc());
+  });
+}
+
+test('WA-13 user can create, update, read and delete own device token', async () => {
+  const ref = authed('parent1').doc('fcmTokens/parent1/devices/dev_a');
+
+  await assertSucceeds(ref.set(deviceDoc()));
+  await assertSucceeds(ref.update({ token: 'tok-2', updatedAt: new Date() }));
+  await assertSucceeds(ref.get());
+  await assertSucceeds(ref.delete());
+});
+
+test('WA-13 user cannot read another user device token', async () => {
+  await seedParentDevice();
+
+  await assertFails(
+    authed('student1').doc('fcmTokens/parent1/devices/dev_a').get(),
+  );
+  await assertFails(
+    authed('student1').collection('fcmTokens/parent1/devices').get(),
+  );
+  // Admin has no client-side token read path either — Admin SDK only.
+  await assertFails(
+    authed('admin1').doc('fcmTokens/parent1/devices/dev_a').get(),
+  );
+});
+
+test('WA-13 user cannot create, update or delete another user token', async () => {
+  await assertFails(
+    authed('student1').doc('fcmTokens/parent1/devices/dev_b').set(deviceDoc()),
+  );
+
+  await seedParentDevice();
+
+  await assertFails(
+    authed('student1')
+      .doc('fcmTokens/parent1/devices/dev_a')
+      .update({ token: 'stolen', updatedAt: new Date() }),
+  );
+  await assertFails(
+    authed('student1').doc('fcmTokens/parent1/devices/dev_a').delete(),
+  );
+});
+
+test('WA-13 unauthenticated device token access denied', async () => {
+  const db = testEnv.unauthenticatedContext().firestore();
+  await assertFails(db.doc('fcmTokens/parent1/devices/dev_a').get());
+  await assertFails(db.doc('fcmTokens/parent1/devices/dev_a').set(deviceDoc()));
+});
+
+test('WA-13 client cannot write server-owned token fields', async () => {
+  const ref = authed('parent1').doc('fcmTokens/parent1/devices/dev_a');
+
+  await assertFails(
+    ref.set(deviceDoc({ disabledReason: 'unregistered_token' })),
+  );
+  await assertFails(ref.set(deviceDoc({ lastSendAt: new Date() })));
+
+  await assertSucceeds(ref.set(deviceDoc()));
+  await assertFails(ref.update({ disabledReason: 'spoofed' }));
+  await assertFails(ref.update({ lastErrorCode: 'messaging/internal' }));
+});
+
+test('WA-13 malformed device token documents denied', async () => {
+  const ref = authed('parent1').doc('fcmTokens/parent1/devices/dev_a');
+
+  await assertFails(ref.set({ platform: 'android', disabled: false }));
+  await assertFails(ref.set(deviceDoc({ token: '' })));
+  await assertFails(ref.set(deviceDoc({ platform: 'desktop' })));
+  await assertFails(ref.set(deviceDoc({ disabled: 'false' })));
+});
+
+test('WA-13 fcmTokens parent document is not client writable', async () => {
+  await assertFails(authed('parent1').doc('fcmTokens/parent1').set({ x: 1 }));
+  await assertSucceeds(authed('parent1').doc('fcmTokens/parent1').get());
+});
+
+test('WA-13 notificationDeliveries are CF-only send state', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('notificationDeliveries/parent1_evt1').set({
+      notificationId: 'parent1_evt1',
+      recipientId: 'parent1',
+      status: 'sent',
+    });
+  });
+
+  await assertFails(
+    authed('parent1').doc('notificationDeliveries/parent1_evt1').get(),
+  );
+  await assertFails(
+    authed('parent1')
+      .doc('notificationDeliveries/parent1_evt1')
+      .update({ status: 'failed' }),
+  );
+  await assertFails(
+    authed('parent1')
+      .doc('notificationDeliveries/parent1_evt2')
+      .set({ status: 'sent' }),
+  );
+  await assertSucceeds(
+    authed('admin1').doc('notificationDeliveries/parent1_evt1').get(),
+  );
+});
+
+test('WA-13 client cannot forge server-owned push fields on notifications', async () => {
+  const db = authed('student1');
+
+  await assertFails(
+    db.doc('notifications/spoof1').set({
+      audience: 'parent1',
+      title: 'x',
+      body: 'y',
+      type: 'assignment',
+      readBy: [],
+      hasAudioAlert: false,
+      data: { kind: 'evaluation', evaluationId: 'rec1' },
+    }),
+  );
+
+  // Existing W4/W5 in-app fan-out shape stays allowed.
+  await assertSucceeds(
+    db.doc('notifications/parent1_homework_reviewed_rec1').set({
+      audience: 'parent1',
+      title: 'تم تقييم التسميع',
+      body: 'تم تقييم تسميع الطالب',
+      type: 'assignment',
+      readBy: [],
+      hasAudioAlert: false,
+    }),
+  );
+
+  await assertFails(
+    db
+      .doc('notifications/parent1_homework_reviewed_rec1')
+      .update({ delivery: { status: 'sent' } }),
+  );
+});

@@ -507,6 +507,8 @@ Do **not** unbounded-copy full student roster onto session by default
 | **Done when** | Token CRUD Rules; send CF exists in emulator; spoof notification denied |
 | **Non-goals** | Claiming FCM production-ready without billing verification |
 
+**Implementation notes (WA-13):** Tokens at `fcmTokens/{uid}/devices/{deviceId}` — owner-only read/create/update/delete, field set frozen to `token`/`platform`/`createdAt`/`updatedAt`/`disabled`; `disabledReason`/`disabledAt`/`lastSendAt`/`lastErrorCode` are Admin-SDK only; no Admin client read path. Send chain is CF-only: `notifyParentsOnEvaluation` (`onDocumentWritten recitationRecords/{recordId}`) → parent audience from `parentProfiles.childrenIds` → notification doc under the existing deterministic identity (`{parentId}_homework_reviewed_{recordId}`, reusing `AcademyEventIds`/`NotificationSignalIds`) → Admin SDK `sendEachForMulticast` → unregistered tokens marked `disabled`. Idempotency/authorization proof lives in CF-only `notificationDeliveries/{notificationId}` (status/attempts, max 3); a push is emitted only for notifications the server authored with that claim, so a forged `notifications/{id}` cannot trigger delivery. FCM payload carries stable ids only (`evaluationId`, `studentId`, `sessionId`, `halaqaId`) — never phone/private data. Production send stays behind the WA-0 gate (`resolvePushSendMode` over `productionGate` predicates; blocked logs and returns instead of throwing in a background trigger). Dart: `FcmTokenContract` + `FcmTokenRegistrar` (single registration point in the root auth listener, stable SharedPreferences device id). Deep-link UI handling remains Wave E.
+
 ---
 
 ### WA-14 — studentSearch projection (C13, D16)

@@ -12,6 +12,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' as _i974;
 import 'package:cloud_functions/cloud_functions.dart' as _i809;
 import 'package:firebase_auth/firebase_auth.dart' as _i59;
+import 'package:firebase_messaging/firebase_messaging.dart' as _i892;
 import 'package:firebase_storage/firebase_storage.dart' as _i457;
 import 'package:flutter/material.dart' as _i409;
 import 'package:get_it/get_it.dart' as _i174;
@@ -28,10 +29,10 @@ import 'package:rafiq_academy/features/admin/data/repositories/admin_repository_
     as _i99;
 import 'package:rafiq_academy/features/admin/domain/repositories/admin_repository.dart'
     as _i255;
+import 'package:rafiq_academy/features/admin/domain/usecases/admin_billing_usecases.dart'
+    as _i606;
 import 'package:rafiq_academy/features/admin/domain/usecases/approve_new_student_usecase.dart'
     as _i928;
-import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usecase.dart'
-    as _iProvisionUser;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_academy_stats_usecase.dart'
     as _i488;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_all_teachers_usecase.dart'
@@ -42,6 +43,8 @@ import 'package:rafiq_academy/features/admin/domain/usecases/get_financial_summa
     as _i369;
 import 'package:rafiq_academy/features/admin/domain/usecases/get_teacher_activity_log_usecase.dart'
     as _i1063;
+import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usecase.dart'
+    as _i540;
 import 'package:rafiq_academy/features/admin/domain/usecases/respond_to_complaint_usecase.dart'
     as _i97;
 import 'package:rafiq_academy/features/admin/domain/usecases/send_broadcast_notification_usecase.dart'
@@ -172,14 +175,28 @@ import 'package:rafiq_academy/features/homework/domain/usecases/homework_usecase
     as _i81;
 import 'package:rafiq_academy/features/homework/presentation/bloc/homework_bloc.dart'
     as _i421;
+import 'package:rafiq_academy/features/notifications/data/datasources/fcm_token_remote_datasource.dart'
+    as _i937;
 import 'package:rafiq_academy/features/notifications/data/datasources/notifications_remote_datasource.dart'
     as _i676;
+import 'package:rafiq_academy/features/notifications/data/repositories/fcm_token_repository_impl.dart'
+    as _i182;
 import 'package:rafiq_academy/features/notifications/data/repositories/notifiaction_repository.dart'
     as _i579;
+import 'package:rafiq_academy/features/notifications/data/services/fcm_device_id_provider.dart'
+    as _i761;
+import 'package:rafiq_academy/features/notifications/data/services/fcm_token_registrar.dart'
+    as _i578;
+import 'package:rafiq_academy/features/notifications/data/services/firebase_messaging_adapter.dart'
+    as _i615;
 import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_handler.dart'
     as _i815;
+import 'package:rafiq_academy/features/notifications/domain/repositories/fcm_token_repository.dart'
+    as _i641;
 import 'package:rafiq_academy/features/notifications/domain/repositories/notifications_repository.dart'
     as _i587;
+import 'package:rafiq_academy/features/notifications/domain/services/fcm_messaging_port.dart'
+    as _i643;
 import 'package:rafiq_academy/features/notifications/domain/usecases/notification_usecase.dart'
     as _i152;
 import 'package:rafiq_academy/features/notifications/presentation/bloc/notifications_bloc.dart'
@@ -204,16 +221,14 @@ import 'package:rafiq_academy/features/parent/domain/usecases/get_halaqat_for_st
     as _i242;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_parent_household_usecase.dart'
     as _i281;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_payment_access_usecase.dart'
+    as _i288;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_payment_public_settings_usecase.dart'
+    as _i183;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_payments_usecase.dart'
     as _i817;
-import 'package:rafiq_academy/features/parent/domain/usecases/get_payment_access_usecase.dart'
-    as _iPayAccess;
-import 'package:rafiq_academy/features/parent/domain/usecases/get_payment_public_settings_usecase.dart'
-    as _iPayPublic;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_wallet_usecase.dart'
     as _i957;
-import 'package:rafiq_academy/features/admin/domain/usecases/admin_billing_usecases.dart'
-    as _iAdminBilling;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_weekly_report_usecase.dart'
     as _i379;
 import 'package:rafiq_academy/features/parent/domain/usecases/initiate_payment_usecase.dart'
@@ -381,6 +396,7 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i59.FirebaseAuth>(() => diModule.firebaseAuth);
     gh.lazySingleton<_i974.FirebaseFirestore>(() => diModule.firebaseFirestore);
+    gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
     gh.lazySingleton<_i457.FirebaseStorage>(() => diModule.firebaseStorage);
     gh.lazySingleton<_i809.FirebaseFunctions>(() => diModule.firebaseFunctions);
     gh.lazySingleton<_i161.InternetConnection>(
@@ -414,6 +430,26 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i550.AuthRemoteDatasourceImpl(
         firebaseAuth: gh<_i59.FirebaseAuth>(),
         firestore: gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i761.FcmDeviceIdProvider>(
+      () => _i761.SharedPreferencesFcmDeviceIdProvider(),
+    );
+    gh.lazySingleton<_i643.FcmMessagingPort>(
+      () => _i615.FirebaseMessagingAdapter(
+        messaging: gh<_i892.FirebaseMessaging>(),
+      ),
+    );
+    gh.lazySingleton<_i543.AdminRemoteDatasource>(
+      () => _i775.AdminRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        functions: gh<_i809.FirebaseFunctions>(),
+      ),
+    );
+    gh.lazySingleton<_i164.ChatRemoteDatasource>(
+      () => _i164.ChatRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        functions: gh<_i809.FirebaseFunctions>(),
       ),
     );
     gh.factory<_i519.StudentAudioLibraryPage>(
@@ -477,12 +513,6 @@ extension GetItInjectableX on _i174.GetIt {
         firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
-    gh.lazySingleton<_i543.AdminRemoteDatasource>(
-      () => _i775.AdminRemoteDatasourceImpl(
-        firestore: gh<_i974.FirebaseFirestore>(),
-        functions: gh<_i809.FirebaseFunctions>(),
-      ),
-    );
     gh.lazySingleton<_i283.ContentLibraryRepository>(
       () => _i669.ContentLibraryRepositoryImpl(
         remoteDatasource: gh<_i37.ContentLibraryRemoteDatasource>(),
@@ -493,12 +523,6 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i982.AwardsRemoteDatasourceImpl(
         firestore: gh<_i974.FirebaseFirestore>(),
         storage: gh<_i457.FirebaseStorage>(),
-      ),
-    );
-    gh.lazySingleton<_i164.ChatRemoteDatasource>(
-      () => _i164.ChatRemoteDatasourceImpl(
-        firestore: gh<_i974.FirebaseFirestore>(),
-        functions: gh<_i809.FirebaseFunctions>(),
       ),
     );
     gh.lazySingleton<_i888.AwardsRepository>(
@@ -548,6 +572,11 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i582.SupervisorRepositoryImpl(
         remoteDatasource: gh<_i65.SupervisorRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i937.FcmTokenRemoteDatasource>(
+      () => _i937.FcmTokenRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
       ),
     );
     gh.lazySingleton<_i255.AdminRepository>(
@@ -696,45 +725,35 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i89.DeleteFileUseCase>(
       () => _i89.DeleteFileUseCase(gh<_i283.ContentLibraryRepository>()),
     );
+    gh.lazySingleton<_i606.GetAdminPaymentPublicSettingsUseCase>(
+      () => _i606.GetAdminPaymentPublicSettingsUseCase(
+        gh<_i255.AdminRepository>(),
+      ),
+    );
+    gh.lazySingleton<_i606.UpdatePaymentPublicSettingsUseCase>(
+      () =>
+          _i606.UpdatePaymentPublicSettingsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i606.GetPricingDefaultsUseCase>(
+      () => _i606.GetPricingDefaultsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i606.UpdatePricingDefaultsUseCase>(
+      () => _i606.UpdatePricingDefaultsUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i606.ListPricingRulesUseCase>(
+      () => _i606.ListPricingRulesUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i606.UpsertPricingRuleUseCase>(
+      () => _i606.UpsertPricingRuleUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i606.GenerateInvoiceUseCase>(
+      () => _i606.GenerateInvoiceUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i606.ReinstatePaymentAccessUseCase>(
+      () => _i606.ReinstatePaymentAccessUseCase(gh<_i255.AdminRepository>()),
+    );
     gh.lazySingleton<_i928.ApproveNewStudentUseCase>(
       () => _i928.ApproveNewStudentUseCase(gh<_i255.AdminRepository>()),
-    );
-    gh.lazySingleton<_iProvisionUser.ProvisionUserUseCase>(
-      () => _iProvisionUser.ProvisionUserUseCase(gh<_i255.AdminRepository>()),
-    );
-    gh.lazySingleton<_iAdminBilling.GetAdminPaymentPublicSettingsUseCase>(
-      () => _iAdminBilling.GetAdminPaymentPublicSettingsUseCase(
-        gh<_i255.AdminRepository>(),
-      ),
-    );
-    gh.lazySingleton<_iAdminBilling.UpdatePaymentPublicSettingsUseCase>(
-      () => _iAdminBilling.UpdatePaymentPublicSettingsUseCase(
-        gh<_i255.AdminRepository>(),
-      ),
-    );
-    gh.lazySingleton<_iAdminBilling.GetPricingDefaultsUseCase>(
-      () =>
-          _iAdminBilling.GetPricingDefaultsUseCase(gh<_i255.AdminRepository>()),
-    );
-    gh.lazySingleton<_iAdminBilling.UpdatePricingDefaultsUseCase>(
-      () => _iAdminBilling.UpdatePricingDefaultsUseCase(
-        gh<_i255.AdminRepository>(),
-      ),
-    );
-    gh.lazySingleton<_iAdminBilling.ListPricingRulesUseCase>(
-      () => _iAdminBilling.ListPricingRulesUseCase(gh<_i255.AdminRepository>()),
-    );
-    gh.lazySingleton<_iAdminBilling.UpsertPricingRuleUseCase>(
-      () =>
-          _iAdminBilling.UpsertPricingRuleUseCase(gh<_i255.AdminRepository>()),
-    );
-    gh.lazySingleton<_iAdminBilling.GenerateInvoiceUseCase>(
-      () => _iAdminBilling.GenerateInvoiceUseCase(gh<_i255.AdminRepository>()),
-    );
-    gh.lazySingleton<_iAdminBilling.ReinstatePaymentAccessUseCase>(
-      () => _iAdminBilling.ReinstatePaymentAccessUseCase(
-        gh<_i255.AdminRepository>(),
-      ),
     );
     gh.lazySingleton<_i488.GetAcademyStatsUseCase>(
       () => _i488.GetAcademyStatsUseCase(gh<_i255.AdminRepository>()),
@@ -750,6 +769,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i1063.GetTeacherActivityLogUseCase>(
       () => _i1063.GetTeacherActivityLogUseCase(gh<_i255.AdminRepository>()),
+    );
+    gh.lazySingleton<_i540.ProvisionUserUseCase>(
+      () => _i540.ProvisionUserUseCase(gh<_i255.AdminRepository>()),
     );
     gh.lazySingleton<_i97.RespondToComplaintUseCase>(
       () => _i97.RespondToComplaintUseCase(gh<_i255.AdminRepository>()),
@@ -833,6 +855,12 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i81.SubmitHomeworkRecitationUseCase(gh<_i951.HomeworkRepository>()),
     );
+    gh.lazySingleton<_i641.FcmTokenRepository>(
+      () => _i182.FcmTokenRepositoryImpl(
+        remoteDatasource: gh<_i937.FcmTokenRemoteDatasource>(),
+        networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
     gh.lazySingleton<_i1010.GetHalaqaAnalyticsUseCase>(
       () => _i1010.GetHalaqaAnalyticsUseCase(gh<_i656.AnalyticsRepository>()),
     );
@@ -865,6 +893,13 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i337.EditChatMessageUseCase>(
       () => _i337.EditChatMessageUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i578.FcmTokenRegistrar>(
+      () => _i578.FcmTokenRegistrar(
+        messaging: gh<_i643.FcmMessagingPort>(),
+        deviceIdProvider: gh<_i761.FcmDeviceIdProvider>(),
+        repository: gh<_i641.FcmTokenRepository>(),
+      ),
     );
     gh.factory<_i999.AnalyticsBloc>(
       () => _i999.AnalyticsBloc(
@@ -903,16 +938,14 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i281.GetParentHouseholdUseCase>(
       () => _i281.GetParentHouseholdUseCase(gh<_i493.ParentRepository>()),
     );
+    gh.lazySingleton<_i288.GetPaymentAccessUseCase>(
+      () => _i288.GetPaymentAccessUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i183.GetPaymentPublicSettingsUseCase>(
+      () => _i183.GetPaymentPublicSettingsUseCase(gh<_i493.ParentRepository>()),
+    );
     gh.lazySingleton<_i817.GetPaymentsUseCase>(
       () => _i817.GetPaymentsUseCase(gh<_i493.ParentRepository>()),
-    );
-    gh.lazySingleton<_iPayPublic.GetPaymentPublicSettingsUseCase>(
-      () => _iPayPublic.GetPaymentPublicSettingsUseCase(
-        gh<_i493.ParentRepository>(),
-      ),
-    );
-    gh.lazySingleton<_iPayAccess.GetPaymentAccessUseCase>(
-      () => _iPayAccess.GetPaymentAccessUseCase(gh<_i493.ParentRepository>()),
     );
     gh.lazySingleton<_i957.GetWalletUseCase>(
       () => _i957.GetWalletUseCase(gh<_i493.ParentRepository>()),
@@ -997,34 +1030,6 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i587.NotificationsRepository>(),
       ),
     );
-    gh.singleton<_i995.ParentBloc>(
-      () => _i995.ParentBloc(
-        getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
-        getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
-        getPayments: gh<_i817.GetPaymentsUseCase>(),
-        getPaymentPublicSettings:
-            gh<_iPayPublic.GetPaymentPublicSettingsUseCase>(),
-        getPaymentAccess: gh<_iPayAccess.GetPaymentAccessUseCase>(),
-        getAbsenceRequests: gh<_i1044.GetAbsenceRequestsUseCase>(),
-        getHalaqatForStudent: gh<_i242.GetHalaqatForStudentUseCase>(),
-        submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
-        initiatePayment: gh<_i693.InitiatePaymentUseCase>(),
-        getHousehold: gh<_i281.GetParentHouseholdUseCase>(),
-        getWallet: gh<_i957.GetWalletUseCase>(),
-        payFromWallet: gh<_i413.PayPaymentFromWalletUseCase>(),
-        submitPaymentProof: gh<_i347.SubmitPaymentProofUseCase>(),
-      ),
-    );
-    gh.factoryParam<_i467.ChatRoomBloc, String, String>(
-      (conversationId, currentUserId) => _i467.ChatRoomBloc(
-        gh<_i337.WatchMessagesUseCase>(),
-        gh<_i337.SendMessageUseCase>(),
-        gh<_i337.MarkConversationAsReadUseCase>(),
-        gh<_i337.SoftDeleteChatMessageUseCase>(),
-        conversationId,
-        currentUserId,
-      ),
-    );
     gh.factory<_i891.GetWeeklySessionsUseCase>(
       () => _i891.GetWeeklySessionsUseCase(gh<_i552.ScheduleRepository>()),
     );
@@ -1057,6 +1062,16 @@ extension GetItInjectableX on _i174.GetIt {
         deletePost: gh<_i918.DeletePostUseCase>(),
       ),
     );
+    gh.factoryParam<_i467.ChatRoomBloc, String, String>(
+      (conversationId, currentUserId) => _i467.ChatRoomBloc(
+        gh<_i337.WatchMessagesUseCase>(),
+        gh<_i337.SendMessageUseCase>(),
+        gh<_i337.MarkConversationAsReadUseCase>(),
+        gh<_i337.SoftDeleteChatMessageUseCase>(),
+        conversationId,
+        currentUserId,
+      ),
+    );
     gh.singleton<_i164.NotificationsBloc>(
       () => _i164.NotificationsBloc(
         watchNotifications: gh<_i152.WatchNotificationsUseCase>(),
@@ -1069,6 +1084,23 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i251.ProgressReportBloc(
         getProgressReport: gh<_i235.GetProgressReportUseCase>(),
         getStudentProfile: gh<_i385.GetStudentProfileUseCase>(),
+      ),
+    );
+    gh.singleton<_i995.ParentBloc>(
+      () => _i995.ParentBloc(
+        getChildrenIds: gh<_i379.GetChildrenIdsUseCase>(),
+        getWeeklyReport: gh<_i379.GetWeeklyReportUseCase>(),
+        getPayments: gh<_i817.GetPaymentsUseCase>(),
+        getPaymentPublicSettings: gh<_i183.GetPaymentPublicSettingsUseCase>(),
+        getPaymentAccess: gh<_i288.GetPaymentAccessUseCase>(),
+        getAbsenceRequests: gh<_i1044.GetAbsenceRequestsUseCase>(),
+        getHalaqatForStudent: gh<_i242.GetHalaqatForStudentUseCase>(),
+        submitAbsenceRequest: gh<_i888.SubmitAbsenceRequestUseCase>(),
+        initiatePayment: gh<_i693.InitiatePaymentUseCase>(),
+        getHousehold: gh<_i281.GetParentHouseholdUseCase>(),
+        getWallet: gh<_i957.GetWalletUseCase>(),
+        payFromWallet: gh<_i413.PayPaymentFromWalletUseCase>(),
+        submitPaymentProof: gh<_i347.SubmitPaymentProofUseCase>(),
       ),
     );
     gh.lazySingleton<_i815.InAppAcademyEventHandler>(
@@ -1120,17 +1152,6 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i824.GetSupervisorDayBoardUseCase(
         teacherRepository: gh<_i1050.TeacherRepository>(),
         supervisorRepository: gh<_i307.SupervisorRepository>(),
-      ),
-    );
-    gh.singleton<_i149.SupervisorBloc>(
-      () => _i149.SupervisorBloc(
-        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
-        getSupervisorDayBoard: gh<_i824.GetSupervisorDayBoardUseCase>(),
-        getSupervisedAbsenceRequests:
-            gh<_i904.GetSupervisedAbsenceRequestsUseCase>(),
-        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
-        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
-        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
       ),
     );
     gh.lazySingleton<_i407.GetTeacherHomeFeedUseCase>(
@@ -1186,6 +1207,17 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i1064.UpsertTeacherEvaluationUseCase(
         gh<_i1050.TeacherRepository>(),
         gh<_i81.EvaluationService>(),
+      ),
+    );
+    gh.singleton<_i149.SupervisorBloc>(
+      () => _i149.SupervisorBloc(
+        getSupervisedHalaqat: gh<_i704.GetSupervisedHalaqatUseCase>(),
+        getSupervisorDayBoard: gh<_i824.GetSupervisorDayBoardUseCase>(),
+        getSupervisedAbsenceRequests:
+            gh<_i904.GetSupervisedAbsenceRequestsUseCase>(),
+        issueAchievement: gh<_i13.IssueAchievementUseCase>(),
+        submitSupervisorReport: gh<_i910.SubmitSupervisorReportUseCase>(),
+        registerNewStudent: gh<_i499.RegisterNewStudentUseCase>(),
       ),
     );
     gh.singleton<_i933.TeacherBloc>(

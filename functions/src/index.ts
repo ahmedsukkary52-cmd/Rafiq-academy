@@ -30,3 +30,6 @@ export {
   softDeleteChatMessage,
   editChatMessage,
 } from "./chat/chatAuthFunctions";
+export {
+  notifyParentsOnEvaluation,
+} from "./notifications/evaluationNotificationFunctions";

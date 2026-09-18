@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
+import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
 import { assertBackendAllowed } from "../productionGate";
 import { assertCallerIsAdmin } from "./assertAdmin";
 import {
@@ -228,6 +230,28 @@ export async function issueInvoiceFromPricing(params: {
 
   await ensurePaymentAccessOk(db, parentId, studentId, paymentId);
 
+  // C16 / WA-16 — audit only newly created invoices (idempotent hits skip).
+  const issuedBy = params.issuedBy.trim();
+  if (issuedBy.length > 0 && issuedBy !== "system") {
+    await writeAuditLog({
+      actor: adminActor(issuedBy),
+      action: AUDIT_ACTION.invoiceCreate,
+      targetType: AUDIT_TARGET_TYPE.invoice,
+      targetId: paymentId,
+      metadata: {
+        paymentId,
+        parentId,
+        studentId,
+        periodKey,
+        pricingRuleId: rule.id,
+        pricingRuleVersion: version,
+        amount,
+        currency,
+      },
+      source: "adminGenerateInvoice",
+    });
+  }
+
   return {
     paymentId,
     amount,
@@ -293,6 +317,11 @@ export const adminReinstatePaymentAccess = onCall(
       throw new HttpsError("failed-precondition", "حالة صلاحية الدفع غير صالحة");
     }
 
+    // Change-only: already ok → succeed without rewriting or auditing.
+    if (current === "ok") {
+      return { parentId, status: "ok" };
+    }
+
     await ref.set(
       {
         parentId,
@@ -307,12 +336,16 @@ export const adminReinstatePaymentAccess = onCall(
       { merge: true },
     );
 
-    await db.collection("auditLogs").add({
-      action: "payment_access_reinstated",
-      actorId: adminUid,
-      parentId,
-      previousStatus: current ?? null,
-      createdAt: FieldValue.serverTimestamp(),
+    await writeAuditLog({
+      actor: adminActor(adminUid),
+      action: AUDIT_ACTION.paymentReinstate,
+      targetType: AUDIT_TARGET_TYPE.paymentAccess,
+      targetId: parentId,
+      metadata: {
+        previousStatus: current ?? null,
+        newStatus: "ok",
+      },
+      source: "adminReinstatePaymentAccess",
     });
 
     return { parentId, status: "ok" };

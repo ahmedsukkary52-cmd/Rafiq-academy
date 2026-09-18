@@ -12,13 +12,17 @@
  */
 
 import * as admin from "firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { assertCallerIsAdmin } from "../admin/assertAdmin";
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
+import {
+  adminActor,
+  migrationTargetId,
+  writeAuditLog,
+} from "../audit/auditLogWrite";
 import { assertBackendAllowed } from "../productionGate";
 import {
-  AUDIT_LOGS_COLLECTION,
   LIFECYCLE_ACTIVE,
   LIFECYCLE_AUDIT_ACTION,
   LifecycleAction,
@@ -30,7 +34,6 @@ import {
   USERS_COLLECTION,
 } from "./studentLifecycleContract";
 import {
-  buildLifecycleAuditEntry,
   buildLifecycleUpdate,
   decideLifecycleTransition,
   LifecycleRejection,
@@ -144,17 +147,17 @@ export const adminSetStudentLifecycle = onCall(
     // C16 — audit only real transitions, outside the transaction so a retry
     // cannot duplicate the log entry for a write that never happened.
     if (result.changed && result.from !== null) {
-      await db.collection(AUDIT_LOGS_COLLECTION).add(
-        buildLifecycleAuditEntry({
-          action,
-          auditAction: LIFECYCLE_AUDIT_ACTION[action],
-          actorId,
-          studentId,
-          from: result.from,
-          to: result.lifecycle,
-          createdAt: FieldValue.serverTimestamp(),
-        }),
-      );
+      await writeAuditLog({
+        actor: adminActor(actorId),
+        action: LIFECYCLE_AUDIT_ACTION[action],
+        targetType: AUDIT_TARGET_TYPE.studentProfile,
+        targetId: studentId,
+        metadata: {
+          previousLifecycle: result.from,
+          newLifecycle: result.lifecycle,
+        },
+        source: "adminSetStudentLifecycle",
+      });
     }
 
     return {
@@ -260,14 +263,21 @@ export const adminBackfillStudentLifecycle = onCall(
       : page.docs[page.docs.length - 1].id;
 
     if (!dryRun && stamped > 0) {
-      await db.collection(AUDIT_LOGS_COLLECTION).add({
-        action: "student_lifecycle_backfill",
-        actorUid: actorId,
-        scanned: page.size,
-        stamped,
-        cursor,
-        nextCursor,
-        createdAt: FieldValue.serverTimestamp(),
+      await writeAuditLog({
+        actor: adminActor(actorId),
+        action: AUDIT_ACTION.studentLifecycleBackfill,
+        targetType: AUDIT_TARGET_TYPE.migration,
+        targetId: migrationTargetId(
+          "lifecycle_bf",
+          cursor ?? "start",
+        ),
+        metadata: {
+          scanned: page.size,
+          stamped,
+          alreadySet,
+          cursor,
+          nextCursor,
+        },
         source: "adminBackfillStudentLifecycle",
       });
     }

@@ -15,7 +15,6 @@
 
 export const STUDENT_PROFILES_COLLECTION = "studentProfiles";
 export const USERS_COLLECTION = "users";
-export const AUDIT_LOGS_COLLECTION = "auditLogs";
 
 export const LIFECYCLE_FIELD = "lifecycle";
 export const STUDENT_ROLE = "student";
@@ -37,9 +36,10 @@ export const LIFECYCLE_TARGET: Record<LifecycleAction, LifecycleValue> = {
   unarchive: LIFECYCLE_ACTIVE,
 };
 
+/** Maps lifecycle actions to canonical C16 audit actions (WA-16). */
 export const LIFECYCLE_AUDIT_ACTION: Record<LifecycleAction, string> = {
-  archive: "student_lifecycle_archived",
-  unarchive: "student_lifecycle_unarchived",
+  archive: "user_archive",
+  unarchive: "user_unarchive",
 };
 
 export function isLifecycleValue(raw: unknown): raw is LifecycleValue {

@@ -1,6 +1,12 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { onCall } from "firebase-functions/v2/https";
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
+import {
+  adminActor,
+  migrationTargetId,
+  writeAuditLog,
+} from "../audit/auditLogWrite";
 import { assertBackendAllowed } from "../productionGate";
 import { assertCallerIsAdmin } from "./assertAdmin";
 
@@ -20,7 +26,7 @@ interface MigrateResult {
  * - Does NOT overwrite a non-empty existing userPrivate.phone with users.phone
  * - Deletes users.phone only after userPrivate has a non-empty phone
  * - Idempotent / safe to re-run
- * - Writes an auditLogs summary entry
+ * - Writes a C16 audit summary only when meaningful work occurred
  *
  * DO NOT run against production until B-BILLING Verified and operators confirm.
  */
@@ -51,7 +57,6 @@ export const adminMigrateUserPhones = onCall<
         : "";
 
     if (!legacyPhone) {
-      // Nothing to migrate from users; still ensure we don't leave empty work.
       skipped += 1;
       continue;
     }
@@ -59,7 +64,6 @@ export const adminMigrateUserPhones = onCall<
     const batch = db.batch();
 
     if (existingPrivate.length > 0) {
-      // Preserve existing private phone; only strip legacy users.phone.
       preservedExistingPrivate += 1;
       batch.update(doc.ref, { phone: FieldValue.delete() });
       await batch.commit();
@@ -67,7 +71,6 @@ export const adminMigrateUserPhones = onCall<
       continue;
     }
 
-    // Copy legacy → private, then remove legacy in the same atomic batch.
     batch.set(
       privateRef,
       {
@@ -82,16 +85,21 @@ export const adminMigrateUserPhones = onCall<
     migrated += 1;
   }
 
-  await db.collection("auditLogs").add({
-    action: "admin_migrate_user_phones",
-    actorUid,
-    scanned: snap.size,
-    migrated,
-    skipped,
-    preservedExistingPrivate,
-    createdAt: FieldValue.serverTimestamp(),
-    source: "adminMigrateUserPhones",
-  });
+  if (migrated > 0) {
+    await writeAuditLog({
+      actor: adminActor(actorUid),
+      action: AUDIT_ACTION.migrateUserPhones,
+      targetType: AUDIT_TARGET_TYPE.migration,
+      targetId: migrationTargetId("phones_migrate", "full"),
+      metadata: {
+        scanned: snap.size,
+        migratedCount: migrated,
+        skippedCount: skipped,
+        preservedExistingPrivate,
+      },
+      source: "adminMigrateUserPhones",
+    });
+  }
 
   return {
     scanned: snap.size,

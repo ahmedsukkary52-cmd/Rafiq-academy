@@ -194,12 +194,12 @@ test("WA-15 the callable never writes another dimension or deletes anything", ()
     );
   }
 
-  // Every Firestore mutation in the file, enumerated: the transactional
-  // lifecycle update, the backfill stamp, and the two audit appends.
+  // Every Firestore mutation in the lifecycle callable body: profile updates
+  // only. Audit appends go through the shared writeAuditLog helper.
   const mutations = [...lifecycleCode.matchAll(/\.(set|update|delete|create|add)\(/g)]
     .map((match) => match[1])
     .sort();
-  assert.deepEqual(mutations, ["add", "add", "update", "update"]);
+  assert.deepEqual(mutations, ["update", "update"]);
 
   assert.ok(
     lifecycleCode.includes("tx.update(profileRef, buildLifecycleUpdate("),
@@ -207,6 +207,7 @@ test("WA-15 the callable never writes another dimension or deletes anything", ()
   assert.ok(
     lifecycleCode.includes("profileRef.update(buildLifecycleUpdate(LIFECYCLE_ACTIVE))"),
   );
+  assert.ok(lifecycleCode.includes("writeAuditLog("));
 });
 
 test("WA-15 does not cascade into halaqat (deferred D21 integration)", () => {
@@ -219,26 +220,38 @@ test("WA-15 does not cascade into halaqat (deferred D21 integration)", () => {
   );
 });
 
-// ── Audit logging ──────────────────────────────────────────────────────────
+// ── Audit logging (WA-16 shared envelope) ──────────────────────────────────
+
+const auditWrite = require("../lib/audit/auditLogWrite.js");
+const auditContract = require("../lib/audit/auditLogContract.js");
 
 test("WA-15 a real transition produces a C16 audit entry", () => {
-  const entry = transition.buildLifecycleAuditEntry({
-    action: "archive",
-    auditAction: contract.LIFECYCLE_AUDIT_ACTION.archive,
-    actorId: "admin1",
-    studentId: "stu1",
-    from: "active",
-    to: "archived",
-    createdAt: "SERVER_TS",
-  });
+  const entry = auditWrite.buildAuditLogEntry(
+    {
+      actor: auditWrite.adminActor("admin1"),
+      action: contract.LIFECYCLE_AUDIT_ACTION.archive,
+      targetType: auditContract.AUDIT_TARGET_TYPE.studentProfile,
+      targetId: "stu1",
+      metadata: {
+        previousLifecycle: "active",
+        newLifecycle: "archived",
+      },
+      source: "adminSetStudentLifecycle",
+    },
+    "SERVER_TS",
+  );
 
-  assert.equal(entry.action, "student_lifecycle_archived");
-  assert.equal(entry.actorUid, "admin1");
-  assert.equal(entry.targetUid, "stu1");
+  assert.equal(entry.action, "user_archive");
+  assert.equal(entry.actorId, "admin1");
+  assert.equal(entry.actorRole, "admin");
+  assert.equal(entry.targetId, "stu1");
   assert.equal(entry.targetType, "studentProfile");
-  assert.equal(entry.previousLifecycle, "active");
-  assert.equal(entry.newLifecycle, "archived");
-  assert.equal(entry.createdAt, "SERVER_TS");
+  assert.equal(entry.metadata.previousLifecycle, "active");
+  assert.equal(entry.metadata.newLifecycle, "archived");
+  assert.equal(entry.timestamp, "SERVER_TS");
+  assert.equal(entry.source, "adminSetStudentLifecycle");
+  assert.ok(!Object.prototype.hasOwnProperty.call(entry, "actorUid"));
+  assert.ok(!Object.prototype.hasOwnProperty.call(entry, "createdAt"));
 });
 
 test("WA-15 archive and unarchive use distinct audit actions", () => {
@@ -246,10 +259,8 @@ test("WA-15 archive and unarchive use distinct audit actions", () => {
     contract.LIFECYCLE_AUDIT_ACTION.archive,
     contract.LIFECYCLE_AUDIT_ACTION.unarchive,
   );
-  assert.equal(
-    contract.LIFECYCLE_AUDIT_ACTION.unarchive,
-    "student_lifecycle_unarchived",
-  );
+  assert.equal(contract.LIFECYCLE_AUDIT_ACTION.archive, "user_archive");
+  assert.equal(contract.LIFECYCLE_AUDIT_ACTION.unarchive, "user_unarchive");
 });
 
 test("WA-15 no-ops are not audited", () => {

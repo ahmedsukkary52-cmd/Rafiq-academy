@@ -761,25 +761,35 @@ Two visual modes: UI-only unless `visualMode` stored as above.
 
 `auditLogs/{logId}` — **CF / Admin SDK write only**; Admin read; all other roles ✖
 
-### 16.2 Minimum fields
+### 16.2 Executable NEW-document schema (WA-16)
 
-| Field | Required |
-|-------|----------|
-| `actorId` | ✔ |
-| `actorRole` | ✔ |
-| `action` | ✔ |
-| `targetType` | ✔ |
-| `targetId` | ✔ |
-| `timestamp` | ✔ server |
-| `metadata` | map (before/after summaries) |
+| Field | Required | Notes |
+|-------|----------|-------|
+| `actorId` | ✔ | Admin UID, or `"system"` for future scheduler hooks |
+| `actorRole` | ✔ | `"admin"` or `"system"` — never from client input |
+| `action` | ✔ | Central vocabulary (below) |
+| `targetType` | ✔ | e.g. `user`, `studentProfile`, `paymentAccess`, `invoice`, `migration` |
+| `targetId` | ✔ | Deterministic subject / run id |
+| `timestamp` | ✔ server | `FieldValue.serverTimestamp()` |
+| `metadata` | ✔ map | Always present (may be `{}`); allowlisted operational facts only |
+| `source` | recommended | Callable / scheduler name |
 
-### 16.3 Required actions
+**NEW documents must not emit** legacy fields `actorUid` or `createdAt`.  
+**Historical documents** may still contain those fields / old action names / flat extras — **not migrated** by WA-16.
 
-payment_review, payment_suspend, payment_reinstate, student_transfer, relationship_children_change, session_create_or_correct, attendance_correct, evaluation_create_or_correct, admin_pricing_change, admin_vodafone_change, user_provision, user_archive, chat_message_moderate_delete
+### 16.3 Action vocabulary
 
-### 16.4 Immutability
+**Emitted by WA-16 (existing server ops):**  
+`user_provision`, `payment_reinstate`, `user_archive`, `user_unarchive`, `invoice_create`,  
+plus operational migration actions: `admin_migrate_user_phones`, `halaqa_schedule_slotid_migrate`, `student_lifecycle_backfill`, `student_search_backfill`.
 
-No client update/delete. Retention purge only via Admin CF after policy set.
+**Deferred audit hooks** (contract ready; pending authoritative CF / scheduler):  
+`payment_review`, `payment_suspend`, `student_transfer`, `relationship_children_change`, `session_create_or_correct`, `attendance_correct`, `evaluation_create_or_correct`, `admin_pricing_change`, `admin_vodafone_change`, `chat_message_moderate_delete`.
+
+### 16.4 Immutability / retention
+
+No client create/update/delete. Retention purge only via Admin CF after policy set (**TBD — NON-BLOCKING**).  
+Delivery guarantee: at-least-once append with operation-level change-only idempotency; possible audit gap if mutation succeeds and audit write fails. No durable outbox in WA-16.
 
 ---
 

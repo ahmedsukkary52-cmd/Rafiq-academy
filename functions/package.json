@@ -10,7 +10,8 @@
     "test:unit": "node --test test/wa1_provision_gate.test.mjs",
     "test:wa13": "node --test test/wa13_fcm_send_chain.test.mjs",
     "test:wa14": "node --test test/wa14_student_search.test.mjs",
-    "test:wa15": "node --test test/wa15_student_lifecycle.test.mjs"
+    "test:wa15": "node --test test/wa15_student_lifecycle.test.mjs",
+    "test:wa16": "node --test test/wa16_audit_logs.test.mjs"
   },
   "engines": {
     "node": "20"

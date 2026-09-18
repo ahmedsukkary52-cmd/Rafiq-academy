@@ -253,7 +253,7 @@ service cloud.firestore {
       }
     }
 
-    // C16 — audit logs
+    // C16 — audit logs (CF/Admin SDK write only; Admin read)
     match /auditLogs/{logId} {
       allow read: if isAdmin();
       allow write: if false;

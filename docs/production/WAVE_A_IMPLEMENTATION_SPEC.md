@@ -560,12 +560,23 @@ Transitions go through the Admin-only `adminSetStudentLifecycle` callable; clien
 
 | Path | `auditLogs/{logId}` |
 |------|---------------------|
-| Write | **CF only** |
-| Read | Admin |
-| Fields | actorId, actorRole, action, targetType, targetId, timestamp, metadata |
-| Hook | Every privileged CF (provision, reinstate, invoice, review, transfer, group sync, …) |
-| Retention days | **TBD — NON-BLOCKING** |
-| Done when | At least provision + reinstate + invoice create emit logs |
+| Write | **CF / Admin SDK only** |
+| Read | Admin only |
+| NEW fields | `actorId`, `actorRole`, `action`, `targetType`, `targetId`, `timestamp`, `metadata` (+ recommended `source`) |
+| Legacy | Historical docs may use `actorUid` / `createdAt` / old action names — **not rewritten** |
+| Retention | **TBD — NON-BLOCKING** (no purge in WA-16) |
+| Indexes | **None** in WA-16 (no Admin query UI) |
+| Flutter | **None** (no audit entity/UI) |
+
+**In scope:** shared builder/writer; normalize provision / reinstate / phone migrate / slot migrate / lifecycle set+backfill / studentSearch backfill; emit `invoice_create` when invoice `created === true`; Rules + contract tests.
+
+**Change-only audits:** lifecycle noop, reinstate already-`ok`, idempotent invoice, zero-work migrations → no audit.
+
+**Deferred hooks:** payment_review, payment_suspend (scheduler), transfer, childrenIds CF, pricing/vodafone CF, session/attendance/evaluation, chat moderate-delete — contract ready, not fabricated in WA-16.
+
+**Done when:** shared helper + all seven writers normalized + invoice_create + Rules/authz tests + privacy/idempotency tests + docs aligned.
+
+**Non-goals:** Admin UI, Flutter feature, retention purge, historical migration, new indexes, scheduler redesign, FCM/search per-write audits.
 
 ---
 

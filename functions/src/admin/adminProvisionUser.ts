@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
+import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
 import { assertBackendAllowed } from "../productionGate";
 import { assertCallerIsAdmin, parseProvisionRole, ProvisionRole } from "./assertAdmin";
 
@@ -82,23 +84,6 @@ async function writeRoleProfile(
   }
 }
 
-async function writeAuditLog(params: {
-  actorUid: string;
-  action: string;
-  targetUid: string;
-  role: string;
-  email: string;
-}): Promise<void> {
-  await admin.firestore().collection("auditLogs").add({
-    action: params.action,
-    actorUid: params.actorUid,
-    targetUid: params.targetUid,
-    role: params.role,
-    email: params.email,
-    createdAt: FieldValue.serverTimestamp(),
-    source: "adminProvisionUser",
-  });
-}
 
 /**
  * C1 / D1 — Admin-only Auth + users + profile provisioning.
@@ -161,11 +146,12 @@ export const adminProvisionUser = onCall<
 
     await writeRoleProfile(db, uid, role, name);
     await writeAuditLog({
-      actorUid,
-      action: "admin_provision_user",
-      targetUid: uid,
-      role,
-      email,
+      actor: adminActor(actorUid),
+      action: AUDIT_ACTION.userProvision,
+      targetType: AUDIT_TARGET_TYPE.user,
+      targetId: uid,
+      metadata: { role },
+      source: "adminProvisionUser",
     });
 
     return { uid };

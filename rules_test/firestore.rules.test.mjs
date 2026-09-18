@@ -1226,3 +1226,67 @@ test('WA-15 studentProfiles create and delete remain closed to clients', async (
     await assertFails(authed(uid).doc('studentProfiles/student1').delete());
   }
 });
+
+// ── WA-16 / C16 — auditLogs authorization ──────────────────────────────────
+
+async function seedAuditLog() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await seed(ctx.firestore(), 'auditLogs/log1', {
+      actorId: 'admin1',
+      actorRole: 'admin',
+      action: 'user_provision',
+      targetType: 'user',
+      targetId: 'student1',
+      timestamp: new Date(),
+      metadata: { role: 'student' },
+      source: 'adminProvisionUser',
+    });
+  });
+}
+
+test('WA-16 Admin may read auditLogs', async () => {
+  await seedAuditLog();
+  await assertSucceeds(authed('admin1').doc('auditLogs/log1').get());
+  await assertSucceeds(authed('admin1').collection('auditLogs').get());
+});
+
+test('WA-16 unauthenticated cannot read auditLogs', async () => {
+  await seedAuditLog();
+  const db = testEnv.unauthenticatedContext().firestore();
+  await assertFails(db.doc('auditLogs/log1').get());
+  await assertFails(db.collection('auditLogs').get());
+});
+
+test('WA-16 Student Parent Teacher Supervisor cannot read auditLogs', async () => {
+  await seedAuditLog();
+  for (const uid of ['student1', 'parent1', 'teacher1', 'supervisor1']) {
+    await assertFails(authed(uid).doc('auditLogs/log1').get());
+    await assertFails(authed(uid).collection('auditLogs').get());
+  }
+});
+
+test('WA-16 every client create update delete of auditLogs is denied', async () => {
+  await seedAuditLog();
+  const payload = {
+    actorId: 'forged',
+    actorRole: 'admin',
+    action: 'user_provision',
+    targetType: 'user',
+    targetId: 'x',
+    timestamp: new Date(),
+    metadata: {},
+    source: 'forged',
+  };
+
+  for (const uid of ['admin1', 'student1', 'parent1', 'teacher1', 'supervisor1']) {
+    const db = authed(uid);
+    await assertFails(db.doc('auditLogs/forged').set(payload));
+    await assertFails(db.doc('auditLogs/log1').update({ action: 'tampered' }));
+    await assertFails(db.doc('auditLogs/log1').delete());
+  }
+
+  const unauth = testEnv.unauthenticatedContext().firestore();
+  await assertFails(unauth.doc('auditLogs/forged').set(payload));
+  await assertFails(unauth.doc('auditLogs/log1').update({ action: 'tampered' }));
+  await assertFails(unauth.doc('auditLogs/log1').delete());
+});

@@ -88,28 +88,6 @@ export function buildLifecycleUpdate(
   return { lifecycle: to };
 }
 
-/** Audit payload for a real transition. Never emitted for a no-op. */
-export function buildLifecycleAuditEntry<T>(params: {
-  action: LifecycleAction;
-  auditAction: string;
-  actorId: string;
-  studentId: string;
-  from: LifecycleValue;
-  to: LifecycleValue;
-  createdAt: T;
-}): Record<string, unknown> {
-  return {
-    action: params.auditAction,
-    actorUid: params.actorId,
-    targetType: "studentProfile",
-    targetUid: params.studentId,
-    previousLifecycle: params.from,
-    newLifecycle: params.to,
-    createdAt: params.createdAt,
-    source: "adminSetStudentLifecycle",
-  };
-}
-
 /** True when the roster/account/payment dimensions are provably untouched. */
 export function isolationHolds(update: Record<string, unknown>): boolean {
   return Object.keys(update).length === 1

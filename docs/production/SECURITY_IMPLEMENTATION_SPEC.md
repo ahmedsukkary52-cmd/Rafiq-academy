@@ -662,7 +662,7 @@ Examples: `users.role`, `users.isActive` (except Admin/CF), `payments.amount`, `
 
 ### 20.2 Mechanism
 
-**Schema TBD:** dedicated `auditLogs` collection (Admin read) vs append-only fields. Requirement: Admin-readable, client-tamper-resistant (CF write only).
+**Superseded by C16 freeze (WA-16):** dedicated `auditLogs/{logId}` collection with CF/Admin SDK write only, Admin read, append-only from the client perspective. Executable NEW schema: `actorId`, `actorRole`, `action`, `targetType`, `targetId`, `timestamp`, `metadata` (+ recommended `source`). See `SECURITY_DATA_CONTRACT_FREEZE.md` §C16. Historical legacy documents are not migrated; retention purge remains TBD.
 
 ---
 

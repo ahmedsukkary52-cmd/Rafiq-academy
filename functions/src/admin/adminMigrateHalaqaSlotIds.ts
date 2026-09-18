@@ -1,6 +1,12 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
+import {
+  adminActor,
+  migrationTargetId,
+  writeAuditLog,
+} from "../audit/auditLogWrite";
 import { assertBackendAllowed } from "../productionGate";
 import { assertCallerIsAdmin } from "./assertAdmin";
 import {
@@ -183,13 +189,20 @@ export const adminMigrateHalaqaSlotIds = onCall(
     }
 
     if (!dryRun && halaqatUpdated > 0) {
-      await db.collection("auditLogs").add({
-        action: "halaqa_schedule_slotid_migrate",
-        actorId: adminUid,
-        dryRun: false,
-        halaqatUpdated,
-        slotsAssigned,
-        createdAt: FieldValue.serverTimestamp(),
+      await writeAuditLog({
+        actor: adminActor(adminUid),
+        action: AUDIT_ACTION.migrateHalaqaSlotIds,
+        targetType: AUDIT_TARGET_TYPE.migration,
+        targetId: migrationTargetId(
+          "slotid_migrate",
+          onlyId ?? "all",
+        ),
+        metadata: {
+          halaqatUpdated,
+          slotsAssigned,
+          dryRun: false,
+        },
+        source: "adminMigrateHalaqaSlotIds",
       });
     }
 

@@ -13,6 +13,12 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { assertCallerIsAdmin } from "../admin/assertAdmin";
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
+import {
+  adminActor,
+  migrationTargetId,
+  writeAuditLog,
+} from "../audit/auditLogWrite";
 import { assertBackendAllowed } from "../productionGate";
 import {
   projectionGateBlockedMessage,
@@ -402,16 +408,23 @@ export const adminBackfillStudentSearch = onCall(
       : page.docs[page.docs.length - 1].id;
 
     if (!dryRun && (created > 0 || updated > 0 || deleted > 0)) {
-      await db.collection("auditLogs").add({
-        action: "student_search_backfill",
-        actorId,
-        scanned: page.size,
-        created,
-        updated,
-        deleted,
-        cursor,
-        nextCursor,
-        createdAt: FieldValue.serverTimestamp(),
+      await writeAuditLog({
+        actor: adminActor(actorId),
+        action: AUDIT_ACTION.studentSearchBackfill,
+        targetType: AUDIT_TARGET_TYPE.migration,
+        targetId: migrationTargetId(
+          "search_bf",
+          cursor ?? "start",
+        ),
+        metadata: {
+          scanned: page.size,
+          createdCount: created,
+          updatedCount: updated,
+          deletedCount: deleted,
+          cursor,
+          nextCursor,
+        },
+        source: "adminBackfillStudentSearch",
       });
     }
 

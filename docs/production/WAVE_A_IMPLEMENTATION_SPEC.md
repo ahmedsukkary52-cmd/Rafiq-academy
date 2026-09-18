@@ -647,6 +647,87 @@ Transitions go through the Admin-only `adminSetStudentLifecycle` callable; clien
 
 Map: D1,D2,D5,D6,D9,D10,D14,D16,D19,D20,D21 → tests above. D7/D11/D17 full chains primarily Wave B/E.
 
+#### WA-19 authoritative regression commands
+
+WA-19 implementation closes three gaps: WA-17 indexes JSON contract test,
+Functions `test:wave-a` runner, and this command matrix. **WA-19 is complete
+only after the automated suites below pass.** Emulator green ≠ production
+verified.
+
+**A. Static checks (repo root)**
+
+```bash
+flutter analyze
+dart format --set-exit-if-changed .
+```
+
+**B. Flutter contract / regression (repo root)**
+
+Focused Wave A–relevant suites:
+
+```bash
+flutter test test/security test/features/parent test/features/schedule test/features/chat
+```
+
+Full suite (may include pre-existing unrelated failures outside WA-19 scope):
+
+```bash
+flutter test
+```
+
+**C. Cloud Functions (from `functions/`)**
+
+```bash
+npm run build
+npm run test:wave-a
+```
+
+`npm test` delegates to `test:wave-a`. This runs **all** Wave A Functions
+suites (WA-1, WA-3…WA-11, WA-13…WA-17), including Paymob-export quarantine
+asserts and the WA-17 indexes contract. No production Firebase, FCM delivery,
+Blaze, or secrets required.
+
+**D. Firestore Rules (emulator)**
+
+```bash
+cd rules_test && npm install && cd ..
+npx firebase emulators:exec --project demo-rafiq-wa2 --only firestore \
+  "npm --prefix rules_test test"
+```
+
+**Local note:** `firebase.json` maps Firestore emulator to port **8080**. If
+Docker Desktop (or another process) already owns 8080, that command can fail
+with HTTP 404 on the Rules API. Workaround: run `emulators:exec` with an
+**ephemeral** config that points Firestore at a free port (e.g. 18080) and
+absolute paths to repo `firestore.rules` — do **not** permanently change
+repository Firebase configuration for a local port conflict. See
+`rules_test/README.md`.
+
+**E. Storage Rules (emulator)**
+
+```bash
+cd rules_test && npm install && cd ..
+npx firebase emulators:exec --project demo-rafiq-wa12 --only firestore,storage \
+  "npm --prefix rules_test run test:storage"
+```
+
+**F. Production / operational gates (NOT local automated tests)**
+
+These remain separate from WA-19 automated/emulator green:
+
+| Gate | Class |
+|------|--------|
+| Blaze / billing checklist Verified (WA-0 / B-BILLING) | Operational |
+| Production FCM delivery | Operational (blocked until Verified) |
+| Production scheduled Cloud Functions (invoice/overdue) | Operational |
+| Live `slotId` migration (B-SLOT-ID-MIGRATE) | Operational |
+| Firestore indexes **deploy** to the academy project | Operational |
+| App Check production configuration | Operational |
+
+Automated unit/Rules/CF tests do **not** satisfy production verification.
+
+**AUD:** Wave A exit criterion #19 (analyzer/format/tests plan documented).
+
 ---
 
 ### WA-20 — Explicit Wave A exclusions

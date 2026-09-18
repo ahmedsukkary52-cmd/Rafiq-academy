@@ -7,6 +7,8 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions",
     "logs": "firebase functions:log",
+    "test": "npm run test:wave-a",
+    "test:wave-a": "node --test test/wa1_provision_gate.test.mjs test/wa3_wa5_billing.test.mjs test/wa6_overdue_grace.test.mjs test/wa7_slot_id_migration.test.mjs test/wa8_session_materialization.test.mjs test/wa9_session_conflict.test.mjs test/wa10_halaqa_group_sync.test.mjs test/wa11_chat_authorization.test.mjs test/wa13_fcm_send_chain.test.mjs test/wa14_student_search.test.mjs test/wa15_student_lifecycle.test.mjs test/wa16_audit_logs.test.mjs test/wa17_indexes_contract.test.mjs",
     "test:unit": "node --test test/wa1_provision_gate.test.mjs",
     "test:wa13": "node --test test/wa13_fcm_send_chain.test.mjs",
     "test:wa14": "node --test test/wa14_student_search.test.mjs",

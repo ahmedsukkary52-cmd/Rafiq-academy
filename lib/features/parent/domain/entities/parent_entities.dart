@@ -138,26 +138,3 @@ class WeeklyReportEntity extends Equatable {
     teacherNotes,
   ];
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// PaymentInitiationEntity
-// ══════════════════════════════════════════════════════════════════════════════
-
-/// نتيجة بدء عملية دفع عند Paymob - بنرجّع منها رابط صفحة الدفع الجاهزة
-/// (checkout) اللي الـ UI هيفتحه (في WebView مثلاً) لما نبني الشاشات.
-class PaymentInitiationEntity extends Equatable {
-  final String clientSecret;
-  final String publicKey;
-
-  const PaymentInitiationEntity({
-    required this.clientSecret,
-    required this.publicKey,
-  });
-
-  /// رابط صفحة الدفع الموحّدة الجاهزة من Paymob (Unified Checkout)
-  String get checkoutUrl =>
-      'https://accept.paymob.com/unifiedcheckout/?publicKey=$publicKey&clientSecret=$clientSecret';
-
-  @override
-  List<Object?> get props => [clientSecret, publicKey];
-}

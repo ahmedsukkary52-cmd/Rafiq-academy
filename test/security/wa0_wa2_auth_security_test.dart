@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/constants/app_constants.dart';
@@ -9,7 +11,6 @@ import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usec
 import 'package:rafiq_academy/features/auth/domain/entities/user_entity.dart';
 import 'package:rafiq_academy/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rafiq_academy/features/auth/domain/usecases/register_with_email_usecase.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_wallet.dart';
 
 class _FakeAuthRepository implements AuthRepository {
   @override
@@ -117,9 +118,36 @@ void main() {
     });
   });
 
-  group('WA-2 D2 wallet quarantine', () {
-    test('ParentWalletContract.enabled is false', () {
-      expect(ParentWalletContract.enabled, isFalse);
+  group('WA-18 D2 wallet/Paymob client quarantine', () {
+    test('parent_wallet contract file is removed', () {
+      expect(
+        File('lib/features/parent/domain/parent_wallet.dart').existsSync(),
+        isFalse,
+      );
+    });
+
+    test('Paymob initiatePayment usecase file is removed', () {
+      expect(
+        File(
+          'lib/features/parent/domain/usecases/initiate_payment_usecase.dart',
+        ).existsSync(),
+        isFalse,
+      );
+    });
+
+    test('wallet pay usecase file is removed', () {
+      expect(
+        File(
+          'lib/features/parent/domain/usecases/pay_payment_from_wallet_usecase.dart',
+        ).existsSync(),
+        isFalse,
+      );
+      expect(
+        File(
+          'lib/features/parent/domain/usecases/get_wallet_usecase.dart',
+        ).existsSync(),
+        isFalse,
+      );
     });
   });
 

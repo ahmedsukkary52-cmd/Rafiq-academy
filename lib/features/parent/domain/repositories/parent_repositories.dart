@@ -6,7 +6,6 @@ import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
 import '../entities/parent_entities.dart';
 import '../parent_household.dart';
-import '../parent_wallet.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Repository Interface
@@ -58,20 +57,6 @@ abstract class ParentRepository {
     String parentId,
   );
 
-  /// بدء عملية دفع جديدة عن طريق Cloud Function وسيطة (راجع
-  /// functions/src/paymob/createPaymentIntention.ts) - المبلغ بيتقرأ
-  /// من Firestore على السيرفر، مش من التطبيق، لأسباب أمان.
-  Future<Either<Failure, PaymentInitiationEntity>> initiatePayment(
-    String paymentId,
-  );
-
-  Future<Either<Failure, ParentWalletEntity>> getWallet(String parentId);
-
-  Future<Either<Failure, Unit>> payPaymentFromWallet({
-    required String parentId,
-    required String paymentId,
-  });
-
   /// Parent screenshot proof for external payment. Never marks payment paid.
   Future<Either<Failure, Unit>> submitPaymentProof({
     required String parentId,
@@ -94,15 +79,6 @@ abstract class ParentRepository {
 // ══════════════════════════════════════════════════════════════════════════════
 // Params
 // ══════════════════════════════════════════════════════════════════════════════
-
-class PaymentIdParams extends Equatable {
-  final String paymentId;
-
-  const PaymentIdParams(this.paymentId);
-
-  @override
-  List<Object?> get props => [paymentId];
-}
 
 class ParentIdParams extends Equatable {
   final String parentId;

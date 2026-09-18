@@ -22,7 +22,6 @@ class FirestoreCollections {
   static const String studentProfiles = 'studentProfiles';
   static const String parentProfiles = 'parentProfiles';
   static const String teacherProfiles = 'teacherProfiles';
-  static const String supervisorProfiles = 'supervisorProfiles';
   static const String academySettings = 'academySettings';
   static const String paymentAccess = 'paymentAccess';
   static const String auditLogs = 'auditLogs';
@@ -35,7 +34,6 @@ class FirestoreCollections {
   static const String achievements = 'achievements';
   static const String assignments = 'assignments';
   static const String payments = 'payments';
-  static const String wallets = 'wallets';
   static const String notifications = 'notifications';
   static const String complaints = 'complaints';
   static const String supervisorReports = 'supervisorReports';

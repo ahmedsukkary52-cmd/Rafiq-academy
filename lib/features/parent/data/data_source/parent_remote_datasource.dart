@@ -1,6 +1,4 @@
-import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
-import '../../domain/parent_wallet.dart';
 import '../models/parent_model.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
@@ -40,15 +38,6 @@ abstract class ParentRemoteDatasource {
   Future<List<({String id, String name})>> getHalaqatForStudent(
     String studentId,
   );
-
-  Future<PaymentInitiationEntity> initiatePayment(String paymentId);
-
-  Future<ParentWalletEntity> getWallet(String parentId);
-
-  Future<void> payPaymentFromWallet({
-    required String parentId,
-    required String paymentId,
-  });
 
   /// Upload screenshot proof for external payment. Does **not** mark paid.
   Future<void> submitPaymentProof({

@@ -3,9 +3,10 @@ import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/parent/domain/parent_household.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_wallet.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/get_halaqat_for_student_usecase.dart';
+import 'package:rafiq_academy/shared/domain/academy_billing_entities.dart';
+import 'package:rafiq_academy/shared/domain/payment_access_entity.dart';
 
 class _FakeParentRepository implements ParentRepository {
   final List<String> children;
@@ -41,6 +42,13 @@ class _FakeParentRepository implements ParentRepository {
   Future<Either<Failure, List<PaymentEntity>>> getPayments(String parentId) =>
       throw UnimplementedError();
   @override
+  Future<Either<Failure, PaymentPublicSettingsEntity>>
+  getPaymentPublicSettings() => throw UnimplementedError();
+  @override
+  Future<Either<Failure, PaymentAccessEntity?>> getPaymentAccess(
+    String parentId,
+  ) => throw UnimplementedError();
+  @override
   Future<Either<Failure, Unit>> submitAbsenceRequest(
     AbsenceRequestEntity request,
   ) => throw UnimplementedError();
@@ -51,18 +59,6 @@ class _FakeParentRepository implements ParentRepository {
   Stream<Either<Failure, List<String>>> watchChildrenAssignments(
     String parentId,
   ) => throw UnimplementedError();
-  @override
-  Future<Either<Failure, PaymentInitiationEntity>> initiatePayment(
-    String paymentId,
-  ) => throw UnimplementedError();
-  @override
-  Future<Either<Failure, ParentWalletEntity>> getWallet(String parentId) =>
-      throw UnimplementedError();
-  @override
-  Future<Either<Failure, Unit>> payPaymentFromWallet({
-    required String parentId,
-    required String paymentId,
-  }) => throw UnimplementedError();
   @override
   Future<Either<Failure, Unit>> submitPaymentProof({
     required String parentId,

@@ -12,7 +12,6 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_payment_proof.dart';
-import '../../domain/parent_wallet.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
@@ -50,7 +49,6 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
     context.read<ParentBloc>().add(LoadPaymentsEvent(auth.user.uid));
-    context.read<ParentBloc>().add(LoadWalletEvent(auth.user.uid));
   }
 
   Future<void> _startExternalPayThenProof(PaymentEntity payment) async {
@@ -158,25 +156,9 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
       textDirection: TextDirection.rtl,
       child: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (p, c) =>
-            p.walletPayStatus != c.walletPayStatus ||
-            p.walletPayError != c.walletPayError ||
             p.paymentProofStatus != c.paymentProofStatus ||
             p.paymentProofError != c.paymentProofError,
         listener: (context, state) {
-          if (state.walletPayStatus == SubmissionStatus.error) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.walletPayError ?? 'تعذر الدفع من المحفظة'),
-              ),
-            );
-            context.read<ParentBloc>().add(const ResetWalletPayEvent());
-          } else if (state.walletPayStatus == SubmissionStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم سداد المستحق من المحفظة')),
-            );
-            context.read<ParentBloc>().add(const ResetWalletPayEvent());
-          }
-
           if (state.paymentProofStatus == SubmissionStatus.error) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -201,9 +183,6 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
             p.paymentsStatus != c.paymentsStatus ||
             p.payments != c.payments ||
             p.paymentsError != c.paymentsError ||
-            p.wallet != c.wallet ||
-            p.walletStatus != c.walletStatus ||
-            p.walletPayStatus != c.walletPayStatus ||
             p.paymentProofStatus != c.paymentProofStatus ||
             p.paymentProofPaymentId != c.paymentProofPaymentId ||
             p.childrenSnapshots != c.childrenSnapshots,
@@ -247,7 +226,6 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
       payments: state.payments,
       nameFor: state.childDisplayName,
     );
-    final walletBalance = state.wallet?.balance ?? 0.0;
     final proofBusy = state.paymentProofStatus == SubmissionStatus.submitting;
 
     return RefreshIndicator(
@@ -281,10 +259,6 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                         remaining: remaining,
                         progress: progress,
                         childrenCaption: childrenCaption,
-                        walletBalance: walletBalance,
-                        walletLoaded:
-                            state.walletStatus == SectionStatus.loaded ||
-                            state.wallet != null,
                       ),
                     ),
                   ],
@@ -330,23 +304,9 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                           studentName: state.childDisplayName(
                             payment.studentId,
                           ),
-                          walletBalance: walletBalance,
-                          paying:
-                              state.walletPayStatus ==
-                              SubmissionStatus.submitting,
                           uploadingProof:
                               proofBusy &&
                               state.paymentProofPaymentId == payment.id,
-                          onPay: () {
-                            final auth = context.read<AuthBloc>().state;
-                            if (auth is! AuthAuthenticated) return;
-                            context.read<ParentBloc>().add(
-                              PayPaymentFromWalletEvent(
-                                parentId: auth.user.uid,
-                                paymentId: payment.id,
-                              ),
-                            );
-                          },
                           onUploadReceipt: proofBusy
                               ? () {}
                               : () => _startExternalPayThenProof(payment),
@@ -554,8 +514,6 @@ class _MonthlySummaryCard extends StatelessWidget {
   final double remaining;
   final double progress;
   final String childrenCaption;
-  final double walletBalance;
-  final bool walletLoaded;
 
   const _MonthlySummaryCard({
     required this.total,
@@ -563,8 +521,6 @@ class _MonthlySummaryCard extends StatelessWidget {
     required this.remaining,
     required this.progress,
     required this.childrenCaption,
-    required this.walletBalance,
-    required this.walletLoaded,
   });
 
   @override
@@ -604,16 +560,6 @@ class _MonthlySummaryCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.onPrimaryMuted,
-              ),
-            ),
-          ],
-          if (walletLoaded) ...[
-            const SizedBox(height: 10),
-            Text(
-              'رصيد المحفظة: ${parentMoneyLabel(walletBalance)}',
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.surface,
-                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -726,19 +672,13 @@ class _FilterChip extends StatelessWidget {
 class _PaymentCard extends StatelessWidget {
   final PaymentEntity payment;
   final String studentName;
-  final double walletBalance;
-  final bool paying;
   final bool uploadingProof;
-  final VoidCallback onPay;
   final VoidCallback onUploadReceipt;
 
   const _PaymentCard({
     required this.payment,
     required this.studentName,
-    required this.walletBalance,
-    required this.paying,
     required this.uploadingProof,
-    required this.onPay,
     required this.onUploadReceipt,
   });
 
@@ -750,8 +690,6 @@ class _PaymentCard extends StatelessWidget {
     final review = payment.reviewStatus?.trim() ?? '';
     final isRejected = review == ParentPaymentProofContract.rejected;
     final isPartial = review == ParentPaymentProofContract.partial;
-    final canPayFromWallet =
-        ParentWalletContract.enabled && walletBalance >= payment.amount;
     final accent = isPaid
         ? AppColors.success
         : isRejected
@@ -972,24 +910,6 @@ class _PaymentCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (canPayFromWallet) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: paying || uploadingProof ? null : onPay,
-                        icon: const Icon(
-                          Icons.account_balance_wallet_outlined,
-                          size: 18,
-                        ),
-                        label: Text(paying ? 'جاري السداد...' : 'سداد الآن'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          foregroundColor: AppColors.textPrimary,
-                          minimumSize: const Size(0, 42),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ],

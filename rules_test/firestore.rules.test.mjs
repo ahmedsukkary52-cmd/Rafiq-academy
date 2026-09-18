@@ -230,6 +230,59 @@ test('unauthenticated users create denied', async () => {
   );
 });
 
+test('WA-18 wallet/ledger client access fully denied', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await seed(db, 'wallets/parent1', { balance: 100 });
+    await seed(db, 'wallets/parent1/ledger/e1', {
+      type: 'debit',
+      amount: 50,
+    });
+  });
+
+  for (const uid of [
+    'parent1',
+    'student1',
+    'teacher1',
+    'supervisor1',
+    'admin1',
+  ]) {
+    const db = authed(uid);
+    await assertFails(db.doc('wallets/parent1').get());
+    await assertFails(db.doc('wallets/parent1/ledger/e1').get());
+    await assertFails(db.doc('wallets/parent1').set({ balance: 1 }));
+    await assertFails(db.doc('wallets/parent1').update({ balance: 2 }));
+    await assertFails(db.doc('wallets/parent1').delete());
+    await assertFails(
+      db.doc('wallets/parent1/ledger/e2').set({ type: 'credit', amount: 1 }),
+    );
+    await assertFails(db.doc('wallets/parent1/ledger/e1').update({ amount: 9 }));
+    await assertFails(db.doc('wallets/parent1/ledger/e1').delete());
+  }
+});
+
+test('WA-18 supervisorProfiles quarantine remains enforced', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await seed(ctx.firestore(), 'supervisorProfiles/supervisor1', {
+      name: 'legacy',
+    });
+  });
+
+  await assertFails(authed('parent1').doc('supervisorProfiles/supervisor1').get());
+  await assertFails(authed('student1').doc('supervisorProfiles/supervisor1').get());
+  await assertFails(authed('teacher1').doc('supervisorProfiles/supervisor1').get());
+  await assertFails(
+    authed('supervisor1').doc('supervisorProfiles/supervisor1').get(),
+  );
+  await assertSucceeds(authed('admin1').doc('supervisorProfiles/supervisor1').get());
+  await assertFails(
+    authed('admin1').doc('supervisorProfiles/supervisor1').set({ name: 'x' }),
+  );
+  await assertFails(
+    authed('supervisor1').doc('supervisorProfiles/new').set({ name: 'x' }),
+  );
+});
+
 test('wallet client write denied', async () => {
   const db = authed('parent1');
   await assertFails(db.doc('wallets/parent1').set({ balance: 999 }));

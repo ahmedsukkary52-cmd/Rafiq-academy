@@ -610,11 +610,13 @@ Transitions go through the Admin-only `adminSetStudentLifecycle` callable; clien
 
 ### WA-18 — Quarantine OUT features (D2, D24)
 
-| Item | Action |
-|------|--------|
-| Wallet → paid | Remove/hide CTA; Rules deny wallets if present |
-| Paymob functions/client | Disable exports / dead UI; confirm Console |
-| `supervisorProfiles` | Not SSOT; dependency search then quarantine Rules |
+| Item | Action | Status |
+|------|--------|--------|
+| Wallet → paid | Removed Parent UX (balance + pay); wallet/ledger client R/W denied | **Done (code/rules)** |
+| Paymob functions/client | CF remain unexported; Flutter initiation stack removed | **Done (code)** |
+| `supervisorProfiles` | Rules quarantine kept; unused Dart constant removed; no SSOT use | **Done (hygiene)** |
+
+**Non-goals (explicit):** no Firebase data deletion, no migration, no deploy.
 
 **AUD:** 007, 013, 035, 100
 

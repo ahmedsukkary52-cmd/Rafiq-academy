@@ -6,7 +6,6 @@ import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
-import '../../domain/parent_wallet.dart';
 import '../../domain/repositories/parent_repositories.dart';
 import '../../domain/usecases/get_absence_requests_usecase.dart';
 import '../../domain/usecases/get_children_ids_usecase.dart';
@@ -15,10 +14,7 @@ import '../../domain/usecases/get_parent_household_usecase.dart';
 import '../../domain/usecases/get_payment_access_usecase.dart';
 import '../../domain/usecases/get_payment_public_settings_usecase.dart';
 import '../../domain/usecases/get_payments_usecase.dart';
-import '../../domain/usecases/get_wallet_usecase.dart';
 import '../../domain/usecases/get_weekly_report_usecase.dart';
-import '../../domain/usecases/initiate_payment_usecase.dart';
-import '../../domain/usecases/pay_payment_from_wallet_usecase.dart';
 import '../../domain/usecases/submit_absence_request_usecase.dart';
 import '../../domain/usecases/submit_payment_proof_usecase.dart';
 import 'parent_event.dart';
@@ -37,10 +33,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   final GetAbsenceRequestsUseCase getAbsenceRequests;
   final GetHalaqatForStudentUseCase getHalaqatForStudent;
   final SubmitAbsenceRequestUseCase submitAbsenceRequest;
-  final InitiatePaymentUseCase initiatePayment;
   final GetParentHouseholdUseCase getHousehold;
-  final GetWalletUseCase getWallet;
-  final PayPaymentFromWalletUseCase payFromWallet;
   final SubmitPaymentProofUseCase submitPaymentProof;
 
   ParentBloc({
@@ -52,10 +45,7 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     required this.getAbsenceRequests,
     required this.getHalaqatForStudent,
     required this.submitAbsenceRequest,
-    required this.initiatePayment,
     required this.getHousehold,
-    required this.getWallet,
-    required this.payFromWallet,
     required this.submitPaymentProof,
   }) : super(ParentState.initial()) {
     on<LoadChildrenEvent>(_onLoadChildren);
@@ -66,11 +56,6 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<LoadStudentHalaqatEvent>(_onLoadStudentHalaqat);
     on<SubmitAbsenceRequestEvent>(_onSubmitAbsenceRequest);
     on<ResetAbsenceSubmissionEvent>(_onResetAbsenceSubmission);
-    on<InitiatePaymentEvent>(_onInitiatePayment);
-    on<ResetPaymentInitiationEvent>(_onResetPaymentInitiation);
-    on<LoadWalletEvent>(_onLoadWallet);
-    on<PayPaymentFromWalletEvent>(_onPayFromWallet);
-    on<ResetWalletPayEvent>(_onResetWalletPay);
     on<SubmitPaymentProofEvent>(_onSubmitPaymentProof);
     on<ResetPaymentProofEvent>(_onResetPaymentProof);
     on<ClearParentSessionEvent>(_onClearSession);
@@ -128,7 +113,6 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
       ParentHouseholdParams(parentId: event.parentId, childrenIds: children),
     );
     final paymentsResult = await getPayments(ParentIdParams(event.parentId));
-    final walletResult = await getWallet(ParentIdParams(event.parentId));
 
     final household = householdResult.getOrElse((_) => const ParentHousehold());
     final payments = paymentsResult.getOrElse((_) => const <PaymentEntity>[]);
@@ -150,13 +134,6 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
             : SectionStatus.loaded,
         payments: payments,
         paymentsError: paymentsResult.fold((f) => f.message, (_) => null),
-        walletStatus: walletResult.isLeft()
-            ? SectionStatus.error
-            : SectionStatus.loaded,
-        wallet: walletResult.getOrElse(
-          (_) => ParentWalletEntity.empty(event.parentId),
-        ),
-        walletError: walletResult.fold((f) => f.message, (_) => null),
         familySummary: ParentHouseholdAssembler.summarize(
           children: hydrated,
           payments: payments,
@@ -466,118 +443,6 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
       state.copyWith(
         absenceSubmissionStatus: SubmissionStatus.idle,
         absenceSubmissionError: null,
-      ),
-    );
-  }
-
-  // ══════════════════════════════════════════════════════════════════════
-  // بدء عملية دفع (Paymob عن طريق Cloud Function)
-  // ══════════════════════════════════════════════════════════════════════
-
-  Future<void> _onInitiatePayment(
-    InitiatePaymentEvent event,
-    Emitter<ParentState> emit,
-  ) async {
-    emit(
-      state.copyWith(
-        paymentInitiationStatus: SubmissionStatus.submitting,
-        paymentInitiationError: null,
-      ),
-    );
-
-    final result = await initiatePayment(PaymentIdParams(event.paymentId));
-
-    result.fold(
-      (failure) => emit(
-        state.copyWith(
-          paymentInitiationStatus: SubmissionStatus.error,
-          paymentInitiationError: failure.message,
-        ),
-      ),
-      // الـ UI هيستخدم paymentInitiation.checkoutUrl عشان يفتح صفحة
-      // الدفع (WebView مثلاً) لما نبني الشاشات.
-      (initiation) => emit(
-        state.copyWith(
-          paymentInitiationStatus: SubmissionStatus.success,
-          paymentInitiation: initiation,
-        ),
-      ),
-    );
-  }
-
-  void _onResetPaymentInitiation(
-    ResetPaymentInitiationEvent event,
-    Emitter<ParentState> emit,
-  ) {
-    emit(
-      state.copyWith(
-        paymentInitiationStatus: SubmissionStatus.idle,
-        paymentInitiation: null,
-        paymentInitiationError: null,
-      ),
-    );
-  }
-
-  Future<void> _onLoadWallet(
-    LoadWalletEvent event,
-    Emitter<ParentState> emit,
-  ) async {
-    emit(
-      state.copyWith(walletStatus: SectionStatus.loading, walletError: null),
-    );
-    final result = await getWallet(ParentIdParams(event.parentId));
-    result.fold(
-      (failure) => emit(
-        state.copyWith(
-          walletStatus: SectionStatus.error,
-          walletError: failure.message,
-          wallet: ParentWalletEntity.empty(event.parentId),
-        ),
-      ),
-      (wallet) => emit(
-        state.copyWith(walletStatus: SectionStatus.loaded, wallet: wallet),
-      ),
-    );
-  }
-
-  Future<void> _onPayFromWallet(
-    PayPaymentFromWalletEvent event,
-    Emitter<ParentState> emit,
-  ) async {
-    emit(
-      state.copyWith(
-        walletPayStatus: SubmissionStatus.submitting,
-        walletPayError: null,
-      ),
-    );
-
-    final result = await payFromWallet(
-      PayPaymentFromWalletParams(
-        parentId: event.parentId,
-        paymentId: event.paymentId,
-      ),
-    );
-
-    result.fold(
-      (failure) => emit(
-        state.copyWith(
-          walletPayStatus: SubmissionStatus.error,
-          walletPayError: failure.message,
-        ),
-      ),
-      (_) {
-        emit(state.copyWith(walletPayStatus: SubmissionStatus.success));
-        add(LoadPaymentsEvent(event.parentId));
-        add(LoadWalletEvent(event.parentId));
-      },
-    );
-  }
-
-  void _onResetWalletPay(ResetWalletPayEvent event, Emitter<ParentState> emit) {
-    emit(
-      state.copyWith(
-        walletPayStatus: SubmissionStatus.idle,
-        walletPayError: null,
       ),
     );
   }

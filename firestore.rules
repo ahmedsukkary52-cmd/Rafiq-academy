@@ -242,14 +242,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // D2 OUT — wallet client writes denied
+    // D2 / WA-18 — wallet OUT; deny all client access (Admin SDK bypasses)
     match /wallets/{walletId} {
-      allow read: if isAdmin() || (signedIn() && walletId == uid());
-      allow write: if false;
+      allow read: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
 
       match /ledger/{entryId} {
-        allow read: if isAdmin() || (signedIn() && walletId == uid());
-        allow write: if false;
+        allow read: if false;
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
       }
     }
 

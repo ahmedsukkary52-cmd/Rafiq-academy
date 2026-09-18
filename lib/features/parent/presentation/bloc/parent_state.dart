@@ -4,7 +4,6 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
-import '../../domain/parent_wallet.dart';
 import '../../domain/repositories/parent_repositories.dart';
 
 class _Unset {
@@ -59,17 +58,6 @@ class ParentState extends Equatable {
   final SubmissionStatus absenceSubmissionStatus;
   final String? absenceSubmissionError;
 
-  // ── بدء عملية دفع ──────────────────────────────────────────────────────
-  final SubmissionStatus paymentInitiationStatus;
-  final PaymentInitiationEntity? paymentInitiation;
-  final String? paymentInitiationError;
-
-  final SectionStatus walletStatus;
-  final ParentWalletEntity? wallet;
-  final String? walletError;
-  final SubmissionStatus walletPayStatus;
-  final String? walletPayError;
-
   final SubmissionStatus paymentProofStatus;
   final String? paymentProofError;
   final String? paymentProofPaymentId;
@@ -102,14 +90,6 @@ class ParentState extends Equatable {
     this.studentHalaqatStudentId,
     this.absenceSubmissionStatus = SubmissionStatus.idle,
     this.absenceSubmissionError,
-    this.paymentInitiationStatus = SubmissionStatus.idle,
-    this.paymentInitiation,
-    this.paymentInitiationError,
-    this.walletStatus = SectionStatus.initial,
-    this.wallet,
-    this.walletError,
-    this.walletPayStatus = SubmissionStatus.idle,
-    this.walletPayError,
     this.paymentProofStatus = SubmissionStatus.idle,
     this.paymentProofError,
     this.paymentProofPaymentId,
@@ -156,14 +136,6 @@ class ParentState extends Equatable {
     Object? studentHalaqatStudentId = _unset,
     SubmissionStatus? absenceSubmissionStatus,
     Object? absenceSubmissionError = _unset,
-    SubmissionStatus? paymentInitiationStatus,
-    Object? paymentInitiation = _unset,
-    Object? paymentInitiationError = _unset,
-    SectionStatus? walletStatus,
-    Object? wallet = _unset,
-    Object? walletError = _unset,
-    SubmissionStatus? walletPayStatus,
-    Object? walletPayError = _unset,
     SubmissionStatus? paymentProofStatus,
     Object? paymentProofError = _unset,
     Object? paymentProofPaymentId = _unset,
@@ -221,25 +193,6 @@ class ParentState extends Equatable {
       absenceSubmissionError: identical(absenceSubmissionError, _unset)
           ? this.absenceSubmissionError
           : absenceSubmissionError as String?,
-      paymentInitiationStatus:
-          paymentInitiationStatus ?? this.paymentInitiationStatus,
-      paymentInitiation: identical(paymentInitiation, _unset)
-          ? this.paymentInitiation
-          : paymentInitiation as PaymentInitiationEntity?,
-      paymentInitiationError: identical(paymentInitiationError, _unset)
-          ? this.paymentInitiationError
-          : paymentInitiationError as String?,
-      walletStatus: walletStatus ?? this.walletStatus,
-      wallet: identical(wallet, _unset)
-          ? this.wallet
-          : wallet as ParentWalletEntity?,
-      walletError: identical(walletError, _unset)
-          ? this.walletError
-          : walletError as String?,
-      walletPayStatus: walletPayStatus ?? this.walletPayStatus,
-      walletPayError: identical(walletPayError, _unset)
-          ? this.walletPayError
-          : walletPayError as String?,
       paymentProofStatus: paymentProofStatus ?? this.paymentProofStatus,
       paymentProofError: identical(paymentProofError, _unset)
           ? this.paymentProofError
@@ -279,14 +232,6 @@ class ParentState extends Equatable {
     studentHalaqatStudentId,
     absenceSubmissionStatus,
     absenceSubmissionError,
-    paymentInitiationStatus,
-    paymentInitiation,
-    paymentInitiationError,
-    walletStatus,
-    wallet,
-    walletError,
-    walletPayStatus,
-    walletPayError,
     paymentProofStatus,
     paymentProofError,
     paymentProofPaymentId,

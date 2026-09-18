@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart';
@@ -17,22 +16,18 @@ import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../analytics/domain/analytics_recitation_honesty.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_payment_proof.dart';
-import '../../domain/parent_wallet.dart';
 import '../../domain/services/parent_recipient_resolver.dart';
 import '../models/parent_model.dart';
 
 @LazySingleton(as: ParentRemoteDatasource)
 class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   final FirebaseFirestore firestore;
-  final FirebaseFunctions functions;
   final FirebaseStorage storage;
 
   const ParentRemoteDatasourceImpl({
     required this.firestore,
-    required this.functions,
     required this.storage,
   });
 
@@ -331,14 +326,6 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   }
 
   @override
-  Future<PaymentInitiationEntity> initiatePayment(String paymentId) async {
-    // D2 OUT — Paymob / gateway intentionally unavailable.
-    throw const ServerException(
-      'الدفع عبر بوابة إلكترونية غير متاح. استخدم فودافون كاش مع إرفاق إثبات الدفع',
-    );
-  }
-
-  @override
   Future<void> submitPaymentProof({
     required String parentId,
     required String paymentId,
@@ -412,117 +399,6 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
             FieldValue.delete(),
         ParentPaymentProofContract.remainingAmountField: FieldValue.delete(),
         // Intentionally omit status / paidAt — Supervisor/Admin confirms.
-      });
-    } on ServerException {
-      rethrow;
-    } catch (e) {
-      throw ServerException(e.toString());
-    }
-  }
-
-  @override
-  Future<ParentWalletEntity> getWallet(String parentId) async {
-    try {
-      final id = parentId.trim();
-      if (id.isEmpty) {
-        throw const ServerException('معرّف ولي الأمر غير صالح');
-      }
-      final doc = await firestore
-          .collection(FirestoreCollections.wallets)
-          .doc(id)
-          .get();
-      if (!doc.exists) {
-        return ParentWalletEntity.empty(id);
-      }
-      final data = doc.data() ?? const <String, dynamic>{};
-      final rawBalance = data[ParentWalletContract.balanceField];
-      final balance = rawBalance is num ? rawBalance.toDouble() : 0.0;
-      final updated = data[ParentWalletContract.updatedAtField];
-      return ParentWalletEntity(
-        parentId: id,
-        balance: balance,
-        updatedAt: updated is Timestamp ? updated.toDate() : null,
-      );
-    } catch (e) {
-      if (e is ServerException) rethrow;
-      throw ServerException(e.toString());
-    }
-  }
-
-  @override
-  Future<void> payPaymentFromWallet({
-    required String parentId,
-    required String paymentId,
-  }) async {
-    // D2 / WA-2 — wallet pay quarantined (Vodafone Cash + proof only).
-    if (!ParentWalletContract.enabled) {
-      throw const ServerException(
-        'الدفع من المحفظة غير متاح. استخدم فودافون كاش مع إرفاق إثبات الدفع',
-      );
-    }
-
-    final pid = parentId.trim();
-    final payId = paymentId.trim();
-    if (pid.isEmpty || payId.isEmpty) {
-      throw const ServerException('بيانات الدفع غير صالحة');
-    }
-
-    try {
-      await firestore.runTransaction((tx) async {
-        final walletRef = firestore
-            .collection(FirestoreCollections.wallets)
-            .doc(pid);
-        final paymentRef = firestore
-            .collection(FirestoreCollections.payments)
-            .doc(payId);
-
-        final paymentSnap = await tx.get(paymentRef);
-        if (!paymentSnap.exists) {
-          throw const ServerException('الدفعة غير موجودة');
-        }
-        final pdata = paymentSnap.data() ?? const <String, dynamic>{};
-        if ((pdata['parentId'] as String? ?? '').trim() != pid) {
-          throw const ServerException('هذه الدفعة غير مرتبطة بحسابك');
-        }
-        final status = (pdata['status'] as String? ?? '').trim();
-        if (status == 'paid') {
-          throw const ServerException('تم سداد هذه الدفعة بالفعل');
-        }
-        final amount = (pdata['amount'] is num)
-            ? (pdata['amount'] as num).toDouble()
-            : 0.0;
-        if (amount <= 0) {
-          throw const ServerException('مبلغ الدفعة غير صالح');
-        }
-
-        final walletSnap = await tx.get(walletRef);
-        final rawBalance = walletSnap
-            .data()?[ParentWalletContract.balanceField];
-        final balance = rawBalance is num ? rawBalance.toDouble() : 0.0;
-        if (balance < amount) {
-          throw const ServerException('رصيد المحفظة غير كافٍ');
-        }
-
-        tx.set(walletRef, {
-          ParentWalletContract.balanceField: balance - amount,
-          ParentWalletContract.updatedAtField: FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        final ledgerRef = walletRef
-            .collection(ParentWalletContract.ledgerSubcollection)
-            .doc();
-        tx.set(ledgerRef, {
-          'type': ParentWalletContract.typeDebit,
-          'amount': amount,
-          'paymentId': payId,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        tx.update(paymentRef, {
-          'status': 'paid',
-          'method': ParentWalletContract.paymentMethod,
-          'paidAt': FieldValue.serverTimestamp(),
-        });
       });
     } on ServerException {
       rethrow;

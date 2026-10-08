@@ -3,7 +3,7 @@
  *
  * Run (requires Java for emulator + network for first firebase download):
  *   cd rules_test && npm install
- *   npx firebase emulators:exec --project demo-rafiq --only firestore \
+ *   npx firebase emulators:exec --project demo-rafiq-rules --only firestore \
  *     "npm test"   (from repo root with firebase-tools)
  *
  * Or with rules-unit-testing's built-in emulator bootstrap via this script alone
@@ -12,6 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PROJECT_ID } from './project_id.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -31,7 +32,7 @@ async function seed(db, path, data) {
 
 test.before(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: 'demo-rafiq-wa2',
+    projectId: PROJECT_ID,
     firestore: { rules },
   });
 });
@@ -694,11 +695,17 @@ test('WA-10 client cannot mutate group participantIds', async () => {
       participantIds: ['teacher1'],
     }),
   );
-  // Non-membership fields (e.g. lastMessage) remain updatable for messaging.
-  await assertSucceeds(
+  // Conversation preview is server-written (sendChatMessage); only the
+  // caller's own unread reset is a client write.
+  await assertFails(
     db.doc('conversations/halaqa_group_h1').update({
       lastMessage: 'مرحبا',
       lastMessageAt: new Date(),
+    }),
+  );
+  await assertSucceeds(
+    db.doc('conversations/halaqa_group_h1').update({
+      'unreadCounts.teacher1': 0,
     }),
   );
 });
@@ -774,7 +781,7 @@ test('WA-11 participantIds cannot be client-mutated on direct chat', async () =>
   );
 });
 
-test('WA-11 group participant can write message; non-member cannot', async () => {
+test('Chat hardening: message create is callable-only (member and non-member denied)', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().doc('conversations/halaqa_group_h1').set({
       kind: 'halaqa_group',
@@ -782,7 +789,7 @@ test('WA-11 group participant can write message; non-member cannot', async () =>
       participantIds: ['teacher1', 'student1'],
     });
   });
-  await assertSucceeds(
+  await assertFails(
     authed('teacher1')
       .doc('conversations/halaqa_group_h1/messages/m1')
       .set({
@@ -853,6 +860,233 @@ test('WA-11 client cannot update/delete message docs (soft-delete via CF)', asyn
   // Participant can still read the message document.
   await assertSucceeds(
     db.doc('conversations/student1_teacher1/messages/m1').get(),
+  );
+});
+
+test('Chat hardening: participant may only reset own unread counter', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+      lastMessage: 'hi',
+      lastMessageSenderId: 'teacher1',
+      unreadCounts: { student1: 3, teacher1: 2 },
+    });
+  });
+  const conv = (uid) => authed(uid).doc('conversations/student1_teacher1');
+  await assertSucceeds(conv('student1').update({ 'unreadCounts.student1': 0 }));
+  await assertFails(conv('student1').update({ 'unreadCounts.student1': 5 }));
+  await assertFails(conv('student1').update({ 'unreadCounts.teacher1': 9 }));
+  await assertFails(conv('student1').update({ 'unreadCounts.teacher1': 0 }));
+  await assertFails(conv('student1').update({ lastMessage: 'spoofed preview' }));
+  await assertFails(
+    conv('student1').update({ lastMessageSenderId: 'teacher1', lastMessageAt: new Date() }),
+  );
+  await assertFails(
+    conv('student1').update({ 'unreadCounts.student1': 0, lastMessage: 'x' }),
+  );
+  // Admin monitors (read) but is not a member and cannot mutate.
+  await assertFails(conv('admin1').update({ 'unreadCounts.admin1': 0 }));
+  await assertFails(conv('parent1').update({ 'unreadCounts.parent1': 0 }));
+});
+
+test('Chat hardening: deactivated participant is denied conversation access', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('users/admin2').set({ role: 'admin', isActive: false });
+    await ctx.firestore().doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+    });
+  });
+  await assertFails(authed('admin2').doc('conversations/student1_teacher1').get());
+});
+
+// ── Pre-staging: chat reads require an active profile ───────────────────────
+
+async function seedChatReadFixtures() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db.doc('users/student2').set({ role: 'student', isActive: true });
+    await db.doc('users/admin2').set({ role: 'admin', isActive: false });
+    await db.doc('conversations/student1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['student1', 'teacher1'],
+      lastMessageAt: new Date(),
+      unreadCounts: { student1: 2, teacher1: 1 },
+    });
+    await db.doc('conversations/student1_teacher1/messages/m1').set({
+      senderId: 'teacher1',
+      type: 'text',
+      text: 'السلام عليكم',
+      deleted: false,
+    });
+    await db.doc('conversations/parent1_teacher1').set({
+      kind: 'direct',
+      participantIds: ['parent1', 'teacher1'],
+      unreadCounts: { parent1: 1, teacher1: 0 },
+    });
+    await db.doc('conversations/parent1_teacher1/messages/p1').set({
+      senderId: 'teacher1',
+      type: 'text',
+      text: 'متابعة',
+      deleted: false,
+    });
+    await db.doc('conversations/halaqa_group_h1').set({
+      kind: 'halaqa_group',
+      halaqaId: 'h1',
+      participantIds: ['teacher1', 'supervisor1', 'student1'],
+      unreadCounts: {},
+    });
+    await db.doc('conversations/halaqa_group_h1/messages/g1').set({
+      senderId: 'teacher1',
+      type: 'text',
+      text: 'درس اليوم',
+      deleted: false,
+    });
+  });
+}
+
+async function setActive(uid, isActive) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc(`users/${uid}`).update({ isActive });
+  });
+}
+
+const DIRECT_CONV = 'conversations/student1_teacher1';
+const DIRECT_MSG = 'conversations/student1_teacher1/messages/m1';
+
+// Same query as ChatRemoteDatasource.watchConversations.
+function myConversations(db, uid) {
+  return db
+    .collection('conversations')
+    .where('participantIds', 'array-contains', uid)
+    .orderBy('lastMessageAt', 'desc')
+    .get();
+}
+
+test('Chat read gate: active participant reads conversation, messages and own lists', async () => {
+  await seedChatReadFixtures();
+  const db = authed('student1');
+  await assertSucceeds(db.doc(DIRECT_CONV).get());
+  await assertSucceeds(db.doc(DIRECT_MSG).get());
+  await assertSucceeds(db.collection(`${DIRECT_CONV}/messages`).get());
+  await assertSucceeds(myConversations(db, 'student1'));
+});
+
+test('Chat read gate: deactivated participant is denied conversation, messages and lists', async () => {
+  await seedChatReadFixtures();
+  await setActive('student1', false);
+  const db = authed('student1');
+  await assertFails(db.doc(DIRECT_CONV).get());
+  await assertFails(db.doc(DIRECT_MSG).get());
+  await assertFails(db.collection(`${DIRECT_CONV}/messages`).get());
+  await assertFails(myConversations(db, 'student1'));
+  await assertFails(db.doc('conversations/halaqa_group_h1/messages/g1').get());
+});
+
+test('Chat read gate: a token issued while active does not survive deactivation', async () => {
+  await seedChatReadFixtures();
+  // Same signed-in client before and after deactivation; claims are not trusted.
+  const db = testEnv
+    .authenticatedContext('student1', { role: 'student', isActive: true })
+    .firestore();
+  await assertSucceeds(db.doc(DIRECT_MSG).get());
+  await setActive('student1', false);
+  await assertFails(db.doc(DIRECT_CONV).get());
+  await assertFails(db.doc(DIRECT_MSG).get());
+  await assertFails(db.doc(DIRECT_CONV).update({ 'unreadCounts.student1': 0 }));
+});
+
+test('Chat read gate: re-activated participant can read again', async () => {
+  await seedChatReadFixtures();
+  await setActive('student1', false);
+  await assertFails(authed('student1').doc(DIRECT_MSG).get());
+  await setActive('student1', true);
+  await assertSucceeds(authed('student1').doc(DIRECT_CONV).get());
+  await assertSucceeds(authed('student1').doc(DIRECT_MSG).get());
+});
+
+test('Chat read gate: deactivated Admin loses monitoring; active Admin keeps it', async () => {
+  await seedChatReadFixtures();
+  await assertFails(authed('admin2').doc(DIRECT_CONV).get());
+  await assertFails(authed('admin2').doc(DIRECT_MSG).get());
+  await assertFails(authed('admin2').collection(`${DIRECT_CONV}/messages`).get());
+  await assertSucceeds(authed('admin1').doc(DIRECT_CONV).get());
+  await assertSucceeds(authed('admin1').doc(DIRECT_MSG).get());
+  await assertSucceeds(authed('admin1').collection('conversations').get());
+});
+
+test('Chat read gate: non-participants stay denied; missing profile denied', async () => {
+  await seedChatReadFixtures();
+  for (const uid of ['student2', 'parent1', 'supervisor1']) {
+    await assertFails(authed(uid).doc(DIRECT_CONV).get());
+    await assertFails(authed(uid).doc(DIRECT_MSG).get());
+  }
+  await assertFails(authed('ghost1').doc(DIRECT_CONV).get());
+  await assertFails(testEnv.unauthenticatedContext().firestore().doc(DIRECT_CONV).get());
+  // Listing is limited to the caller's own conversations.
+  await assertFails(myConversations(authed('student2'), 'student1'));
+  await assertFails(authed('student1').collection('conversations').get());
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/malformed').set({ participantIds: 'student1' });
+  });
+  await assertFails(authed('student1').doc('conversations/malformed').get());
+});
+
+test('Chat read gate: Parent / Teacher / Supervisor / Halaqa group access unchanged', async () => {
+  await seedChatReadFixtures();
+  await assertSucceeds(authed('parent1').doc('conversations/parent1_teacher1').get());
+  await assertSucceeds(authed('parent1').doc('conversations/parent1_teacher1/messages/p1').get());
+  await assertSucceeds(authed('teacher1').doc('conversations/parent1_teacher1/messages/p1').get());
+  for (const uid of ['teacher1', 'supervisor1', 'student1']) {
+    await assertSucceeds(authed(uid).doc('conversations/halaqa_group_h1').get());
+    await assertSucceeds(authed(uid).doc('conversations/halaqa_group_h1/messages/g1').get());
+  }
+  await assertFails(authed('parent1').doc('conversations/halaqa_group_h1').get());
+  await assertFails(authed('parent1').doc('conversations/halaqa_group_h1/messages/g1').get());
+  await assertFails(authed('student2').doc('conversations/halaqa_group_h1/messages/g1').get());
+});
+
+test('Chat read gate: unread reset works for active users only', async () => {
+  await seedChatReadFixtures();
+  await assertSucceeds(authed('student1').doc(DIRECT_CONV).update({ 'unreadCounts.student1': 0 }));
+  await assertSucceeds(
+    authed('parent1').doc('conversations/parent1_teacher1').update({ 'unreadCounts.parent1': 0 }),
+  );
+  await assertFails(authed('student1').doc(DIRECT_CONV).update({ 'unreadCounts.teacher1': 0 }));
+  await setActive('parent1', false);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('conversations/parent1_teacher1').update({ 'unreadCounts.parent1': 4 });
+  });
+  await assertFails(
+    authed('parent1').doc('conversations/parent1_teacher1').update({ 'unreadCounts.parent1': 0 }),
+  );
+});
+
+test('Chat read gate: legacy profile without isActive keeps access (project-wide default)', async () => {
+  await seedChatReadFixtures();
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('users/student1').set({ role: 'student' });
+  });
+  await assertSucceeds(authed('student1').doc(DIRECT_MSG).get());
+});
+
+test('D1: deactivated profile holds no role and cannot reactivate itself', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('users/admin3').set({ role: 'admin', isActive: false });
+    await ctx.firestore().doc('users/student9').set({ role: 'student', isActive: false });
+  });
+  const inactiveAdmin = authed('admin3');
+  await assertFails(
+    inactiveAdmin.doc('academySettings/communication').update({ conversationRetentionDays: 30 }),
+  );
+  await assertFails(inactiveAdmin.doc('users/student1').update({ name: 'x' }));
+  await assertFails(inactiveAdmin.doc('users/admin3').update({ isActive: true }));
+  await assertFails(authed('student9').doc('users/student9').update({ isActive: true }));
+  await assertFails(authed('student9').doc('users/student9').update({ role: 'admin' }));
+  // Active Admin keeps the same capability (control).
+  await assertSucceeds(
+    authed('admin1').doc('academySettings/communication').update({ conversationRetentionDays: 30 }),
   );
 });
 
@@ -994,20 +1228,37 @@ test('WA-13 client cannot forge server-owned push fields on notifications', asyn
     }),
   );
 
-  // Existing W4/W5 in-app fan-out shape stays allowed.
-  await assertSucceeds(
-    db.doc('notifications/parent1_homework_reviewed_rec1').set({
-      audience: 'parent1',
-      title: 'تم تقييم التسميع',
-      body: 'تم تقييم تسميع الطالب',
-      type: 'assignment',
-      readBy: [],
-      hasAudioAlert: false,
-    }),
+  const fanOut = {
+    audience: 'parent1',
+    title: 'تم تقييم التسميع',
+    body: 'تم تقييم تسميع الطالب',
+    type: 'assignment',
+    readBy: [],
+    hasAudioAlert: false,
+  };
+
+  // PH-01: a student may not address a notification to another user.
+  await assertFails(
+    db.doc('notifications/parent1_homework_reviewed_rec1').set(fanOut),
   );
 
+  // PH-02: academy fan-out is CF-authored; staff devices no longer address
+  // parents directly.
   await assertFails(
-    db
+    authed('teacher1')
+      .doc('notifications/parent1_homework_reviewed_rec1')
+      .set(fanOut),
+  );
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await seed(
+      ctx.firestore(),
+      'notifications/parent1_homework_reviewed_rec1',
+      fanOut,
+    );
+  });
+
+  await assertFails(
+    authed('parent1')
       .doc('notifications/parent1_homework_reviewed_rec1')
       .update({ delivery: { status: 'sent' } }),
   );
@@ -1183,6 +1434,7 @@ async function seedLifecycle(value) {
     await seed(ctx.firestore(), 'studentProfiles/student1', {
       uid: 'student1',
       name: 'Student',
+      halaqaId: 'h1',
       overallProgressPercent: 0,
       lifecycle: value,
     });
@@ -1227,8 +1479,10 @@ test('WA-15 lifecycle cannot ride along with an otherwise legal profile update',
 test('WA-15 an unrelated profile field still updates normally', async () => {
   await seedLifecycle('active');
 
+  // PH-02: points/totalStars are server-owned (grantAward), so the legal
+  // client edit is an Admin identity field.
   await assertSucceeds(
-    authed('teacher1').doc('studentProfiles/student1').update({ points: 10 }),
+    authed('admin1').doc('studentProfiles/student1').update({ name: 'renamed' }),
   );
 });
 

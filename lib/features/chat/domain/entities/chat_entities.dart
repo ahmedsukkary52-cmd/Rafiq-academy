@@ -70,11 +70,49 @@ class ConversationEntity extends Equatable {
   ];
 }
 
+enum ChatMessageType {
+  text,
+  image,
+  voice,
+  file;
+
+  /// Wire value written by `sendChatMessage`. Legacy docs have no type.
+  static ChatMessageType fromWire(Object? raw) {
+    for (final t in values) {
+      if (t.name == raw) return t;
+    }
+    return ChatMessageType.text;
+  }
+}
+
+/// Server-verified media metadata (written by `sendChatMessage` only).
+class ChatMediaEntity extends Equatable {
+  final String storagePath;
+  final String fileName;
+  final String contentType;
+  final int sizeBytes;
+  final int? durationMs;
+
+  const ChatMediaEntity({
+    required this.storagePath,
+    required this.fileName,
+    required this.contentType,
+    required this.sizeBytes,
+    this.durationMs,
+  });
+
+  @override
+  List<Object?> get props =>
+      [storagePath, fileName, contentType, sizeBytes, durationMs];
+}
+
 class MessageEntity extends Equatable {
   final String id;
   final String conversationId;
   final String senderId;
+  final ChatMessageType type;
   final String text;
+  final ChatMediaEntity? media;
   final DateTime sentAt;
   final DateTime? editedAt;
   final bool deleted;
@@ -85,7 +123,9 @@ class MessageEntity extends Equatable {
     required this.id,
     required this.conversationId,
     required this.senderId,
+    this.type = ChatMessageType.text,
     required this.text,
+    this.media,
     required this.sentAt,
     this.editedAt,
     this.deleted = false,
@@ -99,12 +139,17 @@ class MessageEntity extends Equatable {
 
   bool get isEdited => editedAt != null && !deleted;
 
+  /// Deleted messages never expose media, even if a stale doc still has it.
+  ChatMediaEntity? get visibleMedia => deleted ? null : media;
+
   @override
   List<Object?> get props => [
     id,
     conversationId,
     senderId,
+    type,
     text,
+    media,
     sentAt,
     editedAt,
     deleted,

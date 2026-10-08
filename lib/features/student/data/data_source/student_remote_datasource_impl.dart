@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/student/data/data_source/student_remote_datasource.dart';
 
@@ -18,8 +19,12 @@ import '../models/student_profile_model.dart';
 @LazySingleton(as: StudentRemoteDatasource)
 class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
   final FirebaseFirestore firestore;
+  final FirebaseFunctions functions;
 
-  const StudentRemoteDatasourceImpl({required this.firestore});
+  const StudentRemoteDatasourceImpl({
+    required this.firestore,
+    required this.functions,
+  });
 
   @override
   Future<StudentProfileModel> getStudentProfile(String uid) async {
@@ -233,6 +238,9 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
         });
   }
 
+  /// Economy (PH-02): the purchaseAvatar callable prices the avatar from the
+  /// trusted catalog and debits atomically. Only [avatarId] is sent — the
+  /// client-computed [unlockedAvatarIds] / [coins] are display-only.
   @override
   Future<void> updateAvatarSelection({
     required String studentId,
@@ -241,14 +249,10 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
     required int coins,
   }) async {
     try {
-      await firestore
-          .collection(FirestoreCollections.studentProfiles)
-          .doc(studentId)
-          .update({
-            'avatarId': avatarId,
-            'unlockedAvatarIds': unlockedAvatarIds,
-            'coins': coins,
-          });
+      final callable = functions.httpsCallable('purchaseAvatar');
+      await callable.call(<String, dynamic>{'avatarId': avatarId.trim()});
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } catch (e) {
       throw ServerException(e.toString());
     }

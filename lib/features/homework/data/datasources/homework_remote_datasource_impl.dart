@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 
@@ -22,10 +23,11 @@ import 'homework_remote_datasource.dart';
 class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
+  final FirebaseFunctions functions;
 
   static const _uploadTimeout = Duration(seconds: 20);
 
-  HomeworkRemoteDatasourceImpl(this.firestore, this.storage);
+  HomeworkRemoteDatasourceImpl(this.firestore, this.storage, this.functions);
 
   Query<Map<String, dynamic>> _latestQuery(String studentId) {
     return firestore
@@ -175,56 +177,23 @@ class HomeworkRemoteDatasourceImpl implements HomeworkRemoteDatasource {
     }
   }
 
+  /// Economy (P0-05): the completeHomework callable checks ownership + task
+  /// completion, derives the reward from the server-owned required kinds and
+  /// credits coins exactly once (homeworkRewards marker). Returns coins.
   @override
   Future<int> completeHomework(String homeworkId) async {
     try {
-      final assignmentRef = firestore
-          .collection(FirestoreCollections.assignments)
-          .doc(homeworkId);
-
-      // Transaction يضمن: فحص isSubmitted + كتابة التسليم + إضافة النقاط مرة واحدة فقط
-      final awardedPoints = await firestore.runTransaction<int>((txn) async {
-        final snap = await txn.get(assignmentRef);
-        if (!snap.exists) {
-          throw const ServerException('التكليف غير موجود');
-        }
-
-        final data = snap.data()!;
-        final alreadySubmitted =
-            data['isSubmitted'] == true || data['status'] == 'completed';
-        if (alreadySubmitted) {
-          throw const ServerException('تم إنهاء هذا الواجب مسبقاً');
-        }
-
-        final homework = _toHomework(AssignmentModel.fromFirestore(snap));
-        if (!homework.allCompleted) {
-          throw const ServerException('لم تكتمل المهام المطلوبة بعد');
-        }
-
-        final points = homework.earnedPoints;
-
-        txn.update(assignmentRef, {
-          'isSubmitted': true,
-          'completedAt': FieldValue.serverTimestamp(),
-          'status': 'completed',
-        });
-
-        if (homework.studentId.isNotEmpty && points > 0) {
-          final profileRef = firestore
-              .collection(FirestoreCollections.studentProfiles)
-              .doc(homework.studentId);
-          txn.set(profileRef, {
-            'points': FieldValue.increment(points),
-            'coins': FieldValue.increment(points),
-          }, SetOptions(merge: true));
-        }
-
-        return points;
+      final callable = functions.httpsCallable('completeHomework');
+      final result = await callable.call(<String, dynamic>{
+        'assignmentId': homeworkId.trim(),
       });
-
-      return awardedPoints;
-    } on ServerException {
-      rethrow;
+      final data = result.data;
+      final awarded = data is Map
+          ? (data['awardedCoins'] ?? data['awardedPoints'])
+          : null;
+      return awarded is num ? awarded.toInt() : 0;
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } catch (e) {
       throw ServerException(e.toString());
     }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_preferences_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 
 /// Student settings — only preferences that actually affect the app.
+/// D15: dark/light theme switching is OUT — no theme toggle here (UI-1).
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -12,24 +14,14 @@ class SettingsPage extends StatelessWidget {
     final appPreferences = AppPreferencesScope.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
+      appBar: AppBar(
+        title: const Text('الإعدادات'),
+        leading: const AppBackButton(),
+      ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: AppSizes.paddingM),
         children: [
           const _SectionLabel('المظهر'),
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: appPreferences.themeMode,
-            builder: (context, mode, _) {
-              return _ToggleTile(
-                icon: Icons.dark_mode_rounded,
-                iconBg: AppColors.dark,
-                iconColor: Colors.white,
-                label: 'الوضع الليلي',
-                value: mode == ThemeMode.dark,
-                onChanged: (v) => appPreferences.setDarkMode(v),
-              );
-            },
-          ),
           const _LinkTile(
             icon: Icons.language_rounded,
             iconBg: AppColors.primaryLight,
@@ -113,37 +105,6 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         label,
         style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
-class _ToggleTile extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleTile({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: _RoundIcon(icon: icon, bg: iconBg, color: iconColor),
-      title: Text(label, style: AppTextStyles.bodyLarge),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
       ),
     );
   }

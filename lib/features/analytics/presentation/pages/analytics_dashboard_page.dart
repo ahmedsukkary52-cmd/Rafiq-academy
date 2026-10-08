@@ -73,6 +73,17 @@ class _AnalyticsDashboardPageState extends State<AnalyticsDashboardPage> {
     );
   }
 
+  /// Escalated supervisors may open Analytics but not `/teacher/chat/*`, so the
+  /// contact CTA is hidden instead of being bounced by the router.
+  bool _canOpenTeacherChat() {
+    final auth = context.read<AuthBloc>().state;
+    return auth is AuthAuthenticated &&
+        AppRouteAccess.isAllowed(
+          path: AppRoutes.teacherChat.replaceFirst(':conversationId', 'probe'),
+          role: auth.user.role,
+        );
+  }
+
   Future<void> _openStudentChat(AtRiskStudentEntity student) async {
     if (_contactBusy) return;
     final auth = context.read<AuthBloc>().state;
@@ -249,7 +260,9 @@ class _AnalyticsDashboardPageState extends State<AnalyticsDashboardPage> {
                               students: state.atRiskStudents,
                               contactBusy: _contactBusy,
                               onEvaluate: _openEvaluations,
-                              onContact: _openStudentChat,
+                              onContact: _canOpenTeacherChat()
+                                  ? _openStudentChat
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -683,7 +696,7 @@ class _AtRiskCard extends StatelessWidget {
   final List<AtRiskStudentEntity> students;
   final bool contactBusy;
   final void Function(AtRiskStudentEntity) onEvaluate;
-  final void Function(AtRiskStudentEntity) onContact;
+  final void Function(AtRiskStudentEntity)? onContact;
 
   const _AtRiskCard({
     required this.students,
@@ -749,7 +762,7 @@ class _AtRiskStudentRow extends StatelessWidget {
   final AtRiskStudentEntity student;
   final bool contactBusy;
   final void Function(AtRiskStudentEntity) onEvaluate;
-  final void Function(AtRiskStudentEntity) onContact;
+  final void Function(AtRiskStudentEntity)? onContact;
 
   const _AtRiskStudentRow({
     required this.student,
@@ -821,7 +834,7 @@ class _AtRiskReasonAction extends StatelessWidget {
   final AtRiskStudentEntity student;
   final bool enabled;
   final void Function(AtRiskStudentEntity) onEvaluate;
-  final void Function(AtRiskStudentEntity) onContact;
+  final void Function(AtRiskStudentEntity)? onContact;
 
   const _AtRiskReasonAction({
     required this.student,
@@ -835,6 +848,8 @@ class _AtRiskReasonAction extends StatelessWidget {
     // One primary CTA from entity reason (datasource picks one signal).
     final isEvaluate =
     AnalyticsCtaNavigation.atRiskActionIsEvaluate(student.reason);
+    final contact = onContact;
+    if (!isEvaluate && contact == null) return const SizedBox.shrink();
     return _AtRiskOutlineLink(
       label: AnalyticsCtaNavigation.atRiskActionLabel(student.reason),
       color: isEvaluate ? AppColors.gradeGood : AppColors.error,
@@ -842,7 +857,7 @@ class _AtRiskReasonAction extends StatelessWidget {
           ? null
           : isEvaluate
           ? () => onEvaluate(student)
-          : () => onContact(student),
+          : () => contact!(student),
     );
   }
 }

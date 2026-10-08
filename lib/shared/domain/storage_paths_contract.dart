@@ -74,6 +74,21 @@ class StoragePathsContract {
     return '$chatVoicePrefix/$c/$m/$f';
   }
 
+  /// `chat_attachments/{conversationId}/{messageId}/{fileName}`
+  static String chatAttachment({
+    required String conversationId,
+    required String messageId,
+    required String fileName,
+  }) {
+    final c = conversationId.trim();
+    final m = messageId.trim();
+    final f = fileName.trim();
+    if (c.isEmpty || m.isEmpty || f.isEmpty) {
+      throw ArgumentError('chat attachment path segments must be non-empty');
+    }
+    return '$chatAttachmentsPrefix/$c/$m/$f';
+  }
+
   /// `posts/{authorId}/{fileName}`
   static String postAttachment({
     required String authorId,

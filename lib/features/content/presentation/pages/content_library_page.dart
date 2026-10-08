@@ -5,10 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/app_subpage_scaffold.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../domain/content_upload_policy.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/content_file_entity.dart';
@@ -30,6 +34,16 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
   String _currentUid = '';
   String _currentUserName = '';
 
+  /// Library uploads are a staff operation (Firestore/Storage Rules deny
+  /// students and parents).
+  bool _canUpload = false;
+
+  static const Set<String> _uploaderRoles = {
+    AppRoles.teacher,
+    AppRoles.supervisor,
+    AppRoles.admin,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -37,9 +51,18 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
     if (authState is AuthAuthenticated) {
       _currentUid = authState.user.uid;
       _currentUserName = authState.user.name;
+      _canUpload = _uploaderRoles.contains(authState.user.role);
     }
     _bloc = sl<ContentLibraryBloc>();
-    _bloc.add(LoadFilesEvent(halaqaId: widget.halaqaId));
+    if (_halaqaId != null) {
+      _bloc.add(LoadFilesEvent(halaqaId: _halaqaId));
+    }
+  }
+
+  /// Shared content is Halaqa-scoped (P0 §8); `null` → nothing to show.
+  String? get _halaqaId {
+    final id = widget.halaqaId?.trim() ?? '';
+    return id.isEmpty ? null : id;
   }
 
   @override
@@ -51,48 +74,15 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
   Future<void> _pickAndUploadFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: [
-        'pdf',
-        'mp3',
-        'wav',
-        'mp4',
-        'png',
-        'jpg',
-        'jpeg',
-        'doc',
-        'docx',
-      ],
+      allowedExtensions: ContentUploadPolicy.allowedExtensions,
     );
     if (result == null) return;
+    final path = result.files.single.path;
+    if (path == null) return;
 
-    final file = File(result.files.single.path!);
+    final file = File(path);
     final fileName = result.files.single.name;
-
-    // Determine file type
-    ContentFileType type;
-    final ext = fileName.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        type = ContentFileType.pdf;
-        break;
-      case 'mp3':
-      case 'wav':
-        type = ContentFileType.audio;
-        break;
-      case 'mp4':
-        type = ContentFileType.video;
-        break;
-      case 'png':
-      case 'jpg':
-      case 'jpeg':
-        type = ContentFileType.image;
-        break;
-      case 'doc':
-      case 'docx':
-      default:
-        type = ContentFileType.document;
-        break;
-    }
+    final type = ContentUploadPolicy.fileTypeFor(fileName);
 
     // Show title input dialog
     if (!mounted) return;
@@ -128,7 +118,7 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
             type: type,
             uploadedBy: _currentUid,
             uploaderName: _currentUserName,
-            halaqaId: widget.halaqaId,
+            halaqaId: _halaqaId,
           ),
         );
       }
@@ -153,13 +143,44 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_halaqaId == null) {
+      return const AppSubpageScaffold(
+        title: 'المحتوى المشترك',
+        body: AppEmptyState(
+          icon: Icons.folder_off_outlined,
+          title: 'لا توجد حلقة مرتبطة',
+          message: 'المحتوى المشترك يظهر داخل الحلقة بعد الانضمام إليها',
+        ),
+      );
+    }
     return BlocProvider.value(
       value: _bloc,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('مكتبة المحتوى'),
-          actions: [
+      child: BlocListener<ContentLibraryBloc, ContentLibraryState>(
+        listenWhen: (p, c) => p.uploadStatus != c.uploadStatus,
+        listener: (context, state) {
+          if (state.uploadStatus == SubmissionStatus.success) {
+            _bloc
+              ..add(const ResetUploadEvent())
+              ..add(LoadFilesEvent(halaqaId: _halaqaId));
+          } else if (state.uploadStatus == SubmissionStatus.error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.uploadError ?? 'تعذر رفع الملف')),
+            );
+            _bloc.add(const ResetUploadEvent());
+          }
+        },
+        child: _buildScaffold(),
+      ),
+    );
+  }
+
+  Widget _buildScaffold() {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('المحتوى المشترك'),
+        actions: [
+          if (_canUpload)
             TextButton.icon(
               onPressed: _pickAndUploadFile,
               icon: const Icon(
@@ -176,230 +197,224 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                 ),
               ),
             ),
-          ],
-        ),
-        body: BlocBuilder<ContentLibraryBloc, ContentLibraryState>(
-          buildWhen: (previous, current) =>
-              previous.filesStatus != current.filesStatus ||
-              previous.allFiles != current.allFiles ||
-              previous.activeFilter != current.activeFilter ||
-              previous.filesError != current.filesError,
-          builder: (context, state) {
-            final files = state.filteredFiles;
-            return Column(
-              children: [
-                // ── بحث ─────────────────────────────────────────
-                const Padding(
-                  padding: EdgeInsets.all(AppSizes.paddingM),
-                  child: AppTextField(
-                    hint: 'بحث في المكتبة...',
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: AppColors.textHint,
-                    ),
+        ],
+      ),
+      body: BlocBuilder<ContentLibraryBloc, ContentLibraryState>(
+        buildWhen: (previous, current) =>
+            previous.filesStatus != current.filesStatus ||
+            previous.allFiles != current.allFiles ||
+            previous.activeFilter != current.activeFilter ||
+            previous.filesError != current.filesError,
+        builder: (context, state) {
+          final files = state.filteredFiles;
+          return Column(
+            children: [
+              // ── بحث ─────────────────────────────────────────
+              const Padding(
+                padding: EdgeInsets.all(AppSizes.paddingM),
+                child: AppTextField(
+                  hint: 'بحث في المكتبة...',
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: AppColors.textHint,
                   ),
                 ),
+              ),
 
-                // ── فلاتر النوع ───────────────────────────────────
-                SizedBox(
-                  height: 36,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
+              // ── فلاتر النوع ───────────────────────────────────
+              SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.paddingM,
+                  ),
+                  reverse: true,
+                  children:
+                      [
+                        null, // الكل
+                        ...ContentFileType.values,
+                      ].map((type) {
+                        final selected = state.activeFilter == type;
+                        final label = type?.label ?? 'الكل';
+                        return GestureDetector(
+                          onTap: () => _bloc.add(FilterFilesEvent(type)),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary
+                                  : AppColors.surface,
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusFull,
+                              ),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontFamily: 'NotoNaskhArabic',
+                                fontSize: 13,
+                                color: selected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── upload progress (isolated from file list rebuilds) ──
+              BlocSelector<ContentLibraryBloc, ContentLibraryState, double?>(
+                selector: (s) => s.uploadProgress,
+                builder: (context, progress) {
+                  if (progress == null) return const SizedBox.shrink();
+                  return Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSizes.paddingM,
                     ),
-                    reverse: true,
-                    children:
-                        [
-                          null, // الكل
-                          ...ContentFileType.values,
-                        ].map((type) {
-                          final selected = state.activeFilter == type;
-                          final label = type?.label ?? 'الكل';
-                          return GestureDetector(
-                            onTap: () => _bloc.add(FilterFilesEvent(type)),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.surface,
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusFull,
-                                ),
-                                border: Border.all(
-                                  color: selected
-                                      ? AppColors.primary
-                                      : AppColors.border,
-                                ),
-                              ),
-                              child: Text(
-                                label,
-                                style: TextStyle(
-                                  fontFamily: 'NotoNaskhArabic',
-                                  fontSize: 13,
-                                  color: selected
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // ── upload progress (isolated from file list rebuilds) ──
-                BlocSelector<ContentLibraryBloc, ContentLibraryState, double?>(
-                  selector: (s) => s.uploadProgress,
-                  builder: (context, progress) {
-                    if (progress == null) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.paddingM,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'جارٍ الرفع... ${(progress * 100).toInt()}%',
-                            style: AppTextStyles.labelMedium.copyWith(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(
-                            value: progress,
-                            valueColor: const AlwaysStoppedAnimation(
-                              AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-
-                // ── الملفات ──────────────────────────────────────
-                Expanded(
-                  child: state.filesStatus == SectionStatus.loading
-                      ? const AppLoadingWidget()
-                      : files.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.folder_open_rounded,
-                                size: 64,
-                                color: AppColors.textHint.withOpacity(0.4),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'لا يوجد محتوى متاح حالياً',
-                                style: AppTextStyles.bodyMedium,
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'ستظهر هنا الملفات التعليمية عند إضافتها',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.textHint,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSizes.paddingM,
-                          ),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                                childAspectRatio: 0.85,
-                              ),
-                          itemCount: files.length,
-                          itemBuilder: (context, i) => _FileCard(
-                            file: files[i],
-                            onTap: () => _openFile(files[i]),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'جارٍ الرفع... ${(progress * 100).toInt()}%',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.primary,
                           ),
                         ),
-                ),
-
-                // ── آخر الرفوعات ──────────────────────────────────
-                if (state.allFiles.isNotEmpty) ...[
-                  const Divider(height: 1),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      AppSizes.paddingM,
-                      8,
-                      AppSizes.paddingM,
-                      0,
-                    ),
-                    child: SectionHeader(title: 'آخر الرفوعات'),
-                  ),
-                  SizedBox(
-                    height: 56,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.paddingM,
-                        vertical: 8,
-                      ),
-                      itemCount: state.allFiles.take(3).length,
-                      itemBuilder: (context, i) {
-                        final file = state.allFiles[i];
-                        return Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(
+                          value: progress,
+                          valueColor: const AlwaysStoppedAnimation(
+                            AppColors.primary,
                           ),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceGrey,
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusM,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              // ── الملفات ──────────────────────────────────────
+              Expanded(
+                child: state.filesStatus == SectionStatus.loading
+                    ? const AppLoadingWidget()
+                    : files.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.folder_open_rounded,
+                              size: 64,
+                              color: AppColors.textHint.withOpacity(0.4),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                file.title,
-                                style: AppTextStyles.labelMedium,
+                            const SizedBox(height: 16),
+                            Text(
+                              'لا يوجد محتوى متاح حالياً',
+                              style: AppTextStyles.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'ستظهر هنا الملفات التعليمية عند إضافتها',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: AppColors.textHint,
                               ),
-                              const SizedBox(width: 6),
-                              Icon(
-                                _iconForType(file.type),
-                                size: 16,
-                                color: _colorForType(file.type),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.paddingM,
+                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 0.85,
+                            ),
+                        itemCount: files.length,
+                        itemBuilder: (context, i) => _FileCard(
+                          file: files[i],
+                          onTap: () => _openFile(files[i]),
+                        ),
+                      ),
+              ),
 
-                const SizedBox(height: 8),
+              // ── آخر الرفوعات ──────────────────────────────────
+              if (state.allFiles.isNotEmpty) ...[
+                const Divider(height: 1),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSizes.paddingM,
+                    8,
+                    AppSizes.paddingM,
+                    0,
+                  ),
+                  child: SectionHeader(title: 'آخر الرفوعات'),
+                ),
+                SizedBox(
+                  height: 56,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.paddingM,
+                      vertical: 8,
+                    ),
+                    itemCount: state.allFiles.take(3).length,
+                    itemBuilder: (context, i) {
+                      final file = state.allFiles[i];
+                      return Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceGrey,
+                          borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(file.title, style: AppTextStyles.labelMedium),
+                            const SizedBox(width: 6),
+                            Icon(
+                              _iconForType(file.type),
+                              size: 16,
+                              color: _colorForType(file.type),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
-            );
-          },
-        ),
+
+              const SizedBox(height: 8),
+            ],
+          );
+        },
       ),
     );
   }

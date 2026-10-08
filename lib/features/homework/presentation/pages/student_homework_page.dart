@@ -10,6 +10,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_back_button.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -64,7 +66,9 @@ class _HomeworkView extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'ربحت $points نقطة',
+                      points > 0
+                          ? 'ربحت $points عملة'
+                          : 'تم احتساب مكافأة هذا الواجب مسبقاً',
                       style: AppTextStyles.headlineMedium.copyWith(
                         color: AppColors.primary,
                       ),
@@ -121,9 +125,9 @@ class _HomeworkView extends StatelessWidget {
           backgroundColor: AppColors.surface,
           elevation: 0,
           centerTitle: true,
-          leading: IconButton(
+          leading: AppBackButton(
             onPressed: () => context.pop(),
-            icon: const Icon(Icons.chevron_right, color: AppColors.textPrimary),
+            color: AppColors.textPrimary,
           ),
           title: const Text(
             'واجباتي 📝',
@@ -182,13 +186,12 @@ class _HomeworkView extends StatelessWidget {
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: const [
-                    SizedBox(height: 120),
-                    Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'لا يوجد واجب حالياً\nسيظهر هنا نفس تكليف «درس اليوم» من المعلم',
-                        textAlign: TextAlign.center,
-                      ),
+                    SizedBox(height: 80),
+                    AppEmptyState(
+                      icon: Icons.assignment_outlined,
+                      title: 'لا يوجد واجب حالياً',
+                      message:
+                          'سيظهر هنا نفس تكليف «درس اليوم» من المعلم عند إرساله.',
                     ),
                   ],
                 ),

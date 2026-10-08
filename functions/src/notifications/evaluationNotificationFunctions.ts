@@ -2,6 +2,15 @@ import * as admin from "firebase-admin";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import {
+  buildHomeworkReviewedNotification,
+  decideHomeworkReviewed,
+} from "./academyNotifications";
+import {
+  loadParentIdsByStudent,
+  loadStudentNames,
+  writeInAppNotifications,
+} from "./academyNotificationStore";
+import {
   assertSafeDataPayload,
   buildParentEvaluationNotification,
   decideDeliveryAttempt,
@@ -15,21 +24,28 @@ import {
   FCM_TOKENS_COLLECTION,
   NOTIFICATION_DELIVERIES_COLLECTION,
   NOTIFICATIONS_COLLECTION,
-  PARENT_PROFILES_COLLECTION,
   selectSendableTokens,
   SendOutcome,
   summarizeSendOutcomes,
-  USERS_COLLECTION,
 } from "./fcmTokenContract";
 import { pushGateBlockedMessage, resolvePushSendMode } from "./pushGate";
 
 const FEATURE = "notifyParentsOnEvaluation";
+
+/** Push transport — Admin SDK in production, injectable for emulator tests. */
+export type PushSender = (params: {
+  notification: ParentNotification;
+  tokens: readonly { deviceId: string; token: string }[];
+}) => Promise<SendOutcome[]>;
 
 /**
  * WA-13 / C11.3 — live evaluation send chain (server-owned).
  *
  * recitationRecords write → academy fact → parent notification doc →
  * Admin SDK FCM send → invalid token cleanup.
+ *
+ * PH-02: the same trigger also owns the homework-review in-app fan-out that
+ * used to be published from the teacher device.
  *
  * The client never authors these notifications and never sends FCM: a push is
  * only emitted for notifications this trigger created together with their
@@ -45,36 +61,82 @@ export const notifyParentsOnEvaluation = onDocumentWritten(
       return;
     }
 
-    const recordId = event.params.recordId;
-    const decision = decideEvaluationNotification({
-      recordId,
+    await handleRecitationRecordWrite({
+      db: admin.firestore(),
+      recordId: event.params.recordId,
       before: event.data?.before?.data() ?? null,
       after: event.data?.after?.data() ?? null,
+      sender: sendPush,
     });
-    if (!decision.notify) return;
-
-    const db = admin.firestore();
-    const parentIds = await loadParentIds(db, decision.facts.studentId);
-    if (parentIds.length === 0) return;
-
-    const studentName = await loadStudentName(db, decision.facts.studentId);
-
-    for (const parentId of parentIds) {
-      await deliverToParent({
-        db,
-        parentId,
-        notification: buildParentEvaluationNotification({
-          parentId,
-          eventId: decision.eventId,
-          facts: decision.facts,
-          studentName,
-        }),
-        facts: decision.facts,
-        eventId: decision.eventId,
-      });
-    }
   },
 );
+
+export async function handleRecitationRecordWrite(params: {
+  db: admin.firestore.Firestore;
+  recordId: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  sender: PushSender;
+}): Promise<void> {
+  const { db, recordId, before, after, sender } = params;
+
+  const reviewed = decideHomeworkReviewed({ before, after });
+  if (reviewed.notify) {
+    await fanOutHomeworkReviewed({ db, recordId, ...reviewed });
+    return;
+  }
+
+  const decision = decideEvaluationNotification({ recordId, before, after });
+  if (!decision.notify) return;
+
+  const parentIds = await loadParentIds(db, decision.facts.studentId);
+  if (parentIds.length === 0) return;
+
+  const names = await loadStudentNames(db, [decision.facts.studentId]);
+  const studentName = names.get(decision.facts.studentId) ?? "";
+
+  for (const parentId of parentIds) {
+    await deliverToParent({
+      db,
+      parentId,
+      notification: buildParentEvaluationNotification({
+        parentId,
+        eventId: decision.eventId,
+        facts: decision.facts,
+        studentName,
+      }),
+      facts: decision.facts,
+      eventId: decision.eventId,
+      sender,
+    });
+  }
+}
+
+async function fanOutHomeworkReviewed(params: {
+  db: admin.firestore.Firestore;
+  recordId: string;
+  studentId: string;
+  halaqaId: string;
+  grade: string;
+}): Promise<void> {
+  const { db, recordId, studentId, halaqaId, grade } = params;
+  const parentsByStudent = await loadParentIdsByStudent(db, [studentId]);
+  const names = await loadStudentNames(db, [studentId]);
+  const observers = [studentId, ...(parentsByStudent.get(studentId) ?? [])];
+  await writeInAppNotifications(
+    db,
+    observers.map((observerId) =>
+      buildHomeworkReviewedNotification({
+        observerId,
+        recordId,
+        studentId,
+        halaqaId,
+        studentName: names.get(studentId),
+        grade,
+      }),
+    ),
+  );
+}
 
 /** C11.3 step 3 — parent audience from the childrenIds relationship only. */
 async function loadParentIds(
@@ -82,22 +144,8 @@ async function loadParentIds(
   studentId: string,
 ): Promise<string[]> {
   if (studentId === "") return [];
-  const snap = await db
-    .collection(PARENT_PROFILES_COLLECTION)
-    .where("childrenIds", "array-contains", studentId)
-    .get();
-  return snap.docs.map((doc) => doc.id).sort();
-}
-
-/** Display enrichment only — never part of the FCM data payload. */
-async function loadStudentName(
-  db: admin.firestore.Firestore,
-  studentId: string,
-): Promise<string> {
-  if (studentId === "") return "";
-  const snap = await db.collection(USERS_COLLECTION).doc(studentId).get();
-  const name = snap.data()?.name;
-  return typeof name === "string" ? name.trim() : "";
+  const byStudent = await loadParentIdsByStudent(db, [studentId]);
+  return byStudent.get(studentId) ?? [];
 }
 
 async function deliverToParent(params: {
@@ -106,8 +154,9 @@ async function deliverToParent(params: {
   notification: ParentNotification;
   facts: EvaluationFacts;
   eventId: string;
+  sender: PushSender;
 }): Promise<void> {
-  const { db, parentId, notification, facts, eventId } = params;
+  const { db, parentId, notification, facts, eventId, sender } = params;
   assertSafeDataPayload(notification.data);
 
   const notificationRef = db
@@ -124,7 +173,11 @@ async function deliverToParent(params: {
     ]);
 
     const attempt = decideDeliveryAttempt(existingDelivery.data() ?? null);
-    if (!attempt.proceed) return attempt;
+    if (!attempt.proceed) return { ...attempt, sentDeviceIds: [] as string[] };
+    const previouslySent = existingDelivery.data()?.sentDeviceIds;
+    const sentDeviceIds = Array.isArray(previouslySent)
+      ? previouslySent.filter((id): id is string => typeof id === "string")
+      : [];
 
     if (!existingNotification.exists) {
       tx.set(notificationRef, {
@@ -156,17 +209,21 @@ async function deliverToParent(params: {
       { merge: true },
     );
 
-    return attempt;
+    return { ...attempt, sentDeviceIds };
   });
 
   if (!claim.proceed) return;
 
+  // A redelivered event never re-pushes a device that already received it.
+  const alreadySent = new Set(claim.sentDeviceIds);
   const devices = await loadDeviceTokens(db, parentId);
-  const sendable = selectSendableTokens(devices);
+  const sendable = selectSendableTokens(devices).filter(
+    (t) => !alreadySent.has(t.deviceId),
+  );
   if (sendable.length === 0) {
     await deliveryRef.set(
       {
-        status: "no_tokens",
+        status: alreadySent.size > 0 ? "sent" : "no_tokens",
         successCount: 0,
         failureCount: 0,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -176,7 +233,7 @@ async function deliverToParent(params: {
     return;
   }
 
-  const outcomes = await sendPush({
+  const outcomes = await sender({
     notification,
     tokens: sendable,
   });
@@ -188,12 +245,23 @@ async function deliverToParent(params: {
     deviceIds: summary.invalidDeviceIds,
   });
 
+  const delivered = outcomes
+    .filter((o) => o.success)
+    .map((o) => o.deviceId);
+  // Dead tokens are disabled above; only retriable failures keep it open.
+  const status =
+    summary.retriableDeviceIds.length === 0 &&
+    delivered.length + alreadySent.size > 0
+      ? "sent"
+      : summary.status;
+
   await deliveryRef.set(
     {
-      status: summary.status,
+      status,
       successCount: summary.successCount,
       failureCount: summary.failureCount,
       disabledDeviceIds: summary.invalidDeviceIds,
+      sentDeviceIds: [...new Set([...alreadySent, ...delivered])],
       errorCodes: summary.errorCodes,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     },

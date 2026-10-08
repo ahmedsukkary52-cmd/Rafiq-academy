@@ -49,13 +49,14 @@ abstract class DiModule {
 
   /// Sole academy-event publish port (H3 / A-H4).
   ///
-  /// Production story:
-  ///   TeacherRepository → [AcademyEventSink] / [FanOutAcademyEventSink]
-  ///     → [InAppAcademyEventHandler] → composer → upsertSignals
+  /// PH-02 / C11: academy notifications (attendance, homework, activities,
+  /// evaluations) are authored by Cloud Functions from the committed
+  /// Firestore facts — recipients are derived server-side and Firestore
+  /// Rules deny device-authored cards. No client handler is registered;
+  /// [InAppAcademyEventHandler] is retired (kept only as copy reference).
   ///
-  /// Admin ops broadcast is **not** registered here (see A-H15 quarantine).
-  /// Adding FCM later (B-FCM) = add another [AcademyEventHandler], not a second sink.
+  /// Admin ops broadcast is **not** routed here (see A-H15 quarantine).
   @lazySingleton
-  AcademyEventSink academyEventSink(InAppAcademyEventHandler inApp) =>
-      FanOutAcademyEventSink(handlers: [inApp]);
+  AcademyEventSink get academyEventSink =>
+      const FanOutAcademyEventSink(handlers: <AcademyEventHandler>[]);
 }

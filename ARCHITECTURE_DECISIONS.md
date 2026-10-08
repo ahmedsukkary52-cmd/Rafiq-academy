@@ -130,6 +130,13 @@ No alternative resolution strategies should be introduced.
 
 # ADR-006
 
+> **SUPERSEDED (2026-10-07)** by D20 in
+> [`docs/production/PRODUCT_DECISIONS_LOCKED.md`](docs/production/PRODUCT_DECISIONS_LOCKED.md):
+> Storage is in scope for chat media. The paths the code currently uses are
+> defined by `storage.rules`; account enablement is gated by
+> `docs/production/FIREBASE_BILLING_CHECKLIST.md`. Fake uploads remain
+> forbidden. Kept for history.
+
 ## Title
 
 Storage Disabled
@@ -245,6 +252,14 @@ Large architectural changes require explicit approval.
 ---
 
 # ADR-011
+
+> **SUPERSEDED (2026-10-07)** by D1 in
+> [`docs/production/PRODUCT_DECISIONS_LOCKED.md`](docs/production/PRODUCT_DECISIONS_LOCKED.md):
+> there is no public self-registration for any role; accounts are provisioned
+> through an Admin-controlled workflow. D1 leaves the exact provisioning
+> mechanism as Engineering TBD; the code currently calls `adminProvisionUser`,
+> which is an implementation detail, not a locked decision. Kept for history —
+> do not reintroduce student self-registration from this ADR.
 
 ## Title
 

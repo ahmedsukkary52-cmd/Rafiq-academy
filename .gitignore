@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local tooling artifacts
+rules_test/node_modules/
+unit_out.txt
+.cursor/mcp.json

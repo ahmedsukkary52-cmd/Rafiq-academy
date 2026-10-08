@@ -6,10 +6,13 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../domain/content_upload_policy.dart';
 import '../../domain/entities/content_file_entity.dart';
 import '../datasources/content_library_remote_datasource.dart';
 import '../models/content_file_model.dart';
 
+/// Halaqa shared content (P0 §8). Every item belongs to exactly one Halaqa;
+/// there is no academy-wide library.
 @LazySingleton(as: ContentLibraryRemoteDatasource)
 class ContentLibraryRemoteDatasourceImpl
     implements ContentLibraryRemoteDatasource {
@@ -24,37 +27,31 @@ class ContentLibraryRemoteDatasourceImpl
   CollectionReference get _filesRef =>
       firestore.collection(FirestoreCollections.contentLibrary);
 
+  String _requireHalaqa(String? halaqaId) {
+    final id = halaqaId?.trim() ?? '';
+    if (id.isEmpty) {
+      throw const ServerException('المحتوى المشترك متاح داخل الحلقة فقط');
+    }
+    return id;
+  }
+
   @override
   Future<List<ContentFileModel>> getFiles({
     String? halaqaId,
     ContentFileType? filterType,
   }) async {
+    final scoped = _requireHalaqa(halaqaId);
     try {
-      Query query = _filesRef.orderBy('uploadedAt', descending: true);
-
+      Query query = _filesRef.where('halaqaId', isEqualTo: scoped);
       if (filterType != null) {
         query = query.where(
           'type',
           isEqualTo: ContentFileModel.typeToString(filterType),
         );
       }
-
-      if (halaqaId != null) {
-        // جلب ملفات الحلقة + الملفات العامة (halaqaId == null)
-        // بنستخدم نفس حل التقويم: قراءتان ونجمعهم
-        final halaqaSnap = await query
-            .where('halaqaId', isEqualTo: halaqaId)
-            .get();
-        final generalSnap = await query.where('halaqaId', isNull: true).get();
-
-        final all = {...halaqaSnap.docs, ...generalSnap.docs};
-
-        return all.map(ContentFileModel.fromFirestore).toList()
-          ..sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
-      }
-
       final snap = await query.get();
-      return snap.docs.map(ContentFileModel.fromFirestore).toList();
+      return snap.docs.map(ContentFileModel.fromFirestore).toList()
+        ..sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -69,17 +66,33 @@ class ContentLibraryRemoteDatasourceImpl
     required String uploaderName,
     String? halaqaId,
   }) async* {
+    final scoped = _requireHalaqa(halaqaId);
+    final fileName = file.path.split(RegExp(r'[\\/]')).last;
+    final contentType = ContentUploadPolicy.contentTypeFor(fileName);
+    if (contentType == null) {
+      throw const ServerException(
+        'نوع الملف غير مدعوم — المسموح: PDF وصوت وصور ومستندات',
+      );
+    }
+    if (file.lengthSync() > ContentUploadPolicy.maxBytes) {
+      throw const ServerException('حجم الملف أكبر من الحد المسموح (50 ميجا)');
+    }
     try {
-      final ext = file.path.split('.').last;
-      final storagePath =
-          'content/$uploadedBy/${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final storagePath = ContentUploadPolicy.storagePath(
+        halaqaId: scoped,
+        uploadedBy: uploadedBy,
+        fileName: fileName,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      );
       final ref = storage.ref(storagePath);
-      final task = ref.putFile(file);
+      final task = ref.putFile(
+        file,
+        SettableMetadata(contentType: contentType),
+      );
 
-      // نبعت نسبة التقدم للـ Bloc أول بأول
       await for (final snapshot in task.snapshotEvents) {
-        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-        yield progress;
+        final total = snapshot.totalBytes;
+        final progress = total == 0 ? 0.0 : snapshot.bytesTransferred / total;
 
         if (snapshot.state == TaskState.success) {
           final url = await ref.getDownloadURL();
@@ -96,9 +109,12 @@ class ContentLibraryRemoteDatasourceImpl
               uploadedBy: uploadedBy,
               uploaderName: uploaderName,
               uploadedAt: DateTime.now(),
-              halaqaId: halaqaId,
+              halaqaId: scoped,
             ).toFirestore(),
           );
+          yield 1.0;
+        } else {
+          yield progress >= 1.0 ? 0.99 : progress;
         }
       }
     } catch (e) {

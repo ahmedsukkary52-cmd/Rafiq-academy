@@ -8,6 +8,7 @@
 import * as admin from "firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { activeRoleOf } from "../authority/callerContext";
 import { normalizeCairoYmd } from "../billing/cairoTime";
 import { assertBackendAllowed } from "../productionGate";
 import {
@@ -53,14 +54,15 @@ function requireCairoDate(raw: unknown): string {
 }
 
 async function assertCanMaterialize(params: {
+  db: admin.firestore.Firestore;
   uid: string;
   teacherId: string;
 }): Promise<{ role: string; createdBy: string }> {
-  const snap = await admin.firestore().collection("users").doc(params.uid).get();
+  const snap = await params.db.collection("users").doc(params.uid).get();
   if (!snap.exists) {
     throw new HttpsError("permission-denied", "ملف المستخدم غير موجود");
   }
-  const role = snap.data()?.role;
+  const role = activeRoleOf(snap.data());
   if (
     !canCallerMaterialize({
       callerUid: params.uid,
@@ -154,6 +156,20 @@ function mapMaterializeError(err: unknown): never {
   throw new HttpsError("internal", message);
 }
 
+export type MaterializeResult = {
+  sessionId: string;
+  created: boolean;
+  halaqaId: string;
+  slotId: string;
+  date: string;
+  status: string;
+  teacherId: string;
+  supervisorId: string | null;
+  startAtMs: number;
+  endAtMs: number;
+  createdBy: string;
+};
+
 /**
  * Materialize Session occurrence with WA-9 conflict gate.
  * Gated by WA-0 production backend gate.
@@ -169,12 +185,29 @@ export const materializeSession = onCall(
     }
 
     const data = (request.data ?? {}) as MaterializeRequest;
+    // Client roster/staff fields are ignored (authoritative halaqa only).
+    return materializeSessionCore(admin.firestore(), uid, {
+      halaqaId: data.halaqaId,
+      slotId: data.slotId,
+      date: data.date,
+    });
+  },
+);
+
+/**
+ * Shared create-or-reuse core (also used by PH-02 session record callables so
+ * attendance can only ever bind to a real, conflict-checked session).
+ */
+export async function materializeSessionCore(
+  db: admin.firestore.Firestore,
+  uid: string,
+  data: { halaqaId?: unknown; slotId?: unknown; date?: unknown },
+): Promise<MaterializeResult> {
+  {
     const halaqaId = requireString(data.halaqaId, "halaqaId");
     const slotId = requireString(data.slotId, "slotId");
     const date = requireCairoDate(data.date);
-    // Client roster/staff fields are ignored (authoritative halaqa only).
 
-    const db = admin.firestore();
     const halaqaRef = db.collection("halaqat").doc(halaqaId);
     const halaqaSnap = await halaqaRef.get();
     if (!halaqaSnap.exists) {
@@ -188,7 +221,7 @@ export const materializeSession = onCall(
       throw new HttpsError("failed-precondition", "الحلقة بلا معلّم");
     }
 
-    const authz = await assertCanMaterialize({ uid, teacherId });
+    const authz = await assertCanMaterialize({ db, uid, teacherId });
     const requestStudentIds = normalizeStudentIds(halaqaRaw.studentIds);
 
     const identity = { halaqaId, slotId, date };
@@ -198,21 +231,7 @@ export const materializeSession = onCall(
       .collection("sessionConflictLocks")
       .doc(cairoDayConflictLockId(date));
 
-    type TxResult = {
-      sessionId: string;
-      created: boolean;
-      halaqaId: string;
-      slotId: string;
-      date: string;
-      status: string;
-      teacherId: string;
-      supervisorId: string | null;
-      startAtMs: number;
-      endAtMs: number;
-      createdBy: string;
-    };
-
-    let result: TxResult;
+    let result: MaterializeResult;
 
     try {
       result = await db.runTransaction(async (tx) => {
@@ -368,5 +387,5 @@ export const materializeSession = onCall(
     }
 
     return result!;
-  },
-);
+  }
+}

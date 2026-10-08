@@ -644,6 +644,7 @@ Production bar: Waves A, B (sessions), D (if commercial), E (FCM for required no
 - [ ] No drive-by refactors; no EN/theme program (D15)
 - [ ] Jira + screenshots (affected roles; 320-width if layout)
 - [ ] Unit / widget / rules tests as applicable
+- [ ] **Production testing bar (permanent):** before final production release, the product must have appropriate **unit**, **widget**, and **integration** coverage. Integration tests must cover critical user journeys (auth/provisioning, payment proof + access/suspension, admission/assignment, halaqa session attendance/evaluation, teacher/supervisor/student/admin cores, chat, notifications/FCM)—not only isolated widgets. Add focused unit/widget tests with each feature wave; defer full journey integration suite to the final testing/production closure phase.
 - [ ] Indexes updated if queries changed
 - [ ] `firebase.json` not wiring **open** rules
 - [ ] Paymob/wallet not reintroduced (D2)

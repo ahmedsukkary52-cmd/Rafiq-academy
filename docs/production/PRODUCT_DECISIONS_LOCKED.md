@@ -73,6 +73,13 @@ These decisions supersede open questions in `FULL_PRODUCT_AUDIT.md` §8 and the 
 - Student must be **Present** or **Late**.
 - **Absent** cannot be evaluated for that session.
 
+### D7.1 — Evaluation edit / correction (PH-02 closure, B1 / B2)
+
+- **Teacher** of the Halaqa creates the evaluation and may edit/correct it for **24 hours** after it was first created. The anchor is the server-set `recitationRecords.createdAt`, written once on creation; client clocks and request fields never move it. From 24h on, the Teacher is denied server-side.
+- **Admin** may create or correct an evaluation at any time, including after the Teacher window closes, under the same real-session / roster / Present-Late gates.
+- **Supervisor** reviews (reads) evaluations of supervised Halaqat; Supervisor does **not** create, edit or correct evaluations.
+- Every evaluation create/correction is audited (`evaluation_create_or_correct`). The audit never contains grades or notes.
+
 ## D8 — Halaqa Creation
 
 - Production Halaqa creation requires **≥1 Schedule Slot**.
@@ -108,6 +115,7 @@ These decisions supersede open questions in `FULL_PRODUCT_AUDIT.md` §8 and the 
 
 - Every Evaluation is typed **memorization** or **revision**.
 - Every Evaluation stores the real **`versesRange`**.
+  - **Open follow-up (not part of PH-02):** the live Teacher evaluation flow does not collect a range today (the Teacher UI deliberately omits it, so stored `versesRange` is `""`). The source and format of the range — free text, surah + ayah span, page, or derived from the assignment — are not defined by any locked contract. It must be decided together with the Wave C progress projector; nothing was invented.
 - Do not mix revision into memorization percentage.
 - Do not label memorization % as «دقة الحفظ».
 
@@ -289,3 +297,37 @@ Admin monitoring (D13) — intentional overlay; not a substitute for D14
 | D19 + D20 → billing | Yes — `FIREBASE_BILLING_CHECKLIST.md` |
 | D18 profile-centric | Yes |
 | D24 non-SSOT | Yes |
+| P0 wave decisions (P1–P10) | Yes — section below |
+
+---
+
+## P0 completion wave — locked decisions (2026-10-04)
+
+Implementation and evidence: `P0_COMPLETION_REPORT.md`.
+
+- **P1 — Homework rewards.** The server owns the reward. Recitation is not a required task while `audioUploadsEnabled` is false. The `homeworkRewards/{assignmentId}` marker, written in the same transaction as the credit, means a homework is never paid twice. The client only displays `awardedCoins`.
+- **P2 — Points quarantine.** Nothing credits `points` any more (homework included). The field is kept. Coins, points and `totalStars` stay separate.
+- **P3 — Supervisor awards.** `grantAward` keeps its scope and only increments `totalStars`.
+- **P4 — Audio Library.** It is a separate feature from the Mushaf and is reachable from the Student profile tab. The player singleton is never disposed by a page Bloc. Listening progress is one document per `{uid}_{surahAudioId}`.
+- **P5 — Messaging.** Halaqa groups contain the Teacher, Supervisor and Students (no Parents, no Admin). Parents use authorized 1:1 chats. Admin monitoring is not membership.
+- **P6 — Posts.** Every new post targets exactly one Halaqa (`audienceTarget` = halaqaId). There is no academy-wide feed. Legacy `audienceTarget: 'all'` posts are visible to Admin only.
+- **P7 — Shared Content.** Content is scoped to one Halaqa. Storage lives at `content_library/{halaqaId}/{uploaderUid}/…`, and the legacy `content/` path is read/delete only. Allowed files are PDF, audio, images and Word documents, up to 50 MB. The 50 MB cap is an engineering default, not a plan limit.
+- **P8 — Halaqa plan («خطة الحلقة»).** It is a read-only projection of the student's lesson homework (`newMemorizationRange` and `reviewRange`, plus `isSubmitted`). The start point is the earliest recorded assignment. It shows no percentages and does not parse `versesRange`. The Mushaf last-read position is not progress.
+- **P9 — Halaqa creation and roster.** These go through callables only: `adminCreateHalaqa`, `adminAddHalaqaSlot`, `admitStudentToHalaqa` and `adminTransferStudent`. A client may edit only the non-conflict fields `name`, `supervisorId` and `meetingLink`. `teacherId`, `schedule` and `studentIds` are frozen for clients.
+- **P10 — Notification deep links.** Destinations are deterministic by type and role. Payloads carry the type only, and the role allowlist is re-checked on open. A type with no destination for the role shows «هذا الإشعار لا يرتبط بصفحة متاحة لحسابك».
+
+### Deferred (documented, not implemented)
+
+- **Points / game contract:** no mini-games and no external game API.
+- **Halaqa-level plan contract:** a declared start, target and portions per track. A `versesRange` grammar is a prerequisite for any percentage.
+- **Shared Content plan-limit contract:** paid-plan entitlement and per-plan storage limits. There is no pricing.
+- **Teacher reassignment callable:** needs a conflict check. `teacherId` stays client-frozen until it exists.
+- **Supervisor payment review for non-primary students:** proofs are listed only for students whose current Halaqa the Supervisor supervises.
+- **Other deferred items:**
+  - Supervisor evaluation correction.
+  - D12 expansion.
+  - Parent–child unlink policy (the callable supports unlinking; the policy on side effects is open).
+  - An Admin award screen.
+  - Supervisor schedule editing.
+  - Audit retention.
+  - Server-sent target IDs in notification payloads.

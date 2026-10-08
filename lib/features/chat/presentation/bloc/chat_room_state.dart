@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/entities/chat_entities.dart';
+import '../../domain/policies/chat_media_policy.dart';
 
 class _Unset {
   const _Unset();
@@ -9,30 +10,124 @@ class _Unset {
 
 const _unset = _Unset();
 
+enum ChatOutgoingStatus { uploading, sending, sent, failed }
+
+/// A message the user sent that the server has not confirmed in the stream
+/// yet. [messageId] is fixed at creation so retries are idempotent.
+class ChatOutgoingMessage extends Equatable {
+  final String messageId;
+  final ChatMessageType type;
+  final String text;
+  final ChatAttachmentDraft? attachment;
+
+  /// Set once the Storage upload completed; retries then only re-send.
+  final String? uploadedPath;
+  final double progress;
+  final ChatOutgoingStatus status;
+  final String? error;
+  final DateTime createdAt;
+
+  const ChatOutgoingMessage({
+    required this.messageId,
+    required this.type,
+    required this.text,
+    this.attachment,
+    this.uploadedPath,
+    this.progress = 0,
+    required this.status,
+    this.error,
+    required this.createdAt,
+  });
+
+  bool get canRetry => status == ChatOutgoingStatus.failed;
+  bool get canCancel =>
+      status == ChatOutgoingStatus.uploading ||
+      status == ChatOutgoingStatus.failed;
+
+  ChatOutgoingMessage copyWith({
+    Object? uploadedPath = _unset,
+    double? progress,
+    ChatOutgoingStatus? status,
+    Object? error = _unset,
+  }) {
+    return ChatOutgoingMessage(
+      messageId: messageId,
+      type: type,
+      text: text,
+      attachment: attachment,
+      uploadedPath: identical(uploadedPath, _unset)
+          ? this.uploadedPath
+          : uploadedPath as String?,
+      progress: progress ?? this.progress,
+      status: status ?? this.status,
+      error: identical(error, _unset) ? this.error : error as String?,
+      createdAt: createdAt,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    messageId,
+    type,
+    text,
+    attachment,
+    uploadedPath,
+    progress,
+    status,
+    error,
+    createdAt,
+  ];
+}
+
 class ChatRoomState extends Equatable {
+  static const int pageSize = 30;
+
   final SectionStatus messagesStatus;
   final List<MessageEntity> messages;
   final String? messagesError;
 
-  final SubmissionStatus sendStatus;
-  final String? sendError;
+  /// Current listener window (grows by [pageSize] on "load older").
+  final int limit;
+  final bool loadingOlder;
+
+  final List<ChatOutgoingMessage> outbox;
+
+  /// Edit / delete / validation feedback (one-shot banner).
+  final String? actionError;
+  final bool actionInProgress;
 
   const ChatRoomState({
     this.messagesStatus = SectionStatus.initial,
     this.messages = const [],
     this.messagesError,
-    this.sendStatus = SubmissionStatus.idle,
-    this.sendError,
+    this.limit = pageSize,
+    this.loadingOlder = false,
+    this.outbox = const [],
+    this.actionError,
+    this.actionInProgress = false,
   });
 
   factory ChatRoomState.initial() => const ChatRoomState();
+
+  /// The listener returned a full window, so older messages may exist.
+  bool get hasMore => messages.length >= limit;
+
+  /// Outbox entries not yet visible in the server stream (dedupe by id).
+  List<ChatOutgoingMessage> get pendingOutbox {
+    if (outbox.isEmpty) return const [];
+    final ids = {for (final m in messages) m.id};
+    return outbox.where((o) => !ids.contains(o.messageId)).toList();
+  }
 
   ChatRoomState copyWith({
     SectionStatus? messagesStatus,
     List<MessageEntity>? messages,
     Object? messagesError = _unset,
-    SubmissionStatus? sendStatus,
-    Object? sendError = _unset,
+    int? limit,
+    bool? loadingOlder,
+    List<ChatOutgoingMessage>? outbox,
+    Object? actionError = _unset,
+    bool? actionInProgress,
   }) {
     return ChatRoomState(
       messagesStatus: messagesStatus ?? this.messagesStatus,
@@ -40,13 +135,25 @@ class ChatRoomState extends Equatable {
       messagesError: identical(messagesError, _unset)
           ? this.messagesError
           : messagesError as String?,
-      sendStatus: sendStatus ?? this.sendStatus,
-      sendError:
-      identical(sendError, _unset) ? this.sendError : sendError as String?,
+      limit: limit ?? this.limit,
+      loadingOlder: loadingOlder ?? this.loadingOlder,
+      outbox: outbox ?? this.outbox,
+      actionError: identical(actionError, _unset)
+          ? this.actionError
+          : actionError as String?,
+      actionInProgress: actionInProgress ?? this.actionInProgress,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [messagesStatus, messages, messagesError, sendStatus, sendError];
+  List<Object?> get props => [
+    messagesStatus,
+    messages,
+    messagesError,
+    limit,
+    loadingOlder,
+    outbox,
+    actionError,
+    actionInProgress,
+  ];
 }

@@ -10,6 +10,11 @@ import '../models/audio_models.dart';
 import 'audio_library_remote_datasource.dart';
 import 'mp3quran_catalog_service.dart';
 
+/// One progress document per (user, surah audio) so periodic saves update in
+/// place instead of appending a new document each time.
+String listeningProgressDocId(String userId, String surahAudioId) =>
+    '${userId}_$surahAudioId'.replaceAll('/', '_');
+
 @LazySingleton(as: AudioLibraryRemoteDatasource)
 class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
   final FirebaseFirestore firestore;
@@ -188,13 +193,12 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
   @override
   Future<void> saveListeningProgress(ListeningProgressModel progress) async {
     try {
-      if (progress.id.isEmpty) {
-        await _listeningProgressRef.add(progress.toFirestore());
-      } else {
-        await _listeningProgressRef
-            .doc(progress.id)
-            .set(progress.toFirestore(), SetOptions(merge: true));
-      }
+      final docId = progress.id.isNotEmpty
+          ? progress.id
+          : listeningProgressDocId(progress.userId, progress.surahAudioId);
+      await _listeningProgressRef
+          .doc(docId)
+          .set(progress.toFirestore(), SetOptions(merge: true));
     } catch (e) {
       throw ServerException(e.toString());
     }

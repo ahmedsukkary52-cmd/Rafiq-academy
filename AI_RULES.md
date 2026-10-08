@@ -179,6 +179,14 @@ Avoid duplicate collections representing the same business concept.
 
 # 8. Firebase Storage
 
+> **SUPERSEDED (2026-10-07).** Storage is in scope for chat media — see D20 in
+> [`docs/production/PRODUCT_DECISIONS_LOCKED.md`](docs/production/PRODUCT_DECISIONS_LOCKED.md).
+> The paths the code currently uses are defined by `storage.rules`.
+> Enabling it on the academy Firebase account is gated by
+> `docs/production/FIREBASE_BILLING_CHECKLIST.md`. The "never fake an upload"
+> rule below still applies. `docs/production/*` is the source of truth where
+> this file disagrees.
+
 Firebase Storage is currently disabled.
 
 Never implement fake upload logic.

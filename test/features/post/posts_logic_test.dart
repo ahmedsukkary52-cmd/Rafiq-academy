@@ -80,13 +80,13 @@ class _FakePostsRepository implements PostsRepository {
 
 void main() {
   group('resolvePostAudienceTarget', () {
-    test('maps allHalaqat to all', () {
+    test('rejects academy-wide allHalaqat (posts are Halaqa-scoped)', () {
       expect(
         resolvePostAudienceTarget(
           audience: PostAudience.allHalaqat,
           halaqaId: 'h1',
         ),
-        'all',
+        isNull,
       );
     });
 
@@ -179,7 +179,7 @@ void main() {
       expect(repo.created.single.audience, PostAudience.specificHalaqa);
     });
 
-    test('allows allHalaqat without inventing a fake halaqa target', () async {
+    test('rejects academy-wide allHalaqat posts', () async {
       final result = await useCase(
         const CreatePostParams(
           authorId: 't1',
@@ -189,9 +189,8 @@ void main() {
           audience: PostAudience.allHalaqat,
         ),
       );
-      expect(result, const Right(unit));
-      expect(repo.created.single.audience, PostAudience.allHalaqat);
-      expect(repo.created.single.halaqaId, 'h-class');
+      expect(result.isLeft(), isTrue);
+      expect(repo.created, isEmpty);
     });
   });
 
@@ -308,12 +307,12 @@ void main() {
       expect(repo.created.single.halaqaId, 'h1');
 
       // Simulate Firestore stream refresh after create.
-      repo.controllerFor('h1').add(
-        Right([_post(id: 'new', halaqaId: 'h1', content: 'منشور جديد')]),
-      );
-      await bloc.stream.firstWhere(
-        (s) => s.posts.any((p) => p.id == 'new'),
-      );
+      repo
+          .controllerFor('h1')
+          .add(
+            Right([_post(id: 'new', halaqaId: 'h1', content: 'منشور جديد')]),
+          );
+      await bloc.stream.firstWhere((s) => s.posts.any((p) => p.id == 'new'));
     });
 
     test('create fails when specific halaqa id is missing', () async {

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -13,6 +15,7 @@ import '../../domain/entities/notification_entity.dart';
 import '../../presentation/bloc/notifications_bloc.dart';
 import '../../presentation/bloc/notifications_event.dart';
 import '../../presentation/bloc/notifications_state.dart';
+import '../notification_deep_links.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -52,12 +55,9 @@ class NotificationsPage extends StatelessWidget {
                         ],
                       ),
                       child: Center(
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back_ios,
-                            color: AppColors.textPrimary,
-                            size: 18,
-                          ),
+                        child: AppBackButton(
+                          color: AppColors.textPrimary,
+                          iconSize: 22,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
@@ -166,6 +166,7 @@ class NotificationsPage extends StatelessWidget {
                                   MarkNotificationAsReadEvent(notif.id),
                                 );
                               }
+                              _open(context, notif);
                             },
                           ),
                         );
@@ -179,6 +180,21 @@ class NotificationsPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _open(BuildContext context, NotificationEntity notif) {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) return;
+    final destination = NotificationDeepLinks.resolve(
+      type: notif.type,
+      role: auth.user.role,
+    );
+    final route = destination.route;
+    if (route != null) {
+      context.push(route);
+    } else if (destination.unavailableMessage != null) {
+      AppSnackBar.showInfo(context, destination.unavailableMessage!);
+    }
   }
 
   /// بترجع list فيها String (header) أو NotificationEntity

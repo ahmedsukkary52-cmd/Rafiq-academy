@@ -128,6 +128,8 @@ class AttendancePolicy {
   /// Whether a stored row belongs to the operational [sessionId].
   ///
   /// Prefers stored `sessionId`; legacy rows fall back to date-derived id.
+  /// C6 dual-read: a row bound to a real `sessions/{id}` (server-written)
+  /// still belongs to the legacy day key of the same halaqa and day.
   static bool belongsToSession({
     required String? recordSessionId,
     required String recordHalaqaId,
@@ -136,10 +138,16 @@ class AttendancePolicy {
     required String halaqaId,
   }) {
     if (recordHalaqaId.trim() != halaqaId.trim()) return false;
+    final target = sessionId.trim();
     final stored = recordSessionId?.trim() ?? '';
-    if (stored.isNotEmpty) return stored == sessionId.trim();
-    return sessionIdForDay(halaqaId: recordHalaqaId, day: recordDate) ==
-        sessionId.trim();
+    if (stored == target) return true;
+    final dayKey = sessionIdForDay(halaqaId: recordHalaqaId, day: recordDate);
+    if (stored.isEmpty) return dayKey == target;
+    if (!isLegacySyntheticSessionId(stored) &&
+        isLegacySyntheticSessionId(target)) {
+      return dayKey == target;
+    }
+    return false;
   }
 
   /// Register is editable until the operational session closes.
@@ -183,8 +191,8 @@ class AttendancePolicy {
         recordSessionId: mark.sessionId,
         recordHalaqaId: mark.halaqaId,
         recordDate: mark.date,
-        sessionId: sessionId ??
-            sessionIdForDay(halaqaId: halaqaId, day: sessionDate),
+        sessionId:
+            sessionId ?? sessionIdForDay(halaqaId: halaqaId, day: sessionDate),
         halaqaId: halaqaId,
       )) {
         continue;

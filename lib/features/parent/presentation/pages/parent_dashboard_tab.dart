@@ -5,6 +5,9 @@ import 'package:hijri/hijri_calendar.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_quick_action_grid.dart';
+import '../../../../shared/widgets/app_stat_tile.dart';
+import '../../../../shared/widgets/app_status_chip.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -20,6 +23,7 @@ import '../parent_display.dart';
 import '../parent_home_nav.dart';
 import '../parent_supervisor_chat.dart';
 import '../widgets/parent_loading_skeletons.dart';
+import '../widgets/parent_payment_access_banner.dart';
 import '../widgets/parent_user_avatar.dart';
 
 class ParentDashboardTab extends StatefulWidget {
@@ -65,7 +69,8 @@ class _ParentDashboardTabState extends State<ParentDashboardTab>
           p.selectedChildId != c.selectedChildId ||
           p.childrenSnapshots != c.childrenSnapshots ||
           p.alerts != c.alerts ||
-          p.familySummary != c.familySummary,
+          p.familySummary != c.familySummary ||
+          p.paymentAccess != c.paymentAccess,
       builder: (context, state) {
         final loading =
             state.childrenStatus == SectionStatus.initial ||
@@ -163,6 +168,14 @@ class _DashboardBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (ParentPaymentAccessLabels.shouldSurface(state.paymentAccess)) ...[
+            ParentPaymentAccessBanner(
+              access: state.paymentAccess!,
+              onPayNow: () => onSwitchTab(ParentHomeNav.storeIndex),
+              onContactAdmin: () => onSwitchTab(ParentHomeNav.messagesIndex),
+            ),
+            const SizedBox(height: 12),
+          ],
           const _QuickActionsCard(),
           const SizedBox(height: 8),
           _SectionTitle(
@@ -301,18 +314,10 @@ class _ParentHomeHeader extends StatelessWidget {
                   bloc: sl<NotificationsBloc>(),
                   selector: (s) => s.unreadCount,
                   builder: (context, unread) {
-                    return Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _HeaderSquareButton(
-                            icon: Icons.notifications_outlined,
-                            showDot: unread > 0,
-                            onTap: onNotifications,
-                          ),
-                        ],
-                      ),
+                    return _HeaderSquareButton(
+                      icon: Icons.notifications_outlined,
+                      showDot: unread > 0,
+                      onTap: onNotifications,
                     );
                   },
                 ),
@@ -344,7 +349,7 @@ class _ParentHomeHeader extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Align(
-              alignment: Alignment.centerRight,
+              alignment: AlignmentDirectional.centerEnd,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -423,109 +428,63 @@ class _QuickActionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <_QuickAction>[
-      _QuickAction(
-        icon: Icons.assessment_outlined,
-        color: AppColors.success,
-        label: 'التقارير',
-        onTap: () => ParentDestinations.reports(context),
-      ),
-      _QuickAction(
-        icon: Icons.calendar_month_outlined,
-        color: AppColors.info,
-        label: 'الجدول',
-        onTap: () => ParentDestinations.schedule(context),
-      ),
-      _QuickAction(
-        icon: Icons.notifications_outlined,
-        color: const Color(0xFFE53935),
-        label: 'الإشعارات',
-        onTap: () => ParentDestinations.notifications(context),
-      ),
-      _QuickAction(
-        icon: Icons.fact_check_outlined,
-        color: AppColors.primary,
-        label: 'الحضور',
-        onTap: () => _openNeedsChild(context, ParentDestinations.attendance),
-      ),
-      _QuickAction(
-        icon: Icons.grade_outlined,
-        color: AppColors.secondary,
-        label: 'التقييمات',
-        onTap: () => _openNeedsChild(context, ParentDestinations.evaluations),
-      ),
-      _QuickAction(
-        icon: Icons.emoji_events_outlined,
-        color: AppColors.awardWeekly,
-        label: 'الإنجازات',
-        onTap: () => ParentDestinations.achievements(context),
-      ),
-    ];
-
-    return Material(
-      color: AppColors.surface,
-      elevation: 0,
-      borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.softShadow,
-              blurRadius: 18,
-              offset: Offset(0, 8),
-            ),
-          ],
+    return AppQuickActionGrid(
+      items: [
+        AppQuickActionItem(
+          icon: Icons.assessment_outlined,
+          color: AppColors.success,
+          label: 'التقارير',
+          onTap: () => ParentDestinations.reports(context),
         ),
-        child: GridView.count(
-          padding: EdgeInsets.zero,
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 4,
-          childAspectRatio: 1.05,
-          children: [
-            for (final item in items)
-              InkWell(
-                onTap: item.onTap,
-                borderRadius: BorderRadius.circular(AppSizes.radiusL),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: item.color.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(item.icon, color: item.color, size: 24),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+        AppQuickActionItem(
+          icon: Icons.calendar_month_outlined,
+          color: AppColors.info,
+          label: 'الجدول',
+          onTap: () => ParentDestinations.schedule(context),
         ),
-      ),
+        AppQuickActionItem(
+          icon: Icons.notifications_outlined,
+          color: const Color(0xFFE53935),
+          label: 'الإشعارات',
+          onTap: () => ParentDestinations.notifications(context),
+        ),
+        AppQuickActionItem(
+          icon: Icons.fact_check_outlined,
+          color: AppColors.primary,
+          label: 'الحضور',
+          onTap: () => _openNeedsChild(context, ParentDestinations.attendance),
+        ),
+        AppQuickActionItem(
+          icon: Icons.grade_outlined,
+          color: AppColors.secondary,
+          label: 'التقييمات',
+          onTap: () => _openNeedsChild(context, ParentDestinations.evaluations),
+        ),
+        AppQuickActionItem(
+          icon: Icons.emoji_events_outlined,
+          color: AppColors.awardWeekly,
+          label: 'الإنجازات',
+          onTap: () => ParentDestinations.achievements(context),
+        ),
+        AppQuickActionItem(
+          icon: Icons.folder_open_rounded,
+          color: AppColors.primaryDark,
+          label: 'محتوى الحلقة',
+          onTap: () => _openNeedsChild(context, (
+            context, {
+            required studentId,
+            studentName,
+          }) {
+            final snapshot = context.read<ParentBloc>().state.snapshotFor(
+              studentId,
+            );
+            return ParentDestinations.sharedContent(
+              context,
+              halaqaId: snapshot?.halaqaId,
+            );
+          }),
+        ),
+      ],
     );
   }
 
@@ -552,20 +511,6 @@ class _QuickActionsCard extends StatelessWidget {
     }
     open(context, studentId: id, studentName: state.childDisplayName(id));
   }
-}
-
-class _QuickAction {
-  final IconData icon;
-  final Color color;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickAction({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.onTap,
-  });
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -860,20 +805,41 @@ class _ChildFollowUpCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              _StatusChip(
+              AppStatusChip(
                 label: child.isAtRisk ? 'يحتاج متابعة' : 'متابعة جيدة',
-                color: child.isAtRisk ? AppColors.warning : AppColors.success,
+                tone: child.isAtRisk
+                    ? AppStatusTone.warning
+                    : AppStatusTone.success,
+                maxWidth: 96,
               ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              _MiniStat(value: progress, label: 'أداء'),
+              Expanded(
+                child: AppStatTile(
+                  value: progress,
+                  label: 'أداء',
+                  variant: AppStatTileVariant.compact,
+                ),
+              ),
               const SizedBox(width: 6),
-              _MiniStat(value: attendancePct, label: 'حضور'),
+              Expanded(
+                child: AppStatTile(
+                  value: attendancePct,
+                  label: 'حضور',
+                  variant: AppStatTileVariant.compact,
+                ),
+              ),
               const SizedBox(width: 6),
-              _MiniStat(value: attendance, label: 'اليوم'),
+              Expanded(
+                child: AppStatTile(
+                  value: attendance,
+                  label: 'اليوم',
+                  variant: AppStatTileVariant.compact,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1007,78 +973,6 @@ class _ChildFollowUpCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 96),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: AppTextStyles.labelSmall.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 10,
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _MiniStat({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceGrey,
-          borderRadius: BorderRadius.circular(AppSizes.radiusM),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
-            ),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textHint,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

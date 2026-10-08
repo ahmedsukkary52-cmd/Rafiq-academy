@@ -66,24 +66,16 @@ class CreatePostUseCase extends UseCase<Unit, CreatePostParams> {
     );
     if (audienceTarget == null) {
       return Future.value(
-        const Left(
-          ValidationFailure('يجب تحديد الحلقة قبل نشر منشور خاص بها'),
-        ),
+        const Left(ValidationFailure('يجب تحديد الحلقة قبل نشر منشور خاص بها')),
       );
     }
-
-    final scopedHalaqaId = params.audience == PostAudience.allHalaqat
-        ? params.halaqaId?.trim()
-        : audienceTarget;
 
     return repository.createPost(
       authorId: params.authorId,
       authorName: params.authorName,
       content: params.content.trim(),
-      halaqaId: scopedHalaqaId == null || scopedHalaqaId.isEmpty
-          ? null
-          : scopedHalaqaId,
-      audience: params.audience,
+      halaqaId: audienceTarget,
+      audience: PostAudience.specificHalaqa,
       attachmentFiles: params.attachmentFiles,
       attachmentTypes: params.attachmentTypes,
     );

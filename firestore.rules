@@ -21,10 +21,16 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
-    function hasRole(role) {
+    // A deactivated profile (isActive == false) holds no role: a valid Auth
+    // token alone never grants privileges. Missing isActive = legacy active.
+    function hasActiveProfile() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(uid()))
-        && userDoc().role == role;
+        && userDoc().get('isActive', true) != false;
+    }
+
+    function hasRole(role) {
+      return hasActiveProfile() && userDoc().role == role;
     }
 
     function isAdmin() {
@@ -59,6 +65,128 @@ service cloud.firestore {
         || request.resource.data.isActive == resource.data.isActive;
     }
 
+    function isTeacher() {
+      return hasRole('teacher');
+    }
+
+    function isStaffRole() {
+      return isTeacher() || isSupervisor();
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ── PH-01 relationship helpers (server-side scope, never client claims) ──
+    // Roster SSOT is halaqat.studentIds; teacher/supervisor SSOT is
+    // halaqat.teacherId / halaqat.supervisorId.
+    function halaqaPath(halaqaId) {
+      return /databases/$(database)/documents/halaqat/$(halaqaId);
+    }
+
+    function halaqaExists(halaqaId) {
+      return halaqaId is string
+        && halaqaId.size() > 0
+        && exists(halaqaPath(halaqaId));
+    }
+
+    function halaqaData(halaqaId) {
+      return get(halaqaPath(halaqaId)).data;
+    }
+
+    function isTeacherOfHalaqa(halaqaId) {
+      return signedIn()
+        && halaqaExists(halaqaId)
+        && halaqaData(halaqaId).get('teacherId', '') == uid();
+    }
+
+    function isSupervisorOfHalaqa(halaqaId) {
+      return signedIn()
+        && halaqaExists(halaqaId)
+        && halaqaData(halaqaId).get('supervisorId', '') == uid();
+    }
+
+    function isStaffOfHalaqa(halaqaId) {
+      return isTeacherOfHalaqa(halaqaId) || isSupervisorOfHalaqa(halaqaId);
+    }
+
+    function isStudentOnRoster(halaqaId, studentId) {
+      return halaqaExists(halaqaId)
+        && studentId is string
+        && studentId in halaqaData(halaqaId).get('studentIds', []);
+    }
+
+    /// D12: linkage comes from parentProfiles.childrenIds (CF/Admin written).
+    function isLinkedParentOf(studentId) {
+      return isParent()
+        && exists(/databases/$(database)/documents/parentProfiles/$(uid()))
+        && studentId in get(
+          /databases/$(database)/documents/parentProfiles/$(uid())
+        ).data.get('childrenIds', []);
+    }
+
+    /// C13: roster-derived, CF-maintained staff scope across every halaqa the
+    /// student belongs to (covers the second halaqa, unlike the UI pointer).
+    function isRosterStaffOf(studentId) {
+      return signedIn()
+        && studentId is string
+        && exists(/databases/$(database)/documents/studentSearch/$(studentId))
+        && uid() in get(
+          /databases/$(database)/documents/studentSearch/$(studentId)
+        ).data.get('visibleTo', []);
+    }
+
+    /// The studentProfiles.halaqaId pointer only selects which halaqa to check;
+    /// authority still comes from that halaqa's roster.
+    function primaryHalaqaOf(studentId) {
+      return exists(/databases/$(database)/documents/studentProfiles/$(studentId))
+        ? get(/databases/$(database)/documents/studentProfiles/$(studentId))
+            .data.get('halaqaId', '')
+        : '';
+    }
+
+    function isSupervisorOfStudent(studentId) {
+      return isSupervisorOfHalaqa(primaryHalaqaOf(studentId))
+        && isStudentOnRoster(primaryHalaqaOf(studentId), studentId);
+    }
+
+    function isStaffOfStudentPrimary(studentId) {
+      return isStaffOfHalaqa(primaryHalaqaOf(studentId))
+        && isStudentOnRoster(primaryHalaqaOf(studentId), studentId);
+    }
+
+    /// Operational student records (attendance / evaluations / homework):
+    /// Admin, the student, a linked parent, or staff of the record's halaqa
+    /// (or roster-derived staff scope for cross-halaqa student views).
+    function canReadStudentRecord(data) {
+      return isAdmin()
+        || (signedIn() && data.studentId == uid())
+        || isStaffOfHalaqa(data.halaqaId)
+        || isLinkedParentOf(data.studentId)
+        || isRosterStaffOf(data.studentId);
+    }
+
+    /// P0 messaging/content contract: a Parent belongs to a Halaqa community
+    /// when at least one linked child (D12 childrenIds) is on its roster.
+    function isLinkedParentOfHalaqa(halaqaId) {
+      return isParent()
+        && halaqaExists(halaqaId)
+        && exists(/databases/$(database)/documents/parentProfiles/$(uid()))
+        && get(/databases/$(database)/documents/parentProfiles/$(uid()))
+            .data.get('childrenIds', [])
+            .hasAny(halaqaData(halaqaId).get('studentIds', []));
+    }
+
+    /// Halaqa-scoped community audience (posts, shared content library):
+    /// Admin (global oversight), the Halaqa's Teacher/Supervisor, rostered
+    /// Students and Parents of rostered Students. Never another Halaqa.
+    function canAccessHalaqaCommunity(halaqaId) {
+      return isAdmin()
+        || isStaffOfHalaqa(halaqaId)
+        || (signedIn() && isStudentOnRoster(halaqaId, uid()))
+        || isLinkedParentOfHalaqa(halaqaId);
+    }
+
     // ── users (identity; phone must live in userPrivate) ───────────────
     match /users/{userId} {
       allow get: if signedIn() && (
@@ -67,9 +195,14 @@ service cloud.firestore {
         || !hasExposedPhone(resource.data)
       );
 
+      // §16.3: Student/Parent never scan the directory; they may only list
+      // Admin contact cards (Parent "contact Admin"). Staff keep roster lists.
       allow list: if signedIn() && (
         isAdmin()
-        || !hasExposedPhone(resource.data)
+        || (
+          !hasExposedPhone(resource.data)
+          && (isStaffRole() || resource.data.role == 'admin')
+        )
       );
 
       allow create: if false;
@@ -81,7 +214,7 @@ service cloud.firestore {
           && roleUnchanged()
           && isActiveUnchanged()
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'isActive', 'phone', 'createdAt'])
+              .hasAny(['role', 'isActive', 'phone', 'createdAt', 'lifecycle'])
           && !hasExposedPhone(request.resource.data)
         )
         || (
@@ -99,17 +232,38 @@ service cloud.firestore {
     }
 
     // ── Profiles ───────────────────────────────────────────────────────
+    // childrenIds is the D12 relationship graph: parents and students never
+    // list other families' links. PH-02 moved academy fan-out to CFs; the
+    // remaining Teacher/Supervisor read serves teacher→parent contact (the
+    // doc carries no phone — D16).
     match /parentProfiles/{parentId} {
-      allow read: if signedIn();
+      allow read: if isAdmin() || isSelf(parentId) || isStaffRole();
       allow create, delete: if false;
-      allow update: if signedIn()
+      allow update: if (isSelf(parentId) || isAdmin())
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['childrenIds', 'phone'])
         && !hasExposedPhone(request.resource.data);
     }
 
     match /studentProfiles/{studentId} {
-      allow read: if signedIn();
+      // PH-02 server-owned fields: membership pointer (admitStudentToHalaqa /
+      // adminTransferStudent), the coin economy (completeHomework /
+      // purchaseAvatar) and award counters (grantAward / completeHomework).
+      // No client — not even Admin — writes them directly.
+      function serverOwnedProfileFields() {
+        return [
+          'halaqaId', 'coins', 'unlockedAvatarIds', 'avatarId',
+          'lastCompletedHomeworkId', 'points', 'totalStars'
+        ];
+      }
+
+      // Student A never reads student B unless they share B's primary halaqa
+      // roster (group chat display names). Staff roles keep directory reads.
+      allow read: if isAdmin()
+        || isStaffRole()
+        || isSelf(studentId)
+        || isLinkedParentOf(studentId)
+        || isStudentOnRoster(resource.data.get('halaqaId', ''), uid());
       allow create: if false;
       allow delete: if false;
       // D16: never allow phone on profile projections via client writes.
@@ -119,7 +273,25 @@ service cloud.firestore {
       allow update: if signedIn()
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['phone', 'lifecycle'])
-        && !hasExposedPhone(request.resource.data);
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(serverOwnedProfileFields())
+        && !hasExposedPhone(request.resource.data)
+        && isAdmin();
+    }
+
+    // C15 / D23 — Mushaf last-read (own R/W; not memorization progress)
+    match /mushafReading/{studentId} {
+      allow read: if isSelf(studentId) || isAdmin();
+      allow create, update: if isSelf(studentId)
+        && request.resource.data.keys().hasOnly([
+          'surahNumber', 'ayahNumber', 'pageNumber', 'updatedAt', 'visualMode'
+        ])
+        && request.resource.data.surahNumber is int
+        && request.resource.data.ayahNumber is int
+        && request.resource.data.pageNumber is int
+        && request.resource.data.pageNumber >= 1
+        && request.resource.data.pageNumber <= 604;
+      allow delete: if false;
     }
 
     match /teacherProfiles/{teacherId} {
@@ -127,7 +299,15 @@ service cloud.firestore {
       allow create: if false;
       allow delete: if false;
       allow update: if signedIn()
-        && (isAdmin() || isSelf(teacherId))
+        && (
+          isAdmin()
+          || (
+            isSelf(teacherId)
+            && !changedKeys().hasAny([
+              'performanceRating', 'weeklyQuota', 'halaqatIds'
+            ])
+          )
+        )
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['phone'])
         && !hasExposedPhone(request.resource.data);
@@ -140,15 +320,32 @@ service cloud.firestore {
     }
 
     // ── Halaqat ────────────────────────────────────────────────────────
+    // Roster SSOT (halaqat.studentIds) + staff SSOT (teacherId/supervisorId).
+    // PH-02: membership changes only through admitStudentToHalaqa /
+    // adminTransferStudent (max-2 cap + duplicate check, transactional).
+    // No client — not even Admin — edits studentIds directly.
+    // P0-04: creation and schedule slots go through adminCreateHalaqa /
+    // adminAddHalaqaSlot (D8 ≥1 slot, D9 conflict engine, teacher lock). No
+    // client — not even Admin — creates a Halaqa or edits schedule/teacher.
     match /halaqat/{halaqaId} {
       allow read: if signedIn();
-      allow create, delete: if isAdmin();
-      allow update: if signedIn() && (
-        isAdmin()
-        || isSupervisor()
-        || !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['studentIds'])
-      );
+      allow create: if false;
+      allow delete: if false;
+      allow update: if isAdmin()
+        && !changedKeys().hasAny(['studentIds', 'schedule', 'teacherId', 'createdBy', 'createdAt']);
+    }
+
+    // P0-04 — per-teacher schedule serialization locks (CF-only).
+    match /halaqaScheduleLocks/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // P0-05 — exactly-once homework reward markers (CF-only).
+    match /homeworkRewards/{assignmentId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.get('studentId', '') == uid());
+      allow write: if false;
     }
 
     // ── Payments ───────────────────────────────────────────────────────
@@ -206,25 +403,28 @@ service cloud.firestore {
         && !('remainingAmount' in request.resource.data);
     }
 
+    // C4 / C16 (PH-02): review outcomes, `status=paid`, reviewer identity and
+    // review timestamps are written only by the reviewPaymentProof callable
+    // (transactional + audited). Clients keep read access and the Parent
+    // proof submission below; no client writes a review conclusion.
     match /payments/{paymentId} {
       allow read: if signedIn() && (
         isAdmin()
-        || isSupervisor()
         || resource.data.parentId == uid()
+        || (isSupervisor() && isSupervisorOfStudent(resource.data.studentId))
       );
       allow create: if false;
       allow delete: if false;
-      allow update: if signedIn() && (
-        isAdmin()
-        || isSupervisor()
-        || parentProofOnlyUpdate()
-      );
+      allow update: if signedIn()
+        && resource.data.get('status', '') != 'paid'
+        && parentProofOnlyUpdate();
     }
 
-    // C2 — clients never write paymentAccess; Teacher/Student cannot read
+    // C2 — clients never write paymentAccess; Teacher/Student cannot read.
+    // Supervisor scope (parents of supervised students) is not expressible
+    // from this doc without a CF-maintained projection → fail closed.
     match /paymentAccess/{parentId} {
       allow read: if isAdmin()
-        || isSupervisor()
         || (isParent() && parentId == uid());
       allow write: if false;
     }
@@ -236,10 +436,18 @@ service cloud.firestore {
     }
 
     // C3 — academy settings (WAVE_A: Parent read paymentPublic only; Admin RW)
+    // paymentPublic is the Parent-safe projection: only the locked C3 fields
+    // may ever be written, so private Admin config cannot leak into it.
     match /academySettings/{docId} {
       allow read: if isAdmin()
         || (docId == 'paymentPublic' && isParent());
-      allow write: if isAdmin();
+      allow write: if isAdmin()
+        && (
+          docId != 'paymentPublic'
+          || request.resource.data.keys().hasOnly([
+            'vodafoneCashDestination', 'updatedAt', 'updatedBy'
+          ])
+        );
     }
 
     // D2 / WA-18 — wallet OUT; deny all client access (Admin SDK bypasses)
@@ -263,89 +471,394 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Operational collections — authenticated RW until later Waves tighten.
-    match /attendanceRecords/{id} {
-      allow read, write: if signedIn();
+    // ── PH-01 operational collections (C6 / D7 / D10 / D12) ──────────────
+    // No collection is signed-in RW any more. Writes are bound to the
+    // halaqa's real teacher/supervisor (halaqat SSOT) and to its roster;
+    // hard deletes of history are denied except retiring legacy duplicates.
+
+    // Attendance (C6 / PH-02): written only by the recordSessionAttendance
+    // callable — real session, roster, halaqa teacher and edit window are
+    // checked transactionally there. Clients read; nobody writes directly.
+    match /attendanceRecords/{recordId} {
+      allow read: if canReadStudentRecord(resource.data);
+      allow write: if false;
     }
-    match /recitationRecords/{id} {
-      allow read, write: if signedIn();
+
+    // Evaluations. Teacher live evaluations are written only by the
+    // upsertSessionEvaluation callable (real session + D7 Present/Late in one
+    // transaction). Students still submit homework recitations and the
+    // halaqa teacher reviews those pending submissions.
+    match /recitationRecords/{recordId} {
+      // `{sessionId}_{studentId}_{type}` ids are reserved for live
+      // evaluations, and `createdAt` is their server-set edit-window anchor
+      // (B1) — a submission can claim neither.
+      function studentSubmissionOk() {
+        let d = request.resource.data;
+        return d.studentId == uid()
+          && d.get('reviewStatus', '') == 'pending'
+          && isStudentOnRoster(d.halaqaId, uid())
+          && !recordId.matches('.*_(memorization|review)$')
+          && !d.keys().hasAny(['grade', 'behaviorGrade', 'sessionId', 'createdAt']);
+      }
+
+      function teacherReviewOfPendingOk() {
+        return isTeacherOfHalaqa(resource.data.halaqaId)
+          && resource.data.get('reviewStatus', '') == 'pending'
+          && request.resource.data.get('reviewStatus', '') == 'reviewed'
+          && changedKeys().hasOnly([
+            'reviewStatus', 'grade', 'behaviorGrade', 'notes'
+          ]);
+      }
+
+      allow read: if canReadStudentRecord(resource.data);
+      allow create: if studentSubmissionOk();
+      allow update: if teacherReviewOfPendingOk();
+      allow delete: if false;
     }
-    match /absenceRequests/{id} {
-      allow read, write: if signedIn();
+
+    // استئذان: linked Parent submits for a rostered child; the halaqa's
+    // Teacher classifies. Never touches attendance (W7).
+    match /absenceRequests/{requestId} {
+      function parentRequestOk() {
+        let d = request.resource.data;
+        return d.requestedBy == uid()
+          && isLinkedParentOf(d.studentId)
+          && d.status == 'pending'
+          && isStudentOnRoster(d.halaqaId, d.studentId)
+          && requestId.matches(d.halaqaId + '_' + d.studentId + '_[0-9]{8}')
+          && d.keys().hasOnly([
+            'studentId', 'halaqaId', 'requestedBy', 'date', 'reason', 'status'
+          ]);
+      }
+
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.requestedBy == uid())
+        || (signedIn() && resource.data.studentId == uid())
+        || isStaffOfHalaqa(resource.data.halaqaId)
+        || isLinkedParentOf(resource.data.studentId);
+      allow create: if parentRequestOk();
+      allow update: if (
+          resource.data.get('status', '') == 'pending'
+          && resource.data.get('requestedBy', '') == uid()
+          && parentRequestOk()
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.halaqaId == resource.data.halaqaId
+        )
+        || (
+          isTeacherOfHalaqa(resource.data.halaqaId)
+          && resource.data.get('status', '') == 'pending'
+          && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.get('reviewedBy', '') == uid()
+          && changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+        );
+      allow delete: if false;
     }
-    match /achievements/{id} {
-      allow read, write: if signedIn();
+
+    // Awards: credited awards (multi-recipient, points/totalStars) are
+    // written only by the grantAward callable. The one client create left is
+    // the Supervisor's record-only achievement (no credit): single student,
+    // on the roster of a halaqa the caller staffs, actor = caller.
+    match /achievements/{achievementId} {
+      function recordOnlyAchievementOk() {
+        let d = request.resource.data;
+        return d.get('grantedBy', '') == uid()
+          && d.get('issuedBy', uid()) == uid()
+          && (isAdmin() || isStaffOfHalaqa(d.get('halaqaId', '')))
+          && isStudentOnRoster(d.get('halaqaId', ''), d.get('studentId', ''))
+          && d.keys().hasOnly([
+            'studentId', 'type', 'halaqaId', 'title', 'note',
+            'grantedBy', 'issuedBy', 'grantedAt', 'date'
+          ]);
+      }
+
+      allow read: if isAdmin()
+        || isStaffRole()
+        || (signedIn() && resource.data.get('studentId', '') == uid())
+        || (signedIn() && uid() in resource.data.recipientStudentIds)
+        || isLinkedParentOf(resource.data.get('studentId', ''));
+      allow create: if recordOnlyAchievementOk();
+      allow update, delete: if false;
     }
-    match /assignments/{id} {
-      allow read, write: if signedIn();
+
+    // Homework + halaqa activities (assignments SSOT).
+    match /assignments/{assignmentId} {
+      function assignmentIdentityFrozen() {
+        return request.resource.data.get('halaqaId', '') == resource.data.get('halaqaId', '')
+          && request.resource.data.get('studentId', '') == resource.data.get('studentId', '')
+          && request.resource.data.get('assignedBy', '') == resource.data.get('assignedBy', '');
+      }
+
+      function teacherCreateOk() {
+        let d = request.resource.data;
+        return d.get('assignedBy', '') == uid()
+          && isTeacherOfHalaqa(d.get('halaqaId', ''))
+          && (
+            d.get('studentId', '') == ''
+            || isStudentOnRoster(d.halaqaId, d.studentId)
+          );
+      }
+
+      // Student progress on their own homework (task ticks) and the
+      // legacy-shape repair on read. Identity fields stay frozen; completion
+      // (`isSubmitted` / `status` / `completedAt`) and its credit belong to
+      // the completeHomework callable, and a completed homework is final.
+      // P0-05: the reward definition is server-owned (canonical required
+      // kinds), so `tasks` edits are evidence only. `kind` may only be set
+      // once, on a legacy doc without it, to lesson homework.
+      function studentOwnHomeworkUpdate() {
+        return signedIn()
+          && resource.data.get('studentId', '') == uid()
+          && resource.data.get('status', '') != 'completed'
+          && resource.data.get('isSubmitted', false) != true
+          && assignmentIdentityFrozen()
+          && changedKeys().hasOnly(['tasks', 'title', 'attachments', 'kind'])
+          && (
+            !changedKeys().hasAny(['kind'])
+            || (
+              resource.data.get('kind', '') == ''
+              && request.resource.data.get('kind', '') == 'lessonHomework'
+            )
+          );
+      }
+
+      // Rostered student refreshing the respondent counter of an activity.
+      function studentActivityCounterUpdate() {
+        return signedIn()
+          && resource.data.get('studentId', '') == ''
+          && isStudentOnRoster(resource.data.get('halaqaId', ''), uid())
+          && changedKeys().hasOnly(['responseCount', 'respondentStudentIds'])
+          && request.resource.data.get('responseCount', 0) is int
+          && uid() in request.resource.data.get('respondentStudentIds', []);
+      }
+
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.studentId == uid())
+        || isStaffOfHalaqa(resource.data.halaqaId)
+        || isStudentOnRoster(resource.data.halaqaId, uid())
+        || isLinkedParentOf(resource.data.studentId);
+      allow create: if teacherCreateOk()
+        && !request.resource.data.keys().hasAny(['completedAt']);
+      // P0-05: `completedAt` is the server-set legacy reward anchor; no
+      // client may set, move or clear it (a reopen can never re-credit).
+      allow update: if (
+          isTeacherOfHalaqa(resource.data.get('halaqaId', ''))
+          && assignmentIdentityFrozen()
+          && !changedKeys().hasAny(['completedAt'])
+        )
+        || studentOwnHomeworkUpdate()
+        || studentActivityCounterUpdate();
+      allow delete: if false;
+
+      match /activityResponses/{responseId} {
+        function activityHalaqaId() {
+          return get(/databases/$(database)/documents/assignments/$(assignmentId))
+            .data.get('halaqaId', '');
+        }
+
+        allow read: if isAdmin()
+          || isStaffOfHalaqa(activityHalaqaId())
+          || isStudentOnRoster(activityHalaqaId(), uid());
+        allow create: if signedIn()
+          && request.resource.data.get('studentId', '') == uid()
+          && isStudentOnRoster(activityHalaqaId(), uid());
+        allow update, delete: if false;
+      }
     }
-    // C11 / WA-13 — in-app cards stay client-writable (W4/W5 fan-out), but the
-    // server-owned push/deep-link fields cannot be forged by a client.
-    match /notifications/{id} {
+
+    // C11 / WA-13 / PH-02 — in-app cards. Academy fan-out (attendance,
+    // homework, activities, evaluations) is CF-authored; recipients come from
+    // relationships server-side. The only client create left is the Admin ops
+    // broadcast. Server-owned push/deep-link fields cannot be forged.
+    match /notifications/{notificationId} {
       function serverOwnedNotificationFields() {
         return ['data', 'delivery', 'push', 'pushedAt', 'deliveredAt'];
       }
 
-      allow read: if signedIn();
-      allow create: if signedIn()
+      function broadcastAudiences() {
+        return ['all', 'admin', 'supervisor', 'teacher', 'parent', 'student'];
+      }
+
+      function isNotificationAudience() {
+        return signedIn()
+          && resource.data.audience in [uid(), userDoc().role, 'all'];
+      }
+
+      allow read: if isAdmin() || isNotificationAudience();
+      allow create: if isAdmin()
         && !request.resource.data.keys()
-            .hasAny(serverOwnedNotificationFields());
-      allow update: if signedIn()
-        && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(serverOwnedNotificationFields());
-      allow delete: if signedIn();
+            .hasAny(serverOwnedNotificationFields())
+        && request.resource.data.get('readBy', []) == []
+        && request.resource.data.get('audience', '') in broadcastAudiences();
+      // Readers may only add themselves to readBy.
+      allow update: if isNotificationAudience()
+        && changedKeys().hasOnly(['readBy'])
+        && request.resource.data.readBy.toSet()
+            .difference(resource.data.get('readBy', []).toSet())
+            .hasOnly([uid()])
+        && resource.data.get('readBy', []).toSet()
+            .difference(request.resource.data.readBy.toSet()).size() == 0;
+      allow delete: if false;
     }
-    match /complaints/{id} {
-      allow read, write: if signedIn();
+
+    match /complaints/{complaintId} {
+      allow read, update: if isAdmin();
+      allow create, delete: if false;
     }
-    match /supervisorReports/{id} {
-      allow read, write: if signedIn();
+
+    match /supervisorReports/{reportId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.supervisorId == uid());
+      allow create: if isSupervisor()
+        && request.resource.data.get('supervisorId', '') == uid();
+      allow update, delete: if false;
     }
-    match /posts/{id} {
-      allow read, write: if signedIn();
+
+    // P0 §7 — posts are Halaqa community announcements, not chat. A post
+    // belongs to the Halaqa it was created for (`audienceTarget == halaqaId`);
+    // there is no academy-wide feed. Legacy `audienceTarget: 'all'` posts stay
+    // readable by Admin only until a product decision re-introduces them.
+    match /posts/{postId} {
+      function authorCanTarget(d) {
+        return d.get('halaqaId', '') is string
+          && d.get('halaqaId', '') != ''
+          && d.get('audienceTarget', '') == d.get('halaqaId', '')
+          && (isAdmin() || isStaffOfHalaqa(d.get('halaqaId', '')));
+      }
+
+      // Audience key is `audienceTarget` (the field clients query on; create
+      // forces it to equal halaqaId). Legacy 'all' posts resolve to no Halaqa
+      // and stay Admin-only.
+      function postHalaqaId() {
+        return resource.data.get('audienceTarget', '') is string
+          ? resource.data.get('audienceTarget', '')
+          : '';
+      }
+
+      allow read: if isAdmin() || canAccessHalaqaCommunity(postHalaqaId());
+      allow create: if signedIn()
+        && request.resource.data.get('authorId', '') == uid()
+        && authorCanTarget(request.resource.data);
+      allow update: if canAccessHalaqaCommunity(postHalaqaId())
+        && request.resource.data.get('halaqaId', '') == resource.data.get('halaqaId', '')
+        && request.resource.data.get('audienceTarget', '')
+            == resource.data.get('audienceTarget', '')
+        && (
+        // Like / unlike: a reader toggles only their own uid.
+        (
+          changedKeys().hasOnly(['likedBy'])
+          && request.resource.data.likedBy.toSet()
+              .difference(resource.data.get('likedBy', []).toSet())
+              .union(
+                resource.data.get('likedBy', []).toSet()
+                  .difference(request.resource.data.likedBy.toSet())
+              )
+              .hasOnly([uid()])
+        )
+        // Comment counter: +1 alongside a comment create.
+        || (
+          changedKeys().hasOnly(['commentsCount'])
+          && request.resource.data.commentsCount
+              == resource.data.get('commentsCount', 0) + 1
+        )
+        // Pin / edit: author or Admin, authorship frozen.
+        || (
+          (resource.data.get('authorId', '') == uid() || isAdmin())
+          && request.resource.data.get('authorId', '')
+              == resource.data.get('authorId', '')
+        )
+      );
+      allow delete: if false;
+
       match /comments/{commentId} {
-        allow read, write: if signedIn();
+        function commentPostHalaqaId() {
+          let post = get(/databases/$(database)/documents/posts/$(postId)).data;
+          return post.get('audienceTarget', '') is string
+            ? post.get('audienceTarget', '')
+            : '';
+        }
+
+        allow read: if isAdmin() || canAccessHalaqaCommunity(commentPostHalaqaId());
+        allow create: if request.resource.data.get('authorId', '') == uid()
+          && canAccessHalaqaCommunity(commentPostHalaqaId());
+        allow update, delete: if false;
       }
     }
-    match /calendarEvents/{id} {
-      allow read, write: if signedIn();
+
+    match /calendarEvents/{eventId} {
+      allow read: if signedIn();
+      allow create: if (isAdmin() || isStaffRole())
+        && request.resource.data.get('createdBy', '') == uid();
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (isStaffRole() && resource.data.get('createdBy', '') == uid());
     }
-    match /contentLibrary/{id} {
-      allow read, write: if signedIn();
+
+    // P0 §8 — Halaqa shared content library ("Halaqa Details → Shared
+    // Content"). Every item belongs to one Halaqa; the Halaqa community reads
+    // it, the Halaqa's Teacher/Supervisor and Admin manage it. The file lives
+    // under content_library/{halaqaId}/… (Storage rules mirror this scope).
+    // Legacy items without a halaqaId are Admin-only.
+    match /contentLibrary/{contentId} {
+      function contentShapeOk(d) {
+        return d.get('halaqaId', '') is string
+          && d.get('halaqaId', '') != ''
+          && d.get('uploadedBy', '') == uid()
+          && d.get('storagePath', '') is string
+          && d.get('storagePath', '').matches(
+            'content_library/' + d.get('halaqaId', '') + '/' + uid() + '/[^/]+'
+          );
+      }
+
+      allow read: if isAdmin()
+        || canAccessHalaqaCommunity(resource.data.get('halaqaId', ''));
+      allow create: if contentShapeOk(request.resource.data)
+        && (isAdmin() || isStaffOfHalaqa(request.resource.data.get('halaqaId', '')));
+      allow update: if false;
+      allow delete: if isAdmin()
+        || isStaffOfHalaqa(resource.data.get('halaqaId', ''));
     }
-    match /reciters/{id} {
-      allow read, write: if signedIn();
+
+    // Reference catalogues: readable, Admin-managed.
+    match /reciters/{reciterId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
-    match /surahAudios/{id} {
-      allow read, write: if signedIn();
+    match /surahAudios/{audioId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
-    match /listeningProgress/{id} {
-      allow read, write: if signedIn();
+
+    match /listeningProgress/{progressId} {
+      allow read: if signedIn() && resource.data.userId == uid();
+      allow create: if signedIn()
+        && request.resource.data.get('userId', '') == uid();
+      allow update: if signedIn()
+        && resource.data.get('userId', '') == uid()
+        && request.resource.data.get('userId', '') == uid();
+      allow delete: if false;
     }
-    match /reviewSchedules/{id} {
-      allow read, write: if signedIn();
+
+    match /reviewSchedules/{scheduleId} {
+      allow read: if canReadStudentRecord(resource.data);
+      allow write: if isAdmin();
     }
+
+    // Legacy collection name — never an authorization source (WA-12).
     match /halaqaActivity/{id} {
-      allow read, write: if signedIn();
+      allow read: if isAdmin();
+      allow write: if false;
       match /activityResponses/{responseId} {
-        allow read, write: if signedIn();
+        allow read: if isAdmin();
+        allow write: if false;
       }
     }
 
     // Chat — WA-10 group membership CF-only; WA-11 relationship + soft-delete.
     match /conversations/{conversationId} {
-      function isHalaqaGroupId() {
-        return conversationId.matches('halaqa_group_.*');
-      }
-
-      function isHalaqaGroupDoc() {
-        return resource != null
-          && resource.data.get('kind', '') == 'halaqa_group';
-      }
-
+      // No `is list` guard: list queries (array-contains uid) cannot prove it
+      // and would be denied; `in` on a non-list already fails closed.
       function isConversationParticipant() {
-        return signedIn()
-          && resource.data.participantIds is list
+        return hasActiveProfile()
           && uid() in resource.data.participantIds;
       }
 
@@ -353,22 +866,16 @@ service cloud.firestore {
         return isAdmin() || isConversationParticipant();
       }
 
-      function groupMembershipFrozen() {
-        return request.resource.data.participantIds == resource.data.participantIds
-          && request.resource.data.kind == resource.data.kind
-          && request.resource.data.halaqaId == resource.data.halaqaId
-          && request.resource.data.get('createdAt', resource.data.createdAt)
-              == resource.data.createdAt
-          && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['participantIds', 'kind', 'halaqaId', 'createdAt', 'createdBy']);
-      }
-
-      function directMembershipFrozen() {
-        return request.resource.data.participantIds == resource.data.participantIds
-          && request.resource.data.get('kind', 'direct')
-              == resource.data.get('kind', 'direct')
-          && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['participantIds', 'kind', 'createdAt', 'createdBy']);
+      // Preview, lastMessage*, membership and other members' counters are
+      // written by sendChatMessage / edit / delete / group sync only.
+      function onlyResetsOwnUnreadCount() {
+        let before = resource.data.get('unreadCounts', {});
+        let after = request.resource.data.get('unreadCounts', {});
+        return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['unreadCounts'])
+          && after is map
+          && after.diff(before).affectedKeys().hasOnly([uid()])
+          && after.get(uid(), 0) == 0;
       }
 
       // Participants + Admin monitor (D13). No broad public read.
@@ -377,13 +884,7 @@ service cloud.firestore {
       // All conversation documents are CF-created (1:1 + halaqa_group).
       allow create: if false;
 
-      allow update: if signedIn() && (
-        (
-          isHalaqaGroupId() || isHalaqaGroupDoc()
-        )
-          ? (canAccessConversation() && groupMembershipFrozen())
-          : (canAccessConversation() && directMembershipFrozen())
-      );
+      allow update: if isConversationParticipant() && onlyResetsOwnUnreadCount();
 
       allow delete: if false;
 
@@ -393,7 +894,7 @@ service cloud.firestore {
         }
 
         function isMsgConversationParticipant() {
-          return signedIn()
+          return hasActiveProfile()
             && parentConversation().participantIds is list
             && uid() in parentConversation().participantIds;
         }
@@ -404,15 +905,9 @@ service cloud.firestore {
 
         allow read: if canAccessMessages();
 
-        allow create: if isMsgConversationParticipant()
-          && request.resource.data.senderId == uid()
-          && request.resource.data.keys().hasAll(['senderId', 'text', 'sentAt'])
-          && !('deleted' in request.resource.data
-              && request.resource.data.deleted == true)
-          && !request.resource.data.keys()
-              .hasAny(['deletedAt', 'deletedBy', 'editedAt']);
-
-        // Soft-delete / edit go through CF (Admin SDK). Clients cannot update/delete.
+        // Send / edit / soft-delete go through callables (sendChatMessage,
+        // editChatMessage, softDeleteChatMessage). Clients never write here.
+        allow create: if false;
         allow update: if false;
         allow delete: if false;
       }

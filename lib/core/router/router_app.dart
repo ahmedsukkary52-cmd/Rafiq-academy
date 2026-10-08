@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/pages/admin_access_page.dart';
+import '../../features/admin/presentation/pages/admin_accounts_page.dart';
+import '../../features/admin/presentation/pages/admin_halaqat_page.dart';
 import '../../features/admin/presentation/pages/admin_home_page.dart';
+import '../../features/admin/presentation/pages/admin_membership_page.dart';
+import '../../features/admin/presentation/pages/admin_parent_links_page.dart';
+import '../../features/admin/presentation/pages/payment_review_page.dart';
 import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 // Awards
@@ -30,6 +37,7 @@ import '../../features/student/presentation/pages/student_badges_page.dart';
 import '../../features/student/presentation/pages/student_evaluation_page.dart';
 // Student
 import '../../features/student/presentation/pages/student_home_page.dart';
+import '../../features/mushaf/presentation/pages/mushaf_reader_host.dart';
 import '../../features/student/presentation/pages/student_mushaf_page.dart';
 import '../../features/student/presentation/pages/student_profile_page.dart';
 import '../../features/student/presentation/pages/student_streak_page.dart';
@@ -50,6 +58,7 @@ class AppRoutes {
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
+  static const String forgotPassword = '/forgot-password';
 
   /// D1 / WA-1 — public self-registration removed. Path kept only so deep links
   /// redirect to login (no RegisterPage route).
@@ -71,6 +80,10 @@ class AppRoutes {
   static const String studentBadges = '/student/badges';
   static const String studentStreak = '/student/streak';
   static const String studentContent = '/student/content';
+
+  /// Halaqa shared content (P0 §8) for the student's own Halaqa.
+  static String studentContentFor(String halaqaId) =>
+      '$studentContent?halaqaId=${Uri.encodeQueryComponent(halaqaId.trim())}';
   static const String studentAudio = '/student/audio';
   static const String studentChat = '/student/chat';
   static const String studentChatRoom = '/student/chat/:conversationId';
@@ -95,6 +108,10 @@ class AppRoutes {
 
   // H6 / A-H8: teacherCalendar / teacherContent remain removed (orphan).
   static const String teacherAwards = '/teacher/halaqa/:halaqaId/awards';
+
+  /// Halaqa Details → Shared Content (Teacher; Supervisor via escalation).
+  static String teacherHalaqaContent(String halaqaId) =>
+      '/teacher/halaqa/${Uri.encodeComponent(halaqaId.trim())}/content';
   static const String teacherChat = '/teacher/chat/:conversationId';
   static const String teacherNotifs = '/teacher/notifications';
   static const String teacherExcuses = '/teacher/excuses';
@@ -103,8 +120,22 @@ class AppRoutes {
   static const String parent = '/parent';
   static const String parentAbsence = '/parent/absence-requests';
   static const String parentNotifs = '/parent/notifications';
+  static const String parentContent = '/parent/content';
+
+  /// Shared content of a linked child's Halaqa.
+  static String parentContentFor(String halaqaId) =>
+      '$parentContent?halaqaId=${Uri.encodeQueryComponent(halaqaId.trim())}';
   static const String supervisor = '/supervisor';
+  static const String supervisorPayments = '/supervisor/payments';
   static const String admin = '/admin';
+
+  // Admin operational subpages (P0-02 / P0-03)
+  static const String adminAccounts = '/admin/accounts';
+  static const String adminParentLinks = '/admin/parent-links';
+  static const String adminHalaqat = '/admin/halaqat';
+  static const String adminMembership = '/admin/membership';
+  static const String adminPayments = '/admin/payments';
+  static const String adminAccess = '/admin/access';
 }
 
 /// Pure role → home route and path allowlist used by [AppRouter] (H8 / A-H11).
@@ -142,6 +173,47 @@ class AppRouteAccess {
   }
 }
 
+/// Pure auth redirect used by [AppRouter]. Fails closed: only an
+/// [AuthAuthenticated] state with a known role reaches role routes; every
+/// other state is confined to Splash or the public sign-in pages.
+class AuthRedirect {
+  const AuthRedirect._();
+
+  static const Set<String> publicAuthPaths = {
+    AppRoutes.login,
+    AppRoutes.forgotPassword,
+  };
+
+  static String? resolve({required AuthState state, required String path}) {
+    if (state is AuthInitial ||
+        state is AuthLoading ||
+        state is AuthStartupFailure) {
+      // A sign-in in progress keeps its own page (it renders loading/error).
+      if (state is AuthLoading && publicAuthPaths.contains(path)) return null;
+      return path == AppRoutes.splash ? null : AppRoutes.splash;
+    }
+
+    if (state is AuthAuthenticated) {
+      final home = AppRouteAccess.homeForRole(state.user.role);
+      if (home == AppRoutes.login) {
+        return path == AppRoutes.login ? null : AppRoutes.login;
+      }
+      if (path == AppRoutes.splash ||
+          path == AppRoutes.register ||
+          publicAuthPaths.contains(path)) {
+        return home;
+      }
+      return AppRouteAccess.isAllowed(path: path, role: state.user.role)
+          ? null
+          : home;
+    }
+
+    // Unauthenticated / failed sign-in: public sign-in pages only
+    // (legacy /register deep links land on login — D1).
+    return publicAuthPaths.contains(path) ? null : AppRoutes.login;
+  }
+}
+
 class AppRouter {
   final AuthBloc authBloc;
   final ValueNotifier<bool> onboardingSeen;
@@ -170,42 +242,7 @@ class AppRouter {
         return AppRoutes.splash;
       }
 
-      // Loading / Initial → فضّل على Splash
-      // (استثناء: لو المستخدم أصلاً في صفحة اللوجن أو الريجستر وبيحاول يسجّل دخول أو يتسجّل،
-      // سيبه فيها - هي بتعرض حالة التحميل والخطأ بنفسها، ومفيش داعي
-      // نوديه لصفحة Splash اللي مفيهاش أي تعامل مع حالة الخطأ)
-      if (authState is AuthInitial || authState is AuthLoading) {
-        if (currentPath == AppRoutes.login) return null;
-        return currentPath == AppRoutes.splash ? null : AppRoutes.splash;
-      }
-
-      // غير مسجّل → Login فقط (التسجيل العام مغلق — D1)
-      if (authState is AuthUnauthenticated) {
-        if (currentPath == AppRoutes.login) {
-          return null;
-        }
-        // Legacy /register deep link → login
-        if (currentPath == AppRoutes.register) {
-          return AppRoutes.login;
-        }
-        return AppRoutes.login;
-      }
-
-      // مسجّل → وجّهه لنافذته لو في صفحة auth
-      if (authState is AuthAuthenticated) {
-        final roleRoute = _routeForRole(authState.user.role);
-        if (currentPath == AppRoutes.splash ||
-            currentPath == AppRoutes.login ||
-            currentPath == AppRoutes.register) {
-          return roleRoute;
-        }
-        // حماية: لو المستخدم حاول يدخل route مش بتاعه
-        if (!_isAllowedRoute(currentPath, authState.user.role)) {
-          return roleRoute;
-        }
-      }
-
-      return null;
+      return AuthRedirect.resolve(state: authState, path: currentPath);
     },
 
     routes: [
@@ -216,6 +253,10 @@ class AppRouter {
       ),
       GoRoute(path: AppRoutes.splash, builder: (_, __) => const SplashPage()),
       GoRoute(path: AppRoutes.login, builder: (_, __) => const LoginPage()),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (_, __) => const ForgotPasswordPage(),
+      ),
       // WA-1: /register intentionally omitted — redirects to login above.
 
       // ── Student ───────────────────────────────────────────────
@@ -264,22 +305,19 @@ class AppRouter {
             builder: (_, state) {
               final surahParam = state.uri.queryParameters['surah'];
               final modeParam = state.uri.queryParameters['mode'];
-              final isFreeMode = state.uri.queryParameters['free'] == 'true';
-              final int surahNumber;
-              if (surahParam != null) {
-                surahNumber = int.tryParse(surahParam) ?? 1;
-              } else if (isFreeMode) {
-                surahNumber = 0;
-              } else {
-                surahNumber = 67;
-              }
+              final preferredSurah = surahParam != null
+                  ? int.tryParse(surahParam)
+                  : null;
               final initialMode = modeParam == 'recitation'
                   ? MushafMode.recitation
                   : MushafMode.reading;
-              return StudentMushafPage(
-                surahNumber: surahNumber,
-                initialMode: initialMode,
-                isFreeMode: isFreeMode,
+              // D23: last-read / Al-Fatihah via MushafBloc — no surah-67 default.
+              return MushafBlocScope(
+                child: MushafReaderHost(
+                  preferredSurah: preferredSurah,
+                  forceSurahJump: preferredSurah != null && preferredSurah >= 1,
+                  initialMode: initialMode,
+                ),
               );
             },
           ),
@@ -291,7 +329,9 @@ class AppRouter {
           // Live student content (not an H6 orphan — teacher content route removed).
           GoRoute(
             path: 'content',
-            builder: (_, __) => const ContentLibraryPage(),
+            builder: (_, state) => ContentLibraryPage(
+              halaqaId: state.uri.queryParameters['halaqaId'],
+            ),
           ),
           GoRoute(
             path: 'audio',
@@ -345,6 +385,12 @@ class AppRouter {
                 path: 'awards',
                 builder: (_, state) =>
                     AwardsPage(halaqaId: state.pathParameters['halaqaId']!),
+              ),
+              GoRoute(
+                path: 'content',
+                builder: (_, state) => ContentLibraryPage(
+                  halaqaId: state.pathParameters['halaqaId'],
+                ),
               ),
             ],
           ),
@@ -401,6 +447,12 @@ class AppRouter {
             path: 'notifications',
             builder: (_, __) => const ParentNotificationsPage(),
           ),
+          GoRoute(
+            path: 'content',
+            builder: (_, state) => ContentLibraryPage(
+              halaqaId: state.uri.queryParameters['halaqaId'],
+            ),
+          ),
         ],
       ),
 
@@ -408,10 +460,42 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.supervisor,
         builder: (_, __) => const SupervisorHomePage(),
+        routes: [
+          GoRoute(
+            path: 'payments',
+            builder: (_, __) => const PaymentReviewPage(isAdmin: false),
+          ),
+        ],
       ),
 
       // ── Admin ─────────────────────────────────────────────────
-      GoRoute(path: AppRoutes.admin, builder: (_, __) => const AdminHomePage()),
+      GoRoute(
+        path: AppRoutes.admin,
+        builder: (_, __) => const AdminHomePage(),
+        routes: [
+          GoRoute(
+            path: 'accounts',
+            builder: (_, __) => const AdminAccountsPage(),
+          ),
+          GoRoute(
+            path: 'parent-links',
+            builder: (_, __) => const AdminParentLinksPage(),
+          ),
+          GoRoute(
+            path: 'halaqat',
+            builder: (_, __) => const AdminHalaqatPage(),
+          ),
+          GoRoute(
+            path: 'membership',
+            builder: (_, __) => const AdminMembershipPage(),
+          ),
+          GoRoute(
+            path: 'payments',
+            builder: (_, __) => const PaymentReviewPage(isAdmin: true),
+          ),
+          GoRoute(path: 'access', builder: (_, __) => const AdminAccessPage()),
+        ],
+      ),
     ],
 
     errorBuilder: (context, state) => Scaffold(
@@ -420,10 +504,6 @@ class AppRouter {
     ),
   );
 
-  static String _routeForRole(String role) => AppRouteAccess.homeForRole(role);
-
-  static bool _isAllowedRoute(String path, String role) =>
-      AppRouteAccess.isAllowed(path: path, role: role);
 }
 
 class _BlocListenable extends ChangeNotifier {

@@ -36,6 +36,13 @@ export const AUDIT_REQUIRED_FIELDS = [
 
 export const ACTOR_ROLE_ADMIN = "admin";
 export const ACTOR_ROLE_SYSTEM = "system";
+/**
+ * Scoped operational actor (freeze §4.7 payment review, admit/transfer within
+ * supervised halaqat). Always derived from `users/{uid}.role` server-side.
+ */
+export const ACTOR_ROLE_SUPERVISOR = "supervisor";
+/** Live-evaluation author (spec §20.1 `evaluation_create_or_correct`). */
+export const ACTOR_ROLE_TEACHER = "teacher";
 export const SYSTEM_ACTOR_ID = "system";
 
 /** Canonical product actions (NEW emissions). */
@@ -49,21 +56,26 @@ export const AUDIT_ACTION = {
   migrateHalaqaSlotIds: "halaqa_schedule_slotid_migrate",
   studentLifecycleBackfill: "student_lifecycle_backfill",
   studentSearchBackfill: "student_search_backfill",
+  // PH-02 — server-authoritative workflows.
+  paymentReview: "payment_review",
+  studentAdmit: "student_admit",
+  studentTransfer: "student_transfer",
+  attendanceCorrect: "attendance_correct",
+  evaluationCreateOrCorrect: "evaluation_create_or_correct",
+  // P0 completion — Admin operational workflows.
+  relationshipChildrenChange: "relationship_children_change",
+  halaqaCreate: "halaqa_create",
+  halaqaScheduleChange: "halaqa_schedule_change",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
 
-/** Deferred C16.3 hooks — contract-ready, not emitted by WA-16. */
+/** Deferred C16.3 hooks — contract-ready, not emitted yet. */
 export const AUDIT_ACTION_DEFERRED = {
   paymentSuspend: "payment_suspend",
-  paymentReview: "payment_review",
   adminPricingChange: "admin_pricing_change",
   adminVodafoneChange: "admin_vodafone_change",
-  studentTransfer: "student_transfer",
-  relationshipChildrenChange: "relationship_children_change",
   sessionCreateOrCorrect: "session_create_or_correct",
-  attendanceCorrect: "attendance_correct",
-  evaluationCreateOrCorrect: "evaluation_create_or_correct",
   chatMessageModerateDelete: "chat_message_moderate_delete",
 } as const;
 
@@ -73,6 +85,11 @@ export const AUDIT_TARGET_TYPE = {
   paymentAccess: "paymentAccess",
   invoice: "invoice",
   migration: "migration",
+  payment: "payment",
+  session: "session",
+  halaqa: "halaqa",
+  evaluation: "evaluation",
+  parentProfile: "parentProfile",
 } as const;
 
 export type AuditTargetType =
@@ -113,6 +130,20 @@ export const AUDIT_METADATA_ALLOWLIST = new Set([
   "nextCursor",
   "pageSize",
   "dryRun",
+  "previousReviewStatus",
+  "newReviewStatus",
+  "decision",
+  "sessionId",
+  "date",
+  "fromHalaqaId",
+  "toHalaqaId",
+  "evaluationType",
+  "versesRange",
+  "operation",
+  "teacherId",
+  "supervisorId",
+  "slotId",
+  "slotCount",
 ]);
 
 /** Privacy deny-list — must never appear as metadata keys or nested content probes. */
@@ -138,7 +169,11 @@ export const AUDIT_METADATA_FORBIDDEN_KEYS = [
 
 export type AuditActor = {
   actorId: string;
-  actorRole: typeof ACTOR_ROLE_ADMIN | typeof ACTOR_ROLE_SYSTEM;
+  actorRole:
+    | typeof ACTOR_ROLE_ADMIN
+    | typeof ACTOR_ROLE_SYSTEM
+    | typeof ACTOR_ROLE_SUPERVISOR
+    | typeof ACTOR_ROLE_TEACHER;
 };
 
 export type AuditLogInput = {

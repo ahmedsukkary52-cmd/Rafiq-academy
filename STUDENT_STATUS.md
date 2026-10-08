@@ -1,5 +1,12 @@
 # حالة المشروع - رفيق أكاديمي (جانب الطالب)
 
+> **Partially superseded (2026-10-07) — Storage statements only.** The lines
+> below saying Firebase Storage is disabled / audio upload is blocked on
+> Storage are outdated: Storage is in scope for chat media (D20 in
+> `docs/production/PRODUCT_DECISIONS_LOCKED.md`), and enabling it on the
+> academy account is gated by `docs/production/FIREBASE_BILLING_CHECKLIST.md`.
+> Where this file conflicts with `docs/production/*`, those documents win.
+
 > ملف مرجعي دائم. لازم يُقرأ في بداية أي جلسة عمل جديدة، ويتحدّث بعد أي تعديل مهم.
 
 **مراجع إضافية:** [STUDENT_AUDIT.md](STUDENT_AUDIT.md) · [CHAT_AUDIT.md](CHAT_AUDIT.md)

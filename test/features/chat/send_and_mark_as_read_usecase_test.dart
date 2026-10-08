@@ -1,13 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
+import 'package:rafiq_academy/features/chat/domain/entities/chat_entities.dart';
+import 'package:rafiq_academy/features/chat/domain/policies/chat_media_policy.dart';
 import 'package:rafiq_academy/features/chat/domain/repositories/chat_repository.dart';
 import 'package:rafiq_academy/features/chat/domain/usecases/chat_usecases.dart';
 
 class _FakeChatRepository implements ChatRepository {
   String? lastSendConversationId;
-  String? lastSendSenderId;
+  String? lastSendMessageId;
+  ChatMessageType? lastSendType;
   String? lastSendText;
+  ChatSendMedia? lastSendMedia;
   int sendCalls = 0;
 
   String? lastReadConversationId;
@@ -20,13 +24,17 @@ class _FakeChatRepository implements ChatRepository {
   @override
   Future<Either<Failure, Unit>> sendMessage({
     required String conversationId,
-    required String senderId,
+    required String messageId,
+    required ChatMessageType type,
     required String text,
+    ChatSendMedia? media,
   }) async {
     sendCalls++;
     lastSendConversationId = conversationId;
-    lastSendSenderId = senderId;
+    lastSendMessageId = messageId;
+    lastSendType = type;
     lastSendText = text;
+    lastSendMedia = media;
     return sendResult;
   }
 
@@ -45,63 +53,84 @@ class _FakeChatRepository implements ChatRepository {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
+const _id = 'AbCdEfGhIj0123456789';
+
 void main() {
   group('SendMessageUseCase', () {
-    test(
-      'rejects empty / whitespace-only text without repository call',
-      () async {
-        final repo = _FakeChatRepository();
-        final useCase = SendMessageUseCase(repo);
-
-        final empty = await useCase(
-          const SendMessageParams(
-            conversationId: 'c1',
-            senderId: 'u1',
-            text: '   ',
-          ),
-        );
-
-        expect(empty.isLeft(), isTrue);
-        empty.fold(
-          (f) => expect(f, isA<ValidationFailure>()),
-          (_) => fail('expected Left'),
-        );
-        expect(repo.sendCalls, 0);
-      },
-    );
-
-    test('trims text before forwarding', () async {
+    test('rejects empty / whitespace-only text without repository call', () async {
       final repo = _FakeChatRepository();
-      final useCase = SendMessageUseCase(repo);
+      final result = await SendMessageUseCase(repo)(
+        const SendMessageParams(conversationId: 'c1', messageId: _id, text: '   '),
+      );
+      expect(result.isLeft(), isTrue);
+      result.fold((f) => expect(f, isA<ValidationFailure>()), (_) => fail('Left'));
+      expect(repo.sendCalls, 0);
+    });
 
-      final result = await useCase(
-        const SendMessageParams(
+    test('rejects text above the server limit', () async {
+      final repo = _FakeChatRepository();
+      final result = await SendMessageUseCase(repo)(
+        SendMessageParams(
           conversationId: 'c1',
-          senderId: 'u1',
-          text: '  مرحبا  ',
+          messageId: _id,
+          text: 'ا' * (ChatMediaPolicy.textMaxChars + 1),
         ),
       );
+      expect(result.isLeft(), isTrue);
+      expect(repo.sendCalls, 0);
+    });
 
+    test('rejects malformed client message ids', () async {
+      final repo = _FakeChatRepository();
+      final result = await SendMessageUseCase(repo)(
+        const SendMessageParams(conversationId: 'c1', messageId: '../x', text: 'hi'),
+      );
+      expect(result.isLeft(), isTrue);
+      expect(repo.sendCalls, 0);
+    });
+
+    test('trims text and forwards id; no sender identity is sent', () async {
+      final repo = _FakeChatRepository();
+      final result = await SendMessageUseCase(repo)(
+        const SendMessageParams(
+          conversationId: 'c1',
+          messageId: _id,
+          text: '  السلام عليكم  ',
+        ),
+      );
       expect(result, const Right(unit));
-      expect(repo.sendCalls, 1);
-      expect(repo.lastSendText, 'مرحبا');
+      expect(repo.lastSendText, 'السلام عليكم');
       expect(repo.lastSendConversationId, 'c1');
-      expect(repo.lastSendSenderId, 'u1');
+      expect(repo.lastSendMessageId, _id);
+      expect(repo.lastSendType, ChatMessageType.text);
+      expect(repo.lastSendMedia, isNull);
+    });
+
+    test('media message may have an empty caption', () async {
+      final repo = _FakeChatRepository();
+      const media = ChatSendMedia(
+        storagePath: 'chat_media/c1/$_id/image.jpg',
+        fileName: 'صورة.jpg',
+      );
+      final result = await SendMessageUseCase(repo)(
+        const SendMessageParams(
+          conversationId: 'c1',
+          messageId: _id,
+          type: ChatMessageType.image,
+          text: '',
+          media: media,
+        ),
+      );
+      expect(result, const Right(unit));
+      expect(repo.lastSendMedia, media);
+      expect(repo.lastSendType, ChatMessageType.image);
     });
 
     test('surfaces repository failure', () async {
-      final repo = _FakeChatRepository()
-        ..sendResult = const Left(NetworkFailure());
-      final useCase = SendMessageUseCase(repo);
-
-      final result = await useCase(
-        const SendMessageParams(
-          conversationId: 'c1',
-          senderId: 'u1',
-          text: 'hi',
-        ),
+      final repo = _FakeChatRepository()..sendResult = const Left(NetworkFailure());
+      final result = await SendMessageUseCase(repo)(
+        const SendMessageParams(conversationId: 'c1', messageId: _id, text: 'hi'),
       );
-
       expect(result, const Left(NetworkFailure()));
     });
   });
@@ -109,12 +138,9 @@ void main() {
   group('MarkConversationAsReadUseCase', () {
     test('forwards conversationId and uid', () async {
       final repo = _FakeChatRepository();
-      final useCase = MarkConversationAsReadUseCase(repo);
-
-      final result = await useCase(
+      final result = await MarkConversationAsReadUseCase(repo)(
         const MarkAsReadParams(conversationId: 'c1', uid: 'u1'),
       );
-
       expect(result, const Right(unit));
       expect(repo.markReadCalls, 1);
       expect(repo.lastReadConversationId, 'c1');
@@ -124,12 +150,9 @@ void main() {
     test('surfaces repository failure', () async {
       final repo = _FakeChatRepository()
         ..markReadResult = const Left(ServerFailure('deny'));
-      final useCase = MarkConversationAsReadUseCase(repo);
-
-      final result = await useCase(
+      final result = await MarkConversationAsReadUseCase(repo)(
         const MarkAsReadParams(conversationId: 'c1', uid: 'u1'),
       );
-
       expect(result, const Left(ServerFailure('deny')));
     });
   });

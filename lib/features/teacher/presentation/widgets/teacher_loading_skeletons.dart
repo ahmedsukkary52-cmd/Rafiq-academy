@@ -1,49 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_skeleton.dart';
 
-/// Shared pulse opacity for Teacher loading skeletons (no shimmer package).
-class TeacherPulse extends StatefulWidget {
+/// Teacher alias of [AppSkeletonPulse] (stable import path).
+class TeacherPulse extends StatelessWidget {
   final Widget Function(BuildContext context, Color bone) builder;
 
   const TeacherPulse({super.key, required this.builder});
 
   @override
-  State<TeacherPulse> createState() => _TeacherPulseState();
-}
-
-class _TeacherPulseState extends State<TeacherPulse>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.4, end: 0.9).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, _) {
-        final bone = AppColors.border.withValues(alpha: _pulse.value);
-        return widget.builder(context, bone);
-      },
-    );
+    return AppSkeletonPulse(builder: builder);
   }
 }
 
@@ -53,13 +21,11 @@ Widget teacherSkeletonBar({
   required double height,
   double radius = AppSizes.radiusS,
 }) {
-  return Container(
+  return AppSkeletonBox(
+    bone: bone,
     width: width,
     height: height,
-    decoration: BoxDecoration(
-      color: bone,
-      borderRadius: BorderRadius.circular(radius),
-    ),
+    radius: radius,
   );
 }
 
@@ -216,7 +182,11 @@ class TeacherStudentsRosterSkeleton extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          teacherSkeletonBar(bone: bone, width: 140, height: 14),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 140,
+                            height: 14,
+                          ),
                           const SizedBox(height: 8),
                           teacherSkeletonBar(bone: bone, width: 90, height: 11),
                         ],
@@ -345,9 +315,17 @@ class TeacherAwardsDashboardSkeleton extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          teacherSkeletonBar(bone: bone, width: 150, height: 14),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 150,
+                            height: 14,
+                          ),
                           const SizedBox(height: 8),
-                          teacherSkeletonBar(bone: bone, width: 100, height: 11),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 100,
+                            height: 11,
+                          ),
                         ],
                       ),
                     ),
@@ -635,11 +613,19 @@ class TeacherStudentProfileSkeleton extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          teacherSkeletonBar(bone: bone, width: 120, height: 14),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 120,
+                            height: 14,
+                          ),
                           const SizedBox(height: 14),
                           teacherSkeletonBar(bone: bone, height: 12),
                           const SizedBox(height: 10),
-                          teacherSkeletonBar(bone: bone, width: 180, height: 12),
+                          teacherSkeletonBar(
+                            bone: bone,
+                            width: 180,
+                            height: 12,
+                          ),
                         ],
                       ),
                     ),

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/confirm_logout.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/repositories/parent_repository.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
@@ -82,11 +88,14 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => _IssueAchievementDialog(
+      builder: (dialogContext) => IssueAchievementDialog(
         studentIds: halaqa.studentIds,
         halaqaId: halaqa.id,
         issuedBy: authState.user.uid,
         achievementTypes: _achievementTypes,
+        loadStudentNames: (ids) async => (await sl<SupervisorRepository>()
+                .getUserDisplayNames(ids))
+            .getOrElse((_) => const <String, String>{}),
         onSubmit: (data) {
           context.read<SupervisorBloc>().add(IssueAchievementEvent(data));
         },
@@ -167,7 +176,21 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
       ],
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(title: const Text('نافذة المشرف')),
+        appBar: AppBar(
+          title: const Text('نافذة المشرف'),
+          actions: [
+            IconButton(
+              tooltip: 'مراجعة المدفوعات',
+              icon: const Icon(Icons.receipt_long_rounded),
+              onPressed: () => context.push(AppRoutes.supervisorPayments),
+            ),
+            IconButton(
+              tooltip: 'تسجيل الخروج',
+              icon: const Icon(Icons.logout_rounded),
+              onPressed: () => confirmAndLogout(context),
+            ),
+          ],
+        ),
         body: BlocBuilder<SupervisorBloc, SupervisorState>(
           buildWhen: (prev, curr) =>
               prev.halaqatStatus != curr.halaqatStatus ||
@@ -321,31 +344,36 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
   }
 }
 
-class _IssueAchievementDialog extends StatefulWidget {
+@visibleForTesting
+class IssueAchievementDialog extends StatefulWidget {
   final List<String> studentIds;
   final String halaqaId;
   final String issuedBy;
   final List<String> achievementTypes;
   final ValueChanged<AchievementIssueEntity> onSubmit;
+  final Future<Map<String, String>> Function(List<String> ids)?
+  loadStudentNames;
 
-  const _IssueAchievementDialog({
+  const IssueAchievementDialog({
+    super.key,
     required this.studentIds,
     required this.halaqaId,
     required this.issuedBy,
     required this.achievementTypes,
     required this.onSubmit,
+    this.loadStudentNames,
   });
 
   @override
-  State<_IssueAchievementDialog> createState() =>
-      _IssueAchievementDialogState();
+  State<IssueAchievementDialog> createState() => _IssueAchievementDialogState();
 }
 
-class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
+class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
   final _titleCtrl = TextEditingController();
   final _manualStudentCtrl = TextEditingController();
   String? _studentId;
   late String _type;
+  Map<String, String> _studentNames = const {};
 
   @override
   void initState() {
@@ -354,6 +382,23 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
     if (widget.studentIds.length == 1) {
       _studentId = widget.studentIds.first;
     }
+    _resolveStudentNames();
+  }
+
+  Future<void> _resolveStudentNames() async {
+    final load = widget.loadStudentNames;
+    if (load == null || widget.studentIds.isEmpty) return;
+    try {
+      final names = await load(widget.studentIds);
+      if (mounted) setState(() => _studentNames = names);
+    } catch (_) {
+      // Names are cosmetic; the dropdown falls back to the raw id.
+    }
+  }
+
+  String _studentLabel(String id) {
+    final name = _studentNames[id]?.trim() ?? '';
+    return name.isEmpty ? id : name;
   }
 
   @override
@@ -450,7 +495,7 @@ class _IssueAchievementDialogState extends State<_IssueAchievementDialog> {
                                 (id) => DropdownMenuItem(
                                   value: id,
                                   child: Text(
-                                    id,
+                                    _studentLabel(id),
                                     style: AppTextStyles.bodyMedium,
                                     textAlign: TextAlign.right,
                                   ),
@@ -887,34 +932,10 @@ class _EmptyHalaqat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.paddingXL),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.groups_rounded,
-              size: 64,
-              color: AppColors.textHint.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'لا توجد حلقات مسندة إليك',
-              style: AppTextStyles.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'عند إسناد حلقات لحسابك من قِبل الأكاديمية ستظهر هنا.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textHint,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.groups_rounded,
+      title: 'لا توجد حلقات مسندة إليك',
+      message: 'عند إسناد حلقات لحسابك من قِبل الأكاديمية ستظهر هنا.',
     );
   }
 }

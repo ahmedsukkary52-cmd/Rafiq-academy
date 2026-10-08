@@ -200,12 +200,8 @@ void main() {
       halaqaIds: ['h1'],
     );
 
-    test('Admin, Supervisor and Parent may compose payment', () {
-      for (final role in [
-        AppRoles.admin,
-        AppRoles.supervisor,
-        AppRoles.parent,
-      ]) {
+    test('Admin and Parent may compose payment', () {
+      for (final role in [AppRoles.admin, AppRoles.parent]) {
         expect(
           StudentStatusComposition.composeForRole(
             viewerRole: role,
@@ -217,18 +213,23 @@ void main() {
       }
     });
 
-    test('Teacher never surfaces the payment dimension', () {
-      expect(
-        StudentStatusVisibility.forRole(AppRoles.teacher).canSeePayment,
-        isFalse,
-      );
-      expect(
-        StudentStatusComposition.composeForRole(
-          viewerRole: AppRoles.teacher,
-          facts: suspendedFacts,
-        ),
-        StudentStatusLabel.active,
-      );
+    test('Teacher and Supervisor never surface the payment dimension', () {
+      // Rules deny paymentAccess reads to both roles (PH-01).
+      for (final role in [AppRoles.teacher, AppRoles.supervisor]) {
+        expect(
+          StudentStatusVisibility.forRole(role).canSeePayment,
+          isFalse,
+          reason: role,
+        );
+        expect(
+          StudentStatusComposition.composeForRole(
+            viewerRole: role,
+            facts: suspendedFacts,
+          ),
+          StudentStatusLabel.active,
+          reason: role,
+        );
+      }
     });
 
     test('Teacher still sees archived and awaiting-halaqa states', () {

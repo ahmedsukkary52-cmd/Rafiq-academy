@@ -45,6 +45,14 @@ void main() {
         'chat_voice/a_b/m1/v.m4a',
       );
       expect(
+        StoragePathsContract.chatAttachment(
+          conversationId: 'a_b',
+          messageId: 'm1',
+          fileName: 'file.pdf',
+        ),
+        'chat_attachments/a_b/m1/file.pdf',
+      );
+      expect(
         StoragePathsContract.recitation(
           studentId: 's1',
           assignmentId: 'asg1',

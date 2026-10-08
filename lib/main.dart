@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/constants/academy_branding.dart';
 import 'core/di/injection_container.dart';
 import 'core/router/router_app.dart';
 import 'core/session/clear_session_projections.dart';
@@ -16,7 +18,9 @@ import 'features/parent/presentation/bloc/parent_bloc.dart';
 import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/notifications/data/services/fcm_token_registrar.dart';
+import 'features/notifications/domain/services/notification_open_port.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
+import 'features/notifications/presentation/notification_deep_links.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/analytics/presentation/bloc/analytics_bloc.dart';
 import 'features/awards/presentation/bloc/awards_bloc.dart';
@@ -26,6 +30,7 @@ import 'features/chat/presentation/bloc/chat_conversations_bloc.dart';
 import 'features/post/presentation/bloc/posts_bloc.dart';
 import 'firebase_options.dart';
 import 'features/onboarding/presentation/pages/onboarding_page.dart';
+import 'shared/theme/app_locale_config.dart';
 import 'shared/theme/app_preferences_controller.dart';
 import 'shared/theme/app_theme.dart';
 
@@ -43,7 +48,7 @@ Future<void> main() async {
   runApp(MyApp(onboardingSeen: onboardingSeen, appPreferences: appPreferences));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final ValueNotifier<bool> onboardingSeen;
   final AppPreferencesController appPreferences;
 
@@ -54,9 +59,66 @@ class MyApp extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final authBloc = sl<AuthBloc>()..add(const CheckAuthStatusEvent());
+  State<MyApp> createState() => _MyAppState();
+}
 
+class _MyAppState extends State<MyApp> {
+  late final AuthBloc authBloc = sl<AuthBloc>()
+    ..add(const CheckAuthStatusEvent());
+
+  /// One router for the app lifetime so push taps can navigate it.
+  late final GoRouter _router = AppRouter(
+    authBloc: authBloc,
+    onboardingSeen: widget.onboardingSeen,
+  ).router;
+
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  StreamSubscription<String>? _pushOpenSub;
+
+  /// A tapped push waiting for authentication to resolve.
+  String? _pendingPushType;
+
+  ValueNotifier<bool> get onboardingSeen => widget.onboardingSeen;
+  AppPreferencesController get appPreferences => widget.appPreferences;
+
+  @override
+  void initState() {
+    super.initState();
+    final opens = sl<NotificationOpenPort>();
+    _pushOpenSub = opens.openedTypes().listen(_onPushOpened);
+    unawaited(
+      opens.initialOpenedType().then((type) {
+        if (type != null) _onPushOpened(type);
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pushOpenSub?.cancel();
+    super.dispose();
+  }
+
+  void _onPushOpened(String type) {
+    _pendingPushType = type;
+    _consumePendingPush();
+  }
+
+  void _consumePendingPush() {
+    final type = _pendingPushType;
+    final auth = authBloc.state;
+    if (type == null || auth is! AuthAuthenticated) return;
+    _pendingPushType = null;
+    final target = NotificationDeepLinks.pushTarget(
+      type: type,
+      role: auth.user.role,
+    );
+    if (target != null) _router.push(target);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: authBloc),
@@ -75,50 +137,62 @@ class MyApp extends StatelessWidget {
       ],
       child: BlocListener<AuthBloc, AuthState>(
         listenWhen: (previous, current) =>
+            current is AuthLogoutFailure ||
             (current is AuthUnauthenticated &&
                 previous is! AuthUnauthenticated) ||
             (current is AuthAuthenticated &&
                 (previous is! AuthAuthenticated ||
                     previous.user.uid != current.user.uid)),
         listener: (context, state) {
+          if (state is AuthLogoutFailure) {
+            _messengerKey.currentState?.showSnackBar(
+              SnackBar(content: Text(state.message, textAlign: TextAlign.right)),
+            );
+            return;
+          }
           if (state is AuthAuthenticated) {
             // WA-13 / C11: the app's single FCM registration point.
             unawaited(sl<FcmTokenRegistrar>().onSignedIn(state.user.uid));
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _consumePendingPush(),
+            );
             return;
           }
           // H1 / A-H1: singleton role & capability projections must not
           // survive logout on shared devices.
+          _pendingPushType = null;
           clearSessionProjections(context);
           unawaited(sl<FcmTokenRegistrar>().onSignedOut());
         },
         child: AppPreferencesScope(
           controller: appPreferences,
-          child: ValueListenableBuilder<ThemeMode>(
-            valueListenable: appPreferences.themeMode,
-            builder: (context, themeMode, _) {
-              return ValueListenableBuilder<AppFontSize>(
-                valueListenable: appPreferences.fontSize,
-                builder: (context, fontSize, _) {
-                  return MaterialApp.router(
-                    debugShowCheckedModeBanner: false,
-                    title: 'أكاديمية رفيق',
-                    theme: AppTheme.theme,
-                    darkTheme: AppTheme.darkTheme,
-                    themeMode: themeMode,
-                    builder: (context, child) {
-                      return MediaQuery(
-                        data: MediaQuery.of(context).copyWith(
-                          textScaler: TextScaler.linear(fontSize.scale),
-                        ),
-                        child: child!,
-                      );
-                    },
-                    routerConfig: AppRouter(
-                      authBloc: authBloc,
-                      onboardingSeen: onboardingSeen,
-                    ).router,
+          child: ValueListenableBuilder<AppFontSize>(
+            valueListenable: appPreferences.fontSize,
+            builder: (context, fontSize, _) {
+              return MaterialApp.router(
+                scaffoldMessengerKey: _messengerKey,
+                debugShowCheckedModeBanner: false,
+                title: AcademyBranding.displayName,
+                // D15 — Arabic + RTL only (UI-1).
+                locale: AppLocaleConfig.locale,
+                supportedLocales: AppLocaleConfig.supportedLocales,
+                localizationsDelegates: AppLocaleConfig.localizationsDelegates,
+                theme: AppTheme.theme,
+                // Infrastructure retained; product always uses light (D15).
+                darkTheme: AppTheme.theme,
+                themeMode: ThemeMode.light,
+                builder: (context, child) {
+                  return Directionality(
+                    textDirection: AppLocaleConfig.textDirection,
+                    child: MediaQuery(
+                      data: MediaQuery.of(
+                        context,
+                      ).copyWith(textScaler: TextScaler.linear(fontSize.scale)),
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   );
                 },
+                routerConfig: _router,
               );
             },
           ),

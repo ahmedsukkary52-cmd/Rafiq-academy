@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource.dart';
 
@@ -15,8 +16,12 @@ import '../../domain/entities/supervisor_report_entity.dart';
 @LazySingleton(as: SupervisorRemoteDatasource)
 class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   final FirebaseFirestore firestore;
+  final FirebaseFunctions functions;
 
-  const SupervisorRemoteDatasourceImpl({required this.firestore});
+  const SupervisorRemoteDatasourceImpl({
+    required this.firestore,
+    required this.functions,
+  });
 
   @override
   Future<List<HalaqaModel>> getSupervisedHalaqat(String supervisorId) async {
@@ -67,23 +72,21 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
     }
   }
 
+  /// Academy Admission via the admitStudentToHalaqa callable: supervised-halaqa
+  /// scope, student role, duplicate and max-2 cap are enforced transactionally.
   @override
   Future<void> registerNewStudent({
     required String halaqaId,
     required String studentId,
   }) async {
     try {
-      await firestore
-          .collection(FirestoreCollections.halaqat)
-          .doc(halaqaId)
-          .update({
-            'studentIds': FieldValue.arrayUnion([studentId]),
-          });
-
-      await firestore
-          .collection(FirestoreCollections.studentProfiles)
-          .doc(studentId)
-          .update({'halaqaId': halaqaId});
+      final callable = functions.httpsCallable('admitStudentToHalaqa');
+      await callable.call(<String, dynamic>{
+        'halaqaId': halaqaId.trim(),
+        'studentId': studentId.trim(),
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } catch (e) {
       throw ServerException(e.toString());
     }

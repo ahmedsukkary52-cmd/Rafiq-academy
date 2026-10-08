@@ -19,16 +19,50 @@ service firebase.storage {
       );
     }
 
+    // Deactivated profiles (isActive == false) hold no role (fail closed).
+    function activeRole() {
+      return userDoc().data.get('isActive', true) != false
+        ? userDoc().data.get('role', '')
+        : '';
+    }
+
     function isAdmin() {
-      return signedIn() && userDoc().data.role == 'admin';
+      return signedIn() && activeRole() == 'admin';
     }
 
     function isSupervisor() {
-      return signedIn() && userDoc().data.role == 'supervisor';
+      return signedIn() && activeRole() == 'supervisor';
     }
 
     function isParentRole() {
-      return signedIn() && userDoc().data.role == 'parent';
+      return signedIn() && activeRole() == 'parent';
+    }
+
+    /// Teacher / Supervisor / Admin — content publishers and award grantors.
+    function isStaff() {
+      return signedIn()
+        && activeRole() in ['teacher', 'supervisor', 'admin'];
+    }
+
+    function halaqaDoc(halaqaId) {
+      return firestore.get(
+        /databases/(default)/documents/halaqat/$(halaqaId)
+      );
+    }
+
+    /// C4.7: a supervisor reviews proofs only for students on a halaqa they
+    /// supervise (pointer selects the halaqa; the roster proves membership).
+    function supervisesPaymentStudent(paymentId) {
+      let payment = firestore.get(
+        /databases/(default)/documents/payments/$(paymentId)
+      ).data;
+      let profile = firestore.get(
+        /databases/(default)/documents/studentProfiles/$(payment.studentId)
+      ).data;
+      let halaqa = halaqaDoc(profile.halaqaId).data;
+      return isSupervisor()
+        && halaqa.supervisorId == uid()
+        && payment.studentId in halaqa.studentIds;
     }
 
     function nonEmpty(s) {
@@ -92,8 +126,64 @@ service firebase.storage {
         && uid() in conversationDoc(conversationId).data.participantIds;
     }
 
-    function canAccessConversationMedia(conversationId) {
-      return isAdmin() || isConversationParticipant(conversationId);
+    function chatMessagePath(conversationId, messageId) {
+      return /databases/(default)/documents/conversations/$(conversationId)/messages/$(messageId);
+    }
+
+    /// Participants read only media bound to a live (non-deleted) message
+    /// whose server-written media.storagePath is this exact object.
+    /// Admin may read retained media of deleted messages (moderation, D13).
+    function canReadChatObject(prefix, conversationId, messageId, fileName) {
+      let path = prefix + '/' + conversationId + '/' + messageId + '/' + fileName;
+      return isAdmin()
+        || (
+          isConversationParticipant(conversationId)
+          && firestore.exists(chatMessagePath(conversationId, messageId))
+          && firestore.get(chatMessagePath(conversationId, messageId))
+              .data.get('deleted', false) != true
+          && firestore.get(chatMessagePath(conversationId, messageId))
+              .data.get('media', {}).get('storagePath', '') == path
+        );
+    }
+
+    /// Upload precedes sendChatMessage. No overwrite, no upload for an
+    /// already-sent messageId, uploader stamped for server verification.
+    function canUploadChatObject(conversationId, messageId, fileName) {
+      return isConversationParticipant(conversationId)
+        && nonEmpty(messageId)
+        && messageId.matches('^[A-Za-z0-9_-]{10,40}$')
+        && nonEmpty(fileName)
+        && resource == null
+        && request.resource.metadata != null
+        && request.resource.metadata.get('uploaderId', '') == uid()
+        && !firestore.exists(chatMessagePath(conversationId, messageId));
+    }
+
+    /// Cancelled / failed sends: uploader removes own object while no
+    /// message references it.
+    function canDeleteOrphanChatObject(conversationId, messageId) {
+      return signedIn()
+        && resource.metadata.get('uploaderId', '') == uid()
+        && !firestore.exists(chatMessagePath(conversationId, messageId));
+    }
+
+    function isChatImageType() {
+      return request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    function isChatVoiceType() {
+      return request.resource.contentType in [
+        'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/mpeg',
+        'audio/ogg', 'audio/webm', 'audio/wav', 'audio/x-wav'
+      ];
+    }
+
+    function isChatDocumentType() {
+      return request.resource.contentType in [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
     }
 
     // ── C10 payment_proofs/{parentId}/{paymentId}/{fileName} ───────────────
@@ -105,7 +195,10 @@ service firebase.storage {
         && (
           (uid() == parentId && isParentRole())
           || isAdmin()
-          || isSupervisor()
+          || (
+            paymentOwnedByParent(parentId, paymentId)
+            && supervisesPaymentStudent(paymentId)
+          )
         );
 
       allow create: if signedIn()
@@ -138,48 +231,44 @@ service firebase.storage {
         && nonEmpty(fileName);
     }
 
-    // ── C10 chat_media ─────────────────────────────────────────────────────
+    // ── C10 chat_media (images) ────────────────────────────────────────────
+    // Limits mirror functions/src/chat/chatMessageContract.ts.
     match /chat_media/{conversationId}/{messageId}/{fileName} {
-      allow read: if canAccessConversationMedia(conversationId)
-        && nonEmpty(messageId)
-        && nonEmpty(fileName);
+      allow read: if canReadChatObject(
+        'chat_media', conversationId, messageId, fileName);
 
-      allow create: if isConversationParticipant(conversationId)
-        && nonEmpty(messageId)
-        && nonEmpty(fileName)
-        && isImage()
+      allow create: if canUploadChatObject(conversationId, messageId, fileName)
+        && isChatImageType()
         && underChatImageSize();
 
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if canDeleteOrphanChatObject(conversationId, messageId);
     }
 
     // ── C10 chat_voice ─────────────────────────────────────────────────────
     match /chat_voice/{conversationId}/{messageId}/{fileName} {
-      allow read: if canAccessConversationMedia(conversationId)
-        && nonEmpty(messageId)
-        && nonEmpty(fileName);
+      allow read: if canReadChatObject(
+        'chat_voice', conversationId, messageId, fileName);
 
-      allow create: if isConversationParticipant(conversationId)
-        && nonEmpty(messageId)
-        && nonEmpty(fileName)
-        && request.resource.contentType.matches('audio/.*')
+      allow create: if canUploadChatObject(conversationId, messageId, fileName)
+        && isChatVoiceType()
         && underChatVoiceSize();
 
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if canDeleteOrphanChatObject(conversationId, messageId);
     }
 
-    // ── C10 chat_attachments (same conversation auth; types IMPLEMENTATION) ─
+    // ── C10 chat_attachments (PDF / Word, same list as Content Library) ────
     match /chat_attachments/{conversationId}/{messageId}/{fileName} {
-      allow read: if canAccessConversationMedia(conversationId)
-        && nonEmpty(messageId)
-        && nonEmpty(fileName);
+      allow read: if canReadChatObject(
+        'chat_attachments', conversationId, messageId, fileName);
 
-      allow create: if isConversationParticipant(conversationId)
-        && nonEmpty(messageId)
-        && nonEmpty(fileName)
+      allow create: if canUploadChatObject(conversationId, messageId, fileName)
+        && isChatDocumentType()
         && underChatImageSize();
 
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if canDeleteOrphanChatObject(conversationId, messageId);
     }
 
     // ── C10 awards/{teacherId}/{file} — grantor staff path lock ─────────────
@@ -190,6 +279,7 @@ service firebase.storage {
 
       allow create: if signedIn()
         && uid() == teacherId
+        && isStaff()
         && nonEmpty(fileName)
         && isImage()
         && underAwardImageSize();
@@ -208,29 +298,86 @@ service firebase.storage {
       allow create: if signedIn()
         && resource == null
         && uid() == authorId
+        && isStaff()
         && nonEmpty(fileName);
 
       allow update: if false;
       allow delete: if false;
     }
 
-    // ── WA-12 content/{uploadedBy}/{fileName} ──────────────────────────────
-    // Upload precedes contentLibrary/{id}; delete is path-owner only.
+    // ── Legacy content/{uploadedBy}/{fileName} (pre-P0, not Halaqa-scoped) ─
+    // New uploads use content_library/{halaqaId}/…; legacy objects stay
+    // readable by their uploader and Admin only.
     match /content/{uploadedBy}/{fileName} {
       allow read: if signedIn()
-        && nonEmpty(uploadedBy)
-        && nonEmpty(fileName);
+        && nonEmpty(fileName)
+        && (uid() == uploadedBy || isAdmin());
+      allow create, update: if false;
+      allow delete: if signedIn()
+        && nonEmpty(fileName)
+        && (uid() == uploadedBy || isAdmin());
+    }
+
+    // ── P0 §8 content_library/{halaqaId}/{uploadedBy}/{fileName} ───────────
+    // Halaqa shared content: same audience as Firestore contentLibrary.
+    function isStaffOfHalaqaDoc(halaqaId) {
+      return nonEmpty(halaqaId)
+        && firestore.exists(/databases/(default)/documents/halaqat/$(halaqaId))
+        && (
+          halaqaDoc(halaqaId).data.get('teacherId', '') == uid()
+          || halaqaDoc(halaqaId).data.get('supervisorId', '') == uid()
+        );
+    }
+
+    function isStudentOnHalaqa(halaqaId) {
+      return nonEmpty(halaqaId)
+        && firestore.exists(/databases/(default)/documents/halaqat/$(halaqaId))
+        && uid() in halaqaDoc(halaqaId).data.get('studentIds', []);
+    }
+
+    function isLinkedParentOfHalaqa(halaqaId) {
+      return isParentRole()
+        && nonEmpty(halaqaId)
+        && firestore.exists(/databases/(default)/documents/halaqat/$(halaqaId))
+        && firestore.exists(/databases/(default)/documents/parentProfiles/$(uid()))
+        && firestore.get(/databases/(default)/documents/parentProfiles/$(uid()))
+            .data.get('childrenIds', [])
+            .hasAny(halaqaDoc(halaqaId).data.get('studentIds', []));
+    }
+
+    // PDF, audio, images and Word documents (product decision §8).
+    function isAllowedContentType() {
+      return request.resource.contentType.matches('image/.*')
+        || request.resource.contentType.matches('audio/.*')
+        || request.resource.contentType == 'application/pdf'
+        || request.resource.contentType == 'application/msword'
+        || request.resource.contentType
+          == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+
+    match /content_library/{halaqaId}/{uploadedBy}/{fileName} {
+      allow read: if signedIn()
+        && nonEmpty(fileName)
+        && (
+          isAdmin()
+          || isStaffOfHalaqaDoc(halaqaId)
+          || isStudentOnHalaqa(halaqaId)
+          || isLinkedParentOfHalaqa(halaqaId)
+        );
 
       allow create: if signedIn()
         && resource == null
         && uid() == uploadedBy
-        && nonEmpty(fileName);
+        && nonEmpty(fileName)
+        && (isAdmin() || isStaffOfHalaqaDoc(halaqaId))
+        && isAllowedContentType()
+        && request.resource.size < 50 * 1024 * 1024;
 
       allow update: if false;
 
       allow delete: if signedIn()
-        && uid() == uploadedBy
-        && nonEmpty(fileName);
+        && nonEmpty(fileName)
+        && (isAdmin() || isStaffOfHalaqaDoc(halaqaId));
     }
 
     // ── WA-12 halaqa_activities/{activityId}/{studentId}/{folder}/{file} ───
@@ -275,12 +422,28 @@ service firebase.storage {
         ).data.studentIds;
     }
 
+    /// Teacher / Supervisor of the assignment's halaqa (roster SSOT doc).
+    function isStaffOfAssignmentHalaqa(activityId) {
+      return assignmentHasHalaqaId(activityId)
+        && (
+          halaqaDoc(assignmentHalaqaId(activityId)).data.get('teacherId', '') == uid()
+          || halaqaDoc(assignmentHalaqaId(activityId)).data.get('supervisorId', '') == uid()
+        );
+    }
+
     match /halaqa_activities/{activityId}/{studentId}/{folder}/{fileName} {
+      // Owner, the halaqa's staff, rostered classmates (shared thread), Admin.
       allow read: if signedIn()
         && nonEmpty(activityId)
         && nonEmpty(studentId)
         && nonEmpty(fileName)
-        && (folder == 'images' || folder == 'audio');
+        && (folder == 'images' || folder == 'audio')
+        && (
+          uid() == studentId
+          || isAdmin()
+          || isStaffOfAssignmentHalaqa(activityId)
+          || studentOnAssignmentHalaqa(activityId, uid())
+        );
 
       allow create: if signedIn()
         && resource == null

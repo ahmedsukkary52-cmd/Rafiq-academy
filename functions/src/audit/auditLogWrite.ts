@@ -11,7 +11,9 @@ import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   ACTOR_ROLE_ADMIN,
+  ACTOR_ROLE_SUPERVISOR,
   ACTOR_ROLE_SYSTEM,
+  ACTOR_ROLE_TEACHER,
   AUDIT_ACTION_FIELD,
   AUDIT_ACTOR_ID_FIELD,
   AUDIT_ACTOR_ROLE_FIELD,
@@ -36,6 +38,39 @@ export function adminActor(uid: string): AuditActor {
     throw new Error("audit actorId (admin) is required");
   }
   return { actorId, actorRole: ACTOR_ROLE_ADMIN };
+}
+
+export function supervisorActor(uid: string): AuditActor {
+  const actorId = typeof uid === "string" ? uid.trim() : "";
+  if (!actorId) {
+    throw new Error("audit actorId (supervisor) is required");
+  }
+  return { actorId, actorRole: ACTOR_ROLE_SUPERVISOR };
+}
+
+export function teacherActor(uid: string): AuditActor {
+  const actorId = typeof uid === "string" ? uid.trim() : "";
+  if (!actorId) {
+    throw new Error("audit actorId (teacher) is required");
+  }
+  return { actorId, actorRole: ACTOR_ROLE_TEACHER };
+}
+
+/**
+ * Actor for an authenticated caller whose role was loaded server-side from
+ * `users/{uid}.role`. Parent / Student / unknown roles never author audits.
+ */
+export function actorForCallerRole(uid: string, role: string): AuditActor {
+  switch (role) {
+    case ACTOR_ROLE_ADMIN:
+      return adminActor(uid);
+    case ACTOR_ROLE_SUPERVISOR:
+      return supervisorActor(uid);
+    case ACTOR_ROLE_TEACHER:
+      return teacherActor(uid);
+    default:
+      throw new Error(`audit actorRole not allowed for caller role: ${role}`);
+  }
 }
 
 /** Reserved for future scheduler hooks (e.g. payment_suspend). */
@@ -77,7 +112,12 @@ export function buildAuditLogEntry<T>(
 ): Record<string, unknown> {
   const actorId = requireNonEmpty(input.actor.actorId, "actorId");
   const actorRole = requireNonEmpty(input.actor.actorRole, "actorRole");
-  if (actorRole !== ACTOR_ROLE_ADMIN && actorRole !== ACTOR_ROLE_SYSTEM) {
+  if (
+    actorRole !== ACTOR_ROLE_ADMIN &&
+    actorRole !== ACTOR_ROLE_SYSTEM &&
+    actorRole !== ACTOR_ROLE_SUPERVISOR &&
+    actorRole !== ACTOR_ROLE_TEACHER
+  ) {
     throw new Error(`audit actorRole invalid: ${actorRole}`);
   }
 

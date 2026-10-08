@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 
@@ -16,16 +17,16 @@ import 'award_remote_datasource.dart';
 class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
+  final FirebaseFunctions functions;
 
   const AwardsRemoteDatasourceImpl({
     required this.firestore,
     required this.storage,
+    required this.functions,
   });
 
   CollectionReference get _awardsRef =>
       firestore.collection(FirestoreCollections.achievements);
-
-  static const _profileOpsPerBatch = 400;
 
   @override
   Future<AwardsStatsEntity> getAwardsStats(String halaqaId) async {
@@ -93,33 +94,24 @@ class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
         imageUrl = await ref.getDownloadURL();
       }
 
-      final payload = award.toFirestore(
-        imageUrl: imageUrl,
-        imageStoragePath: imageStoragePath,
-      );
-      final awardRef = _awardsRef.doc();
-
-      var remaining = [...recipientIds];
-      var wroteAward = false;
-      while (!wroteAward || remaining.isNotEmpty) {
-        final batch = firestore.batch();
-        if (!wroteAward) {
-          batch.set(awardRef, payload);
-          wroteAward = true;
-        }
-        final chunk = remaining.take(_profileOpsPerBatch).toList();
-        remaining = remaining.skip(_profileOpsPerBatch).toList();
-        for (final studentId in chunk) {
-          final profileRef = firestore
-              .collection(FirestoreCollections.studentProfiles)
-              .doc(studentId);
-          batch.update(profileRef, {
-            'points': FieldValue.increment(10),
-            'totalStars': FieldValue.increment(1),
-          });
-        }
-        await batch.commit();
-      }
+      // The server writes the award and credits stars atomically; the
+      // pre-generated id makes a replayed call a no-op.
+      final callable = functions.httpsCallable('grantAward');
+      await callable.call(<String, dynamic>{
+        'awardId': _awardsRef.doc().id,
+        'type': award.type.firestoreKey,
+        'title': award.displayTitle,
+        'description': award.description?.trim() ?? '',
+        'studentName': award.studentName,
+        'studentImageUrl': award.studentImageUrl ?? '',
+        'halaqaId': award.halaqaId,
+        'halaqaIds': award.resolvedHalaqaIds,
+        'recipientStudentIds': recipientIds,
+        'imageUrl': imageUrl ?? '',
+        'imageStoragePath': imageStoragePath ?? '',
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException(e.toString());

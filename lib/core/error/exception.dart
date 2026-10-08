@@ -1,5 +1,9 @@
 library;
 
+import 'auth_error_reason.dart';
+
+export 'auth_error_reason.dart';
+
 class ServerException implements Exception {
   final String message;
 
@@ -20,8 +24,9 @@ class CacheException implements Exception {
 
 class AuthException implements Exception {
   final String message;
+  final AuthErrorReason reason;
 
-  const AuthException(this.message);
+  const AuthException(this.message, {this.reason = AuthErrorReason.generic});
 
   @override
   String toString() => message;

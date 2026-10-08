@@ -5,13 +5,14 @@
  * call firestore.get / exists).
  *
  * Run from repo root:
- *   npx firebase emulators:exec --project demo-rafiq-wa12 \
+ *   npx firebase emulators:exec --project demo-rafiq-rules \
  *     --only firestore,storage \
  *     "npm --prefix rules_test run test:storage"
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PROJECT_ID } from './project_id.mjs';
 import test from 'node:test';
 import {
   assertFails,
@@ -62,7 +63,7 @@ async function putAudio(ref) {
 
 test.before(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: 'demo-rafiq-wa12',
+    projectId: PROJECT_ID,
     firestore: { rules: firestoreRules },
     storage: { rules: storageRules },
   });
@@ -182,6 +183,15 @@ test('WA-12 parent cannot read another parent proof', async () => {
 });
 
 test('WA-12 supervisor and admin can read payment proof', async () => {
+  // PH-01 / C4.7: the supervisor must supervise the invoice's student.
+  await seedFirestore(async (db) => {
+    await db.doc('halaqat/h1').set({
+      teacherId: 'teacher1',
+      supervisorId: 'supervisor1',
+      studentIds: ['student1'],
+    });
+    await db.doc('studentProfiles/student1').set({ halaqaId: 'h1' });
+  });
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx
       .storage()
@@ -267,54 +277,176 @@ test('WA-12 signed-in users can read profile images', async () => {
 
 // ── Chat media / voice ──────────────────────────────────────────────────────
 
-test('WA-12 participant can write/read chat media; stranger denied', async () => {
-  const path = 'chat_media/student1_teacher1/m1/photo.jpg';
-  await assertSucceeds(putImage(authedStorage('teacher1').ref(path)));
+// Upload precedes sendChatMessage; reads require a live message whose
+// server-written media.storagePath equals the object path.
+
+function chatPut(uid, path, contentType, uploaderId = uid, bytes = jpegBytes()) {
+  return authedStorage(uid)
+    .ref(path)
+    .put(bytes, { contentType, customMetadata: { uploaderId } });
+}
+
+async function seedChatObject(path, contentType, uploaderId) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.storage().ref(path).put(jpegBytes(), {
+      contentType,
+      customMetadata: { uploaderId },
+    });
+  });
+}
+
+async function seedChatMessage(conversationId, messageId, data) {
+  await seedFirestore(async (db) => {
+    await db
+      .doc(`conversations/${conversationId}/messages/${messageId}`)
+      .set({ sentAt: new Date(), deleted: false, ...data });
+  });
+}
+
+test('Chat storage: participant uploads with own uploaderId; stranger and spoofed uploader denied', async () => {
+  const path = 'chat_media/student1_teacher1/upImgAaaaa01/photo.jpg';
+  await assertFails(chatPut('stranger', path, 'image/jpeg'));
+  await assertFails(chatPut('teacher1', path, 'image/jpeg', 'student1'));
+  await assertFails(
+    putImage(authedStorage('teacher1').ref(path)), // no uploaderId metadata
+  );
+  await assertSucceeds(chatPut('teacher1', path, 'image/jpeg'));
+});
+
+test('Chat storage: knowing conversationId alone is insufficient (Parent not in group)', async () => {
+  const path = 'chat_media/halaqa_group_h1/grpImgAaaa01/x.jpg';
+  await assertFails(chatPut('parent1', path, 'image/jpeg'));
+  await seedChatObject(path, 'image/jpeg', 'teacher1');
+  await seedChatMessage('halaqa_group_h1', 'grpImgAaaa01', {
+    senderId: 'teacher1',
+    type: 'image',
+    media: { storagePath: path },
+  });
+  await assertFails(authedStorage('parent1').ref(path).getDownloadURL());
   await assertSucceeds(authedStorage('student1').ref(path).getDownloadURL());
-  await assertFails(putImage(authedStorage('stranger').ref(path)));
+});
+
+test('Chat storage: unsent upload is not readable by the other participant', async () => {
+  const path = 'chat_media/student1_teacher1/orphanRead01/photo.jpg';
+  await seedChatObject(path, 'image/jpeg', 'teacher1');
+  await assertFails(authedStorage('student1').ref(path).getDownloadURL());
+  await assertSucceeds(authedStorage('admin1').ref(path).getDownloadURL());
+});
+
+test('Chat storage: message must reference this exact path', async () => {
+  const path = 'chat_media/student1_teacher1/mismatch0001/real.jpg';
+  const other = 'chat_media/student1_teacher1/mismatch0001/other.jpg';
+  await seedChatObject(path, 'image/jpeg', 'teacher1');
+  await seedChatObject(other, 'image/jpeg', 'teacher1');
+  await seedChatMessage('student1_teacher1', 'mismatch0001', {
+    senderId: 'teacher1',
+    type: 'image',
+    media: { storagePath: path },
+  });
+  await assertSucceeds(authedStorage('student1').ref(path).getDownloadURL());
+  await assertFails(authedStorage('student1').ref(other).getDownloadURL());
   await assertFails(authedStorage('stranger').ref(path).getDownloadURL());
 });
 
-test('WA-12 knowing conversationId alone is insufficient for media', async () => {
-  const path = 'chat_media/halaqa_group_h1/m9/x.jpg';
-  await assertFails(putImage(authedStorage('parent1').ref(path)));
-  await assertFails(authedStorage('parent1').ref(path).getDownloadURL());
-});
-
-test('WA-12 Admin can monitor chat media read', async () => {
-  const path = 'chat_media/student1_teacher1/m2/photo.jpg';
-  await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await ctx.storage().ref(path).put(jpegBytes(), { contentType: 'image/jpeg' });
+test('Chat storage: deleted message media hidden from participants; Admin retains moderation read', async () => {
+  const path = 'chat_media/student1_teacher1/deletedImg01/photo.jpg';
+  await seedChatObject(path, 'image/jpeg', 'teacher1');
+  await seedChatMessage('student1_teacher1', 'deletedImg01', {
+    senderId: 'teacher1',
+    type: 'image',
+    deleted: true,
+    media: { storagePath: path },
   });
+  await assertFails(authedStorage('student1').ref(path).getDownloadURL());
+  await assertFails(authedStorage('teacher1').ref(path).getDownloadURL());
   await assertSucceeds(authedStorage('admin1').ref(path).getDownloadURL());
-  await assertFails(putImage(authedStorage('admin1').ref(path)));
 });
 
-test('WA-12 nonexistent conversation media denied', async () => {
-  await assertFails(
-    putImage(
-      authedStorage('teacher1').ref('chat_media/does_not_exist/m1/x.jpg'),
+test('Chat storage: no upload for an already-sent messageId and no overwrite', async () => {
+  const sentPath = 'chat_media/student1_teacher1/alreadySent1/new.jpg';
+  await seedChatMessage('student1_teacher1', 'alreadySent1', {
+    senderId: 'teacher1',
+    type: 'text',
+    text: 'hi',
+  });
+  await assertFails(chatPut('teacher1', sentPath, 'image/jpeg'));
+
+  const path = 'chat_media/student1_teacher1/overwrite001/a.jpg';
+  await seedChatObject(path, 'image/jpeg', 'teacher1');
+  await assertFails(chatPut('teacher1', path, 'image/jpeg'));
+});
+
+test('Chat storage: type allow-lists per folder', async () => {
+  const conv = 'chat_media/student1_teacher1';
+  await assertFails(chatPut('teacher1', `${conv}/typeImgGif01/a.gif`, 'image/gif'));
+  await assertFails(chatPut('teacher1', `${conv}/typeImgSvg01/a.svg`, 'image/svg+xml'));
+  await assertSucceeds(chatPut('teacher1', `${conv}/typeImgPng01/a.png`, 'image/png'));
+
+  const voice = 'chat_voice/student1_teacher1';
+  await assertSucceeds(chatPut('student1', `${voice}/typeVoiceM41/v.m4a`, 'audio/mp4'));
+  await assertFails(chatPut('student1', `${voice}/typeVoiceTx1/v.txt`, 'text/plain'));
+
+  const files = 'chat_attachments/student1_teacher1';
+  await assertSucceeds(chatPut('student1', `${files}/typeFilePdf1/a.pdf`, 'application/pdf'));
+  await assertSucceeds(
+    chatPut(
+      'student1',
+      `${files}/typeFileDcx1/a.docx`,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ),
+  );
+  await assertFails(chatPut('student1', `${files}/typeFileExe1/a.exe`, 'application/x-msdownload'));
+  await assertFails(chatPut('student1', `${files}/typeFileHtm1/a.html`, 'text/html'));
+  await assertFails(chatPut('student1', `${files}/typeFileImg1/a.jpg`, 'image/jpeg'));
+});
+
+test('Chat storage: size ceilings enforced', async () => {
+  const big = new Uint8Array(10 * 1024 * 1024);
+  await assertFails(
+    chatPut('teacher1', 'chat_media/student1_teacher1/bigImage0001/a.jpg', 'image/jpeg', 'teacher1', big),
+  );
+  await assertFails(
+    chatPut('teacher1', 'chat_attachments/student1_teacher1/bigFile00001/a.pdf', 'application/pdf', 'teacher1', big),
   );
 });
 
-test('WA-12 chat voice participant write/read; stranger denied', async () => {
-  const path = 'chat_voice/student1_teacher1/m1/clip.mp3';
-  await assertSucceeds(putAudio(authedStorage('student1').ref(path)));
-  await assertSucceeds(authedStorage('teacher1').ref(path).getDownloadURL());
-  await assertFails(putAudio(authedStorage('stranger').ref(path)));
-  await assertFails(authedStorage('stranger').ref(path).getDownloadURL());
+test('Chat storage: malformed messageId path rejected', async () => {
+  await assertFails(chatPut('teacher1', 'chat_media/student1_teacher1/m1/a.jpg', 'image/jpeg'));
 });
 
-test('WA-12 Admin can read chat voice; cannot create as non-participant', async () => {
-  const path = 'chat_voice/student1_teacher1/m2/clip.mp3';
-  await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await ctx.storage().ref(path).put(new Uint8Array([1, 2, 3]), {
-      contentType: 'audio/mpeg',
-    });
+test('Chat storage: uploader deletes own orphan; not others, not once sent', async () => {
+  const orphan = 'chat_voice/student1_teacher1/orphanDel001/v.m4a';
+  await seedChatObject(orphan, 'audio/mp4', 'student1');
+  await assertFails(authedStorage('teacher1').ref(orphan).delete());
+  await assertSucceeds(authedStorage('student1').ref(orphan).delete());
+
+  const sent = 'chat_voice/student1_teacher1/sentNoDel001/v.m4a';
+  await seedChatObject(sent, 'audio/mp4', 'student1');
+  await seedChatMessage('student1_teacher1', 'sentNoDel001', {
+    senderId: 'student1',
+    type: 'voice',
+    media: { storagePath: sent },
   });
-  await assertSucceeds(authedStorage('admin1').ref(path).getDownloadURL());
-  await assertFails(putAudio(authedStorage('admin1').ref(path)));
+  await assertFails(authedStorage('student1').ref(sent).delete());
+  await assertFails(authedStorage('admin1').ref(sent).delete());
+});
+
+test('Chat storage: nonexistent conversation and Admin non-member upload denied', async () => {
+  await assertFails(
+    chatPut('teacher1', 'chat_media/does_not_exist/noConvImg01/x.jpg', 'image/jpeg'),
+  );
+  await assertFails(
+    chatPut('admin1', 'chat_voice/student1_teacher1/adminVoice01/v.m4a', 'audio/mp4'),
+  );
+});
+
+test('Chat storage: deactivated Admin loses moderation read', async () => {
+  const path = 'chat_media/student1_teacher1/inactiveAdm1/photo.jpg';
+  await seedFirestore(async (db) => {
+    await db.doc('users/admin9').set({ role: 'admin', isActive: false });
+  });
+  await seedChatObject(path, 'image/jpeg', 'teacher1');
+  await assertFails(authedStorage('admin9').ref(path).getDownloadURL());
 });
 
 // ── Recitations gated ───────────────────────────────────────────────────────
@@ -349,25 +481,32 @@ test('WA-12 posts: different user create denied; owner overwrite/update/delete d
 
 // ── content/ ────────────────────────────────────────────────────────────────
 
-test('WA-12 content: owner create/read; other create denied', async () => {
+// P0 §8: legacy content/ is closed for writes (new uploads go to
+// content_library/{halaqaId}/…, covered by p0_storage.rules.test.mjs).
+async function legacyContentPut(path) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.storage().ref(path).put(jpegBytes(), { contentType: 'image/jpeg' });
+  });
+}
+
+test('WA-12 content (legacy): no new uploads; uploader/Admin read only', async () => {
   const path = 'content/teacher1/doc1.pdf';
   await assertFails(putImage(unauthStorage().ref(path)));
-  await assertSucceeds(putImage(authedStorage('teacher1').ref(path)));
-  await assertSucceeds(authedStorage('student1').ref(path).getDownloadURL());
+  await assertFails(putImage(authedStorage('teacher1').ref(path)));
+  await legacyContentPut(path);
+  await assertSucceeds(authedStorage('teacher1').ref(path).getDownloadURL());
+  await assertFails(authedStorage('student1').ref(path).getDownloadURL());
   await assertFails(putImage(authedStorage('student1').ref(path)));
 });
 
-test('WA-12 content: owner delete allowed; other delete denied; overwrite/update denied', async () => {
+test('WA-12 content (legacy): owner delete allowed; other delete denied; overwrite denied', async () => {
   const path = 'content/teacher1/doc2.pdf';
-  await assertSucceeds(putImage(authedStorage('teacher1').ref(path)));
+  await legacyContentPut(path);
   await assertFails(authedStorage('student1').ref(path).delete());
-  // Owner may delete once.
-  await assertSucceeds(authedStorage('teacher1').ref(path).delete());
-  // Recreate then deny overwrite (immutable create-only aside from owner delete).
-  await assertSucceeds(putImage(authedStorage('teacher1').ref(path)));
   await assertFails(
     authedStorage('teacher1').ref(path).put(jpegBytes(), { contentType: 'image/jpeg' }),
   );
+  await assertSucceeds(authedStorage('teacher1').ref(path).delete());
 });
 
 // ── halaqa_activities/ ──────────────────────────────────────────────────────
@@ -475,11 +614,16 @@ test('WA-12 halaqa_activities: missing halaqaId fail-closed; unsupported folder 
   );
 });
 
-test('WA-12 halaqa_activities: owner overwrite/update/delete denied; authenticated read allowed', async () => {
+test('WA-12 halaqa_activities: owner overwrite/update/delete denied; scoped read only', async () => {
   await seedFirestore(async (db) => {
     await db.doc('halaqat/h1').set({
       teacherId: 'teacher1',
-      studentIds: ['student1'],
+      studentIds: ['student1', 'classmate'],
+    });
+    await db.doc('users/classmate').set({
+      name: 'Classmate',
+      role: 'student',
+      isActive: true,
     });
     await db.doc('assignments/act1').set({
       kind: 'halaqa_activity',
@@ -489,7 +633,10 @@ test('WA-12 halaqa_activities: owner overwrite/update/delete denied; authenticat
   });
   const path = 'halaqa_activities/act1/student1/images/z.jpg';
   await assertSucceeds(putImage(authedStorage('student1').ref(path)));
-  await assertSucceeds(authedStorage('stranger').ref(path).getDownloadURL());
+  // PH-01: shared thread is roster-scoped, not every signed-in user.
+  await assertSucceeds(authedStorage('classmate').ref(path).getDownloadURL());
+  await assertSucceeds(authedStorage('teacher1').ref(path).getDownloadURL());
+  await assertFails(authedStorage('stranger').ref(path).getDownloadURL());
   await assertFails(authedStorage('student1').ref(path).delete());
   await assertFails(
     authedStorage('student1').ref(path).put(jpegBytes(), {

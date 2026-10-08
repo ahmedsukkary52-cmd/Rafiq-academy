@@ -607,7 +607,7 @@ Client **MUST NOT**:
 
 ### 11.3 Live Evaluation chain (D17) — LOCKED
 
-1. Teacher persists evaluation (authorized; D7 gate)
+1. Teacher persists evaluation (authorized; D7 gate) — via the `upsertSessionEvaluation` callable. Teacher may edit for 24h from the server-set `createdAt`; Admin may correct afterwards; Supervisor is read-only (D7.1). Corrections never re-push (per-device delivery ledger).
 2. Server publishes Academy Event (existing sink pattern; after commit)
 3. Handler creates Parent notification(s) via `childrenIds` resolver
 4. CF sends FCM to those parents’ tokens
@@ -765,8 +765,8 @@ Two visual modes: UI-only unless `visualMode` stored as above.
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `actorId` | ✔ | Admin UID, or `"system"` for future scheduler hooks |
-| `actorRole` | ✔ | `"admin"` or `"system"` — never from client input |
+| `actorId` | ✔ | Authenticated caller UID, or `"system"` for future scheduler hooks |
+| `actorRole` | ✔ | `"admin"`, `"system"`, `"supervisor"` or `"teacher"` (PH-02 amendment) — derived server-side from `users/{uid}.role`, never from client input |
 | `action` | ✔ | Central vocabulary (below) |
 | `targetType` | ✔ | e.g. `user`, `studentProfile`, `paymentAccess`, `invoice`, `migration` |
 | `targetId` | ✔ | Deterministic subject / run id |
@@ -783,8 +783,11 @@ Two visual modes: UI-only unless `visualMode` stored as above.
 `user_provision`, `payment_reinstate`, `user_archive`, `user_unarchive`, `invoice_create`,  
 plus operational migration actions: `admin_migrate_user_phones`, `halaqa_schedule_slotid_migrate`, `student_lifecycle_backfill`, `student_search_backfill`.
 
+**Emitted by PH-02 (server-authoritative workflows):**  
+`payment_review` (Admin / scoped Supervisor), `student_admit` (Admin / scoped Supervisor), `student_transfer` (Admin / Supervisor of both halaqat), `attendance_correct` (Admin outside the Teacher window), `evaluation_create_or_correct` (halaqa Teacher within 24h, or Admin at any time — D7.1; change-only, spec §20.1; metadata `sessionId`, `halaqaId`, `studentId`, `evaluationType`, `versesRange`, `operation` — never grades or notes). Actor roles `supervisor` / `teacher` are only ever produced by `actorForCallerRole` from the server-loaded role; Parent / Student never author audits. See `PH02_SUPERVISOR_AUTHORITY_REVIEW.md`.
+
 **Deferred audit hooks** (contract ready; pending authoritative CF / scheduler):  
-`payment_review`, `payment_suspend`, `student_transfer`, `relationship_children_change`, `session_create_or_correct`, `attendance_correct`, `evaluation_create_or_correct`, `admin_pricing_change`, `admin_vodafone_change`, `chat_message_moderate_delete`.
+`payment_suspend`, `relationship_children_change`, `session_create_or_correct`, `admin_pricing_change`, `admin_vodafone_change`, `chat_message_moderate_delete`.
 
 ### 16.4 Immutability / retention
 

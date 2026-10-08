@@ -574,6 +574,8 @@ Transitions go through the Admin-only `adminSetStudentLifecycle` callable; clien
 
 **Deferred hooks:** payment_review, payment_suspend (scheduler), transfer, childrenIds CF, pricing/vodafone CF, session/attendance/evaluation, chat moderate-delete — contract ready, not fabricated in WA-16.
 
+**PH-02 update:** `payment_review`, `student_admit`, `student_transfer`, `attendance_correct` and `evaluation_create_or_correct` are now emitted (actor roles admin / supervisor / teacher, derived server-side). Evaluation authority (D7.1): Teacher edits for 24h from the server-set `recitationRecords.createdAt`; Admin corrects at any time; Supervisor is read-only. See `PH02_SUPERVISOR_AUTHORITY_REVIEW.md`.
+
 **Done when:** shared helper + all seven writers normalized + invoice_create + Rules/authz tests + privacy/idempotency tests + docs aligned.
 
 **Non-goals:** Admin UI, Flutter feature, retention purge, historical migration, new indexes, scheduler redesign, FCM/search per-write audits.
@@ -735,7 +737,7 @@ Automated unit/Rules/CF tests do **not** satisfy production verification.
 | Excluded | Wave / note |
 |----------|-------------|
 | Evaluation Present/Late enforcement in Teacher UI | B (D7) |
-| Progress % projector / versesRange collection UI | C (D11) |
+| Progress % projector / versesRange collection UI | C (D11) — still open after PH-02: range source/format undefined, live evaluations store `""` |
 | Mushaf redesign / two modes / last-read UX | C15 stub optional; UI later (D23) |
 | EN locale / dark theme program | OUT (D15) |
 | Full Parent suspended shell polish | D |

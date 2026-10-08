@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -247,8 +248,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('ملف الطالب'),
-          leading: IconButton(
-            icon: const Icon(Icons.chevron_right_rounded),
+          leading: AppBackButton(
+            color: AppColors.textPrimary,
             onPressed: _goBack,
           ),
         ),

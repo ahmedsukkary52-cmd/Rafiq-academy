@@ -1,63 +1,55 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/shared/presentation/halaqa_activities/halaqa_activities_mock_store.dart';
 import 'package:rafiq_academy/shared/presentation/halaqa_activities/halaqa_activity_ui_models.dart';
 
-/// Presentation-model contracts from the approved UI batch (no DI / Firestore).
+ActivityThreadMessageUi _msg(String authorId, {bool isTeacher = false}) =>
+    ActivityThreadMessageUi(
+      id: 'm_$authorId',
+      authorId: authorId,
+      authorName: authorId,
+      createdAt: DateTime(2026, 8, 1, 10),
+      isTeacher: isTeacher,
+      text: 'x',
+    );
+
+HalaqaActivityUi _activity({
+  List<ActivityThreadMessageUi> thread = const [],
+  int? listedResponseCount,
+}) => HalaqaActivityUi(
+  id: '1',
+  halaqaId: 'h1',
+  prompt: 'p',
+  createdAt: DateTime(2026, 8, 1),
+  allowedResponseTypes: const {ActivityResponseTypeUi.text},
+  teacherName: 't',
+  thread: thread,
+  listedResponseCount: listedResponseCount,
+);
+
+/// Teacher activity list response counts.
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  const halaqaId = 'ui_batch_halaqa';
-
-  setUp(() {
-    HalaqaActivitiesMockStore.instance.clearActivities(halaqaId);
+  test('listedResponseCount used when thread is not loaded', () {
+    expect(_activity(listedResponseCount: 3).responseCount, 3);
+    expect(_activity().responseCount, 0);
   });
 
-  test('locked Tasks dual-action copy remains distinct from حفظ/مراجعة', () {
-    const dualActions = ['مهمة جديدة', 'تكليف حفظ/مراجعة', 'المهام'];
-    expect(dualActions, containsAll(['مهمة جديدة', 'تكليف حفظ/مراجعة']));
+  test('loaded thread counts distinct students, not messages or teacher', () {
+    final a = _activity(
+      listedResponseCount: 9,
+      thread: [
+        _msg('teacher', isTeacher: true),
+        _msg('s1'),
+        _msg('s1'),
+        _msg('s2'),
+      ],
+    );
+    expect(a.responseCount, 2);
   });
 
-  test('mock store create + reply (UI batch contract)', () {
-    final store = HalaqaActivitiesMockStore.instance;
-    final created = store.addActivity(
-      halaqaId: halaqaId,
-      prompt: 'اكتب ثلاثة أسطر عن فضل العلم',
-      allowedResponseTypes: {
-        ActivityResponseTypeUi.text,
-        ActivityResponseTypeUi.image,
-      },
-      teacherName: 'أ. اختبار',
-      sharedToPosts: true,
+  test('teacher-only thread counts zero responses', () {
+    final a = _activity(
+      listedResponseCount: 4,
+      thread: [_msg('teacher', isTeacher: true)],
     );
-    expect(created.sharedToPosts, isTrue);
-    expect(store.activitiesFor(halaqaId), isNotEmpty);
-
-    final updated = store.appendStudentReply(
-      halaqaId: halaqaId,
-      activityId: created.id,
-      studentId: 's1',
-      studentName: 'أحمد',
-      text: 'هذا ردي',
-    );
-    expect(updated, isNotNull);
-    expect(updated!.thread, isNotEmpty);
-    expect(
-      store.replyStateForStudent(activity: updated, studentId: 's1'),
-      StudentActivityReplyState.replied,
-    );
-  });
-
-  test('listedResponseCount used when thread empty', () {
-    final a = HalaqaActivityUi(
-      id: '1',
-      halaqaId: halaqaId,
-      prompt: 'p',
-      createdAt: DateTime(2026, 8, 1),
-      allowedResponseTypes: const {ActivityResponseTypeUi.text},
-      teacherName: 't',
-      listedResponseCount: 3,
-    );
-    expect(a.responseCount, 3);
-    expect(a.hasStudentResponded('s1'), isFalse);
+    expect(a.responseCount, 0);
   });
 }

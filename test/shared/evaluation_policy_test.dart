@@ -8,11 +8,11 @@ void main() {
   const studentId = 'student1';
 
   EvaluationIdentity identity(RecitationType type) => EvaluationIdentity(
-        sessionId: sessionId,
-        halaqaId: halaqaId,
-        studentId: studentId,
-        type: type,
-      );
+    sessionId: sessionId,
+    halaqaId: halaqaId,
+    studentId: studentId,
+    type: type,
+  );
 
   RecitationRecordEntity record({
     required String id,
@@ -124,5 +124,48 @@ void main() {
       records: [mem],
     );
     expect(found, isNull);
+  });
+
+  group('C6 dual-read', () {
+    test('real-session record matches the legacy day key of its day', () {
+      final server = record(
+        id: 'sessRealA_student1_memorization',
+        sessionIdField: 'sessRealA',
+      );
+      final found = EvaluationPolicy.findExisting(
+        identity: identity(RecitationType.memorization),
+        records: [server],
+      );
+      expect(found, server);
+    });
+
+    test('real-session record on another day does not match', () {
+      final server = record(
+        id: 'sessRealB_student1_memorization',
+        sessionIdField: 'sessRealB',
+        date: DateTime(2026, 8, 6),
+      );
+      expect(
+        EvaluationPolicy.matchesIdentity(
+          server,
+          identity(RecitationType.memorization),
+        ),
+        isFalse,
+      );
+    });
+
+    test('different real sessions never match each other', () {
+      final server = record(
+        id: 'sessRealA_student1_memorization',
+        sessionIdField: 'sessRealA',
+      );
+      const realIdentity = EvaluationIdentity(
+        sessionId: 'sessRealB',
+        halaqaId: halaqaId,
+        studentId: studentId,
+        type: RecitationType.memorization,
+      );
+      expect(EvaluationPolicy.matchesIdentity(server, realIdentity), isFalse);
+    });
   });
 }

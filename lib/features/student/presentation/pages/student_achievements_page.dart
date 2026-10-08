@@ -181,7 +181,7 @@ class _Header extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 24),
+                      padding: const EdgeInsetsDirectional.only(start: 24),
                       child: _HeaderButton(
                         icon: Icons.chevron_left_rounded,
                         onTap: () => Navigator.maybePop(context),
@@ -191,7 +191,7 @@ class _Header extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 24),
+                    padding: const EdgeInsetsDirectional.only(end: 24),
                     child: Text(
                       '🏆 الإنجازات',
                       style: AppTextStyles.displayMedium.copyWith(
@@ -204,7 +204,10 @@ class _Header extends StatelessWidget {
                 Align(
                   alignment: Alignment.bottomLeft,
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 24, bottom: 16),
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 24,
+                      bottom: 16,
+                    ),
                     child: TextButton(
                       onPressed: () => context.push(AppRoutes.studentBadges),
                       child: const Text('الشارات'),
@@ -374,14 +377,10 @@ class _AchievementRow extends StatelessWidget {
     AchievementType.star => '⭐',
     AchievementType.badge => '🎖️',
     AchievementType.certificate => '📜',
-    AchievementType.completionBadge ||
-    AchievementType.completion => '✅',
-    AchievementType.performanceStars ||
-    AchievementType.performance => '🌟',
-    AchievementType.perfectAttendance ||
-    AchievementType.attendance => '📅',
-    AchievementType.studentOfWeek ||
-    AchievementType.achievement => '🏆',
+    AchievementType.completionBadge || AchievementType.completion => '✅',
+    AchievementType.performanceStars || AchievementType.performance => '🌟',
+    AchievementType.perfectAttendance || AchievementType.attendance => '📅',
+    AchievementType.studentOfWeek || AchievementType.achievement => '🏆',
     AchievementType.custom => '🎖️',
   };
 

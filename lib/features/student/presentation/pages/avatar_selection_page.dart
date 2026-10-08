@@ -236,7 +236,7 @@ class _AvatarSelectionPageState extends State<AvatarSelectionPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '$coins نقطة متاحة',
+                                  '$coins عملة متاحة',
                                   style: AppTextStyles.titleMedium,
                                 ),
                                 Text(
@@ -388,7 +388,7 @@ class _AvatarCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isUnlocked ? 'مجاني' : '${avatar.unlockCost} نقطة',
+                  isUnlocked ? 'مجاني' : '${avatar.unlockCost} عملة',
                   style: AppTextStyles.labelSmall.copyWith(
                     color: isUnlocked ? AppColors.success : AppColors.textHint,
                   ),

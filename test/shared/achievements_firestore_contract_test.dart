@@ -17,7 +17,10 @@ void main() {
       expect(fields[AchievementsFirestoreContract.studentIdField], 's1');
       expect(fields[AchievementsFirestoreContract.halaqaIdField], 'h1');
       expect(fields[AchievementsFirestoreContract.halaqaIdsField], ['h1']);
-      expect(fields[AchievementsFirestoreContract.typeField], 'completion_badge');
+      expect(
+        fields[AchievementsFirestoreContract.typeField],
+        'completion_badge',
+      );
       expect(fields[AchievementsFirestoreContract.grantedByField], 'teacher-1');
       expect(fields[AchievementsFirestoreContract.issuedByField], 'teacher-1');
       expect(fields[AchievementsFirestoreContract.titleField], 'ختم جزء عمّ');
@@ -26,33 +29,64 @@ void main() {
         fields[AchievementsFirestoreContract.grantedAtField],
         isA<FieldValue>(),
       );
-      expect(fields[AchievementsFirestoreContract.dateField], isA<FieldValue>());
-    });
-
-    test('supervisorIssueFields dual-writes actor, time, title, and halaqaId', () {
-      final at = DateTime(2026, 7, 31, 10);
-      final fields = AchievementsFirestoreContract.supervisorIssueFields(
-        studentId: 's2',
-        type: 'badge',
-        title: 'شارة التميز',
-        issuedBy: 'sup-1',
-        halaqaId: 'h2',
-        at: at,
-      );
-
-      expect(fields[AchievementsFirestoreContract.halaqaIdField], 'h2');
-      expect(fields[AchievementsFirestoreContract.issuedByField], 'sup-1');
-      expect(fields[AchievementsFirestoreContract.grantedByField], 'sup-1');
-      expect(fields[AchievementsFirestoreContract.titleField], 'شارة التميز');
-      expect(fields[AchievementsFirestoreContract.noteField], 'شارة التميز');
       expect(
         fields[AchievementsFirestoreContract.dateField],
-        Timestamp.fromDate(at),
+        isA<FieldValue>(),
       );
-      expect(
-        fields[AchievementsFirestoreContract.grantedAtField],
-        Timestamp.fromDate(at),
+    });
+
+    test(
+      'supervisorIssueFields dual-writes actor, time, title, and halaqaId',
+      () {
+        final at = DateTime(2026, 7, 31, 10);
+        final fields = AchievementsFirestoreContract.supervisorIssueFields(
+          studentId: 's2',
+          type: 'badge',
+          title: 'شارة التميز',
+          issuedBy: 'sup-1',
+          halaqaId: 'h2',
+          at: at,
+        );
+
+        expect(fields[AchievementsFirestoreContract.halaqaIdField], 'h2');
+        expect(fields[AchievementsFirestoreContract.issuedByField], 'sup-1');
+        expect(fields[AchievementsFirestoreContract.grantedByField], 'sup-1');
+        expect(fields[AchievementsFirestoreContract.titleField], 'شارة التميز');
+        expect(fields[AchievementsFirestoreContract.noteField], 'شارة التميز');
+        expect(
+          fields[AchievementsFirestoreContract.dateField],
+          Timestamp.fromDate(at),
+        );
+        expect(
+          fields[AchievementsFirestoreContract.grantedAtField],
+          Timestamp.fromDate(at),
+        );
+      },
+    );
+
+    test('supervisorIssueFields matches the record-only rule keys', () {
+      final fields = AchievementsFirestoreContract.supervisorIssueFields(
+        studentId: 's2',
+        type: 'star',
+        title: 'متميز',
+        issuedBy: 'sup-1',
+        halaqaId: 'h2',
       );
+
+      // Mirrors recordOnlyAchievementOk() in firestore.rules: credited,
+      // multi-recipient awards go through the grantAward callable only.
+      expect(fields.keys.toSet(), <String>{
+        'studentId',
+        'type',
+        'halaqaId',
+        'title',
+        'note',
+        'grantedBy',
+        'issuedBy',
+        'grantedAt',
+        'date',
+      });
+      expect(fields.containsKey('recipientStudentIds'), isFalse);
     });
 
     test('resolve helpers tolerate legacy teacher-only docs', () {

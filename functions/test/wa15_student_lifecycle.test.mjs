@@ -313,9 +313,10 @@ test("WA-15 the backfill never downgrades an archived student", () => {
 
 test("WA-15 Rules deny every client lifecycle write on studentProfiles", () => {
   const rules = readFileSync(join(repoRoot, "firestore.rules"), "utf8");
-  const block = rules
-    .split("match /studentProfiles/{studentId} {")[1]
-    .split("    }")[0];
+  // The match block ends at its own 4-space closing line; nested helper
+  // functions close at deeper indentation.
+  const rest = rules.split("match /studentProfiles/{studentId} {")[1];
+  const block = rest.slice(0, rest.search(/\r?\n {4}\}\r?\n/));
 
   assert.ok(block.includes("hasAny(['phone', 'lifecycle'])"));
   assert.ok(block.includes("allow create: if false;"));

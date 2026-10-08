@@ -7,6 +7,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -21,8 +23,8 @@ import '../bloc/teacher_bloc.dart';
 
 /// Teacher Messages inbox — Figma 09 (`1:1314`) Phase 1 UI.
 ///
-/// Filters are presentation-only over existing conversations. Parent tab does
-/// **not** enable teacher↔parent messaging ([ChatPermissionPolicy] unchanged).
+/// Filters are presentation-only over existing conversations. Teacher→parent
+/// chats start from the student card / profile (`teacher_contact_parent.dart`).
 class TeacherMessagesTab extends StatefulWidget {
   const TeacherMessagesTab({super.key});
 
@@ -176,7 +178,10 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: _SearchField(controller: _searchCtrl),
+              child: AppSearchField(
+                controller: _searchCtrl,
+                hint: 'بحث في المحادثات...',
+              ),
             ),
             Expanded(
               child: BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
@@ -206,19 +211,21 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                   final items = _visible(state.conversations, currentUid);
 
                   if (state.conversations.isEmpty) {
-                    return const _EmptyInbox(
+                    return const AppEmptyState(
+                      icon: Icons.chat_bubble_outline_rounded,
                       title: 'لا توجد رسائل بعد',
-                      subtitle: 'ستظهر محادثاتك هنا عند بدء التواصل',
+                      message: 'ستظهر محادثاتك هنا عند بدء التواصل',
                     );
                   }
 
                   if (items.isEmpty) {
-                    return _EmptyInbox(
+                    return AppEmptyState(
+                      icon: Icons.chat_bubble_outline_rounded,
                       title: _filter == _InboxFilter.parents
                           ? 'لا محادثات مع أولياء الأمور'
                           : 'لا نتائج',
-                      subtitle: _filter == _InboxFilter.parents
-                          ? 'التواصل مع ولي الأمر غير متاح في هذه المرحلة'
+                      message: _filter == _InboxFilter.parents
+                          ? 'تواصل مع ولي الأمر من الملف الشخصي للطالب'
                           : 'جرّب بحثاً أو تصنيفاً آخر',
                     );
                   }
@@ -427,55 +434,6 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _SearchField extends StatelessWidget {
-  final TextEditingController controller;
-
-  const _SearchField({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      textAlign: TextAlign.right,
-      textDirection: TextDirection.rtl,
-      style: AppTextStyles.bodyMedium.copyWith(
-        color: AppColors.textPrimary,
-        fontSize: 13,
-      ),
-      decoration: InputDecoration(
-        hintText: 'بحث في المحادثات...',
-        hintStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textHint,
-          fontSize: 13,
-        ),
-        prefixIcon: const Icon(
-          Icons.search_rounded,
-          color: AppColors.textHint,
-          size: 20,
-        ),
-        filled: true,
-        fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          borderSide: const BorderSide(color: Color(0xFFE8EEF0)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          borderSide: const BorderSide(color: Color(0xFFE8EEF0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
-        ),
-      ),
-    );
-  }
-}
-
 // ── Tiles ─────────────────────────────────────────────────────────────────────
 
 class _ConversationTile extends StatelessWidget {
@@ -631,48 +589,6 @@ class _LetterAvatar extends StatelessWidget {
   }
 }
 
-class _EmptyInbox extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const _EmptyInbox({required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 56,
-              color: AppColors.textHint.withValues(alpha: 0.45),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              title,
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MessagesListSkeleton extends StatefulWidget {
   const _MessagesListSkeleton();
 
@@ -749,7 +665,7 @@ class _MessagesListSkeletonState extends State<_MessagesListSkeleton>
 }
 
 /// Policy-filtered contacts for teacher `+` (students + supervisors of halaqat).
-/// Parents are never listed — [ChatPermissionPolicy] rejects teacher↔parent.
+/// Parents are not listed here; they are reached via the student card / profile.
 class _NewChatPickerSheet extends StatefulWidget {
   final String teacherUid;
   final String teacherRole;

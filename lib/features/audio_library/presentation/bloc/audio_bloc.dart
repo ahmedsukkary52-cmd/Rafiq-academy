@@ -526,7 +526,9 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
     _progressSaveTimer?.cancel();
     _cancelLoadingWatchdog();
     _saveProgress();
-    audioPlayerService.dispose();
+    // The player is an app-wide singleton; disposing it here would break the
+    // next library visit (the Bloc is a per-page factory).
+    audioPlayerService.stop();
     return super.close();
   }
 

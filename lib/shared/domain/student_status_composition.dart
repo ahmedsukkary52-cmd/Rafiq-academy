@@ -41,10 +41,11 @@ enum StudentStatusLabel {
 
 /// Which dimensions a viewing role is permitted to compose.
 ///
-/// This mirrors the existing Rules rather than relaxing them. A Teacher cannot
-/// read `paymentAccess` (`firestore.rules` restricts it to Admin, Supervisor,
-/// and the owning Parent), so [canSeePayment] is false for Teacher and the
-/// payment tier is skipped instead of guessed.
+/// This mirrors the existing Rules rather than relaxing them. Teachers and
+/// Supervisors cannot read `paymentAccess` (`firestore.rules` restricts it to
+/// Admin and the owning Parent until a server-scoped Supervisor projection
+/// exists), so [canSeePayment] is false for them and the payment tier is
+/// skipped instead of guessed.
 class StudentStatusVisibility {
   final bool canSeeLifecycle;
   final bool canSeeLogin;
@@ -85,7 +86,7 @@ class StudentStatusVisibility {
   static StudentStatusVisibility forRole(String? role) =>
       switch (role?.trim()) {
         AppRoles.admin => full,
-        AppRoles.supervisor => full,
+        AppRoles.supervisor => withoutPayment,
         AppRoles.parent => full,
         AppRoles.teacher => withoutPayment,
         _ => none,

@@ -23,75 +23,45 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    if (!await networkInfo.isConnected) {
-      return const Left(NetworkFailure());
-    }
-
-    try {
-      final user = await remoteDatasource.loginWithEmail(
-        email: email,
-        password: password,
-      );
-      return Right(user);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    }
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    return _guard(
+      () => remoteDatasource.loginWithEmail(email: email, password: password),
+    );
   }
 
   @override
-  Future<Either<Failure, UserEntity>> registerWithEmail({
+  Future<Either<Failure, Unit>> sendPasswordResetEmail({
     required String email,
-    required String password,
-    required String name,
-    required String phone,
-    required String role,
   }) async {
-    if (!await networkInfo.isConnected) {
-      return const Left(NetworkFailure());
-    }
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    return _guard(() async {
+      await remoteDatasource.sendPasswordResetEmail(email: email);
+      return unit;
+    });
+  }
 
+  @override
+  Future<Either<Failure, Unit>> logout() => _guard(() async {
+    await remoteDatasource.logout();
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, UserEntity?>> getCurrentUser() =>
+      _guard(remoteDatasource.getCurrentUser);
+
+  @override
+  Stream<String?> get sessionUidChanges => remoteDatasource.sessionUidChanges;
+
+  Future<Either<Failure, T>> _guard<T>(Future<T> Function() run) async {
     try {
-      final user = await remoteDatasource.registerWithEmail(
-        email: email,
-        password: password,
-        name: name,
-        phone: phone,
-        role: role,
-      );
-      return Right(user);
+      return Right(await run());
     } on AuthException catch (e) {
-      return Left(AuthFailure(e.message));
+      return Left(AuthFailure(e.message, reason: e.reason));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(UnexpectedFailure());
     }
-  }
-
-  @override
-  Future<Either<Failure, Unit>> logout() async {
-    try {
-      await remoteDatasource.logout();
-      return const Right(unit);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(e.message));
-    }
-  }
-
-  @override
-  Future<Either<Failure, UserEntity?>> getCurrentUser() async {
-    try {
-      final user = await remoteDatasource.getCurrentUser();
-      return Right(user);
-    } on AuthException catch (e) {
-      return Left(AuthFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    }
-  }
-
-  @override
-  Stream<UserEntity?> get authStateChanges {
-    return remoteDatasource.authStateChanges;
   }
 }

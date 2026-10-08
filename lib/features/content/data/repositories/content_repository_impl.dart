@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
@@ -62,7 +63,16 @@ class ContentLibraryRepositoryImpl implements ContentLibraryRepository {
           halaqaId: halaqaId,
         )
         .map<Either<Failure, double>>(Right.new)
-        .handleError((e) => Left(ServerFailure(e.toString())));
+        .transform(
+          StreamTransformer<
+            Either<Failure, double>,
+            Either<Failure, double>
+          >.fromHandlers(
+            handleError: (e, _, sink) => sink.add(
+              Left(ServerFailure(e is ServerException ? e.message : '$e')),
+            ),
+          ),
+        );
   }
 
   @override

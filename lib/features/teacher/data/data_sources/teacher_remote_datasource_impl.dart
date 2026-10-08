@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart';
 
@@ -10,7 +11,6 @@ import '../../../../shared/domain/absence_request.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/assignment_kind.dart';
 import '../../../../shared/domain/assignment_policy.dart';
-import '../../../../shared/utils/attendance_absence_transitions.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../student/data/models/assignment_model.dart';
@@ -24,8 +24,20 @@ import '../models/halaqa_student_summary_model.dart';
 @LazySingleton(as: TeacherRemoteDatasource)
 class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
   final FirebaseFirestore firestore;
+  final FirebaseFunctions functions;
 
-  const TeacherRemoteDatasourceImpl({required this.firestore});
+  const TeacherRemoteDatasourceImpl({
+    required this.firestore,
+    required this.functions,
+  });
+
+  /// Cairo calendar day wire format expected by the session callables.
+  static String _ymd(DateTime date) {
+    final d = AttendancePolicy.dayStart(date);
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year.toString().padLeft(4, '0')}-$m-$day';
+  }
 
   @override
   Future<List<HalaqaModel>> getTeacherHalaqat(String teacherId) async {
@@ -158,6 +170,11 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     await saveDayAttendance([record]);
   }
 
+  /// C6 / PH-02 — the recordSessionAttendance callable binds the day to a real
+  /// `sessions/{id}`, validates roster + teacher + edit window, retires legacy
+  /// duplicates and fans out absence cards to linked parents. The client
+  /// sends intent only (halaqa, Cairo day, marks); no events are published
+  /// from the device.
   @override
   Future<List<AcademyEvent>> saveDayAttendance(
     List<AttendanceRecordModel> records,
@@ -165,99 +182,18 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     try {
       if (records.isEmpty) return const [];
 
-      final halaqaId = records.first.halaqaId;
-      final dayStart = AttendancePolicy.dayStart(records.first.date);
-      final dayEnd = AttendancePolicy.dayEndExclusive(records.first.date);
-
-      final existingSnap = await firestore
-          .collection(FirestoreCollections.attendanceRecords)
-          .where('halaqaId', isEqualTo: halaqaId)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart))
-          .where('date', isLessThan: Timestamp.fromDate(dayEnd))
-          .get();
-
-      // Raw pre-save statuses; AttendanceRecordModel is deliberately not used
-      // here because it maps unknown → absent.
-      final previousStatuses =
-          AttendanceAbsenceTransitions.previousStatusByStudent(
-            existingSnap.docs.map((doc) {
-              final data = doc.data();
-              return AttendanceMarkRef(
-                id: doc.id,
-                halaqaId: (data['halaqaId'] as String?) ?? halaqaId,
-                studentId: (data['studentId'] as String?) ?? '',
-                date: dayStart,
-                status: data['status'] as String?,
-                sessionId: data['sessionId'] as String?,
-              );
-            }),
-          );
-
-      // Firestore batch max is 500 ops; keep day save atomic (no split commits).
-      final estimatedOps = records.length + existingSnap.docs.length;
-      if (estimatedOps > 500) {
-        throw const ServerException(
-          'عدد سجلات الحضور كبير جداً للحفظ دفعة واحدة. قلّل حجم الحلقة أو أعد المحاولة لاحقاً.',
-        );
-      }
-
-      final batch = firestore.batch();
-      final savedStudentIds = <String>{};
-      final preferredIds = <String>{};
-
-      for (final record in records) {
-        final normalizedDay = AttendancePolicy.dayStart(record.date);
-        final sessionId = record.sessionId.trim();
-        if (sessionId.isEmpty) {
-          throw const ServerException('sessionId مطلوب لكل سجل حضور جديد');
-        }
-        final docId = AttendancePolicy.documentId(
-          sessionId: sessionId,
-          studentId: record.studentId,
-        );
-        final normalized = AttendanceRecordModel(
-          id: docId,
-          studentId: record.studentId,
-          studentName: record.studentName,
-          halaqaId: record.halaqaId,
-          date: normalizedDay,
-          status: record.status,
-          recordedBy: record.recordedBy,
-          sessionId: sessionId,
-        );
-        final ref = firestore
-            .collection(FirestoreCollections.attendanceRecords)
-            .doc(docId);
-        batch.set(ref, normalized.toFirestore(), SetOptions(merge: true));
-        savedStudentIds.add(record.studentId);
-        preferredIds.add(docId);
-      }
-
-      // Remove legacy / colliding docs for the same students/session.
-      for (final doc in existingSnap.docs) {
-        final data = doc.data();
-        final studentId = data['studentId'] as String? ?? '';
-        if (!savedStudentIds.contains(studentId)) continue;
-        if (preferredIds.contains(doc.id)) continue;
-        batch.delete(doc.reference);
-      }
-
-      await batch.commit();
-
-      // Derived only from a committed save: no events for failed writes.
-      return AttendanceAbsenceTransitions.project(
-        previousStatusByStudentId: previousStatuses,
-        currentMarks: records.map(
-          (record) => AttendanceMarkInput(
-            studentId: record.studentId,
-            studentName: record.studentName,
-            halaqaId: record.halaqaId,
-            date: record.date,
-            status: record.wireStatus,
-            sessionId: record.sessionId,
-          ),
-        ),
-      );
+      final callable = functions.httpsCallable('recordSessionAttendance');
+      await callable.call(<String, dynamic>{
+        'halaqaId': records.first.halaqaId.trim(),
+        'date': _ymd(records.first.date),
+        'marks': [
+          for (final record in records)
+            {'studentId': record.studentId.trim(), 'status': record.wireStatus},
+        ],
+      });
+      return const [];
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } on ServerException {
       rethrow;
     } catch (e) {
@@ -313,28 +249,40 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     }
   }
 
+  /// C6 + D7 / PH-02 — the upsertSessionEvaluation callable resolves the real
+  /// session from the student's attendance and re-checks Present/Late in the
+  /// same transaction. Legacy synthetic day ids are never sent as a session;
+  /// duplicate retirement is decided server-side ([retireDocumentIds] is
+  /// ignored).
   @override
   Future<void> upsertTeacherEvaluation({
     required RecitationRecordModel record,
     required List<String> retireDocumentIds,
   }) async {
     try {
-      final id = record.id.trim();
-      if (id.isEmpty) {
-        throw const ServerException('معرّف التقييم مطلوب');
+      final grade = record.grade;
+      final behaviorGrade = record.behaviorGrade;
+      if (grade == null || behaviorGrade == null) {
+        throw const ServerException('التقييم مطلوب');
       }
+      final sessionId = record.sessionId?.trim() ?? '';
+      final notes = record.notes?.trim() ?? '';
 
-      final batch = firestore.batch();
-      final col = firestore.collection(FirestoreCollections.recitationRecords);
-      batch.set(col.doc(id), record.toFirestore(), SetOptions(merge: true));
-
-      for (final raw in retireDocumentIds) {
-        final retireId = raw.trim();
-        if (retireId.isEmpty || retireId == id) continue;
-        batch.delete(col.doc(retireId));
-      }
-
-      await batch.commit();
+      final callable = functions.httpsCallable('upsertSessionEvaluation');
+      await callable.call(<String, dynamic>{
+        'halaqaId': record.halaqaId.trim(),
+        'studentId': record.studentId.trim(),
+        'type': record.type.name,
+        'grade': grade.name,
+        'behaviorGrade': behaviorGrade.name,
+        'date': _ymd(record.date),
+        if (sessionId.isNotEmpty &&
+            !AttendancePolicy.isLegacySyntheticSessionId(sessionId))
+          'sessionId': sessionId,
+        if (notes.isNotEmpty) 'notes': notes,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } on ServerException {
       rethrow;
     } catch (e) {

@@ -1,35 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/chat_entities.dart';
+import '../../domain/policies/chat_media_policy.dart';
 import '../bloc/chat_conversations_bloc.dart';
 import '../bloc/chat_conversations_state.dart';
 import '../bloc/chat_room_bloc.dart';
 import '../bloc/chat_room_event.dart';
 import '../bloc/chat_room_state.dart';
 import '../chat_message_alignment.dart';
+import '../media/chat_media_loader.dart';
+import '../media/chat_voice_recorder.dart';
+import '../widgets/chat_composer.dart';
+import '../widgets/chat_message_bubble.dart';
 
-/// Shared chat room — Figma 10 text chrome (Teacher + Student routes).
-///
-/// Text messaging only. No audio / attachments / presence / read receipts.
+/// Shared chat room (1:1 and Halaqa group) — Teacher, Student, Parent,
+/// Supervisor and Admin routes. Text, image, voice and PDF/Word messages;
+/// sends go through `sendChatMessage`, history is paged newest-first.
 class ChatRoomPage extends StatefulWidget {
   final String conversationId;
   final String otherUserName;
   final String? otherUserImage;
+
+  /// Test seams; production resolves these from DI / plugins.
+  final ChatRoomBloc? bloc;
+  final ChatMediaLoader? mediaLoader;
+  final ChatVoiceRecorder Function()? recorderFactory;
+  final ChatAttachmentPicker? pickAttachment;
 
   const ChatRoomPage({
     super.key,
     required this.conversationId,
     required this.otherUserName,
     this.otherUserImage,
+    this.bloc,
+    this.mediaLoader,
+    this.recorderFactory,
+    this.pickAttachment,
   });
 
   @override
@@ -40,20 +56,26 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final _messageCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   late final ChatRoomBloc _chatBloc;
+  late final ChatMediaLoader _loader;
   String _currentUid = '';
-  int _lastMessageCount = 0;
-  String _pendingSend = '';
 
   @override
   void initState() {
     super.initState();
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) _currentUid = authState.user.uid;
-
-    _chatBloc = sl<ChatRoomBloc>(
-      param1: widget.conversationId,
-      param2: _currentUid,
-    );
+    final injected = widget.bloc;
+    if (injected != null) {
+      _chatBloc = injected;
+      _currentUid = injected.currentUserId;
+    } else {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) _currentUid = authState.user.uid;
+      _chatBloc = sl<ChatRoomBloc>(
+        param1: widget.conversationId,
+        param2: _currentUid,
+      );
+    }
+    _loader = widget.mediaLoader ?? sl<ChatMediaLoader>();
+    _scrollCtrl.addListener(_onScroll);
   }
 
   @override
@@ -64,37 +86,49 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     super.dispose();
   }
 
-  void _sendMessage() {
-    final text = _messageCtrl.text.trim();
-    if (text.isEmpty) return;
-    _pendingSend = text;
-    _messageCtrl.clear();
-    _chatBloc.add(SendMessageRequestedEvent(text));
-    _scrollToBottom();
+  /// List is reversed: offset 0 is the newest message, max extent is history.
+  void _onScroll() {
+    if (!_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 240) {
+      final s = _chatBloc.state;
+      if (s.hasMore && !s.loadingOlder) {
+        _chatBloc.add(const LoadOlderMessagesRequestedEvent());
+      }
+    }
   }
 
-  void _scrollToBottom() {
+  void _scrollToNewest() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollCtrl.hasClients) return;
       _scrollCtrl.animateTo(
-        _scrollCtrl.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 280),
+        0,
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
     });
+  }
+
+  void _sendText(String text) {
+    _chatBloc.add(SendMessageRequestedEvent(text));
+    _scrollToNewest();
+  }
+
+  void _sendAttachment(ChatAttachmentDraft draft) {
+    _chatBloc.add(SendAttachmentRequestedEvent(draft));
+    _scrollToNewest();
   }
 
   /// Prefer route `extra`; fall back to denormalized conversation participants.
   (String, String?) _resolvePeer(ChatParticipantEntity? peer) {
     final extraName = widget.otherUserName.trim();
     final peerName = peer?.name.trim() ?? '';
-    final name = extraName.isNotEmpty &&
-        extraName != 'محادثة' &&
-        extraName != 'المعلم'
+    final name =
+        extraName.isNotEmpty && extraName != 'محادثة' && extraName != 'المعلم'
         ? extraName
         : (peerName.isNotEmpty
-        ? peerName
-        : (extraName.isNotEmpty ? extraName : 'محادثة'));
+              ? peerName
+              : (extraName.isNotEmpty ? extraName : 'محادثة'));
 
     final extraImage = widget.otherUserImage?.trim();
     final image = (extraImage != null && extraImage.isNotEmpty)
@@ -103,190 +137,326 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     return (name, image);
   }
 
+  Future<void> _showMessageActions(MessageEntity msg) async {
+    final isMine = msg.isMine(_currentUid);
+    final canCopy = !msg.deleted && msg.text.trim().isNotEmpty;
+    final canEdit = ChatMediaPolicy.canEdit(msg, _currentUid);
+    final canDelete = isMine && !msg.deleted;
+    if (!canCopy && !canEdit && !canDelete) return;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (canCopy)
+                ListTile(
+                  leading: const Icon(Icons.copy_rounded),
+                  title: const Text('نسخ النص'),
+                  onTap: () => Navigator.pop(ctx, 'copy'),
+                ),
+              if (canEdit)
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('تعديل'),
+                  subtitle: const Text('متاح خلال 15 دقيقة من الإرسال'),
+                  onTap: () => Navigator.pop(ctx, 'edit'),
+                ),
+              if (canDelete)
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: AppColors.error,
+                  ),
+                  title: const Text(
+                    'حذف',
+                    style: TextStyle(color: AppColors.error),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'delete'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: msg.text));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم نسخ النص', textAlign: TextAlign.right)),
+        );
+      case 'edit':
+        await _editMessage(msg);
+      case 'delete':
+        await _confirmDelete(msg);
+    }
+  }
+
+  Future<void> _editMessage(MessageEntity msg) async {
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => _EditMessageDialog(initialText: msg.text),
+    );
+    if (text == null || text.trim() == msg.text.trim()) return;
+    _chatBloc.add(EditMessageRequestedEvent(msg.id, text));
+  }
+
+  Future<void> _confirmDelete(MessageEntity msg) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('حذف الرسالة'),
+          content: const Text(
+            'ستظهر الرسالة للجميع على أنها محذوفة، ولن يتمكن أحد من فتح مرفقها.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('حذف'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm == true) {
+      _chatBloc.add(SoftDeleteMessageRequestedEvent(msg.id));
+    }
+  }
+
+  Widget _header() {
+    Widget build(ChatParticipantEntity? peer) {
+      final (name, imageUrl) = _resolvePeer(peer);
+      return _ChatRoomHeader(
+        name: name,
+        imageUrl: imageUrl,
+        onBack: () {
+          if (context.canPop()) context.pop();
+        },
+      );
+    }
+
+    if (!sl.isRegistered<ChatConversationsBloc>()) return build(null);
+    return BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
+      bloc: sl<ChatConversationsBloc>(),
+      buildWhen: (p, c) => p.conversations != c.conversations,
+      builder: (context, convState) {
+        ChatParticipantEntity? peer;
+        for (final c in convState.conversations) {
+          if (c.id == widget.conversationId && _currentUid.isNotEmpty) {
+            peer = c.otherParticipant(_currentUid);
+            break;
+          }
+        }
+        return build(peer);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: BlocProvider.value(
         value: _chatBloc,
-        child: BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
-          bloc: sl<ChatConversationsBloc>(),
-          buildWhen: (p, c) => p.conversations != c.conversations,
-          builder: (context, convState) {
-            ConversationEntity? conversation;
-            for (final c in convState.conversations) {
-              if (c.id == widget.conversationId) {
-                conversation = c;
-                break;
-              }
-            }
-            final peer = conversation != null && _currentUid.isNotEmpty
-                ? conversation.otherParticipant(_currentUid)
-                : null;
-            final (name, imageUrl) = _resolvePeer(peer);
-
-            return Scaffold(
-              backgroundColor: const Color(0xFFF5FAFB),
-              body: Column(
-                children: [
-                  _ChatRoomHeader(
-                    name: name,
-                    imageUrl: imageUrl,
-                    onBack: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      }
-                    },
-                  ),
-                  Expanded(
-                    child: BlocConsumer<ChatRoomBloc, ChatRoomState>(
-                      listenWhen: (p, c) =>
-                      p.messages.length != c.messages.length ||
-                          p.sendStatus != c.sendStatus,
-                      listener: (context, state) {
-                        if (state.messages.length > _lastMessageCount) {
-                          _scrollToBottom();
-                        }
-                        _lastMessageCount = state.messages.length;
-                        if (state.sendStatus == SubmissionStatus.error &&
-                            _pendingSend.isNotEmpty &&
-                            _messageCtrl.text.isEmpty) {
-                          _messageCtrl.text = _pendingSend;
-                        }
-                        if (state.sendStatus == SubmissionStatus.success) {
-                          _pendingSend = '';
-                        }
-                      },
-                      buildWhen: (p, c) =>
-                      p.messages != c.messages ||
-                          p.messagesStatus != c.messagesStatus ||
-                          p.messagesError != c.messagesError,
-                      builder: (context, state) {
-                        if (state.messagesStatus == SectionStatus.loading ||
-                            state.messagesStatus == SectionStatus.initial) {
-                          return const _MessagesSkeleton();
-                        }
-
-                        if (state.messagesStatus == SectionStatus.error) {
-                          return AppErrorWidget(
-                            message:
-                            state.messagesError ?? 'تعذر تحميل الرسائل',
-                            onRetry: () =>
-                                _chatBloc.add(
-                                  const WatchMessagesStartedEvent(),
-                                ),
-                          );
-                        }
-
-                        if (state.messages.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  size: 52,
-                                  color: AppColors.textHint
-                                      .withValues(alpha: 0.45),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'ابدأ المحادثة',
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        final messages = state.messages;
-                        final auth = context
-                            .read<AuthBloc>()
-                            .state;
-                        final uid = auth is AuthAuthenticated
-                            ? auth.user.uid
-                            : _currentUid;
-                        return ListView.builder(
-                          controller: _scrollCtrl,
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                          itemCount: messages.length,
-                          itemBuilder: (context, i) {
-                            final msg = messages[i];
-                            final isMine = msg.isMine(uid);
-                            final showDate = i == 0 ||
-                                !_sameDay(
-                                  messages[i - 1].sentAt,
-                                  msg.sentAt,
-                                );
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (showDate) _DateChip(date: msg.sentAt),
-                                Align(
-                                  alignment: ChatMessageAlignment
-                                      .bubbleAlignment(
-                                    isMine: isMine,
-                                  ),
-                                  child: _MessageBubble(
-                                    message: msg,
-                                    isMine: isMine,
-                                    onSoftDelete: isMine && !msg.deleted
-                                        ? () => _chatBloc.add(
-                                              SoftDeleteMessageRequestedEvent(
-                                                msg.id,
-                                              ),
-                                            )
-                                        : null,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  BlocBuilder<ChatRoomBloc, ChatRoomState>(
-                    buildWhen: (p, c) => p.sendError != c.sendError,
-                    builder: (context, state) {
-                      if (state.sendError == null) {
-                        return const SizedBox.shrink();
-                      }
-                      return Container(
-                        width: double.infinity,
-                        color: AppColors.error.withValues(alpha: 0.1),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 6,
-                        ),
-                        child: Text(
-                          state.sendError!,
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.error,
-                          ),
-                          textAlign: TextAlign.right,
-                        ),
-                      );
-                    },
-                  ),
-                  _ComposerBar(
-                    controller: _messageCtrl,
-                    onSend: _sendMessage,
-                  ),
-                ],
-              ),
-            );
+        child: BlocListener<ChatRoomBloc, ChatRoomState>(
+          listenWhen: (p, c) =>
+              c.actionError != null && p.actionError != c.actionError,
+          listener: (context, state) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(state.actionError!, textAlign: TextAlign.right),
+                ),
+              );
+            _chatBloc.add(const ActionErrorDismissedEvent());
           },
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF5FAFB),
+            body: Column(
+              children: [
+                _header(),
+                Expanded(child: _buildMessages()),
+                ChatComposer(
+                  controller: _messageCtrl,
+                  onSendText: _sendText,
+                  onAttachment: _sendAttachment,
+                  recorderFactory:
+                      widget.recorderFactory ?? RecordChatVoiceRecorder.new,
+                  pickAttachment: widget.pickAttachment ?? pickChatAttachment,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildMessages() {
+    return BlocBuilder<ChatRoomBloc, ChatRoomState>(
+      buildWhen: (p, c) =>
+          p.messages != c.messages ||
+          p.messagesStatus != c.messagesStatus ||
+          p.messagesError != c.messagesError ||
+          p.outbox != c.outbox ||
+          p.loadingOlder != c.loadingOlder,
+      builder: (context, state) {
+        final pending = state.pendingOutbox;
+        if (state.messages.isEmpty && pending.isEmpty) {
+          if (state.messagesStatus == SectionStatus.loading ||
+              state.messagesStatus == SectionStatus.initial) {
+            return const _MessagesSkeleton();
+          }
+          if (state.messagesStatus == SectionStatus.error) {
+            return AppErrorWidget(
+              message: state.messagesError ?? 'تعذر تحميل الرسائل',
+              onRetry: () => _chatBloc.add(const WatchMessagesStartedEvent()),
+            );
+          }
+          return const _EmptyConversation();
+        }
+
+        final messages = state.messages;
+        final showHistoryRow = state.hasMore || state.loadingOlder;
+        final itemCount =
+            pending.length + messages.length + (showHistoryRow ? 1 : 0);
+
+        return Column(
+          children: [
+            if (state.messagesStatus == SectionStatus.error)
+              _StreamErrorBanner(
+                message: state.messagesError ?? 'تعذر تحديث الرسائل',
+                onRetry: () => _chatBloc.add(const WatchMessagesStartedEvent()),
+              ),
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollCtrl,
+                reverse: true,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                itemCount: itemCount,
+                itemBuilder: (context, index) {
+                  if (index < pending.length) {
+                    final item = pending[pending.length - 1 - index];
+                    return ChatOutgoingBubble(
+                      key: ValueKey('out_${item.messageId}'),
+                      item: item,
+                      onRetry: () => _chatBloc.add(
+                        RetryOutgoingRequestedEvent(item.messageId),
+                      ),
+                      onCancel: () => _chatBloc.add(
+                        CancelOutgoingRequestedEvent(item.messageId),
+                      ),
+                    );
+                  }
+                  final mi = index - pending.length;
+                  if (mi >= messages.length) {
+                    return _HistoryRow(
+                      loading: state.loadingOlder,
+                      onLoad: () => _chatBloc.add(
+                        const LoadOlderMessagesRequestedEvent(),
+                      ),
+                    );
+                  }
+                  final i = messages.length - 1 - mi;
+                  final msg = messages[i];
+                  final showDate =
+                      i == 0 || !_sameDay(messages[i - 1].sentAt, msg.sentAt);
+                  return Column(
+                    key: ValueKey('msg_${msg.id}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (showDate) _DateChip(date: msg.sentAt),
+                      ChatMessageBubble(
+                        message: msg,
+                        isMine: msg.isMine(_currentUid),
+                        loader: _loader,
+                        onLongPress: msg.deleted
+                            ? null
+                            : () => _showMessageActions(msg),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   bool _sameDay(DateTime a, DateTime b) =>
       a.day == b.day && a.month == b.month && a.year == b.year;
+}
+
+// ── Edit dialog ───────────────────────────────────────────────────────────────
+
+class _EditMessageDialog extends StatefulWidget {
+  final String initialText;
+
+  const _EditMessageDialog({required this.initialText});
+
+  @override
+  State<_EditMessageDialog> createState() => _EditMessageDialogState();
+}
+
+class _EditMessageDialogState extends State<_EditMessageDialog> {
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('تعديل الرسالة'),
+        content: TextField(
+          controller: _ctrl,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 6,
+          maxLength: ChatMediaPolicy.textMaxChars,
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _ctrl,
+            builder: (context, value, _) => TextButton(
+              onPressed: value.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.pop(context, value.text.trim()),
+              child: const Text('حفظ'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -304,9 +474,7 @@ class _ChatRoomHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery
-        .paddingOf(context)
-        .top;
+    final top = MediaQuery.paddingOf(context).top;
     return Container(
       padding: EdgeInsets.fromLTRB(12, top + 8, 12, 12),
       decoration: const BoxDecoration(
@@ -317,21 +485,11 @@ class _ChatRoomHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Material(
-            color: const Color(0xFFF5FAFB),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: onBack,
-              borderRadius: BorderRadius.circular(12),
-              child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
+          AppBackButton(
+            circular: true,
+            size: 40,
+            color: AppColors.textPrimary,
+            onPressed: onBack,
           ),
           const SizedBox(width: 10),
           _HeaderAvatar(name: name, imageUrl: imageUrl),
@@ -348,14 +506,6 @@ class _ChatRoomHeader extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: null,
-            icon: Icon(
-              Icons.more_vert_rounded,
-              color: AppColors.textHint.withValues(alpha: 0.5),
-            ),
-            tooltip: 'قريباً',
-          ),
         ],
       ),
     );
@@ -370,9 +520,7 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = name
-        .trim()
-        .isEmpty ? '?' : name.trim()[0];
+    final initial = name.trim().isEmpty ? '?' : name.trim()[0];
     final url = imageUrl?.trim();
     return CircleAvatar(
       radius: 20,
@@ -380,129 +528,94 @@ class _HeaderAvatar extends StatelessWidget {
       backgroundImage: url != null && url.isNotEmpty ? NetworkImage(url) : null,
       child: url == null || url.isEmpty
           ? Text(
-        initial,
-        style: AppTextStyles.titleMedium.copyWith(
-          color: const Color(0xFF92400E),
-          fontWeight: FontWeight.w800,
-        ),
-      )
+              initial,
+              style: AppTextStyles.titleMedium.copyWith(
+                color: const Color(0xFF92400E),
+                fontWeight: FontWeight.w800,
+              ),
+            )
           : null,
     );
   }
 }
 
-// ── Bubbles ───────────────────────────────────────────────────────────────────
+// ── List chrome ───────────────────────────────────────────────────────────────
 
-class _MessageBubble extends StatelessWidget {
-  final MessageEntity message;
-  final bool isMine;
-  final VoidCallback? onSoftDelete;
-
-  const _MessageBubble({
-    required this.message,
-    required this.isMine,
-    this.onSoftDelete,
-  });
+class _EmptyConversation extends StatelessWidget {
+  const _EmptyConversation();
 
   @override
   Widget build(BuildContext context) {
-    final time = formatTimeHm12Ar(message.sentAt);
-    final maxWidth = ChatMessageAlignment.maxBubbleWidth(
-      MediaQuery
-          .sizeOf(context)
-          .width,
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: ChatMessageAlignment.contentCrossAxis(
-            isMine: isMine,
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 52,
+            color: AppColors.textHint.withValues(alpha: 0.45),
           ),
-          children: [
-            GestureDetector(
-              onLongPress: onSoftDelete == null
-                  ? null
-                  : () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('حذف الرسالة'),
-                          content: const Text(
-                            'سيتم حذف الرسالة من المحادثة (حذف ناعم).',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('إلغاء'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('حذف'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) onSoftDelete!();
-                    },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isMine ? AppColors.primary : AppColors.surface,
-                  borderRadius: ChatMessageAlignment.bubbleBorderRadius(
-                    isMine: isMine,
-                  ).resolve(Directionality.of(context)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  message.deleted
-                      ? 'تم حذف هذه الرسالة'
-                      : message.text,
-                  style: AppTextStyles.bodyLarge.copyWith(
-                    color:
-                        isMine ? AppColors.onPrimary : AppColors.textPrimary,
-                    fontSize: 14,
-                    height: 1.45,
-                    fontStyle:
-                        message.deleted ? FontStyle.italic : FontStyle.normal,
-                  ),
-                  textAlign: TextAlign.start,
-                  softWrap: true,
-                ),
-              ),
+          const SizedBox(height: 12),
+          Text(
+            'ابدأ المحادثة',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
             ),
-            if (message.isEdited && !message.deleted) ...[
-              const SizedBox(height: 2),
-              Text(
-                'تم التعديل',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textHint,
-                  fontSize: 9,
-                ),
-              ),
-            ],
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                time,
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textHint,
-                  fontSize: 10,
-                ),
-              ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreamErrorBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _StreamErrorBanner({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: AppColors.error.withValues(alpha: 0.1),
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
             ),
-          ],
-        ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+        ],
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onLoad;
+
+  const _HistoryRow({required this.loading, required this.onLoad});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: loading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : TextButton(
+                onPressed: onLoad,
+                child: const Text('عرض الرسائل الأقدم'),
+              ),
       ),
     );
   }
@@ -547,111 +660,6 @@ class _DateChip extends StatelessWidget {
   }
 }
 
-// ── Composer ──────────────────────────────────────────────────────────────────
-
-class _ComposerBar extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onSend;
-
-  const _ComposerBar({required this.controller, required this.onSend});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            top: BorderSide(color: Color(0xFFE8EEF0), width: 0.8),
-          ),
-        ),
-        child: Row(
-          children: [
-            // Decorative mic — not wired (no audio in this phase).
-            Opacity(
-              opacity: 0.35,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.mic_none_rounded,
-                  color: AppColors.primaryDark,
-                  size: 20,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                textAlign: TextAlign.right,
-                textDirection: TextDirection.rtl,
-                maxLines: null,
-                minLines: 1,
-                textInputAction: TextInputAction.send,
-                keyboardType: TextInputType.multiline,
-                style: AppTextStyles.bodyLarge.copyWith(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: '...اكتب رسالة',
-                  hintStyle: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textHint,
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFFF5FAFB),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(color: Color(0xFFE8EEF0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(color: Color(0xFFE8EEF0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: const BorderSide(
-                      color: AppColors.primary,
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-                onSubmitted: (_) => onSend(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Material(
-              color: AppColors.primary,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onSend,
-                child: const SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Icon(
-                    Icons.send_rounded,
-                    color: AppColors.onPrimary,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 class _MessagesSkeleton extends StatefulWidget {
@@ -672,11 +680,11 @@ class _MessagesSkeletonState extends State<_MessagesSkeleton>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )
-      ..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.35, end: 0.8).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(
+      begin: 0.35,
+      end: 0.8,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override

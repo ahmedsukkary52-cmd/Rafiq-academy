@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>يستخدم رفيق الميكروفون لتسجيل الرسائل الصوتية في المحادثات.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>يستخدم رفيق مكتبة الصور لإرسال صورة في المحادثات.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

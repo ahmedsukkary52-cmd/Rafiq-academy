@@ -30,6 +30,7 @@ export {
   softDeleteChatMessage,
   editChatMessage,
 } from "./chat/chatAuthFunctions";
+export { sendChatMessage } from "./chat/chatMessageFunctions";
 export {
   notifyParentsOnEvaluation,
 } from "./notifications/evaluationNotificationFunctions";
@@ -43,3 +44,24 @@ export {
   adminBackfillStudentLifecycle,
   adminSetStudentLifecycle,
 } from "./lifecycle/studentLifecycleFunctions";
+
+// PH-02 — backend authority (server-owned transitions; clients send intent).
+export { reviewPaymentProof } from "./billing/paymentReview";
+export {
+  recordSessionAttendance,
+  upsertSessionEvaluation,
+} from "./sessions/sessionRecordFunctions";
+export { notifyOnAssignmentCreated } from "./notifications/assignmentNotificationFunctions";
+export {
+  admitStudentToHalaqa,
+  adminTransferStudent,
+} from "./halaqa/membershipFunctions";
+export { completeHomework, purchaseAvatar } from "./economy/economyFunctions";
+export { grantAward } from "./awards/awardFunctions";
+
+// P0 completion — Admin operational workflows (server-authoritative).
+export { adminLinkParentChild } from "./relationships/parentLinkFunctions";
+export {
+  adminAddHalaqaSlot,
+  adminCreateHalaqa,
+} from "./halaqa/halaqaScheduleFunctions";

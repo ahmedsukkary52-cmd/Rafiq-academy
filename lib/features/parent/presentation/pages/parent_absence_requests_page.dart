@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/app_status_chip.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -572,23 +574,13 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = AbsenceRequestProjection.statusLabel(status);
-    final color = switch (status) {
-      AbsenceRequestStatus.pending => AppColors.warning,
-      AbsenceRequestStatus.approved => AppColors.success,
-      AbsenceRequestStatus.rejected => AppColors.error,
+    final tone = switch (status) {
+      AbsenceRequestStatus.pending => AppStatusTone.warning,
+      AbsenceRequestStatus.approved => AppStatusTone.success,
+      AbsenceRequestStatus.rejected => AppStatusTone.error,
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSizes.radiusS),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.labelSmall.copyWith(color: color),
-      ),
-    );
+    return AppStatusChip(label: label, tone: tone);
   }
 }
 
@@ -597,28 +589,10 @@ class _EmptyRequests extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        children: [
-          Icon(
-            Icons.event_busy_outlined,
-            size: 40,
-            color: AppColors.textHint.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'لا توجد طلبات استئذان بعد',
-            style: AppTextStyles.titleMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'بعد الإرسال والمراجعة ستظهر نتيجة كل طلب هنا من سجل الاستئذان.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const AppEmptyState(
+      icon: Icons.event_busy_outlined,
+      title: 'لا توجد طلبات استئذان بعد',
+      message: 'بعد الإرسال والمراجعة ستظهر نتيجة كل طلب هنا من سجل الاستئذان.',
     );
   }
 }
@@ -628,34 +602,10 @@ class _EmptyChildrenForAbsence extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.paddingXL),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.family_restroom_rounded,
-              size: 64,
-              color: AppColors.textHint.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'لا يوجد طلاب مرتبطون بهذا الحساب بعد',
-              style: AppTextStyles.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'لا يمكن تقديم استئذان قبل ربط الأبناء بحسابك.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textHint,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.family_restroom_rounded,
+      title: 'لا يوجد طلاب مرتبطون بهذا الحساب بعد',
+      message: 'لا يمكن تقديم استئذان قبل ربط الأبناء بحسابك.',
     );
   }
 }

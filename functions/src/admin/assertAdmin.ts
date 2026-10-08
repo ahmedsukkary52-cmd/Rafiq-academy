@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 import { HttpsError } from "firebase-functions/v2/https";
+import { activeRoleOf } from "../authority/callerContext";
 
 const ADMIN_ROLE = "admin";
 
@@ -17,8 +18,7 @@ export async function assertCallerIsAdmin(uid: string | undefined): Promise<stri
     throw new HttpsError("permission-denied", "ملف المستخدم غير موجود");
   }
 
-  const role = snap.data()?.role;
-  if (role !== ADMIN_ROLE) {
+  if (activeRoleOf(snap.data()) !== ADMIN_ROLE) {
     throw new HttpsError(
       "permission-denied",
       "هذه العملية متاحة للمسؤول فقط",

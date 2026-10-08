@@ -17,12 +17,19 @@ import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
 import '../parent_display.dart';
 import '../widgets/parent_loading_skeletons.dart';
+import '../widgets/parent_payment_access_banner.dart';
 import '../widgets/parent_subpage_scaffold.dart';
+import '../parent_home_nav.dart';
 
 class ParentSubscriptionsPage extends StatefulWidget {
   final bool embedded;
+  final ValueChanged<int>? onSwitchTab;
 
-  const ParentSubscriptionsPage({super.key, this.embedded = false});
+  const ParentSubscriptionsPage({
+    super.key,
+    this.embedded = false,
+    this.onSwitchTab,
+  });
 
   @override
   State<ParentSubscriptionsPage> createState() =>
@@ -185,7 +192,8 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
             p.paymentsError != c.paymentsError ||
             p.paymentProofStatus != c.paymentProofStatus ||
             p.paymentProofPaymentId != c.paymentProofPaymentId ||
-            p.childrenSnapshots != c.childrenSnapshots,
+            p.childrenSnapshots != c.childrenSnapshots ||
+            p.paymentAccess != c.paymentAccess,
         builder: (context, state) {
           return Scaffold(
             backgroundColor: AppColors.background,
@@ -281,6 +289,23 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (ParentPaymentAccessLabels.shouldSurface(
+                      state.paymentAccess,
+                    )) ...[
+                      ParentPaymentAccessBanner(
+                        access: state.paymentAccess!,
+                        onPayNow: () {
+                          // Already on payments — nudge toward unpaid filter.
+                          setState(() => _filter = 2);
+                        },
+                        onContactAdmin: widget.onSwitchTab == null
+                            ? null
+                            : () => widget.onSwitchTab!(
+                                ParentHomeNav.messagesIndex,
+                              ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     _FilterRow(
                       filters: _filters,
                       selected: _filter,

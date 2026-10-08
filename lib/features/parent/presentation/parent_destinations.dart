@@ -99,6 +99,15 @@ class ParentDestinations {
     return context.push(AppRoutes.parentNotifs);
   }
 
+  /// Shared content of the linked child's Halaqa (P0 §8). Rules re-check the
+  /// parent ↔ roster relationship; a blank id shows the empty state.
+  static Future<void> sharedContent(
+    BuildContext context, {
+    required String? halaqaId,
+  }) {
+    return context.push(AppRoutes.parentContentFor(halaqaId ?? ''));
+  }
+
   static Future<void> chat(
     BuildContext context, {
     required String conversationId,

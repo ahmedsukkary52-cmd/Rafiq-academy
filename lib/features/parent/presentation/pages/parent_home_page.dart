@@ -43,6 +43,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
     if (authState is! AuthAuthenticated) return;
     final uid = authState.user.uid;
     context.read<ParentBloc>().add(LoadChildrenEvent(uid));
+    context.read<ParentBloc>().add(LoadPaymentsEvent(uid));
     sl<NotificationsBloc>().add(
       StartWatchingNotificationsEvent(uid: uid, role: AppRoles.parent),
     );
@@ -56,24 +57,21 @@ class _ParentHomePageState extends State<ParentHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: IndexedStack(
-          index: _currentTab,
-          children: [
-            ParentDashboardTab(onSwitchTab: _switchTab),
-            const ParentChildrenPage(),
-            const ParentMessagesTab(),
-            const ParentSubscriptionsPage(embedded: true),
-            ParentProfileTab(onSwitchTab: _switchTab),
-          ],
-        ),
-        bottomNavigationBar: _ParentBottomNav(
-          selected: _currentTab,
-          onChanged: _switchTab,
-        ),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: IndexedStack(
+        index: _currentTab,
+        children: [
+          ParentDashboardTab(onSwitchTab: _switchTab),
+          const ParentChildrenPage(),
+          const ParentMessagesTab(),
+          ParentSubscriptionsPage(embedded: true, onSwitchTab: _switchTab),
+          ParentProfileTab(onSwitchTab: _switchTab),
+        ],
+      ),
+      bottomNavigationBar: _ParentBottomNav(
+        selected: _currentTab,
+        onChanged: _switchTab,
       ),
     );
   }

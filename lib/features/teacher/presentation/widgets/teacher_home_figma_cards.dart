@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_stat_tile.dart';
 
 /// Figma 1:432 stats + session cards (shared by Home and visual capture tests).
 /// Presentation only — no BLoC / UseCase logic here.
@@ -50,58 +51,39 @@ class TeacherHomeStatsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Column(
+      child: AppStatsGrid(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TeacherHomeStatTile(
-                  value: sessionsToday,
-                  label: 'حصص اليوم',
-                  icon: Icons.calendar_today_outlined,
-                  iconBg: AppColors.primaryLight,
-                  iconColor: AppColors.primaryDark,
-                  onTap: onSessionsTap,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TeacherHomeStatTile(
-                  value: studentsCount,
-                  label: 'إجمالي الطلاب',
-                  icon: Icons.person_outline_rounded,
-                  iconBg: AppColors.successBg,
-                  iconColor: AppColors.success,
-                  onTap: onStudentsTap,
-                ),
-              ),
-            ],
+          TeacherHomeStatTile(
+            value: sessionsToday,
+            label: 'حصص اليوم',
+            icon: Icons.calendar_today_outlined,
+            iconBg: AppColors.primaryLight,
+            iconColor: AppColors.primaryDark,
+            onTap: onSessionsTap,
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TeacherHomeStatTile(
-                  value: pendingTasks,
-                  label: 'مهام معلقة',
-                  icon: Icons.checklist_rtl_rounded,
-                  iconBg: AppColors.secondaryBg,
-                  iconColor: AppColors.secondary,
-                  onTap: onPendingTap,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TeacherHomeStatTile(
-                  value: newMessages,
-                  label: 'رسائل جديدة',
-                  icon: Icons.chat_bubble_outline_rounded,
-                  iconBg: AppColors.messagesBg,
-                  iconColor: AppColors.awardWeekly,
-                  onTap: onMessagesTap,
-                ),
-              ),
-            ],
+          TeacherHomeStatTile(
+            value: studentsCount,
+            label: 'إجمالي الطلاب',
+            icon: Icons.person_outline_rounded,
+            iconBg: AppColors.successBg,
+            iconColor: AppColors.success,
+            onTap: onStudentsTap,
+          ),
+          TeacherHomeStatTile(
+            value: pendingTasks,
+            label: 'مهام معلقة',
+            icon: Icons.checklist_rtl_rounded,
+            iconBg: AppColors.secondaryBg,
+            iconColor: AppColors.secondary,
+            onTap: onPendingTap,
+          ),
+          TeacherHomeStatTile(
+            value: newMessages,
+            label: 'رسائل جديدة',
+            icon: Icons.chat_bubble_outline_rounded,
+            iconBg: AppColors.messagesBg,
+            iconColor: AppColors.awardWeekly,
+            onTap: onMessagesTap,
           ),
         ],
       ),
@@ -109,6 +91,7 @@ class TeacherHomeStatsGrid extends StatelessWidget {
   }
 }
 
+/// Teacher-home adapter: formats eastern digits, then renders [AppStatTile].
 class TeacherHomeStatTile extends StatelessWidget {
   final int value;
   final String label;
@@ -129,73 +112,13 @@ class TeacherHomeStatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 1.3,
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-        elevation: 0,
-        shadowColor: AppColors.softShadow,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-          child: Ink(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.softShadow,
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: iconBg,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(icon, color: iconColor, size: 20),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    teacherHomeEasternDigits('$value'),
-                    textAlign: TextAlign.right,
-                    style: AppTextStyles.displayLarge.copyWith(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 26,
-                      height: 1.05,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    label,
-                    textAlign: TextAlign.right,
-                    style: AppTextStyles.labelMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      height: 1.25,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    return AppStatTile(
+      value: teacherHomeEasternDigits('$value'),
+      label: label,
+      icon: icon,
+      iconBg: iconBg,
+      iconColor: iconColor,
+      onTap: onTap,
     );
   }
 }
@@ -360,7 +283,7 @@ class TeacherHomeSessionCard extends StatelessWidget {
             const SizedBox(height: 20),
             // ── CTA area (always present — enabled or muted) ───────────
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: Opacity(
                 opacity: ctaEnabled ? 1 : 0.4,
                 child: IgnorePointer(

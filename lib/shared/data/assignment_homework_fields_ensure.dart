@@ -25,9 +25,14 @@ class AssignmentHomeworkFieldsEnsure {
       newMemorizationRange: raw['newMemorizationRange'] as String? ?? '',
       reviewRange: raw['reviewRange'] as String? ?? '',
     );
+    // Completion state (`isSubmitted` / `status` / `completedAt`) is
+    // server-owned (P0-05); `kind` may only be set once on a legacy doc.
+    seed.remove('isSubmitted');
+    final existingKind = raw[AssignmentPolicy.kindField];
     await doc.reference.set({
       ...seed,
-      AssignmentPolicy.kindField: AssignmentKind.wireLessonHomework,
+      if (existingKind is! String || existingKind.isEmpty)
+        AssignmentPolicy.kindField: AssignmentKind.wireLessonHomework,
     }, SetOptions(merge: true));
     return true;
   }

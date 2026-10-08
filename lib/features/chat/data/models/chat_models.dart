@@ -97,7 +97,9 @@ class MessageModel extends MessageEntity {
     required super.id,
     required super.conversationId,
     required super.senderId,
+    super.type,
     required super.text,
+    super.media,
     required super.sentAt,
     super.editedAt,
     super.deleted,
@@ -120,18 +122,35 @@ class MessageModel extends MessageEntity {
       Map<String, dynamic> data, {
         required String conversationId,
       }) {
+    final deleted = data['deleted'] == true;
     return MessageModel(
       id: id,
       conversationId: conversationId,
       senderId: data['senderId']?.toString() ?? '',
+      type: ChatMessageType.fromWire(data['type']),
       text: data['text']?.toString() ?? '',
+      media: deleted ? null : _mediaFrom(data['media']),
       // Server timestamps are null on the local optimistic snapshot. Using
       // now() keeps the stream alive and shows the bubble immediately.
       sentAt: dateTimeFromFirestore(data['sentAt']) ?? DateTime.now(),
       editedAt: dateTimeFromFirestore(data['editedAt']),
-      deleted: data['deleted'] == true,
+      deleted: deleted,
       deletedAt: dateTimeFromFirestore(data['deletedAt']),
       deletedBy: _stringFrom(data['deletedBy']),
+    );
+  }
+
+  static ChatMediaEntity? _mediaFrom(Object? raw) {
+    if (raw is! Map) return null;
+    final path = raw['storagePath'];
+    if (path is! String || path.isEmpty) return null;
+    final duration = raw['durationMs'];
+    return ChatMediaEntity(
+      storagePath: path,
+      fileName: raw['fileName']?.toString() ?? path.split('/').last,
+      contentType: raw['contentType']?.toString() ?? '',
+      sizeBytes: intFromFirestore(raw['sizeBytes']),
+      durationMs: duration is num ? duration.toInt() : null,
     );
   }
 }

@@ -26,12 +26,9 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
 
   @override
   Stream<List<PostModel>> watchPosts({required String halaqaId}) {
-    // نجيب منشورات الحلقة المحددة + المنشورات العامة لكل الحلقات.
-    // Firestore مش بتدعم OR query على حقلين مختلفين في query واحد،
-    // بنستخدم whereIn على حقل واحد (audience_target) بدل ما نعمل
-    // mergين لقائمتين مختلفتين - أبسط وأقل reads.
+    // منشورات الحلقة فقط (P0 §7) — لا يوجد موجز عام لكل الأكاديمية.
     return _postsRef
-        .where('audienceTarget', whereIn: [halaqaId, 'all'])
+        .where('audienceTarget', isEqualTo: halaqaId)
         .orderBy('isPinned', descending: true)
         .orderBy('createdAt', descending: true)
         .limit(30)
@@ -93,26 +90,21 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
       }
 
       // ثانياً: حفظ الـ document في Firestore
-      // audienceTarget = halaqaId للمنشورات الخاصة بحلقة، أو 'all' للعامة.
-      // بنستخدم حقل واحد عشان الـ whereIn query في watchPosts يشتغل.
+      // audienceTarget = halaqaId دائماً (المنشورات خاصة بالحلقة فقط).
       final audienceTarget = resolvePostAudienceTarget(
         audience: audience,
         halaqaId: halaqaId,
       );
       if (audienceTarget == null) {
-        throw const ServerException(
-          'يجب تحديد الحلقة قبل نشر منشور خاص بها',
-        );
+        throw const ServerException('يجب تحديد الحلقة قبل نشر منشور خاص بها');
       }
 
       await _postsRef.add({
         'authorId': authorId,
         'authorName': authorName,
         'content': content,
-        'halaqaId': halaqaId,
-        'audience': audience == PostAudience.allHalaqat
-            ? 'allHalaqat'
-            : 'specificHalaqa',
+        'halaqaId': audienceTarget,
+        'audience': 'specificHalaqa',
         'audienceTarget': audienceTarget,
         'attachments': attachments.map((a) => a.toMap()).toList(),
         'createdAt': FieldValue.serverTimestamp(),

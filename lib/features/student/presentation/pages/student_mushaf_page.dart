@@ -4,48 +4,38 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/di/injection_container.dart';
-import '../../../../core/network/network_info.dart';
+import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../mushaf/data/datasources/quran_text_remote_datasource.dart';
+import '../../../mushaf/domain/entities/mushaf_ayah.dart';
+import '../../../mushaf/domain/entities/mushaf_navigation_index.dart';
+import '../../../mushaf/domain/entities/mushaf_position.dart';
+import '../../../mushaf/domain/entities/quran_text_bundle.dart';
+import '../../../mushaf/domain/mushaf_page_range.dart';
+import '../../../mushaf/domain/quran_surah_catalog.dart';
+import '../../../mushaf/presentation/bloc/mushaf_audio_bloc.dart';
+import '../../../mushaf/presentation/bloc/mushaf_audio_event.dart';
+import '../../../mushaf/presentation/bloc/mushaf_audio_state.dart';
+import '../../../mushaf/presentation/bloc/mushaf_bloc.dart';
+import '../../../mushaf/presentation/bloc/mushaf_event.dart';
+import '../../../mushaf/presentation/bloc/mushaf_state.dart';
+import '../../../mushaf/presentation/widgets/mushaf_audio_bar.dart';
+import '../../../mushaf/presentation/widgets/mushaf_navigation_sheet.dart';
+import '../../../mushaf/presentation/widgets/mushaf_page_surface.dart';
+import '../../../mushaf/presentation/widgets/mushaf_reader_states.dart';
+import '../../../mushaf/presentation/widgets/mushaf_reader_tokens.dart';
+import '../../../mushaf/presentation/widgets/mushaf_reader_top_chrome.dart';
 import 'student_recitation_page.dart';
 
 enum MushafMode { reading, recitation }
-
-class ReciterInfo {
-  final String id;
-  final String name;
-  final String subDirectory;
-
-  const ReciterInfo({
-    required this.id,
-    required this.name,
-    required this.subDirectory,
-  });
-}
-
-class SurahMeta {
-  final int number;
-  final String name;
-  final String juz;
-  final String type;
-  final int versesCount;
-
-  const SurahMeta({
-    required this.number,
-    required this.name,
-    required this.juz,
-    required this.type,
-    required this.versesCount,
-  });
-}
 
 class AyahModel {
   final int number;
@@ -74,15 +64,15 @@ class AyahModel {
 }
 
 class StudentMushafPage extends StatefulWidget {
-  final int surahNumber;
+  /// Optional deep-link surah. Position is owned by [MushafBloc] (D23).
+  /// Prefer [MushafReaderHost] for production entry.
+  final int? preferredSurah;
   final MushafMode initialMode;
-  final bool isFreeMode;
 
   const StudentMushafPage({
     super.key,
-    this.surahNumber = 67,
+    this.preferredSurah,
     this.initialMode = MushafMode.reading,
-    this.isFreeMode = false,
   });
 
   @override
@@ -90,832 +80,6 @@ class StudentMushafPage extends StatefulWidget {
 }
 
 class _StudentMushafPageState extends State<StudentMushafPage> {
-  static const Map<int, SurahMeta> _surahCatalog = {
-    1: SurahMeta(
-      number: 1,
-      name: 'الفاتحة',
-      juz: 'الجزء الأول',
-      type: 'مكية',
-      versesCount: 7,
-    ),
-    2: SurahMeta(
-      number: 2,
-      name: 'البقرة',
-      juz: 'الجزء الأول',
-      type: 'مدنية',
-      versesCount: 286,
-    ),
-    3: SurahMeta(
-      number: 3,
-      name: 'آل عمران',
-      juz: 'الجزء الثالث',
-      type: 'مدنية',
-      versesCount: 200,
-    ),
-    4: SurahMeta(
-      number: 4,
-      name: 'النساء',
-      juz: 'الجزء الرابع',
-      type: 'مدنية',
-      versesCount: 176,
-    ),
-    5: SurahMeta(
-      number: 5,
-      name: 'المائدة',
-      juz: 'الجزء السادس',
-      type: 'مدنية',
-      versesCount: 120,
-    ),
-    6: SurahMeta(
-      number: 6,
-      name: 'الأنعام',
-      juz: 'الجزء السابع',
-      type: 'مكية',
-      versesCount: 165,
-    ),
-    7: SurahMeta(
-      number: 7,
-      name: 'الأعراف',
-      juz: 'الجزء الثامن',
-      type: 'مكية',
-      versesCount: 206,
-    ),
-    8: SurahMeta(
-      number: 8,
-      name: 'الأنفال',
-      juz: 'الجزء العاشر',
-      type: 'مدنية',
-      versesCount: 75,
-    ),
-    9: SurahMeta(
-      number: 9,
-      name: 'التوبة',
-      juz: 'الجزء العاشر',
-      type: 'مدنية',
-      versesCount: 129,
-    ),
-    10: SurahMeta(
-      number: 10,
-      name: 'يونس',
-      juz: 'الجزء الحادي عشر',
-      type: 'مكية',
-      versesCount: 109,
-    ),
-    11: SurahMeta(
-      number: 11,
-      name: 'هود',
-      juz: 'الجزء الثاني عشر',
-      type: 'مكية',
-      versesCount: 123,
-    ),
-    12: SurahMeta(
-      number: 12,
-      name: 'يوسف',
-      juz: 'الجزء الثالث عشر',
-      type: 'مكية',
-      versesCount: 111,
-    ),
-    13: SurahMeta(
-      number: 13,
-      name: 'الرعد',
-      juz: 'الجزء الرابع عشر',
-      type: 'مدنية',
-      versesCount: 43,
-    ),
-    14: SurahMeta(
-      number: 14,
-      name: 'إبراهيم',
-      juz: 'الجزء الرابع عشر',
-      type: 'مكية',
-      versesCount: 52,
-    ),
-    15: SurahMeta(
-      number: 15,
-      name: 'الحجر',
-      juz: 'الجزء الخامس عشر',
-      type: 'مكية',
-      versesCount: 99,
-    ),
-    16: SurahMeta(
-      number: 16,
-      name: 'النحل',
-      juz: 'الجزء الخامس عشر',
-      type: 'مكية',
-      versesCount: 128,
-    ),
-    17: SurahMeta(
-      number: 17,
-      name: 'الإسراء',
-      juz: 'الجزء السادس عشر',
-      type: 'مكية',
-      versesCount: 111,
-    ),
-    18: SurahMeta(
-      number: 18,
-      name: 'الكهف',
-      juz: 'الجزء السادس عشر',
-      type: 'مكية',
-      versesCount: 110,
-    ),
-    19: SurahMeta(
-      number: 19,
-      name: 'مريم',
-      juz: 'الجزء السابع عشر',
-      type: 'مكية',
-      versesCount: 98,
-    ),
-    20: SurahMeta(
-      number: 20,
-      name: 'طه',
-      juz: 'الجزء السابع عشر',
-      type: 'مكية',
-      versesCount: 135,
-    ),
-    21: SurahMeta(
-      number: 21,
-      name: 'الأنبياء',
-      juz: 'الجزء الثامن عشر',
-      type: 'مكية',
-      versesCount: 112,
-    ),
-    22: SurahMeta(
-      number: 22,
-      name: 'الحج',
-      juz: 'الجزء الثامن عشر',
-      type: 'مدنية',
-      versesCount: 78,
-    ),
-    23: SurahMeta(
-      number: 23,
-      name: 'المؤمنون',
-      juz: 'الجزء التاسع عشر',
-      type: 'مكية',
-      versesCount: 118,
-    ),
-    24: SurahMeta(
-      number: 24,
-      name: 'النور',
-      juz: 'الجزء التاسع عشر',
-      type: 'مدنية',
-      versesCount: 64,
-    ),
-    25: SurahMeta(
-      number: 25,
-      name: 'الفرقان',
-      juz: 'الجزء العشرون',
-      type: 'مكية',
-      versesCount: 77,
-    ),
-    26: SurahMeta(
-      number: 26,
-      name: 'الشعراء',
-      juz: 'الجزء العشرون',
-      type: 'مكية',
-      versesCount: 227,
-    ),
-    27: SurahMeta(
-      number: 27,
-      name: 'النمل',
-      juz: 'الجزء الحادي والعشرون',
-      type: 'مكية',
-      versesCount: 93,
-    ),
-    28: SurahMeta(
-      number: 28,
-      name: 'القصص',
-      juz: 'الجزء الحادي والعشرون',
-      type: 'مكية',
-      versesCount: 88,
-    ),
-    29: SurahMeta(
-      number: 29,
-      name: 'العنكبوت',
-      juz: 'الجزء الثاني والعشرون',
-      type: 'مكية',
-      versesCount: 69,
-    ),
-    30: SurahMeta(
-      number: 30,
-      name: 'الروم',
-      juz: 'الجزء الثاني والعشرون',
-      type: 'مكية',
-      versesCount: 60,
-    ),
-    31: SurahMeta(
-      number: 31,
-      name: 'لقمان',
-      juz: 'الجزء الثالث والعشرون',
-      type: 'مكية',
-      versesCount: 34,
-    ),
-    32: SurahMeta(
-      number: 32,
-      name: 'السجدة',
-      juz: 'الجزء الثالث والعشرون',
-      type: 'مكية',
-      versesCount: 30,
-    ),
-    33: SurahMeta(
-      number: 33,
-      name: 'الأحزاب',
-      juz: 'الجزء الثالث والعشرون',
-      type: 'مدنية',
-      versesCount: 73,
-    ),
-    34: SurahMeta(
-      number: 34,
-      name: 'سبأ',
-      juz: 'الجزء الرابع والعشرون',
-      type: 'مكية',
-      versesCount: 54,
-    ),
-    35: SurahMeta(
-      number: 35,
-      name: 'فاطر',
-      juz: 'الجزء الرابع والعشرون',
-      type: 'مكية',
-      versesCount: 45,
-    ),
-    36: SurahMeta(
-      number: 36,
-      name: 'يس',
-      juz: 'الجزء الرابع والعشرون',
-      type: 'مكية',
-      versesCount: 83,
-    ),
-    37: SurahMeta(
-      number: 37,
-      name: 'الصافات',
-      juz: 'الجزء الخامس والعشرون',
-      type: 'مكية',
-      versesCount: 182,
-    ),
-    38: SurahMeta(
-      number: 38,
-      name: 'ص',
-      juz: 'الجزء الخامس والعشرون',
-      type: 'مكية',
-      versesCount: 88,
-    ),
-    39: SurahMeta(
-      number: 39,
-      name: 'الزمر',
-      juz: 'الجزء السادس والعشرون',
-      type: 'مكية',
-      versesCount: 75,
-    ),
-    40: SurahMeta(
-      number: 40,
-      name: 'غافر',
-      juz: 'الجزء السادس والعشرون',
-      type: 'مكية',
-      versesCount: 85,
-    ),
-    41: SurahMeta(
-      number: 41,
-      name: 'فصلت',
-      juz: 'الجزء السابع والعشرون',
-      type: 'مكية',
-      versesCount: 54,
-    ),
-    42: SurahMeta(
-      number: 42,
-      name: 'الشورى',
-      juz: 'الجزء السابع والعشرون',
-      type: 'مكية',
-      versesCount: 53,
-    ),
-    43: SurahMeta(
-      number: 43,
-      name: 'الزخرف',
-      juz: 'الجزء الثامن والعشرون',
-      type: 'مكية',
-      versesCount: 89,
-    ),
-    44: SurahMeta(
-      number: 44,
-      name: 'الدخان',
-      juz: 'الجزء الثامن والعشرون',
-      type: 'مكية',
-      versesCount: 59,
-    ),
-    45: SurahMeta(
-      number: 45,
-      name: 'الجاثية',
-      juz: 'الجزء الثامن والعشرون',
-      type: 'مكية',
-      versesCount: 37,
-    ),
-    46: SurahMeta(
-      number: 46,
-      name: 'الأحقاف',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 35,
-    ),
-    47: SurahMeta(
-      number: 47,
-      name: 'محمد',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مدنية',
-      versesCount: 38,
-    ),
-    48: SurahMeta(
-      number: 48,
-      name: 'الفتح',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مدنية',
-      versesCount: 29,
-    ),
-    49: SurahMeta(
-      number: 49,
-      name: 'الحجرات',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مدنية',
-      versesCount: 18,
-    ),
-    50: SurahMeta(
-      number: 50,
-      name: 'ق',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 45,
-    ),
-    51: SurahMeta(
-      number: 51,
-      name: 'الذاريات',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 60,
-    ),
-    52: SurahMeta(
-      number: 52,
-      name: 'الطور',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 49,
-    ),
-    53: SurahMeta(
-      number: 53,
-      name: 'النجم',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 62,
-    ),
-    54: SurahMeta(
-      number: 54,
-      name: 'القمر',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 55,
-    ),
-    55: SurahMeta(
-      number: 55,
-      name: 'الرحمن',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 78,
-    ),
-    56: SurahMeta(
-      number: 56,
-      name: 'الواقعة',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 96,
-    ),
-    57: SurahMeta(
-      number: 57,
-      name: 'الحديد',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 29,
-    ),
-    58: SurahMeta(
-      number: 58,
-      name: 'المجادلة',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 22,
-    ),
-    59: SurahMeta(
-      number: 59,
-      name: 'الحشر',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 24,
-    ),
-    60: SurahMeta(
-      number: 60,
-      name: 'الممتحنة',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 13,
-    ),
-    61: SurahMeta(
-      number: 61,
-      name: 'الصف',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 14,
-    ),
-    62: SurahMeta(
-      number: 62,
-      name: 'الجمعة',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 11,
-    ),
-    63: SurahMeta(
-      number: 63,
-      name: 'المنافقون',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 11,
-    ),
-    64: SurahMeta(
-      number: 64,
-      name: 'التغابن',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 18,
-    ),
-    65: SurahMeta(
-      number: 65,
-      name: 'الطلاق',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 12,
-    ),
-    66: SurahMeta(
-      number: 66,
-      name: 'التحريم',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 12,
-    ),
-    67: SurahMeta(
-      number: 67,
-      name: 'الملك',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 30,
-    ),
-    68: SurahMeta(
-      number: 68,
-      name: 'القلم',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 52,
-    ),
-    69: SurahMeta(
-      number: 69,
-      name: 'الحاقة',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 52,
-    ),
-    70: SurahMeta(
-      number: 70,
-      name: 'المعارج',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 44,
-    ),
-    71: SurahMeta(
-      number: 71,
-      name: 'نوح',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 28,
-    ),
-    72: SurahMeta(
-      number: 72,
-      name: 'الجن',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 28,
-    ),
-    73: SurahMeta(
-      number: 73,
-      name: 'المزمل',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 20,
-    ),
-    74: SurahMeta(
-      number: 74,
-      name: 'المدثر',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 56,
-    ),
-    75: SurahMeta(
-      number: 75,
-      name: 'القيامة',
-      juz: 'الجزء التاسع والعشرون',
-      type: 'مكية',
-      versesCount: 40,
-    ),
-    76: SurahMeta(
-      number: 76,
-      name: 'الإنسان',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 31,
-    ),
-    77: SurahMeta(
-      number: 77,
-      name: 'المرسلات',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 50,
-    ),
-    78: SurahMeta(
-      number: 78,
-      name: 'النبأ',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 40,
-    ),
-    79: SurahMeta(
-      number: 79,
-      name: 'النازعات',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 46,
-    ),
-    80: SurahMeta(
-      number: 80,
-      name: 'عبس',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 42,
-    ),
-    81: SurahMeta(
-      number: 81,
-      name: 'التكوير',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 29,
-    ),
-    82: SurahMeta(
-      number: 82,
-      name: 'الانفطار',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 19,
-    ),
-    83: SurahMeta(
-      number: 83,
-      name: 'المطففين',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 36,
-    ),
-    84: SurahMeta(
-      number: 84,
-      name: 'الانشقاق',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 25,
-    ),
-    85: SurahMeta(
-      number: 85,
-      name: 'البروج',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 22,
-    ),
-    86: SurahMeta(
-      number: 86,
-      name: 'الطارق',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 17,
-    ),
-    87: SurahMeta(
-      number: 87,
-      name: 'الأعلى',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 19,
-    ),
-    88: SurahMeta(
-      number: 88,
-      name: 'الغاشية',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 26,
-    ),
-    89: SurahMeta(
-      number: 89,
-      name: 'الفجر',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 30,
-    ),
-    90: SurahMeta(
-      number: 90,
-      name: 'البلد',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 20,
-    ),
-    91: SurahMeta(
-      number: 91,
-      name: 'الشمس',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 15,
-    ),
-    92: SurahMeta(
-      number: 92,
-      name: 'الليل',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 21,
-    ),
-    93: SurahMeta(
-      number: 93,
-      name: 'الضحى',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 11,
-    ),
-    94: SurahMeta(
-      number: 94,
-      name: 'الشرح',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 8,
-    ),
-    95: SurahMeta(
-      number: 95,
-      name: 'التين',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 8,
-    ),
-    96: SurahMeta(
-      number: 96,
-      name: 'العلق',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 19,
-    ),
-    97: SurahMeta(
-      number: 97,
-      name: 'القدر',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 5,
-    ),
-    98: SurahMeta(
-      number: 98,
-      name: 'البينة',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 8,
-    ),
-    99: SurahMeta(
-      number: 99,
-      name: 'الزلزلة',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 8,
-    ),
-    100: SurahMeta(
-      number: 100,
-      name: 'العاديات',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 11,
-    ),
-    101: SurahMeta(
-      number: 101,
-      name: 'القارعة',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 11,
-    ),
-    102: SurahMeta(
-      number: 102,
-      name: 'التكاثر',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 8,
-    ),
-    103: SurahMeta(
-      number: 103,
-      name: 'العصر',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 3,
-    ),
-    104: SurahMeta(
-      number: 104,
-      name: 'الهمزة',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 9,
-    ),
-    105: SurahMeta(
-      number: 105,
-      name: 'الفيل',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 5,
-    ),
-    106: SurahMeta(
-      number: 106,
-      name: 'قريش',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 4,
-    ),
-    107: SurahMeta(
-      number: 107,
-      name: 'الماعون',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 7,
-    ),
-    108: SurahMeta(
-      number: 108,
-      name: 'الكوثر',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 3,
-    ),
-    109: SurahMeta(
-      number: 109,
-      name: 'الكافرون',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 6,
-    ),
-    110: SurahMeta(
-      number: 110,
-      name: 'النصر',
-      juz: 'الجزء الثلاثون',
-      type: 'مدنية',
-      versesCount: 3,
-    ),
-    111: SurahMeta(
-      number: 111,
-      name: 'المسد',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 5,
-    ),
-    112: SurahMeta(
-      number: 112,
-      name: 'الإخلاص',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 4,
-    ),
-    113: SurahMeta(
-      number: 113,
-      name: 'الفلق',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 5,
-    ),
-    114: SurahMeta(
-      number: 114,
-      name: 'الناس',
-      juz: 'الجزء الثلاثون',
-      type: 'مكية',
-      versesCount: 6,
-    ),
-  };
-
-  static const List<ReciterInfo> _reciters = [
-    ReciterInfo(
-      id: 'minshawi',
-      name: 'المنشاوي',
-      subDirectory: 'Minshawy_Murattal_128kbps',
-    ),
-    ReciterInfo(id: 'husary', name: 'الحصري', subDirectory: 'Husary_128kbps'),
-    ReciterInfo(
-      id: 'basit',
-      name: 'عبد الباسط',
-      subDirectory: 'Abdul_Basit_Murattal_128kbps',
-    ),
-    ReciterInfo(id: 'afasy', name: 'العفاسي', subDirectory: 'Alafasy_128kbps'),
-    ReciterInfo(
-      id: 'ajmi',
-      name: 'العجمي',
-      subDirectory: 'Ahmad_Al_Ajmi_64kbps',
-    ),
-    ReciterInfo(
-      id: 'muaiqly',
-      name: 'المعيقلي',
-      subDirectory: 'Maher_AlMuaiqly_128kbps',
-    ),
-  ];
-
   static final String _bismillahText = String.fromCharCodes([
     0x0628,
     0x0650,
@@ -957,134 +121,17 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     0x0650,
   ]);
 
-  static const List<String> _allSurahNames = [
-    'الفاتحة',
-    'البقرة',
-    'آل عمران',
-    'النساء',
-    'المائدة',
-    'الأنعام',
-    'الأعراف',
-    'الأنفال',
-    'التوبة',
-    'يونس',
-    'هود',
-    'يوسف',
-    'الرعد',
-    'إبراهيم',
-    'الحجر',
-    'النحل',
-    'الإسراء',
-    'الكهف',
-    'مريم',
-    'طه',
-    'الأنبياء',
-    'الحج',
-    'المؤمنون',
-    'النور',
-    'الفرقان',
-    'الشعراء',
-    'النمل',
-    'القصص',
-    'العنكبوت',
-    'الروم',
-    'لقمان',
-    'السجدة',
-    'الأحزاب',
-    'سبأ',
-    'فاطر',
-    'يس',
-    'الصافات',
-    'ص',
-    'الزمر',
-    'غافر',
-    'فصلت',
-    'الشورى',
-    'الزخرف',
-    'الدخان',
-    'الجاثية',
-    'الأحقاف',
-    'محمد',
-    'الفتح',
-    'الحجرات',
-    'ق',
-    'الذاريات',
-    'الطور',
-    'النجم',
-    'القمر',
-    'الرحمن',
-    'الواقعة',
-    'الحديد',
-    'المجادلة',
-    'الحشر',
-    'الممتحنة',
-    'الصف',
-    'الجمعة',
-    'المنافقون',
-    'التغابن',
-    'الطلاق',
-    'التحريم',
-    'الملك',
-    'القلم',
-    'الحاقة',
-    'المعارج',
-    'نوح',
-    'الجن',
-    'المزمل',
-    'المدثر',
-    'القيامة',
-    'الإنسان',
-    'المرسلات',
-    'النبأ',
-    'النازعات',
-    'عبس',
-    'التكوير',
-    'الانفطار',
-    'المطففين',
-    'الانشقاق',
-    'البروج',
-    'الطارق',
-    'الأعلى',
-    'الغاشية',
-    'الفجر',
-    'البلد',
-    'الشمس',
-    'الليل',
-    'الضحى',
-    'الشرح',
-    'التين',
-    'العلق',
-    'القدر',
-    'البينة',
-    'الزلزلة',
-    'العاديات',
-    'القارعة',
-    'التكاثر',
-    'العصر',
-    'الهمزة',
-    'الفيل',
-    'قريش',
-    'الماعون',
-    'الكوثر',
-    'الكافرون',
-    'النصر',
-    'المسد',
-    'الإخلاص',
-    'الفلق',
-    'الناس',
-  ];
-
   late MushafMode _mode;
   int _currentPage = 1; // Current page number
   late final PageController _pageController; // Controller for PageView
-  final Map<int, int> _surahStartPage = {}; // Map surah number to first page
+  MushafNavigationIndex _navigation = MushafNavigationIndex.empty;
 
   bool _isDarkMode = false;
+  bool _chromeVisible = true;
+
+  /// Recitation-mode panel only; reading mode uses the audio bar.
   bool _showBottomPanel = false;
-  double _fontSize = 22;
-  double _playbackSpeed = 1;
-  bool _isLooping = false;
-  bool _isMuted = false;
+  double _fontSize = 23;
 
   bool _isLoadingData = true;
   String _errorLoading = '';
@@ -1092,118 +139,170 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   final Map<int, int> _ayahIndexByNumber = {};
   List<List<AyahModel>> _groupedByPage =
       []; // Each element is ayahs for one Quran page
-  int _selectedAyahIndex = 0;
-  bool _audioPrepared = false;
 
-  late AudioPlayer _audioPlayer;
-  final ValueNotifier<bool> _isPlayingAudio = ValueNotifier(false);
-  final ValueNotifier<Duration> _audioPosition = ValueNotifier(Duration.zero);
-  final ValueNotifier<Duration> _audioDuration = ValueNotifier(Duration.zero);
-  StreamSubscription<Duration>? _positionSub;
-  StreamSubscription<Duration?>? _durationSub;
-  StreamSubscription<PlayerState>? _playerStateSub;
+  /// Index into [_ayahs]; null until the reader taps an ayah.
+  int? _selectedAyahIndex;
+
+  /// Null when the page is pumped without DI (preview / tests).
+  MushafAudioBloc? _audio;
+
   StreamSubscription<Duration>? _recordPositionSub;
   StreamSubscription<Duration?>? _recordDurationSub;
   StreamSubscription<PlayerState>? _recordPlayerStateSub;
 
-  late AudioRecorder _audioRecorder;
+  AudioRecorder? _audioRecorderInstance;
   bool _isRecording = false;
   String? _recordedFilePath;
   int _recordDurationSeconds = 0;
   Timer? _recordTimer;
   bool _hasRecorded = false;
   final ValueNotifier<bool> _isPlayingRecording = ValueNotifier(false);
-  late AudioPlayer _recordingPlayer;
+  AudioPlayer? _recordingPlayerInstance;
   final ValueNotifier<Duration> _recordPosition = ValueNotifier(Duration.zero);
   final ValueNotifier<Duration> _recordDuration = ValueNotifier(Duration.zero);
 
-  ReciterInfo _selectedReciter = _reciters.first;
-
   final List<TapGestureRecognizer> _ayahRecognizers = [];
 
-  SurahMeta get _meta {
-    if (_groupedByPage.isEmpty) {
-      return _surahCatalog[1]!;
-    }
-    final currentPageAyahs =
-        _groupedByPage[_pageController.hasClients
-            ? _pageController.page?.round() ?? 0
-            : 0];
-    final firstAyah = currentPageAyahs.first;
-    // Find surah number for this ayah
-    int? currentSurahNumber;
-    for (final entry in _surahStartPage.entries) {
-      if (entry.value <= firstAyah.page) {
-        currentSurahNumber = entry.key;
-      }
-    }
-    currentSurahNumber ??= 1;
-    return _surahCatalog[currentSurahNumber]!;
+  /// Surah of the first ayah on the visible page.
+  QuranSurahInfo get _meta =>
+      QuranSurahCatalog.of(_navigation.surahForPage(_currentPage) ?? 1);
+
+  AyahModel? get _selectedAyah {
+    final index = _selectedAyahIndex;
+    if (index == null || index < 0 || index >= _ayahs.length) return null;
+    return _ayahs[index];
+  }
+
+  AudioRecorder get _audioRecorder =>
+      _audioRecorderInstance ??= AudioRecorder();
+
+  AudioPlayer get _recordingPlayer {
+    final existing = _recordingPlayerInstance;
+    if (existing != null) return existing;
+    final player = AudioPlayer();
+    _recordPositionSub = player.positionStream.listen((pos) {
+      _recordPosition.value = pos;
+    });
+    _recordDurationSub = player.durationStream.listen((dur) {
+      _recordDuration.value = dur ?? Duration.zero;
+    });
+    _recordPlayerStateSub = player.playerStateStream.listen((state) {
+      _isPlayingRecording.value = state.playing;
+    });
+    return _recordingPlayerInstance = player;
   }
 
   @override
   void initState() {
     super.initState();
     _mode = widget.initialMode;
-    _pageController = PageController(
-      initialPage: 0,
-    ); // Page indices start at 0, pages start at 1
-    _audioPlayer = AudioPlayer();
-    _recordingPlayer = AudioPlayer();
-    _audioRecorder = AudioRecorder();
-    _setupAudioListeners();
-    _bootstrap();
+    _pageController = PageController(initialPage: 0);
+    try {
+      _audio = context.read<MushafAudioBloc>();
+    } catch (_) {
+      _audio = null;
+    }
+    _restoreNightPreference();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureInitialized());
   }
 
-  Future<void> _bootstrap() async {
-    await _loadSurahData();
+  Future<void> _restoreNightPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final night = prefs.getBool(kMushafNightModePrefsKey) ?? false;
+    if (!mounted) return;
+    setState(() => _isDarkMode = night);
+    _syncNightToBloc(night);
   }
 
-  void _setupAudioListeners() {
-    _positionSub = _audioPlayer.positionStream.listen((pos) {
-      _audioPosition.value = pos;
-    });
-    _durationSub = _audioPlayer.durationStream.listen((dur) {
-      _audioDuration.value = dur ?? Duration.zero;
-    });
-    _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
-      if (!mounted) return;
-      _isPlayingAudio.value = state.playing;
-      if (state.processingState == ProcessingState.completed) {
-        _onAyahCompleted();
+  void _syncNightToBloc(bool isNight) {
+    try {
+      context.read<MushafBloc>().add(MushafSetNightModeEvent(isNight));
+    } catch (_) {}
+  }
+
+  Future<void> _setNightMode(bool isNight) async {
+    setState(() => _isDarkMode = isNight);
+    _syncNightToBloc(isNight);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(kMushafNightModePrefsKey, isNight);
+  }
+
+  void _ensureInitialized() {
+    if (!mounted) return;
+    MushafBloc? mushaf;
+    try {
+      mushaf = context.read<MushafBloc>();
+    } catch (_) {
+      mushaf = null;
+    }
+    if (mushaf != null) {
+      // Host ([MushafReaderHost]) owns InitializeMushafEvent.
+      if (mushaf.state.status == SectionStatus.loaded &&
+          mushaf.state.quran != null) {
+        _hydrateFromBloc(mushaf.state);
       }
-    });
+      return;
+    }
+    // Fallback (preview without DI): load text only, start Al-Fatihah.
+    _loadSurahDataLegacyAlFatihah();
+  }
 
-    _recordPositionSub = _recordingPlayer.positionStream.listen((pos) {
-      _recordPosition.value = pos;
-    });
-    _recordDurationSub = _recordingPlayer.durationStream.listen((dur) {
-      _recordDuration.value = dur ?? Duration.zero;
-    });
-    _recordPlayerStateSub = _recordingPlayer.playerStateStream.listen((state) {
-      _isPlayingRecording.value = state.playing;
+  void _hydrateFromBloc(MushafState state) {
+    final quran = state.quran;
+    if (quran == null) return;
+    _applyBundle(quran, state.navigation);
+    _isLoadingData = false;
+    _errorLoading = '';
+    if (mounted) setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _jumpToPage(state.position.pageNumber);
     });
   }
 
-  Future<void> _loadSurahData() async {
+  void _applyBundle(QuranTextBundle quran, MushafNavigationIndex navigation) {
+    _navigation = navigation;
+    _ayahs
+      ..clear()
+      ..addAll(quran.ayahs.map(_ayahFromEntity));
+    _groupedByPage = quran.pagesByIndex
+        .map((page) => page.map(_ayahFromEntity).toList())
+        .toList();
+    _ayahIndexByNumber
+      ..clear()
+      ..addEntries([
+        for (var i = 0; i < _ayahs.length; i++) MapEntry(_ayahs[i].number, i),
+      ]);
+    _rebuildAyahRecognizers();
+  }
+
+  AyahModel _ayahFromEntity(MushafAyah a) => AyahModel(
+    number: a.globalNumber,
+    numberInSurah: a.numberInSurah,
+    text: a.text,
+    page: a.page,
+    surahNumber: a.surahNumber,
+  );
+
+  Future<void> _loadSurahDataLegacyAlFatihah() async {
+    // Preview-only path: same network/cache load, always open Al-Fatihah.
+    await _loadSurahData(forceAlFatihah: true);
+  }
+
+  Future<void> _loadSurahData({bool forceAlFatihah = true}) async {
     setState(() {
       _isLoadingData = true;
       _errorLoading = '';
-      _selectedAyahIndex = 0;
-      _audioPrepared = false;
+      _selectedAyahIndex = null;
     });
 
     const cacheKey = 'cached_entire_quran';
-    const lastPageKey = 'last_mushaf_page';
     final prefs = await SharedPreferences.getInstance();
     String? responseBody;
 
-    // Try to load from cache first
     if (prefs.containsKey(cacheKey)) {
       responseBody = prefs.getString(cacheKey);
     }
 
-    // If no cache, fetch from API
     if (responseBody == null) {
       try {
         final client = HttpClient();
@@ -1235,77 +334,19 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     _parseSurahResponse(responseBody);
     if (mounted) setState(() => _isLoadingData = false);
 
-    // Navigate to correct page (يحترم isFreeMode + surah من الـ route)
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      int targetPage;
-      if (!widget.isFreeMode &&
-          _surahStartPage.containsKey(widget.surahNumber)) {
-        targetPage = _surahStartPage[widget.surahNumber]!;
-      } else if (prefs.containsKey(lastPageKey)) {
-        targetPage = prefs.getInt(lastPageKey) ?? 1;
-      } else {
-        targetPage = 1;
-      }
-      _jumpToPage(targetPage);
+    // D23: preview/legacy path always opens Al-Fatihah (never Surah 67).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _jumpToPage(forceAlFatihah ? 1 : 1);
     });
   }
 
-  Future<void> _saveLastPage(int page) async {
-    const lastPageKey = 'last_mushaf_page';
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(lastPageKey, page);
+  void _notifyPageChanged(int page) {
+    _maybeMushafBloc()?.add(MushafGoToPageEvent(page));
   }
 
   void _parseSurahResponse(String jsonBody) {
-    final decoded = json.decode(jsonBody) as Map<String, dynamic>;
-    final data = decoded['data'] as Map<String, dynamic>;
-    final surahsList = data['surahs'] as List<dynamic>;
-
-    // Clear previous data
-    _ayahs.clear();
-    _ayahIndexByNumber.clear();
-    _surahStartPage.clear();
-
-    // Iterate all surahs
-    for (final surahJson in surahsList) {
-      final surahMap = surahJson as Map<String, dynamic>;
-      final surahNum = surahMap['number'] as int;
-      final ayahsList = surahMap['ayahs'] as List<dynamic>;
-
-      // Process ayahs of this surah
-      for (var i = 0; i < ayahsList.length; i++) {
-        final ayahJson = ayahsList[i] as Map<String, dynamic>;
-        final ayah = AyahModel.fromJson(ayahJson, surahNum);
-        _ayahs.add(ayah);
-
-        // Record start page of this surah
-        if (i == 0) {
-          _surahStartPage[surahNum] = ayah.page;
-        }
-      }
-    }
-
-    // Group ALL ayahs by page
-    final Map<int, List<AyahModel>> pageMap = {};
-    for (final ayah in _ayahs) {
-      if (pageMap.containsKey(ayah.page)) {
-        pageMap[ayah.page]!.add(ayah);
-      } else {
-        pageMap[ayah.page] = [ayah];
-      }
-    }
-
-    // Convert to ordered list of pages (1-604)
-    final sortedPages = pageMap.keys.toList()..sort();
-    _groupedByPage = sortedPages.map((page) => pageMap[page]!).toList();
-
-    _ayahIndexByNumber
-      ..clear()
-      ..addEntries([
-        for (var i = 0; i < _ayahs.length; i++) MapEntry(_ayahs[i].number, i),
-      ]);
-
-    _rebuildAyahRecognizers();
+    final bundle = QuranTextRemoteDatasourceImpl.parseBundle(jsonBody);
+    _applyBundle(bundle, MushafNavigationIndex.fromBundle(bundle));
   }
 
   void _rebuildAyahRecognizers() {
@@ -1391,345 +432,169 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       (page) => page.first.page == pageNumber,
     );
     if (pageIndex == -1) return;
+    // Post-frame callers may run after dispose or before the PageView mounts.
+    if (!mounted || !_pageController.hasClients) return;
     _pageController.jumpToPage(pageIndex);
   }
 
-  void _jumpToSurah(int surahNumber) {
-    final startPage = _surahStartPage[surahNumber];
-    if (startPage == null) return;
-    // Find page index in _groupedByPage
-    final pageIndex = _groupedByPage.indexWhere(
-      (page) => page.first.page == startPage,
-    );
-    if (pageIndex == -1) return;
-    Navigator.pop(context);
-    _pageController.animateToPage(
-      pageIndex,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-  }
-
-  void _showSurahPicker() {
-    final surfaceColor = _isDarkMode ? AppColors.darkCard : Colors.white;
-    final textColor = _isDarkMode ? Colors.white : AppColors.textPrimary;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.75,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        builder: (context, scrollController) => Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.textHint.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  const Icon(Icons.menu_book_rounded, color: AppColors.primary),
-                  const SizedBox(width: 10),
-                  Text(
-                    'اختر سورة',
-                    style: TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.separated(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                itemCount: _surahCatalog.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final number = index + 1;
-                  final surah = _surahCatalog[number]!;
-                  return ListTile(
-                    onTap: () => _jumpToSurah(number),
-                    leading: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _toArabicDigits(number),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      surah.name,
-                      style: TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontWeight: FontWeight.w600,
-                        color: textColor,
-                      ),
-                    ),
-                    subtitle: Text(
-                      surah.type,
-                      style: const TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 12,
-                        color: AppColors.textHint,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSurahActionsMenu() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: _isDarkMode ? AppColors.darkCard : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(
-                Icons.favorite_border,
-                color: AppColors.textHint,
-              ),
-              title: const Text(
-                'إضافة للمفضلة',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              trailing: Text(
-                'Coming Soon',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.bookmark_border,
-                color: AppColors.textHint,
-              ),
-              title: const Text(
-                'حفظ إشارة مرجعية',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              trailing: Text(
-                'Coming Soon',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.share_outlined,
-                color: AppColors.textHint,
-              ),
-              title: const Text(
-                'مشاركة السورة',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              trailing: Text(
-                'Coming Soon',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.settings_outlined,
-                color: AppColors.primary,
-              ),
-              title: const Text(
-                'إعدادات القراءة',
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _showFontSizeSheet(
-                  _isDarkMode ? AppColors.darkCard : Colors.white,
-                  _isDarkMode ? Colors.white : AppColors.textPrimary,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<bool> _ensureNetworkForAudio() async {
-    final connected = await sl<NetworkInfo>().isConnected;
-    if (!connected && mounted) {
-      AppSnackBar.showInfo(context, 'تشغيل الصوت يتطلب اتصالاً بالإنترنت');
-    }
-    return connected;
-  }
-
-  String _getAudioUrlForAyah(AyahModel ayah) {
-    final surahStr = ayah.surahNumber.toString().padLeft(3, '0');
-    final ayahStr = ayah.numberInSurah.toString().padLeft(3, '0');
-    return 'https://everyayah.com/data/${_selectedReciter.subDirectory}/$surahStr$ayahStr.mp3';
-  }
-
-  Future<void> _prepareAudioForCurrentAyah() async {
-    if (_ayahs.isEmpty) return;
-    if (!await sl<NetworkInfo>().isConnected) return;
-    final ayah = _ayahs[_selectedAyahIndex];
-    final url = _getAudioUrlForAyah(ayah);
+  MushafBloc? _maybeMushafBloc() {
     try {
-      await _audioPlayer.setSpeed(_playbackSpeed);
-      await _audioPlayer.setVolume(_isMuted ? 0 : 1);
-      await _audioPlayer.setUrl(url);
-      if (mounted) setState(() => _audioPrepared = true);
-    } catch (e) {
-      debugPrint('Prepare audio error: $e');
+      return context.read<MushafBloc>();
+    } catch (_) {
+      return null;
     }
   }
 
-  Future<void> _playCurrentAyah() async {
-    if (_ayahs.isEmpty) return;
-    if (!await _ensureNetworkForAudio()) return;
+  Future<void> _openNavigation() async {
+    if (_groupedByPage.isEmpty) return;
+    final mushaf = _maybeMushafBloc();
+    final state = mushaf?.state;
+    final current = state != null && state.status == SectionStatus.loaded
+        ? state.position
+        : MushafPosition(
+            pageNumber: _currentPage,
+            surahNumber: _meta.number,
+            ayahNumber: 1,
+          );
 
-    try {
-      if (!_audioPrepared ||
-          _audioPlayer.processingState == ProcessingState.idle) {
-        await _prepareAudioForCurrentAyah();
-      }
-      await _audioPlayer.play();
-    } catch (e) {
-      debugPrint('Play audio error: $e');
-      if (mounted) {
-        AppSnackBar.showError(
-          context,
-          'تعذر تشغيل صوت الآية، تحقق من الاتصال بالإنترنت',
-        );
-      }
-    }
-  }
+    final target = await showMushafNavigationSheet(
+      context: context,
+      tokens: MushafReaderTokens.of(isNight: _isDarkMode),
+      navigation: _navigation,
+      current: current,
+      lastRead: state?.resumePosition,
+    );
+    if (target == null || !mounted) return;
 
-  void _onAyahCompleted() {
-    if (_isLooping) {
-      _playCurrentAyah();
-    } else if (_selectedAyahIndex < _ayahs.length - 1) {
-      setState(() {
-        _selectedAyahIndex++;
-        _audioPrepared = false;
+    if (mushaf != null) {
+      mushaf.add(switch (target) {
+        MushafNavigateToSurah(:final surahNumber) => MushafGoToSurahEvent(
+          surahNumber,
+        ),
+        MushafNavigateToJuz(:final juzNumber) => MushafGoToJuzEvent(juzNumber),
+        MushafNavigateToPage(:final pageNumber) => MushafGoToPageEvent(
+          pageNumber,
+          fromNavigation: true,
+        ),
+        MushafNavigateToLastRead() => const MushafResumeLastReadEvent(),
       });
-      _playCurrentAyah();
-    } else {
-      _isPlayingAudio.value = false;
-    }
-  }
-
-  void _selectAyah(int index) {
-    setState(() {
-      _selectedAyahIndex = index;
-      _audioPrepared = false;
-      _showBottomPanel = true;
-    });
-    _prepareAudioForCurrentAyah();
-  }
-
-  void _togglePlayPause() async {
-    if (_isPlayingAudio.value) {
-      await _audioPlayer.pause();
       return;
     }
-    if (!_audioPrepared ||
-        _audioPlayer.processingState == ProcessingState.idle) {
-      await _playCurrentAyah();
-    } else {
-      if (!await _ensureNetworkForAudio()) return;
-      await _audioPlayer.play();
-    }
+
+    final page = switch (target) {
+      MushafNavigateToSurah(:final surahNumber) => _navigation.pageForSurah(
+        surahNumber,
+      ),
+      MushafNavigateToJuz(:final juzNumber) => _navigation.pageForJuz(
+        juzNumber,
+      ),
+      MushafNavigateToPage(:final pageNumber) => pageNumber,
+      MushafNavigateToLastRead() => MushafPageRange.minPage,
+    };
+    if (page != null) _jumpToPage(page);
   }
 
-  void _skipNext() {
-    if (_selectedAyahIndex < _ayahs.length - 1) {
+  /// Selecting never touches the network; audio for another ayah stops.
+  /// With [play], the ayah starts immediately (bar previous / next).
+  void _selectAyah(int index, {bool play = false}) {
+    if (index < 0 || index >= _ayahs.length) return;
+    final ayah = _ayahs[index];
+    final changed = index != _selectedAyahIndex;
+    // Skipping no-op setState keeps play / pause from rebuilding the pages.
+    if (changed || !_chromeVisible || !_showBottomPanel) {
       setState(() {
-        _selectedAyahIndex++;
-        _audioPrepared = false;
+        _selectedAyahIndex = index;
+        _chromeVisible = true;
+        _showBottomPanel = true;
       });
-      _playCurrentAyah();
     }
+    final mushaf = _maybeMushafBloc();
+    final quranAyahs = mushaf?.state.quran?.ayahs;
+    if (changed &&
+        mushaf != null &&
+        quranAyahs != null &&
+        index < quranAyahs.length) {
+      mushaf.add(MushafSelectAyahEvent(quranAyahs[index]));
+    }
+    _audio?.add(
+      play
+          ? MushafAudioPlayAyahEvent(
+              surahNumber: ayah.surahNumber,
+              ayahNumberInSurah: ayah.numberInSurah,
+            )
+          : MushafAudioSetTargetEvent(
+              surahNumber: ayah.surahNumber,
+              ayahNumberInSurah: ayah.numberInSurah,
+            ),
+    );
   }
 
-  void _skipPrevious() {
-    if (_selectedAyahIndex > 0) {
-      setState(() {
-        _selectedAyahIndex--;
-        _audioPrepared = false;
-      });
-      _playCurrentAyah();
+  /// First ayah of the visible page — the play target when nothing is
+  /// selected yet.
+  int? _firstAyahIndexOnCurrentPage() {
+    for (final page in _groupedByPage) {
+      if (page.first.page == _currentPage) {
+        return _ayahIndexByNumber[page.first.number];
+      }
     }
+    return null;
   }
 
-  void _cyclePlaybackSpeed() {
-    const speeds = [1.0, 1.25, 1.5, 2.0];
-    final idx = speeds.indexOf(_playbackSpeed);
-    final newSpeed = speeds[(idx + 1) % speeds.length];
-    setState(() => _playbackSpeed = newSpeed);
-    _audioPlayer.setSpeed(newSpeed);
+  void _onAudioPrimary(MushafAudioState audioState) {
+    final audio = _audio;
+    if (audio == null) return;
+    if (audioState.isLoading || audioState.isPlaying) {
+      // Pausing while loading cancels the load.
+      audio.add(const MushafAudioPauseEvent());
+      return;
+    }
+    final index = _selectedAyahIndex ?? _firstAyahIndexOnCurrentPage();
+    if (index == null) return;
+    _selectAyah(index, play: true);
+  }
+
+  void _stepAyah(int delta) {
+    final current = _selectedAyahIndex ?? _firstAyahIndexOnCurrentPage();
+    if (current == null) return;
+    _selectAyah(current + delta, play: true);
+  }
+
+  void _closeAudio() {
+    _audio?.add(const MushafAudioStopEvent(clearTarget: true));
+    _maybeMushafBloc()?.add(const MushafClearSelectionEvent());
+    setState(() => _selectedAyahIndex = null);
+  }
+
+  void _openAudioOptions(MushafReaderTokens tokens, MushafAudioState state) {
+    final audio = _audio;
+    if (audio == null) return;
+    showMushafAudioOptionsSheet(
+      context: context,
+      tokens: tokens,
+      selectedReciterId: state.reciter.id,
+      isLooping: state.isLooping,
+      onSelectReciter: (id) => audio.add(MushafAudioSelectReciterEvent(id)),
+      onLoopChanged: (_) => audio.add(const MushafAudioToggleLoopEvent()),
+    );
   }
 
   void _onScreenTap() {
-    setState(() => _showBottomPanel = !_showBottomPanel);
-  }
-
-  void _onReciterSelected(ReciterInfo reciter) {
     setState(() {
-      _selectedReciter = reciter;
-      _audioPrepared = false;
+      _chromeVisible = !_chromeVisible;
+      _showBottomPanel = _chromeVisible;
     });
-    if (_isPlayingAudio.value) {
-      _playCurrentAyah();
-    } else {
-      _prepareAudioForCurrentAyah();
-    }
   }
 
   Future<void> _startRecording() async {
     try {
+      final currentAyah =
+          _selectedAyah ??
+          _ayahs.elementAtOrNull(_firstAyahIndexOnCurrentPage() ?? -1);
+      if (currentAyah == null) return;
       if (await _audioRecorder.hasPermission()) {
         final tempDir = await getTemporaryDirectory();
-        final currentAyah = _ayahs[_selectedAyahIndex];
         final path =
-            '${tempDir.path}/recitation_${currentAyah.surahNumber}_${_selectedAyahIndex + 1}_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            '${tempDir.path}/recitation_${currentAyah.surahNumber}_${currentAyah.numberInSurah}_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
         setState(() {
           _recordedFilePath = path;
@@ -1812,19 +677,17 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     for (final r in _ayahRecognizers) {
       r.dispose();
     }
-    _positionSub?.cancel();
-    _durationSub?.cancel();
-    _playerStateSub?.cancel();
+    // The audio bloc is an app singleton; leaving the reader silences it.
+    final audio = _audio;
+    if (audio != null && !audio.isClosed) {
+      audio.add(const MushafAudioStopEvent(clearTarget: true));
+    }
     _recordPositionSub?.cancel();
     _recordDurationSub?.cancel();
     _recordPlayerStateSub?.cancel();
-    _audioPlayer.dispose();
-    _recordingPlayer.dispose();
-    _audioRecorder.dispose();
+    _recordingPlayerInstance?.dispose();
+    _audioRecorderInstance?.dispose();
     _recordTimer?.cancel();
-    _isPlayingAudio.dispose();
-    _audioPosition.dispose();
-    _audioDuration.dispose();
     _isPlayingRecording.dispose();
     _recordPosition.dispose();
     _recordDuration.dispose();
@@ -1833,175 +696,177 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   @override
   Widget build(BuildContext context) {
-    final surfaceColor = _isDarkMode ? AppColors.darkCard : Colors.white;
-    final textColor = _isDarkMode ? Colors.white : AppColors.textPrimary;
-    final iconColor = _isDarkMode ? Colors.white70 : AppColors.textSecondary;
+    final tokens = MushafReaderTokens.of(isNight: _isDarkMode);
+    final canPop = Navigator.canPop(context);
 
-    return Directionality(
+    Widget reader = Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: surfaceColor,
-        appBar: AppBar(
-          backgroundColor: _isDarkMode ? AppColors.darkCard : AppColors.primary,
-          elevation: 0,
-          leading: Navigator.canPop(context)
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                )
-              : null,
-          title: Text(
-            '${_meta.name} - صفحة ${_toArabicDigits(_currentPage)}',
-            style: GoogleFonts.amiri(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.menu_book_rounded, color: Colors.white),
-              onPressed: _showSurahPicker,
-            ),
-            IconButton(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onPressed: _showSurahActionsMenu,
-            ),
-            IconButton(
-              icon: Icon(
-                _isDarkMode
-                    ? Icons.wb_sunny_outlined
-                    : Icons.nightlight_round_outlined,
-                color: Colors.white,
-              ),
-              onPressed: () => setState(() => _isDarkMode = !_isDarkMode),
-            ),
-          ],
-        ),
-        body: Column(
+        backgroundColor: tokens.canvas,
+        body: Stack(
           children: [
-            _ModeSelector(
-              mode: _mode,
-              isDarkMode: _isDarkMode,
-              onReadingTap: () => setState(() => _mode = MushafMode.reading),
-              onRecitationTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => StudentRecitationPage(
-                      surahName: _meta.name,
-                      pageNumber: _currentPage,
-                    ),
-                  ),
-                );
-              },
-            ),
-            Expanded(
+            Positioned.fill(
               child: GestureDetector(
                 onTap: _onScreenTap,
                 behavior: HitTestBehavior.translucent,
-                child: _buildAyahsBody(textColor, iconColor),
+                child: _buildAyahsBody(tokens),
               ),
             ),
-            if (_showBottomPanel)
-              AnimatedSlide(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeInOut,
-                offset: Offset.zero,
-                child: _mode == MushafMode.recitation
-                    ? _buildRecordingPanel(surfaceColor, textColor)
-                    : _buildPlaybackPanel(surfaceColor, textColor, iconColor),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: MushafReaderTopChrome(
+                tokens: tokens,
+                surahName: _meta.name,
+                pageNumber: _currentPage,
+                visible: _chromeVisible,
+                onBack: canPop ? () => Navigator.pop(context) : null,
+                onToggleNight: () => _setNightMode(!_isDarkMode),
+                onOpenNavigation: _openNavigation,
+                onOpenSettings: () =>
+                    _showFontSizeSheet(tokens.chrome, tokens.chromeInk),
+                onOpenRecitation: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentRecitationPage(
+                        surahName: _meta.name,
+                        pageNumber: _currentPage,
+                      ),
+                    ),
+                  );
+                },
               ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _mode == MushafMode.recitation
+                  ? _bottomSlot(
+                      visible: _chromeVisible && _showBottomPanel,
+                      child: _buildRecordingPanel(
+                        tokens.chrome,
+                        tokens.chromeInk,
+                      ),
+                    )
+                  : _buildAudioBarSlot(tokens),
+            ),
           ],
         ),
       ),
     );
+
+    MushafBloc? mushaf;
+    try {
+      mushaf = context.read<MushafBloc>();
+    } catch (_) {
+      mushaf = null;
+    }
+    if (mushaf == null) return reader;
+
+    return BlocListener<MushafBloc, MushafState>(
+      listenWhen: (prev, next) =>
+          prev.status != next.status ||
+          prev.quran != next.quran ||
+          prev.position.pageNumber != next.position.pageNumber ||
+          prev.isNightMode != next.isNightMode,
+      listener: (context, state) {
+        if (state.isNightMode != _isDarkMode) {
+          setState(() => _isDarkMode = state.isNightMode);
+        }
+        if (state.status == SectionStatus.loaded && state.quran != null) {
+          final needsFullHydrate =
+              _groupedByPage.isEmpty ||
+              _ayahs.length != state.quran!.ayahs.length;
+          if (needsFullHydrate) {
+            _hydrateFromBloc(state);
+          } else if (_currentPage != state.position.pageNumber) {
+            _jumpToPage(state.position.pageNumber);
+          }
+        } else if (state.status == SectionStatus.error) {
+          setState(() {
+            _isLoadingData = false;
+            _errorLoading = state.errorMessage ?? 'تعذر تحميل المصحف';
+          });
+        } else if (state.status == SectionStatus.loading && _ayahs.isEmpty) {
+          setState(() {
+            _isLoadingData = true;
+            _errorLoading = '';
+          });
+        }
+      },
+      child: reader,
+    );
   }
 
-  Widget _buildAyahsBody(Color textColor, Color iconColor) {
+  Widget _buildAyahsBody(MushafReaderTokens tokens) {
     if (_isLoadingData) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
+      return MushafReaderLoading(tokens: tokens);
     }
 
     if (_errorLoading.isNotEmpty && _ayahs.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.cloud_off, size: 48, color: iconColor),
-              const SizedBox(height: 12),
-              Text(
-                _errorLoading,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  color: iconColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              AppButton(label: 'إعادة المحاولة', onPressed: _loadSurahData),
-            ],
-          ),
-        ),
+      return MushafReaderError(
+        tokens: tokens,
+        message: _errorLoading,
+        onRetry: () {
+          MushafBloc? mushaf;
+          try {
+            mushaf = context.read<MushafBloc>();
+          } catch (_) {
+            mushaf = null;
+          }
+          if (mushaf != null) {
+            mushaf.add(const MushafRetryEvent());
+            setState(() {
+              _isLoadingData = true;
+              _errorLoading = '';
+            });
+          } else {
+            _loadSurahData(forceAlFatihah: true);
+          }
+        },
       );
     }
 
     if (_groupedByPage.isEmpty) {
-      return const SizedBox.shrink();
+      return ColoredBox(color: tokens.canvas);
     }
 
     return PageView.builder(
       controller: _pageController,
       physics: const PageScrollPhysics(),
-      // Real page turning feel
       itemCount: _groupedByPage.length,
       onPageChanged: (pageIndex) {
         final pageNumber = _groupedByPage[pageIndex].first.page;
         setState(() {
           _currentPage = pageNumber;
         });
-        _saveLastPage(pageNumber);
+        _notifyPageChanged(pageNumber);
       },
       itemBuilder: (context, pageIndex) {
         final pageAyahs = _groupedByPage[pageIndex];
-        return _MushafPageFrame(
-          isDarkMode: _isDarkMode,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Ayahs
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: _buildMushafFlowText(textColor, pageAyahs),
-                ),
-              ),
-            ],
-          ),
+        final pageNumber = pageAyahs.first.page;
+        return MushafPageSurface(
+          tokens: tokens,
+          pageNumber: pageNumber,
+          // The audio bar can only show while an ayah is selected.
+          bottomInset: _mode == MushafMode.reading && _selectedAyahIndex != null
+              ? 112
+              : 0,
+          child: _buildMushafFlowText(tokens, pageAyahs),
         );
       },
     );
   }
 
-  Widget _buildMushafFlowText(Color textColor, List<AyahModel> pageAyahs) {
-    final highlightBg = _isDarkMode
-        ? AppColors.primary.withOpacity(0.22)
-        : const Color(0xFFE8F5E9);
-
-    final baseStyle = GoogleFonts.amiri(
-      fontSize: _fontSize,
-      height: 1.6,
-      letterSpacing: 0,
-      color: textColor,
-      fontWeight: FontWeight.w500,
-    );
+  Widget _buildMushafFlowText(
+    MushafReaderTokens tokens,
+    List<AyahModel> pageAyahs,
+  ) {
+    final highlightBg = tokens.selection;
+    final baseStyle = tokens.bodyStyle(fontSize: _fontSize);
 
     final children = <Widget>[];
     final allSpans = <InlineSpan>[];
@@ -2026,14 +891,13 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         }
 
         final surahNum = ayah.surahNumber;
-        final surahName = _allSurahNames[surahNum - 1];
-        final surahMeta = _surahCatalog[surahNum]!;
+        final surahMeta = QuranSurahCatalog.of(surahNum);
         children.add(
-          _TraditionalSurahHeader(
-            surahName: surahName,
+          MushafSurahHeader(
+            tokens: tokens,
+            surahName: surahMeta.name,
             surahNumber: surahNum,
-            surahType: surahMeta.type,
-            isDarkMode: _isDarkMode,
+            surahType: surahMeta.revelationLabel,
           ),
         );
 
@@ -2041,16 +905,11 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         if (surahNum != 1 && surahNum != 9) {
           children.add(
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Text(
                 _bismillahText,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.amiri(
-                  fontSize: _fontSize,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1A5C4B),
-                  height: 1.8,
-                ),
+                style: tokens.basmalaStyle(fontSize: _fontSize),
               ),
             ),
           );
@@ -2066,7 +925,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         TextSpan(
           text: ' $displayText ',
           style: baseStyle.copyWith(
-            color: isSelected ? const Color(0xFF1A5C4B) : textColor,
+            color: tokens.ink,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             backgroundColor: isSelected ? highlightBg : null,
           ),
@@ -2079,9 +938,9 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         TextSpan(
           text: _inlineVerseMarker(ayah.numberInSurah),
           style: baseStyle.copyWith(
-            fontSize: _fontSize * 0.72,
-            color: isSelected ? AppColors.primary : const Color(0xFF3D8B7A),
-            fontWeight: FontWeight.bold,
+            fontSize: _fontSize * 0.7,
+            color: isSelected ? tokens.accent : tokens.ayahMarker,
+            fontWeight: FontWeight.w600,
             backgroundColor: isSelected ? highlightBg : null,
           ),
           recognizer: _ayahRecognizers.length > originalIndex
@@ -2112,188 +971,61 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     );
   }
 
-  Widget _buildPlaybackPanel(
-    Color surfaceColor,
-    Color textColor,
-    Color iconColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 38,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _reciters.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final reciter = _reciters[index];
-                  final selected = reciter.id == _selectedReciter.id;
-                  return GestureDetector(
-                    onTap: () => _onReciterSelected(reciter),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.primary
-                            : (_isDarkMode
-                                  ? Colors.white10
-                                  : AppColors.surfaceGrey),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        reciter.name,
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: selected ? Colors.white : textColor,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-            AnimatedBuilder(
-              animation: Listenable.merge([_audioPosition, _audioDuration]),
-              builder: (context, _) {
-                final position = _audioPosition.value;
-                final duration = _audioDuration.value;
-                return Row(
-                  children: [
-                    Text(
-                      formatDurationMmSs(position),
-                      style: TextStyle(fontSize: 11, color: iconColor),
-                    ),
-                    Expanded(
-                      child: Slider(
-                        activeColor: AppColors.primary,
-                        inactiveColor: _isDarkMode
-                            ? Colors.white10
-                            : Colors.black.withOpacity(0.06),
-                        value: position.inMilliseconds
-                            .clamp(
-                              0,
-                              duration.inMilliseconds > 0
-                                  ? duration.inMilliseconds
-                                  : 1,
-                            )
-                            .toDouble(),
-                        max: duration.inMilliseconds > 0
-                            ? duration.inMilliseconds.toDouble()
-                            : 1,
-                        onChanged: (val) {
-                          _audioPlayer.seek(
-                            Duration(milliseconds: val.toInt()),
-                          );
-                        },
-                      ),
-                    ),
-                    Text(
-                      formatDurationMmSs(duration),
-                      style: TextStyle(fontSize: 11, color: iconColor),
-                    ),
-                  ],
-                );
-              },
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _isLooping ? Icons.repeat_one : Icons.repeat,
-                    color: _isLooping ? AppColors.primary : iconColor,
-                  ),
-                  onPressed: () => setState(() => _isLooping = !_isLooping),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.skip_next),
-                  color: textColor,
-                  iconSize: 28,
-                  onPressed: _skipPrevious,
-                ),
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: _isPlayingAudio,
-                    builder: (context, playing, _) {
-                      return IconButton(
-                        icon: Icon(
-                          playing ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
-                        ),
-                        iconSize: 32,
-                        onPressed: _togglePlayPause,
-                      );
-                    },
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.skip_previous),
-                  color: textColor,
-                  iconSize: 28,
-                  onPressed: _skipNext,
-                ),
-                IconButton(
-                  icon: Icon(
-                    _isMuted ? Icons.volume_off : Icons.volume_up,
-                    color: _isMuted ? AppColors.error : iconColor,
-                  ),
-                  onPressed: () {
-                    setState(() => _isMuted = !_isMuted);
-                    _audioPlayer.setVolume(_isMuted ? 0 : 1);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _OptionTextButton(
-                  icon: Icons.repeat,
-                  label:
-                      'x${_playbackSpeed == 1 ? 1 : _playbackSpeed.toString().replaceAll('.0', '')}',
-                  onTap: _cyclePlaybackSpeed,
-                ),
-                const SizedBox(width: 24),
-                _OptionTextButton(
-                  icon: Icons.text_fields,
-                  label: 'حجم الخط',
-                  onTap: () => _showFontSizeSheet(surfaceColor, textColor),
-                ),
-              ],
-            ),
-          ],
+  Widget _bottomSlot({required bool visible, required Widget child}) {
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        offset: visible ? Offset.zero : const Offset(0, 1.05),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 220),
+          opacity: visible ? 1 : 0,
+          child: child,
         ),
       ),
+    );
+  }
+
+  /// Scoped rebuilds: audio state changes never rebuild the PageView.
+  Widget _buildAudioBarSlot(MushafReaderTokens tokens) {
+    final audio = _audio;
+    if (audio == null) return const SizedBox.shrink();
+    return BlocBuilder<MushafAudioBloc, MushafAudioState>(
+      bloc: audio,
+      builder: (context, state) {
+        final surah = state.surahNumber;
+        final ayah = state.ayahNumberInSurah;
+        // Shown for a selected ayah while chrome is up; audible playback keeps
+        // it visible when the reader hides chrome.
+        final visible =
+            surah != null &&
+            ayah != null &&
+            (_chromeVisible || state.isPlaying || state.isLoading);
+        final current = _selectedAyahIndex ?? _firstAyahIndexOnCurrentPage();
+        return _bottomSlot(
+          visible: visible,
+          child: surah == null || ayah == null
+              ? const SizedBox.shrink()
+              : MushafAudioBar(
+                  tokens: tokens,
+                  state: state,
+                  surahName: QuranSurahCatalog.of(surah).name,
+                  ayahNumber: ayah,
+                  positionStream: audio.positionStream,
+                  durationStream: audio.durationStream,
+                  onPrimary: () => _onAudioPrimary(state),
+                  onOptions: () => _openAudioOptions(tokens, state),
+                  onClose: _closeAudio,
+                  onPrevious: current != null && current > 0
+                      ? () => _stepAyah(-1)
+                      : null,
+                  onNext: current != null && current < _ayahs.length - 1
+                      ? () => _stepAyah(1)
+                      : null,
+                ),
+        );
+      },
     );
   }
 
@@ -2355,7 +1087,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -2367,7 +1099,9 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'وضع التسميع — ${_meta.name} · الآية ${_selectedAyahIndex + 1}',
+              _selectedAyah == null
+                  ? 'وضع التسميع — ${_meta.name}'
+                  : 'وضع التسميع — ${QuranSurahCatalog.of(_selectedAyah!.surahNumber).name} · الآية ${_toArabicDigits(_selectedAyah!.numberInSurah)}',
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 fontSize: 12,
@@ -2472,7 +1206,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 children: [
                   Expanded(
                     child: AppButton(
-                      label: 'رفع التسجيل — Coming Soon',
+                      label: 'رفع التسجيل',
                       onPressed: _submitRecitation,
                     ),
                   ),
@@ -2515,238 +1249,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               ),
             ],
             const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeSelector extends StatelessWidget {
-  final MushafMode mode;
-  final bool isDarkMode;
-  final VoidCallback onReadingTap;
-  final VoidCallback onRecitationTap;
-
-  const _ModeSelector({
-    required this.mode,
-    required this.isDarkMode,
-    required this.onReadingTap,
-    required this.onRecitationTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDarkMode ? AppColors.darkCard : AppColors.primary;
-    return Container(
-      color: bg,
-      padding: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          children: [
-            _ModeTabButton(
-              label: 'قراءة',
-              icon: Icons.menu_book_outlined,
-              selected: mode == MushafMode.reading,
-              onTap: onReadingTap,
-            ),
-            _ModeTabButton(
-              label: 'تسميع',
-              icon: Icons.mic_none_rounded,
-              selected: mode == MushafMode.recitation,
-              onTap: onRecitationTap,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeTabButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ModeTabButton({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            color: selected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected ? AppColors.primary : Colors.white,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                  color: selected ? AppColors.primary : Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MushafPageFrame extends StatelessWidget {
-  final bool isDarkMode;
-  final Widget child;
-
-  const _MushafPageFrame({required this.isDarkMode, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final pageColor = isDarkMode
-        ? const Color(0xFF2A2A2A)
-        : const Color(0xFFF5F0E1); // Traditional Mushaf paper color
-    final borderColor = isDarkMode
-        ? Colors.white24
-        : const Color(0xFF2D6B4F).withOpacity(0.6);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: pageColor,
-        border: Border.all(color: borderColor, width: 2.5),
-        // Ornate border all around
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _TraditionalSurahHeader extends StatelessWidget {
-  final String surahName;
-  final int surahNumber;
-  final String surahType;
-  final bool isDarkMode;
-
-  const _TraditionalSurahHeader({
-    required this.surahName,
-    required this.surahNumber,
-    required this.surahType,
-    required this.isDarkMode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = isDarkMode ? Colors.white : const Color(0xFF1A5C4B);
-    final borderColor = isDarkMode ? Colors.white38 : const Color(0xFF2D6B4F);
-    final bgColor = isDarkMode
-        ? const Color(0xFF3A3A3A)
-        : const Color(0xFFFFF8E1);
-
-    String toArabicDigits(int n) {
-      const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-      return n.toString().split('').map((c) => digits[int.parse(c)]).join();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor, width: 2),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'سورة $surahName',
-              style: GoogleFonts.amiri(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${toArabicDigits(surahNumber)} - $surahType',
-              style: GoogleFonts.amiri(
-                fontSize: 16,
-                color: textColor.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OptionTextButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _OptionTextButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: AppColors.primary),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'NotoNaskhArabic',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
           ],
         ),
       ),

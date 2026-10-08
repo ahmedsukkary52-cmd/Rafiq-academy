@@ -1,5 +1,12 @@
 # Chat / Messaging Audit — رفيق أكاديمي
 
+> **SUPERSEDED (2026-10-07) — historical audit (2026-07-19).** Chat now supports
+> text, images, voice, edit and delete via Cloud Functions (D20), with role pairs
+> defined in `ChatPermissionPolicy`. Current contracts:
+> `docs/production/PRODUCT_DECISIONS_LOCKED.md`,
+> `docs/production/SECURITY_DATA_CONTRACT_FREEZE.md` and
+> `docs/production/AUTH_CHAT_HARDENING_REPORT.md`.
+
 تاريخ الجرد: 2026-07-19  
 النطاق: كل ما يتعلق بالشات/المحادثات تحت `lib/` (أسماء ملفات + كلمات Chat / Conversation /
 Message)  

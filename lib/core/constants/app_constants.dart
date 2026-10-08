@@ -1,3 +1,5 @@
+import 'academy_branding.dart';
+
 /// أدوار المستخدمين - يتطابق مع قيمة حقل [role] في Firestore
 class AppRoles {
   const AppRoles._();
@@ -50,6 +52,9 @@ class FirestoreCollections {
   static const String surahAudios = 'surahAudios';
   static const String listeningProgress = 'listeningProgress';
 
+  /// C15 / D23 — per-student Mushaf last-read (not memorization progress).
+  static const String mushafReading = 'mushafReading';
+
   /// C6 / WA-8 — first-class session occurrences (SSOT).
   static const String sessions = 'sessions';
 }
@@ -80,7 +85,8 @@ class NotificationTypes {
 class AppConstants {
   const AppConstants._();
 
-  static const String appName = 'رفيق - أكاديمية التحفيظ';
+  /// Alias of [AcademyBranding.fullTitle] — prefer branding constants in new UI.
+  static const String appName = AcademyBranding.fullTitle;
   static const Duration snackBarDuration = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 300);
 }

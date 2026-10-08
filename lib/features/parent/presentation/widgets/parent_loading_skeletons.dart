@@ -1,49 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_skeleton.dart';
 
-class ParentPulse extends StatefulWidget {
+/// Parent alias of [AppSkeletonPulse] (stable import path).
+class ParentPulse extends StatelessWidget {
   final Widget Function(BuildContext context, Color bone) builder;
 
   const ParentPulse({super.key, required this.builder});
 
   @override
-  State<ParentPulse> createState() => _ParentPulseState();
-}
-
-class _ParentPulseState extends State<ParentPulse>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
-    _pulse = Tween<double>(
-      begin: 0.4,
-      end: 0.9,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, _) {
-        final bone = AppColors.border.withValues(alpha: _pulse.value);
-        return widget.builder(context, bone);
-      },
-    );
+    return AppSkeletonPulse(builder: builder);
   }
 }
 
@@ -53,13 +21,11 @@ Widget parentSkeletonBar({
   required double height,
   double radius = AppSizes.radiusS,
 }) {
-  return Container(
+  return AppSkeletonBox(
+    bone: bone,
     width: width,
     height: height,
-    decoration: BoxDecoration(
-      color: bone,
-      borderRadius: BorderRadius.circular(radius),
-    ),
+    radius: radius,
   );
 }
 

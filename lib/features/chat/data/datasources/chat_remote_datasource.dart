@@ -1,16 +1,27 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../domain/entities/chat_entities.dart';
+import '../../domain/policies/chat_media_policy.dart';
+import '../../domain/repositories/chat_repository.dart';
 import '../models/chat_models.dart';
 
 abstract class ChatRemoteDatasource {
   Stream<List<ConversationModel>> watchConversations(String uid);
 
-  Stream<List<MessageModel>> watchMessages(String conversationId);
+  /// Newest [limit] messages, returned in ascending time order.
+  Stream<List<MessageModel>> watchMessages(
+    String conversationId, {
+    required int limit,
+  });
 
   Future<ConversationModel> getOrCreateConversation({
     required ChatParticipantEntity currentUser,
@@ -19,9 +30,22 @@ abstract class ChatRemoteDatasource {
 
   Future<void> sendMessage({
     required String conversationId,
-    required String senderId,
+    required String messageId,
+    required ChatMessageType type,
     required String text,
+    ChatSendMedia? media,
   });
+
+  ChatUploadTask startAttachmentUpload({
+    required String conversationId,
+    required String messageId,
+    required String uploaderId,
+    required ChatAttachmentDraft draft,
+  });
+
+  Future<void> deleteUpload(String storagePath);
+
+  Future<Uint8List> downloadMedia(ChatMediaEntity media);
 
   Future<void> markConversationAsRead({
     required String conversationId,
@@ -47,10 +71,12 @@ abstract class ChatRemoteDatasource {
 class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   final FirebaseFirestore firestore;
   final FirebaseFunctions functions;
+  final FirebaseStorage storage;
 
   const ChatRemoteDatasourceImpl({
     required this.firestore,
     required this.functions,
+    required this.storage,
   });
 
   CollectionReference get _conversationsRef =>
@@ -76,12 +102,16 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   }
 
   @override
-  Stream<List<MessageModel>> watchMessages(String conversationId) {
+  Stream<List<MessageModel>> watchMessages(
+    String conversationId, {
+    required int limit,
+  }) {
     return _messagesRef(conversationId)
-        .orderBy('sentAt')
+        .orderBy('sentAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
+          (snapshot) => snapshot.docs.reversed
               .map(
                 (doc) => MessageModel.fromFirestore(
                   doc,
@@ -141,52 +171,92 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   @override
   Future<void> sendMessage({
     required String conversationId,
-    required String senderId,
+    required String messageId,
+    required ChatMessageType type,
     required String text,
+    ChatSendMedia? media,
   }) async {
     try {
-      final conversationRef = _conversationsRef.doc(conversationId);
-      final convSnap = await conversationRef.get();
-      if (!convSnap.exists) {
-        throw const ServerException('المحادثة غير موجودة');
-      }
-      final convData = convSnap.data() as Map<String, dynamic>? ?? {};
-      final participantIds = (convData['participantIds'] as List<dynamic>? ?? [])
-          .map((e) => e.toString())
-          .where((id) => id.isNotEmpty)
-          .toList();
-      if (!participantIds.contains(senderId)) {
-        throw const ServerException('لست مشاركاً في هذه المحادثة');
-      }
-
-      final batch = firestore.batch();
-      final messageRef = _messagesRef(conversationId).doc();
-      batch.set(messageRef, {
-        'senderId': senderId,
-        'text': text,
-        'sentAt': FieldValue.serverTimestamp(),
-        'deleted': false,
+      final callable = functions.httpsCallable('sendChatMessage');
+      await callable.call(<String, dynamic>{
+        'conversationId': conversationId.trim(),
+        'messageId': messageId,
+        'type': type.name,
+        if (text.trim().isNotEmpty) 'text': text.trim(),
+        if (media != null)
+          'media': <String, dynamic>{
+            'storagePath': media.storagePath,
+            'fileName': media.fileName,
+            if (media.durationMs != null) 'durationMs': media.durationMs,
+          },
       });
-
-      final updates = <String, dynamic>{
-        'lastMessage': text,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'lastMessageSenderId': senderId,
-      };
-
-      // Increment unread for every other participant (1:1 and halaqa groups).
-      for (final uid in participantIds) {
-        if (uid == senderId) continue;
-        updates['unreadCounts.$uid'] = FieldValue.increment(1);
-      }
-
-      batch.update(conversationRef, updates);
-      await batch.commit();
-    } on ServerException {
-      rethrow;
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(_callableMessage(e, 'تعذر إرسال الرسالة'));
     } catch (e) {
-      throw ServerException(e.toString());
+      throw const ServerException('تعذر إرسال الرسالة. تحقق من الاتصال.');
     }
+  }
+
+  @override
+  ChatUploadTask startAttachmentUpload({
+    required String conversationId,
+    required String messageId,
+    required String uploaderId,
+    required ChatAttachmentDraft draft,
+  }) {
+    final path = ChatMediaPolicy.storagePath(
+      conversationId: conversationId,
+      messageId: messageId,
+      draft: draft,
+    );
+    final task = storage.ref(path).putFile(
+      File(draft.localPath),
+      SettableMetadata(
+        contentType: draft.contentType,
+        customMetadata: {'uploaderId': uploaderId},
+      ),
+    );
+    return _FirebaseChatUploadTask(task, path);
+  }
+
+  @override
+  Future<void> deleteUpload(String storagePath) async {
+    try {
+      await storage.ref(storagePath).delete();
+    } on FirebaseException catch (e) {
+      if (e.code == 'object-not-found') return;
+      throw ServerException(e.message ?? e.code);
+    }
+  }
+
+  @override
+  Future<Uint8List> downloadMedia(ChatMediaEntity media) async {
+    try {
+      final limit = media.sizeBytes > 0
+          ? media.sizeBytes + 1024
+          : ChatMediaPolicy.voiceMaxBytes;
+      final bytes = await storage.ref(media.storagePath).getData(limit);
+      if (bytes == null) {
+        throw const ServerException('الملف غير متاح');
+      }
+      return bytes;
+    } on FirebaseException catch (e) {
+      if (e.code == 'unauthorized' || e.code == 'object-not-found') {
+        throw const ServerException('الملف لم يعد متاحاً');
+      }
+      throw const ServerException('تعذر تحميل الملف. تحقق من الاتصال.');
+    }
+  }
+
+  static String _callableMessage(FirebaseFunctionsException e, String fallback) {
+    final message = e.message?.trim() ?? '';
+    final isArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(message);
+    if (isArabic) return message;
+    return switch (e.code) {
+      'unavailable' || 'deadline-exceeded' => '$fallback. تحقق من الاتصال.',
+      'permission-denied' => 'غير مسموح بهذا الإجراء في هذه المحادثة',
+      _ => fallback,
+    };
   }
 
   @override
@@ -215,9 +285,9 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         'messageId': messageId.trim(),
       });
     } on FirebaseFunctionsException catch (e) {
-      throw ServerException(e.message ?? e.code);
+      throw ServerException(_callableMessage(e, 'تعذر حذف الرسالة'));
     } catch (e) {
-      throw ServerException(e.toString());
+      throw const ServerException('تعذر حذف الرسالة. تحقق من الاتصال.');
     }
   }
 
@@ -235,9 +305,9 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         'text': text.trim(),
       });
     } on FirebaseFunctionsException catch (e) {
-      throw ServerException(e.message ?? e.code);
+      throw ServerException(_callableMessage(e, 'تعذر تعديل الرسالة'));
     } catch (e) {
-      throw ServerException(e.toString());
+      throw const ServerException('تعذر تعديل الرسالة. تحقق من الاتصال.');
     }
   }
 
@@ -293,5 +363,39 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     } catch (e) {
       throw ServerException(e.toString());
     }
+  }
+}
+
+class _FirebaseChatUploadTask implements ChatUploadTask {
+  final UploadTask _task;
+
+  @override
+  final String storagePath;
+
+  _FirebaseChatUploadTask(this._task, this.storagePath);
+
+  @override
+  Stream<double> get progress => _task.snapshotEvents.map(
+    (s) => s.totalBytes <= 0 ? 0.0 : s.bytesTransferred / s.totalBytes,
+  );
+
+  @override
+  Future<void> get completion async {
+    try {
+      await _task;
+    } on FirebaseException catch (e) {
+      if (e.code == 'canceled') {
+        throw const ServerException('تم إلغاء الرفع');
+      }
+      if (e.code == 'unauthorized') {
+        throw const ServerException('غير مسموح برفع هذا الملف في المحادثة');
+      }
+      throw const ServerException('تعذر رفع الملف. تحقق من الاتصال.');
+    }
+  }
+
+  @override
+  Future<void> cancel() async {
+    await _task.cancel();
   }
 }

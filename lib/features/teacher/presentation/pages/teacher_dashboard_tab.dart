@@ -278,8 +278,7 @@ class TeacherDashboardTab extends StatelessWidget {
   String _activityRoute(TeacherRecentActivity activity) {
     final id = activity.halaqaId!;
     return switch (activity.kind) {
-      TeacherRecentActivityKind.evaluation =>
-        '/teacher/halaqa/$id/evaluations',
+      TeacherRecentActivityKind.evaluation => '/teacher/halaqa/$id/evaluations',
       TeacherRecentActivityKind.attendance => '/teacher/attendance/$id',
       TeacherRecentActivityKind.award => '/teacher/halaqa/$id',
     };
@@ -516,28 +515,24 @@ class _TeacherHeader extends StatelessWidget {
                   bloc: sl<NotificationsBloc>(),
                   selector: (state) => state.unreadCount,
                   builder: (context, unreadCount) {
-                    return Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _HeaderCircleButton(
-                            icon: Icons.search_rounded,
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('قريباً')),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          _HeaderCircleButton(
-                            icon: Icons.notifications_outlined,
-                            showDot: unreadCount > 0,
-                            onTap: () =>
-                                context.push(AppRoutes.teacherNotifs),
-                          ),
-                        ],
-                      ),
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _HeaderCircleButton(
+                          icon: Icons.search_rounded,
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('قريباً')),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _HeaderCircleButton(
+                          icon: Icons.notifications_outlined,
+                          showDot: unreadCount > 0,
+                          onTap: () => context.push(AppRoutes.teacherNotifs),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -567,10 +562,12 @@ class _TeacherHeader extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Align(
-              alignment: Alignment.centerRight,
+              alignment: AlignmentDirectional.centerEnd,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.onPrimaryOverlay,
                   borderRadius: BorderRadius.circular(AppSizes.radiusFull),

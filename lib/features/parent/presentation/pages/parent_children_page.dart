@@ -7,6 +7,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
+import '../../../../shared/widgets/app_status_chip.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -426,23 +427,25 @@ class _ChildStatusCard extends StatelessWidget {
                         runSpacing: 6,
                         children: [
                           if (payment.isNotEmpty)
-                            _StatusChip(
+                            AppStatusChip(
                               label: payment,
-                              color:
+                              tone:
                                   snapshot?.paymentStatus == PaymentStatus.paid
-                                  ? AppColors.success
-                                  : AppColors.warning,
+                                  ? AppStatusTone.success
+                                  : AppStatusTone.warning,
                             ),
-                          _StatusChip(
+                          AppStatusChip(
                             label: attendance,
-                            color: switch ((snapshot?.todayAttendanceStatus ??
+                            tone: switch ((snapshot?.todayAttendanceStatus ??
                                     '')
                                 .trim()) {
                               AttendancePolicy.statusPresent =>
-                                AppColors.success,
-                              AttendancePolicy.statusAbsent => AppColors.error,
-                              AttendancePolicy.statusLate => AppColors.warning,
-                              _ => AppColors.info,
+                                AppStatusTone.success,
+                              AttendancePolicy.statusAbsent =>
+                                AppStatusTone.error,
+                              AttendancePolicy.statusLate =>
+                                AppStatusTone.warning,
+                              _ => AppStatusTone.info,
                             },
                           ),
                         ],
@@ -627,34 +630,6 @@ class _MetaLine extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.labelSmall.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 11,
-        ),
-      ),
     );
   }
 }

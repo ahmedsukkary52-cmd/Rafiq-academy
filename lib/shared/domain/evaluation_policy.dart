@@ -1,4 +1,5 @@
 import '../../features/student/domain/entities/recitation_record_entity.dart';
+import '../utils/attendance_policy.dart';
 
 /// Business identity of a teacher live evaluation (session-scoped SSOT).
 ///
@@ -38,11 +39,11 @@ class EvaluationOpenDecision {
   final RecitationRecordEntity? existing;
 
   const EvaluationOpenDecision.create()
-      : mode = EvaluationSheetMode.create,
-        existing = null;
+    : mode = EvaluationSheetMode.create,
+      existing = null;
 
   const EvaluationOpenDecision.edit(this.existing)
-      : mode = EvaluationSheetMode.edit;
+    : mode = EvaluationSheetMode.edit;
 }
 
 /// Where to write so duplicates are structurally impossible.
@@ -143,17 +144,22 @@ class EvaluationPolicy {
     if (record.studentId.trim() != identity.studentId.trim()) return false;
     if (record.type != identity.type) return false;
 
+    final target = identity.sessionId.trim();
     final stored = record.sessionId?.trim() ?? '';
-    if (stored.isNotEmpty) {
-      return stored == identity.sessionId.trim();
-    }
+    if (stored == target) return true;
 
-    // Legacy (no sessionId): same operational day as the identity session.
+    // Legacy (no sessionId), or C6 dual-read: a record bound to a real
+    // session still matches the legacy day key of the same operational day.
     final derived = sessionIdForDay(
       halaqaId: record.halaqaId,
       day: record.date,
     );
-    return derived == identity.sessionId.trim();
+    if (stored.isEmpty) return derived == target;
+    if (!AttendancePolicy.isLegacySyntheticSessionId(stored) &&
+        AttendancePolicy.isLegacySyntheticSessionId(target)) {
+      return derived == target;
+    }
+    return false;
   }
 
   /// First matching evaluation for [identity], or null.

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../shared/theme/app_preferences_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/confirm_logout.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -508,7 +507,6 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prefs = AppPreferencesScope.of(context);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -524,20 +522,6 @@ class _SettingsCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: prefs.themeMode,
-            builder: (context, mode, _) {
-              return _ToggleRow(
-                icon: Icons.dark_mode_rounded,
-                iconBg: const Color(0xFFE8E8F0),
-                iconColor: AppColors.textPrimary,
-                label: 'الوضع الليلي',
-                value: mode == ThemeMode.dark,
-                onChanged: prefs.setDarkMode,
-              );
-            },
-          ),
-          const _SettingsDivider(),
           _NavRow(
             icon: Icons.notifications_rounded,
             iconBg: const Color(0xFFD6F6F8),
@@ -587,52 +571,6 @@ class _RoundIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, size: 17, color: color),
-    );
-  }
-}
-
-class _ToggleRow extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleRow({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          _RoundIcon(icon: icon, bg: iconBg, color: iconColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          Switch.adaptive(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: AppColors.onPrimary,
-            activeTrackColor: AppColors.primary,
-          ),
-        ],
-      ),
     );
   }
 }

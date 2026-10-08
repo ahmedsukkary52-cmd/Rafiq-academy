@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
@@ -5,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/chat_entities.dart';
+import '../policies/chat_media_policy.dart';
 import '../policies/chat_permission_policy.dart';
 import '../repositories/chat_repository.dart';
 
@@ -31,15 +34,15 @@ class WatchConversationsUseCase
 
 @lazySingleton
 class WatchMessagesUseCase
-    extends StreamUseCase<List<MessageEntity>, ConversationIdParams> {
+    extends StreamUseCase<List<MessageEntity>, WatchMessagesParams> {
   final ChatRepository repository;
   WatchMessagesUseCase(this.repository);
 
   @override
   Stream<Either<Failure, List<MessageEntity>>> call(
-      ConversationIdParams params,
+      WatchMessagesParams params,
       ) =>
-      repository.watchMessages(params.conversationId);
+      repository.watchMessages(params.conversationId, limit: params.limit);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -87,21 +90,76 @@ class SendMessageUseCase extends UseCase<Unit, SendMessageParams> {
 
   @override
   Future<Either<Failure, Unit>> call(SendMessageParams params) {
-    // التحقق من إن النص مش فاضي قبل ما نوصل للسيرفر خالص - validation
-    // بسيطة بس بتمنع رسائل فاضية تتسجل بالغلط.
     final trimmed = params.text.trim();
-    if (trimmed.isEmpty) {
+    final media = params.media;
+    if (media == null) {
+      final invalid = validateMessageText(trimmed);
+      if (invalid != null) return Future.value(Left(ValidationFailure(invalid)));
+    } else if (trimmed.length > ChatMediaPolicy.textMaxChars) {
       return Future.value(
-        const Left(ValidationFailure('لا يمكن إرسال رسالة فارغة')),
+        Left(ValidationFailure(validateMessageText(trimmed)!)),
       );
+    }
+    if (!ChatMessageIds.isValid(params.messageId)) {
+      return Future.value(const Left(ValidationFailure('معرف الرسالة غير صالح')));
     }
 
     return repository.sendMessage(
       conversationId: params.conversationId,
-      senderId: params.senderId,
+      messageId: params.messageId,
+      type: params.type,
       text: trimmed,
+      media: media,
     );
   }
+}
+
+/// Arabic validation message for a text body, or null when acceptable.
+String? validateMessageText(String trimmed) {
+  if (trimmed.isEmpty) return 'لا يمكن إرسال رسالة فارغة';
+  if (trimmed.length > ChatMediaPolicy.textMaxChars) {
+    return 'الرسالة أطول من ${ChatMediaPolicy.textMaxChars} حرف';
+  }
+  return null;
+}
+
+@lazySingleton
+class StartChatUploadUseCase
+    extends UseCase<ChatUploadTask, StartChatUploadParams> {
+  final ChatRepository repository;
+  StartChatUploadUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, ChatUploadTask>> call(StartChatUploadParams params) {
+    final invalid = ChatMediaPolicy.validate(params.draft);
+    if (invalid != null) return Future.value(Left(ValidationFailure(invalid)));
+    return repository.startAttachmentUpload(
+      conversationId: params.conversationId,
+      messageId: params.messageId,
+      uploaderId: params.uploaderId,
+      draft: params.draft,
+    );
+  }
+}
+
+@lazySingleton
+class DiscardChatUploadUseCase extends UseCase<Unit, String> {
+  final ChatRepository repository;
+  DiscardChatUploadUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, Unit>> call(String storagePath) =>
+      repository.discardUpload(storagePath);
+}
+
+@lazySingleton
+class DownloadChatMediaUseCase extends UseCase<Uint8List, ChatMediaEntity> {
+  final ChatRepository repository;
+  DownloadChatMediaUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, Uint8List>> call(ChatMediaEntity media) =>
+      repository.downloadMedia(media);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -164,6 +222,8 @@ class EditChatMessageUseCase extends UseCase<Unit, EditChatMessageParams> {
         const Left(ValidationFailure('لا يمكن حفظ رسالة فارغة')),
       );
     }
+    final invalid = validateMessageText(trimmed);
+    if (invalid != null) return Future.value(Left(ValidationFailure(invalid)));
     return repository.editMessage(
       conversationId: params.conversationId,
       messageId: params.messageId,
@@ -205,19 +265,51 @@ class GetOrCreateConversationParams extends Equatable {
   List<Object?> get props => [currentUser, otherUser];
 }
 
+class WatchMessagesParams extends Equatable {
+  final String conversationId;
+  final int limit;
+
+  const WatchMessagesParams({required this.conversationId, required this.limit});
+
+  @override
+  List<Object?> get props => [conversationId, limit];
+}
+
+/// Sender identity is never a client parameter (server uses the auth uid).
 class SendMessageParams extends Equatable {
   final String conversationId;
-  final String senderId;
+  final String messageId;
+  final ChatMessageType type;
   final String text;
+  final ChatSendMedia? media;
 
   const SendMessageParams({
     required this.conversationId,
-    required this.senderId,
+    required this.messageId,
+    this.type = ChatMessageType.text,
     required this.text,
+    this.media,
   });
 
   @override
-  List<Object?> get props => [conversationId, senderId, text];
+  List<Object?> get props => [conversationId, messageId, type, text, media];
+}
+
+class StartChatUploadParams extends Equatable {
+  final String conversationId;
+  final String messageId;
+  final String uploaderId;
+  final ChatAttachmentDraft draft;
+
+  const StartChatUploadParams({
+    required this.conversationId,
+    required this.messageId,
+    required this.uploaderId,
+    required this.draft,
+  });
+
+  @override
+  List<Object?> get props => [conversationId, messageId, uploaderId, draft];
 }
 
 class MarkAsReadParams extends Equatable {

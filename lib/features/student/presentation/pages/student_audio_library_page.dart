@@ -6,6 +6,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../audio_library/domain/entities/audio_entities.dart';
 import '../../../audio_library/presentation/bloc/audio_bloc.dart';
 import '../../../audio_library/presentation/bloc/audio_event.dart';
@@ -118,21 +119,12 @@ class _AudioLibraryHeader extends StatelessWidget {
           Row(
             children: [
               // back button
-              GestureDetector(
-                onTap: () => Navigator.of(context).maybePop(),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
+              AppBackButton(
+                color: Colors.white,
+                circular: false,
+                size: 38,
+                iconSize: 18,
+                onPressed: () => Navigator.of(context).maybePop(),
               ),
               const SizedBox(width: 12),
               Expanded(

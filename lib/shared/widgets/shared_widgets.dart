@@ -357,7 +357,6 @@ class AppErrorWidget extends StatelessWidget {
               AppButton(
                 label: 'إعادة المحاولة',
                 onPressed: onRetry,
-                width: 160,
                 height: 44,
               ),
             ],
@@ -389,9 +388,9 @@ class NotificationBadge extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         child,
-        Positioned(
+        PositionedDirectional(
           top: -4,
-          right: -4,
+          end: -4,
           child: Container(
             width: 18,
             height: 18,

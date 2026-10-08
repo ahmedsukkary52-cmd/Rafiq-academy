@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../di/injection_container.dart';
 import '../../features/admin/presentation/bloc/admin_bloc.dart';
 import '../../features/admin/presentation/bloc/admin_event.dart';
 import '../../features/chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../features/chat/presentation/bloc/chat_conversations_event.dart';
+import '../../features/chat/presentation/media/chat_media_loader.dart';
 import '../../features/notifications/presentation/bloc/notifications_bloc.dart';
 import '../../features/notifications/presentation/bloc/notifications_event.dart';
 import '../../features/parent/presentation/bloc/parent_bloc.dart';
@@ -35,4 +39,5 @@ void clearSessionProjections(BuildContext context) {
     const ClearChatConversationsSessionEvent(),
   );
   context.read<PostsBloc>().add(const ClearPostsSessionEvent());
+  unawaited(sl<ChatMediaLoader>().clear());
 }

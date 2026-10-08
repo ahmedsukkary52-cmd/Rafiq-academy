@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
 import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
@@ -214,7 +214,7 @@ export async function issueInvoiceFromPricing(params: {
       parentId,
       amount,
       currency,
-      dueDate: admin.firestore.Timestamp.fromDate(dueDate),
+      dueDate: Timestamp.fromDate(dueDate),
       status: "due",
       method: null,
       paidAt: null,
@@ -268,7 +268,7 @@ export async function issueInvoiceFromPricing(params: {
  * Does not let Admin set amount; only triggers server-owned generation.
  */
 export const adminGenerateInvoice = onCall(
-  { region: "us-central1" },
+  { region: "europe-west1" },
   async (request): Promise<IssueInvoiceResult> => {
     assertBackendAllowed("adminGenerateInvoice");
     const adminUid = await assertCallerIsAdmin(request.auth?.uid);
@@ -293,7 +293,7 @@ interface ReinstateRequest {
  * WA-3 — Admin-only reinstatement of paymentAccess (no overdue scheduler).
  */
 export const adminReinstatePaymentAccess = onCall(
-  { region: "us-central1" },
+  { region: "europe-west1" },
   async (request): Promise<{ parentId: string; status: string }> => {
     assertBackendAllowed("adminReinstatePaymentAccess");
     const adminUid = await assertCallerIsAdmin(request.auth?.uid);

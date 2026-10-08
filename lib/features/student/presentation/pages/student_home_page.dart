@@ -15,6 +15,8 @@ import '../../../../shared/widgets/student_last_evaluation_widget.dart';
 import '../../../../shared/widgets/student_progress_widget.dart';
 import '../../../../shared/widgets/student_quick_action_widget.dart';
 import '../../../../shared/widgets/student_session_card_widget.dart';
+import '../../../halaqa_plan/presentation/bloc/halaqa_plan_bloc.dart';
+import '../../../halaqa_plan/presentation/pages/student_halaqa_plan_page.dart';
 import '../../../homework/presentation/pages/student_activities_page.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
@@ -27,8 +29,8 @@ import '../../domain/entities/halaqa_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
+import '../../../mushaf/presentation/pages/mushaf_reader_host.dart';
 import 'student_badges_page.dart';
-import 'student_mushaf_dashboard.dart';
 
 class StudentHomePage extends StatefulWidget {
   const StudentHomePage({super.key});
@@ -45,7 +47,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
     _StudentTab(icon: Icons.home_rounded, label: 'الرئيسية'),
     _StudentTab(icon: Icons.menu_book_outlined, label: 'مصحفي'),
     _StudentTab(icon: Icons.star_rounded, label: '', isElevated: true),
-    _StudentTab(icon: Icons.map_outlined, label: 'خريطتي'),
+    _StudentTab(icon: Icons.route_outlined, label: 'خطة الحلقة'),
     _StudentTab(icon: Icons.person_outline_rounded, label: 'حسابي'),
   ];
 
@@ -101,9 +103,9 @@ class _StudentHomePageState extends State<StudentHomePage> {
               onTabChanged: (index) => setState(() => _currentTab = index),
               onRetryProfile: _loadStudentData,
             ),
-            const StudentMushafDashboard(),
+            const MushafBlocScope(child: MushafReaderHost()),
             const StudentBadgesPage(),
-            const _StudentMapTab(),
+            const _StudentPlanTab(),
             const _StudentProfileTab(),
           ],
         ),
@@ -474,49 +476,47 @@ class _StudentHomeTab extends StatelessWidget {
   }
 }
 
-/// Adventure map is not backed by real progress data yet — keep the tab slot.
-class _StudentMapTab extends StatelessWidget {
-  const _StudentMapTab();
+class _StudentPlanTab extends StatefulWidget {
+  const _StudentPlanTab();
+
+  @override
+  State<_StudentPlanTab> createState() => _StudentPlanTabState();
+}
+
+class _StudentPlanTabState extends State<_StudentPlanTab> {
+  final HalaqaPlanBloc _bloc = sl<HalaqaPlanBloc>();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _bloc.close();
+    super.dispose();
+  }
+
+  void _load() {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) return;
+    _bloc.add(
+      LoadStudentHalaqaPlanEvent(
+        studentId: auth.user.uid,
+        halaqaId: context.read<StudentBloc>().state.profile?.halaqaId,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('خريطتي')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingL),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: AppColors.textHint,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'خريطة المغامرة',
-                style: AppTextStyles.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Coming Soon',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'ستظهر خريطة التقدم عند تفعيل خطة الحفظ',
-                style: AppTextStyles.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+    return BlocProvider.value(
+      value: _bloc,
+      child: BlocListener<StudentBloc, StudentState>(
+        listenWhen: (p, c) => p.profile?.halaqaId != c.profile?.halaqaId,
+        listener: (_, __) => _load(),
+        child: StudentHalaqaPlanView(onRetry: _load),
       ),
     );
   }
@@ -543,11 +543,11 @@ class _StudentProfileTab extends StatelessWidget {
             children: [
               // ── Header ────────────────────────────────────────────
               Container(
-                padding: EdgeInsets.only(
+                padding: EdgeInsetsDirectional.only(
                   top: MediaQuery.of(context).padding.top + 20,
                   bottom: AppSizes.paddingL,
-                  left: AppSizes.paddingL,
-                  right: AppSizes.paddingL,
+                  start: AppSizes.paddingL,
+                  end: AppSizes.paddingL,
                 ),
                 decoration: const BoxDecoration(
                   color: AppColors.primary,
@@ -559,7 +559,7 @@ class _StudentProfileTab extends StatelessWidget {
                 child: Column(
                   children: [
                     Align(
-                      alignment: Alignment.centerLeft,
+                      alignment: AlignmentDirectional.centerStart,
                       child: IconButton(
                         onPressed: () =>
                             context.push(AppRoutes.studentSettings),
@@ -724,13 +724,27 @@ class _StudentProfileTab extends StatelessWidget {
 
                     const SizedBox(height: AppSizes.paddingM),
 
-                    // موارد إضافية — مكتبة محتوى عامة (PDF / فيديو / صوت / صور)
+                    // موارد الحلقة — المحتوى المشترك (P0 §8) + المكتبة الصوتية (§5)
                     _ProfileMenuGroup(
                       items: [
                         _ProfileMenuItem(
                           icon: Icons.folder_open_rounded,
-                          label: 'مكتبة المحتوى',
-                          onTap: () => context.push(AppRoutes.studentContent),
+                          label: 'المحتوى المشترك للحلقة',
+                          onTap: () {
+                            final halaqaId =
+                                context
+                                    .read<StudentBloc>()
+                                    .state
+                                    .profile
+                                    ?.halaqaId ??
+                                '';
+                            context.push(AppRoutes.studentContentFor(halaqaId));
+                          },
+                        ),
+                        _ProfileMenuItem(
+                          icon: Icons.headphones_rounded,
+                          label: 'المكتبة الصوتية',
+                          onTap: () => context.push(AppRoutes.studentAudio),
                         ),
                       ],
                     ),
@@ -922,13 +936,13 @@ class _StudentBottomNav extends StatelessWidget {
       selector: (state) => state.unreadCount,
       builder: (context, unreadCount) {
         return Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: AppColors.softShadow,
                 blurRadius: 12,
-                offset: const Offset(0, -2),
+                offset: Offset(0, -2),
               ),
             ],
           ),
@@ -994,11 +1008,10 @@ class _StudentBottomNav extends StatelessWidget {
                               size: AppSizes.iconL,
                             ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Text(
                             tab.label,
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
+                            style: AppTextStyles.labelSmall.copyWith(
                               fontSize: 10,
                               fontWeight: isSelected
                                   ? FontWeight.w600

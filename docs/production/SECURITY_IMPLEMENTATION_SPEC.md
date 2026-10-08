@@ -346,6 +346,8 @@ Freeze has **no** Add Student Request collection. **Schema TBD** for request doc
 | Parent/Student | Read linked/own | ✖ | ✖ |
 | Admin | Read / correction **TBD** | | |
 
+**Resolved (PH-02 final closure, PRODUCT_DECISIONS_LOCKED D7.1):** Teacher edit window = 24h from the server-set `createdAt`; Admin may create/correct at any time, audited; Supervisor stays read-only.
+
 ### 10.2 Required fields
 
 - `evaluationType` ∈ {`memorization`, `revision`} (names **Schema TBD** but concept locked).

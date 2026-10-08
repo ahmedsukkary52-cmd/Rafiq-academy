@@ -5,7 +5,6 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
-import '../../../../shared/data/academy_admission_firestore.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/academy_payment_settings_contract.dart';
 import '../../../../shared/domain/pricing_rules_contract.dart';
@@ -110,11 +109,17 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String halaqaId,
   }) async {
     try {
-      await AcademyAdmissionFirestore.establishMembership(
-        firestore: firestore,
-        studentId: studentId,
-        halaqaId: halaqaId,
-      );
+      final callable = functions.httpsCallable('admitStudentToHalaqa');
+      await callable.call(<String, dynamic>{
+        'halaqaId': halaqaId.trim(),
+        'studentId': studentId.trim(),
+      });
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code != 'already-exists') {
+        throw ServerException(e.message ?? e.code);
+      }
+      // Already on this roster: approval only (re)activates the account.
+      await toggleAccountStatus(uid: studentId.trim(), isActive: true);
     } on ServerException {
       rethrow;
     } catch (e) {

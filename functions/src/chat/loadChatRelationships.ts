@@ -3,6 +3,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { activeRoleOf } from "../authority/callerContext";
 import {
   emptyRelationshipContext,
   isChatRole,
@@ -17,7 +18,7 @@ export async function loadUserRole(
 ): Promise<ChatRole | null> {
   const snap = await db.collection("users").doc(uid).get();
   if (!snap.exists) return null;
-  const role = snap.data()?.role;
+  const role = activeRoleOf(snap.data());
   return isChatRole(role) ? role : null;
 }
 

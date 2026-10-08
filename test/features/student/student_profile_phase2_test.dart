@@ -31,7 +31,7 @@ RecitationRecordEntity _record({
 
 void main() {
   group('StudentProfileModel.fromMaps', () {
-    test('maps phone from users.phone when present', () {
+    test('D16: never hydrates phone from users.phone even when present', () {
       final model = StudentProfileModel.fromMaps(
         uid: 's1',
         user: {
@@ -49,25 +49,31 @@ void main() {
           'totalVersesMemorized': 80,
         },
       );
-      expect(model.phone, '0501234567');
+      // D16 — phone is Admin/self via userPrivate only; public users.phone must not leak.
+      expect(model.phone, isNull);
+      expect(model.name, 'أحمد');
       expect(model.streakDays, 12);
       expect(model.totalVersesMemorized, 80);
       expect(model.level, 3);
     });
 
-    test('treats blank users.phone as unavailable', () {
-      final model = StudentProfileModel.fromMaps(
-        uid: 's1',
-        user: {'name': 'أحمد', 'phone': '  '},
-        profile: {
-          'currentPlanName': '',
-          'overallProgressPercent': 0,
-          'totalStars': 0,
-          'badges': const <String>[],
-        },
-      );
-      expect(model.phone, isNull);
-    });
+    test(
+      'D16: ignores blank users.phone the same as populated users.phone',
+      () {
+        final model = StudentProfileModel.fromMaps(
+          uid: 's1',
+          user: {'name': 'أحمد', 'phone': '  '},
+          profile: {
+            'currentPlanName': '',
+            'overallProgressPercent': 0,
+            'totalStars': 0,
+            'badges': const <String>[],
+          },
+        );
+        expect(model.phone, isNull);
+        expect(model.name, 'أحمد');
+      },
+    );
 
     test('prefers profile createdAt then users.createdAt', () {
       final fromProfile = StudentProfileModel.fromMaps(
@@ -118,16 +124,19 @@ void main() {
       );
     });
 
-    test('returns null when halaqa is missing so no history page is invented', () {
-      expect(
-        studentProfileEvaluationsPath(halaqaId: null, studentId: 's1'),
-        isNull,
-      );
-      expect(
-        studentProfileEvaluationsPath(halaqaId: '  ', studentId: 's1'),
-        isNull,
-      );
-    });
+    test(
+      'returns null when halaqa is missing so no history page is invented',
+      () {
+        expect(
+          studentProfileEvaluationsPath(halaqaId: null, studentId: 's1'),
+          isNull,
+        );
+        expect(
+          studentProfileEvaluationsPath(halaqaId: '  ', studentId: 's1'),
+          isNull,
+        );
+      },
+    );
   });
 
   group('pickLatestStudentProfileEvaluation', () {
@@ -155,43 +164,49 @@ void main() {
       expect(picked.behaviorGrade, RecitationGrade.veryGood);
     });
 
-    test('composes حفظ / مراجعة / سلوك from existing records without inventing', () {
-      final picked = pickLatestStudentProfileEvaluation([
-        _record(
-          id: 'mem',
-          type: RecitationType.memorization,
-          date: DateTime(2026, 8, 12),
-          grade: RecitationGrade.excellent,
-          behaviorGrade: RecitationGrade.good,
-          notes: 'أداء قوي',
-        ),
-        _record(
-          id: 'rev',
-          type: RecitationType.review,
-          date: DateTime(2026, 8, 8),
-          grade: RecitationGrade.veryGood,
-        ),
-      ]);
-      expect(picked!.memorizationGrade, RecitationGrade.excellent);
-      expect(picked.reviewGrade, RecitationGrade.veryGood);
-      expect(picked.behaviorGrade, RecitationGrade.good);
-      expect(picked.notes, 'أداء قوي');
-      expect(picked.date, DateTime(2026, 8, 12));
-    });
+    test(
+      'composes حفظ / مراجعة / سلوك from existing records without inventing',
+      () {
+        final picked = pickLatestStudentProfileEvaluation([
+          _record(
+            id: 'mem',
+            type: RecitationType.memorization,
+            date: DateTime(2026, 8, 12),
+            grade: RecitationGrade.excellent,
+            behaviorGrade: RecitationGrade.good,
+            notes: 'أداء قوي',
+          ),
+          _record(
+            id: 'rev',
+            type: RecitationType.review,
+            date: DateTime(2026, 8, 8),
+            grade: RecitationGrade.veryGood,
+          ),
+        ]);
+        expect(picked!.memorizationGrade, RecitationGrade.excellent);
+        expect(picked.reviewGrade, RecitationGrade.veryGood);
+        expect(picked.behaviorGrade, RecitationGrade.good);
+        expect(picked.notes, 'أداء قوي');
+        expect(picked.date, DateTime(2026, 8, 12));
+      },
+    );
 
-    test('leaves an axis unavailable when no matching reviewed grade exists', () {
-      final picked = pickLatestStudentProfileEvaluation([
-        _record(
-          id: 'mem-only',
-          type: RecitationType.memorization,
-          date: DateTime(2026, 8, 1),
-          grade: RecitationGrade.good,
-        ),
-      ]);
-      expect(picked!.memorizationGrade, RecitationGrade.good);
-      expect(picked.reviewGrade, isNull);
-      expect(picked.behaviorGrade, isNull);
-    });
+    test(
+      'leaves an axis unavailable when no matching reviewed grade exists',
+      () {
+        final picked = pickLatestStudentProfileEvaluation([
+          _record(
+            id: 'mem-only',
+            type: RecitationType.memorization,
+            date: DateTime(2026, 8, 1),
+            grade: RecitationGrade.good,
+          ),
+        ]);
+        expect(picked!.memorizationGrade, RecitationGrade.good);
+        expect(picked.reviewGrade, isNull);
+        expect(picked.behaviorGrade, isNull);
+      },
+    );
 
     test('returns null when there are no reviewed records', () {
       expect(

@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -249,11 +250,9 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'بحث في المحادثات...',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
+                  child: AppSearchField(
+                    hint: 'بحث في المحادثات...',
+                    showClear: false,
                     onChanged: (v) => setState(() => _query = v.trim()),
                   ),
                 ),

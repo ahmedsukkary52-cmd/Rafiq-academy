@@ -1,5 +1,9 @@
 import 'package:equatable/equatable.dart';
 
+import 'auth_error_reason.dart';
+
+export 'auth_error_reason.dart';
+
 abstract class Failure extends Equatable {
   final String message;
 
@@ -18,7 +22,12 @@ class NetworkFailure extends Failure {
 }
 
 class AuthFailure extends Failure {
-  const AuthFailure(super.message);
+  final AuthErrorReason reason;
+
+  const AuthFailure(super.message, {this.reason = AuthErrorReason.generic});
+
+  @override
+  List<Object?> get props => [message, reason];
 }
 
 class ValidationFailure extends Failure {

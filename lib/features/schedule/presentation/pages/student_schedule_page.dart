@@ -8,6 +8,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../domain/entities/class_session_entity.dart';
@@ -66,9 +67,9 @@ class _ScheduleView extends StatelessWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
+        leading: AppBackButton(
           onPressed: () => context.pop(),
-          icon: const Icon(Icons.chevron_right, color: AppColors.textPrimary),
+          color: AppColors.textPrimary,
         ),
         title: const Text(
           'حصصي 🕌',

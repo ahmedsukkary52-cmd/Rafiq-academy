@@ -1,5 +1,11 @@
 # H6 — Surface Cleanup Validation
 
+> **HISTORICAL (2026-10-07).** `lib/shared/hardening/h6_surface_cleanup.dart`
+> and `test/shared/h6_surface_cleanup_test.dart` were removed (audit OA-62:
+> no production references). Route removals are now asserted by
+> `test/core/router/route_registry_test.dart`. Current state lives in
+> `docs/production/*`.
+
 **Status:** Approved (product)  
 **Date:** 2026-07-31  
 **Scope:** Slice H6 only (`docs/PRODUCTION_HARDENING_PHASE0.md`) — **A-H8**, **A-H9**, **A-H16**, **A-H17**  

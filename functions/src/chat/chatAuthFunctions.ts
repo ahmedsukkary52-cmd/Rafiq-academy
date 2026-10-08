@@ -22,6 +22,12 @@ import {
   loadUserRole,
 } from "./loadChatRelationships";
 import { isHalaqaGroupConversationId } from "./halaqaGroupSync";
+import {
+  CHAT_DELETED_PREVIEW,
+  ChatInputError,
+  messagePreview,
+  normalizeMessageText,
+} from "./chatMessageContract";
 
 function requireUid(uid: string | undefined): string {
   if (!uid) {
@@ -194,14 +200,23 @@ export const softDeleteChatMessage = onCall(
         );
       }
 
+      // Media metadata leaves the client-readable doc; the Storage object is
+      // retained (Admin-readable only) until a retention policy (D20) exists.
       const payload = softDeletePayload({ deletedBy: callerUid });
       tx.update(msgRef, {
         deleted: true,
         deletedAt: FieldValue.serverTimestamp(),
         deletedBy: payload.deletedBy,
         text: "",
+        media: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       });
+      if (convSnap.data()?.lastMessageId === messageId) {
+        tx.update(convRef, {
+          lastMessage: CHAT_DELETED_PREVIEW,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     });
 
     return { conversationId, messageId, deleted: true };
@@ -218,13 +233,22 @@ export const editChatMessage = onCall(
     const callerUid = requireUid(request.auth?.uid);
     const conversationId = requireOtherUid(request.data?.conversationId);
     const messageId = requireOtherUid(request.data?.messageId);
-    const textRaw = request.data?.text;
-    if (typeof textRaw !== "string" || textRaw.trim().length === 0) {
+    let text: string;
+    try {
+      text = normalizeMessageText(request.data?.text);
+    } catch (e) {
+      if (e instanceof ChatInputError) throw new HttpsError(e.code, e.message);
+      throw e;
+    }
+    if (text.length === 0) {
       throw new HttpsError("invalid-argument", "نص الرسالة مطلوب");
     }
-    const text = textRaw.trim();
 
     const db = admin.firestore();
+    const role = await loadUserRole(db, callerUid);
+    if (!role) {
+      throw new HttpsError("permission-denied", "الحساب غير مفعّل");
+    }
     const convRef = db.collection("conversations").doc(conversationId);
     const msgRef = convRef.collection("messages").doc(messageId);
 
@@ -268,12 +292,24 @@ export const editChatMessage = onCall(
           "غير مسموح بتعديل هذه الرسالة",
         );
       }
+      if ((msg.type ?? "text") !== "text") {
+        throw new HttpsError(
+          "failed-precondition",
+          "لا يمكن تعديل رسائل الوسائط",
+        );
+      }
 
       tx.update(msgRef, {
         text,
         editedAt: FieldValue.serverTimestamp(),
-        // senderId / sentAt / deleted* must not change
+        updatedAt: FieldValue.serverTimestamp(),
       });
+      if (convSnap.data()?.lastMessageId === messageId) {
+        tx.update(convRef, {
+          lastMessage: messagePreview("text", text),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     });
 
     return { conversationId, messageId, edited: true };

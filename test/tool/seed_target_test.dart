@@ -19,22 +19,27 @@ void main() {
       );
     });
 
-    test('emulator, dev and staging are accepted with their project IDs', () {
+    test('only the emulator target exists', () {
       final emulator = resolveSeedTarget(const ['--target=emulator']);
       expect(emulator.target, SeedTarget.emulator);
       expect(emulator.projectId, 'demo-rafiq-rules');
-
-      final dev = resolveSeedTarget(const [], definedTarget: 'dev');
-      expect(dev.target, SeedTarget.dev);
-      expect(dev.projectId, 'rafiq-academy');
-
-      final staging = resolveSeedTarget(const ['--target=staging']);
-      expect(staging.target, SeedTarget.staging);
-      expect(staging.projectId, 'rafiq-academy-staging');
+      expect(
+        resolveSeedTarget(const [], definedTarget: 'EMULATOR').projectId,
+        'demo-rafiq-rules',
+      );
+      expect(SeedTarget.values, [SeedTarget.emulator]);
+      expect(seedTargetProjectIds, {SeedTarget.emulator: 'demo-rafiq-rules'});
     });
 
-    test('prod / production are rejected from args and dart-define', () {
-      for (final value in ['prod', 'production', 'PROD']) {
+    test('real targets are rejected from args and dart-define', () {
+      for (final value in [
+        'dev',
+        'staging',
+        'prod',
+        'production',
+        'PROD',
+        'Dev',
+      ]) {
         expect(
           () => resolveSeedTarget(['--target=$value']),
           throwsA(isA<SeedTargetException>()),
@@ -55,39 +60,33 @@ void main() {
       );
       expect(
         () => resolveSeedTarget(
-          const ['--target=dev'],
-          definedTarget: 'staging',
+          const ['--target=emulator'],
+          definedTarget: 'dev',
         ),
         throwsA(isA<SeedTargetException>()),
       );
     });
-
-    test('no target resolves to the production project', () {
-      expect(seedTargetProjectIds.values, isNot(contains(productionProjectId)));
-    });
   });
 
   group('assertSeedProjectAllowed', () {
-    test('rejects the production project ID', () {
-      expect(productionProjectId, 'rafiq-academy-prod');
-      expect(
-        () => assertSeedProjectAllowed('rafiq-academy-prod'),
-        throwsA(isA<SeedTargetException>()),
-      );
-      expect(
-        () => assertSeedProjectAllowed(' rafiq-academy-prod '),
-        throwsA(isA<SeedTargetException>()),
-      );
-      expect(
-        () => assertSeedProjectAllowed(''),
-        throwsA(isA<SeedTargetException>()),
-      );
-    });
-
-    test('allows the non-production projects', () {
-      for (final id in seedTargetProjectIds.values) {
-        assertSeedProjectAllowed(id);
+    test('rejects every project except the exact emulator project', () {
+      for (final id in [
+        'rafiq-academy',
+        'rafiq-academy-staging',
+        'rafiq-academy-prod',
+        'demo-other',
+        'demo-rafiq-rules-x',
+        ' demo-rafiq-rules',
+        'DEMO-RAFIQ-RULES',
+        '',
+      ]) {
+        expect(
+          () => assertSeedProjectAllowed(id),
+          throwsA(isA<SeedTargetException>()),
+          reason: id,
+        );
       }
+      assertSeedProjectAllowed('demo-rafiq-rules');
     });
   });
 
@@ -96,45 +95,38 @@ void main() {
       target: SeedTarget.emulator,
       projectId: seedEmulatorProjectId,
     );
-    const dev = SeedTargetConfig(
-      target: SeedTarget.dev,
-      projectId: seedDevProjectId,
-    );
-    const staging = SeedTargetConfig(
-      target: SeedTarget.staging,
-      projectId: seedStagingProjectId,
-    );
 
-    test('emulator may fall back to the demo default', () {
+    test('emulator falls back to the demo default or uses an explicit one', () {
       expect(
         resolveSeedPassword(
           emulator,
-          explicitPassword: '',
+          explicitPassword: ' ',
           emulatorDefault: 'demo',
         ),
         'demo',
       );
+      expect(
+        resolveSeedPassword(
+          emulator,
+          explicitPassword: 'explicit',
+          emulatorDefault: 'demo',
+        ),
+        'explicit',
+      );
     });
 
-    test('dev and staging require an explicit password', () {
-      for (final config in [dev, staging]) {
-        expect(
-          () => resolveSeedPassword(
-            config,
-            explicitPassword: ' ',
-            emulatorDefault: 'demo',
+    test('a config naming another project is refused', () {
+      expect(
+        () => resolveSeedPassword(
+          const SeedTargetConfig(
+            target: SeedTarget.emulator,
+            projectId: 'rafiq-academy',
           ),
-          throwsA(isA<SeedTargetException>()),
-        );
-        expect(
-          resolveSeedPassword(
-            config,
-            explicitPassword: 'explicit',
-            emulatorDefault: 'demo',
-          ),
-          'explicit',
-        );
-      }
+          explicitPassword: '',
+          emulatorDefault: 'demo',
+        ),
+        throwsA(isA<SeedTargetException>()),
+      );
     });
   });
 
@@ -171,6 +163,8 @@ void main() {
         const <String>[],
         const ['--target=prod'],
         const ['--target=production'],
+        const ['--target=dev'],
+        const ['--target=staging'],
         const ['--target=unknown'],
       ]) {
         calls = [];
@@ -181,7 +175,7 @@ void main() {
 
     test('a failing preflight stops before initialization', () async {
       final code = await run(
-        const ['--target=dev'],
+        const ['--target=emulator'],
         preflight: (_) => throw const SeedTargetException('no password'),
       );
       expect(code, isNot(0));
@@ -191,7 +185,7 @@ void main() {
     test('a guard failure during initialization stops before any write',
         () async {
       final code = await run(
-        const ['--target=staging'],
+        const ['--target=emulator'],
         initialize: (_) async =>
             throw const SeedTargetException('not configured'),
       );
@@ -236,25 +230,9 @@ void main() {
       expect(options.storageBucket, isNull);
     });
 
-    test('dev options are the existing rafiq-academy registration', () {
-      final options = seedFirebaseOptions(SeedTarget.dev);
-      expect(options, DefaultFirebaseOptions.android);
-      expect(options.projectId, seedDevProjectId);
-    });
-
-    test('staging options are refused until they exist', () {
-      expect(
-        () => seedFirebaseOptions(SeedTarget.staging),
-        throwsA(isA<SeedTargetException>()),
-      );
-    });
-
-    test('no seeder options point at production', () {
-      for (final target in [SeedTarget.emulator, SeedTarget.dev]) {
-        expect(
-          seedFirebaseOptions(target).projectId,
-          isNot(productionProjectId),
-        );
+    test('every seeder target resolves to the emulator options', () {
+      for (final target in SeedTarget.values) {
+        expect(seedFirebaseOptions(target), seedEmulatorFirebaseOptions);
       }
     });
   });
@@ -277,6 +255,27 @@ void main() {
       final source = File('tool/seed_firestore.dart').readAsStringSync();
       expect(source, contains('emulatorDefault: demoPasswordDefault'));
       expect(source, isNot(contains('return demoPasswordDefault')));
+    });
+
+    test('seeder tools never reference real Firebase options or projects', () {
+      for (final path in [
+        'tool/seed_target.dart',
+        'tool/seed_firebase.dart',
+        'tool/seed_firestore.dart',
+        'tool/seed_teacher_flow.dart',
+      ]) {
+        final source = File(path).readAsStringSync();
+        expect(source, isNot(contains('firebase_options.dart')), reason: path);
+        expect(source, isNot(contains('DefaultFirebaseOptions')), reason: path);
+        expect(source, isNot(contains('rafiq-academy')), reason: path);
+        expect(source, isNot(contains('SEED_TARGET=dev')), reason: path);
+      }
+    });
+
+    test('emulator connections use the IPv4 loopback the emulators bind to',
+        () {
+      final source = File('tool/seed_firebase.dart').readAsStringSync();
+      expect(source, contains("_emulatorHost = '127.0.0.1'"));
     });
   });
 }

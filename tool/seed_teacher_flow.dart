@@ -3,9 +3,8 @@
 /// Inserts the minimum documents to unlock Teacher screens with real data.
 /// Reuses existing app models / field shapes. Does not change app architecture.
 ///
-/// Run (from project root), with an existing teacher Auth account and an
-/// explicit target (`emulator` | `dev` | `staging`; no default; production is
-/// never accepted):
+/// Run (from project root), with an existing teacher Auth account, against the
+/// local emulators only (`--target=emulator`; real projects are refused):
 ///
 /// ```bash
 /// flutter run -d windows -t tool/seed_teacher_flow.dart --dart-define=SEED_TARGET=emulator --dart-define=SEED_TEACHER_UID=<uid> --dart-define=SEED_TEACHER_EMAIL=<email> --dart-define=SEED_TEACHER_PASSWORD=<password>

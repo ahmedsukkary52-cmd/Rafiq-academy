@@ -5,22 +5,22 @@
 /// validated before Firebase is initialized and before any write.
 library;
 
-/// Environments a seeder may write to. Production is intentionally absent.
-enum SeedTarget { emulator, dev, staging }
+/// Environments a demo seeder may write to: the local emulator only.
+/// Real projects (dev / staging / prod) are configured outside these tools.
+enum SeedTarget { emulator }
 
-/// Firebase project IDs per environment (see `.firebaserc`).
 const seedEmulatorProjectId = 'demo-rafiq-rules';
-const seedDevProjectId = 'rafiq-academy';
-const seedStagingProjectId = 'rafiq-academy-staging';
-const productionProjectId = 'rafiq-academy-prod';
 
-/// Project IDs a seeder must never initialize against, whatever the target.
-const seedForbiddenProjectIds = <String>{productionProjectId};
+/// Real project names, recognized only to refuse them with a clear message.
+const _realTargetNames = <String>{
+  'dev',
+  'staging',
+  'prod',
+  'production',
+};
 
 const seedTargetProjectIds = <SeedTarget, String>{
   SeedTarget.emulator: seedEmulatorProjectId,
-  SeedTarget.dev: seedDevProjectId,
-  SeedTarget.staging: seedStagingProjectId,
 };
 
 class SeedTargetException implements Exception {
@@ -41,7 +41,7 @@ class SeedTargetConfig {
 }
 
 const _targetFlag = '--target=';
-const _allowedTargets = 'emulator | dev | staging';
+const _allowedTargets = 'emulator';
 
 /// Resolves the target from `--target=<value>` in [args] and/or the
 /// `SEED_TARGET` dart-define ([definedTarget]). There is no default.
@@ -73,9 +73,10 @@ SeedTargetConfig resolveSeedTarget(
       'Use "emulator" for local development.',
     );
   }
-  if (raw == 'prod' || raw == 'production') {
-    throw const SeedTargetException(
-      'Seeding production is not allowed. Allowed targets: $_allowedTargets.',
+  if (_realTargetNames.contains(raw)) {
+    throw SeedTargetException(
+      'Demo seeders never write to a real Firebase project ("$raw"). '
+      'Allowed target: $_allowedTargets.',
     );
   }
   final target = SeedTarget.values.where((t) => t.name == raw).firstOrNull;
@@ -92,34 +93,26 @@ SeedTargetConfig resolveSeedTarget(
   return config;
 }
 
-/// Throws when [projectId] is production (or otherwise forbidden). Call it
+/// Throws unless [projectId] is exactly the emulator demo project. Call it
 /// on the resolved target and again on the initialized Firebase app.
 void assertSeedProjectAllowed(String projectId) {
-  final id = projectId.trim();
-  if (id.isEmpty) {
-    throw const SeedTargetException('Seed project ID is empty.');
-  }
-  if (seedForbiddenProjectIds.contains(id)) {
+  if (projectId != seedEmulatorProjectId) {
     throw SeedTargetException(
-      'Refusing to seed project "$id": seeders never write to production.',
+      'Refusing to seed project "$projectId": demo seeders only write to '
+      'the local emulator project "$seedEmulatorProjectId".',
     );
   }
 }
 
-/// Default passwords are only acceptable against the local emulator.
+/// Explicit password if given, otherwise the emulator demo default.
 String resolveSeedPassword(
   SeedTargetConfig config, {
   required String explicitPassword,
   required String emulatorDefault,
 }) {
+  assertSeedProjectAllowed(config.projectId);
   final explicit = explicitPassword.trim();
-  if (explicit.isNotEmpty) return explicit;
-  if (config.isEmulator) return emulatorDefault;
-  throw SeedTargetException(
-    'Target "${config.target.name}" needs an explicit password: pass '
-    '--dart-define=SEED_PASSWORD=<password> (or --password=<password>). '
-    'The default demo password is emulator-only.',
-  );
+  return explicit.isNotEmpty ? explicit : emulatorDefault;
 }
 
 /// Validates the target, then runs [preflight] (pure checks), then

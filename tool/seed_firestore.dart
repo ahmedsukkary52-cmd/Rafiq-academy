@@ -3,19 +3,16 @@
 /// Expands the original W1–W8 smoke seeder into a realistic multi-halaqa academy.
 /// Does **not** modify production app code beyond what the app already reads.
 ///
-/// Run from project root with an explicit target (no default; production is
-/// never accepted):
+/// Run from project root against the local emulators only (real projects are
+/// refused):
 ///
 /// ```bash
-/// # Local emulators (preferred): cd functions && npm run serve
+/// # Start emulators first: cd functions && npm run serve
 /// flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=emulator
-///
-/// # Real dev project (rafiq-academy) — password is required
-/// flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=dev --dart-define=SEED_PASSWORD=<password>
 /// ```
 ///
-/// `--target=<target>` / `--password=<password>` entrypoint args are accepted
-/// too. The default demo password is used only for the emulator target.
+/// `--target=emulator` / `--password=<password>` entrypoint args are accepted
+/// too.
 ///
 /// Idempotent: fixed Auth emails + document IDs; re-runs overwrite the same docs.
 ///

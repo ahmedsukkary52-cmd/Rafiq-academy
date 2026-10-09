@@ -3,20 +3,22 @@
 Permanent development dataset for Rafiq Academy. Created by expanding
 `tool/seed_firestore.dart` (implementation: `tool/demo_academy_dataset.dart`).
 
-## How to run
+## Status
 
-A target is required (`emulator` | `dev` | `staging`). There is no default,
-and production (`rafiq-academy-prod`) is always rejected before Firebase is
-initialized. The seeder prints `Target:` and `Project:` before any write.
+The Dart seeder below writes with the client SDK, so the current
+`firestore.rules` deny its writes (the first write, `academies/*`, has no rule
+and hits the catch-all deny). It is kept until the Node seeder reaches data
+parity. See "Node emulator seeder" for the replacement.
 
-| Target | Firebase project |
-|---|---|
-| `emulator` | `demo-rafiq-rules` (local Auth + Firestore emulators) |
-| `dev` | `rafiq-academy` |
-| `staging` | `rafiq-academy-staging` (unavailable until its FirebaseOptions exist) |
+## How to run (Dart seeder)
 
-Local emulators (preferred). Start them only through the fixed entry point,
-then seed in a second terminal:
+The only target is `emulator` (`demo-rafiq-rules`). `dev`, `staging` and
+`prod` are refused before Firebase is initialized; real projects are
+configured outside the demo tools. The seeder prints `Target:` and `Project:`
+before any write.
+
+Start the emulators only through the fixed entry point, then seed in a
+second terminal:
 
 ```bash
 cd functions && npm run serve
@@ -34,22 +36,70 @@ commands: without `--project`, the Firebase CLI uses its user-level active
 project for this folder, which can be a real project.
 
 The `emulator` target uses fake emulator-only credentials (no real API key or
-app ID) and connects Auth to `localhost:9099` and Firestore to
-`localhost:8080` before any read or write. It is local testing only; the
-`dev` target below writes to a real project.
+app ID) and connects Auth to `127.0.0.1:9099` and Firestore to
+`127.0.0.1:8080` before any read or write.
 
-Real dev project (an explicit password is required):
+Default password for **all** accounts: `SeedDemo123!` (emulator only).
 
-```bash
-flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=dev --dart-define=SEED_PASSWORD=<password>
-```
+The Dart seeder is idempotent (fixed Auth emails + document IDs).
 
-Default password for **all** accounts on the emulator target: `SeedDemo123!`.
-The `dev` and `staging` targets never fall back to it.
+## Node emulator seeder (`npm run seed:emulator`)
 
-Idempotent: fixed Auth emails + document IDs. Safe to re-run.
+`functions/scripts/seed-emulator.mjs` seeds with firebase-admin against the
+local emulators only. It takes no arguments and fails closed, in order:
 
-## What is created
+1. Refuses any argument (exit 64).
+2. Reads the auth / firestore / hub ports from `firebase.json`; hosts, when
+   set, must be `127.0.0.1`.
+3. Refuses the environment if `GOOGLE_APPLICATION_CREDENTIALS`,
+   `CLOUDSDK_CONFIG` or `GOOGLE_API_USE_CLIENT_CERTIFICATE` is set, gcloud
+   application default credentials exist on
+   disk, any project variable (`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`,
+   `GCP_PROJECT`, `CLOUDSDK_CORE_PROJECT`, `FIREBASE_CONFIG.projectId`) is not
+   exactly `demo-rafiq-rules`, a proxy variable is set, or a pre-set emulator
+   host differs from `127.0.0.1:<firebase.json port>`. The `demo-` prefix is
+   not trusted on its own.
+4. Installs a network allowlist on this process's `net` and `dns` modules
+   before firebase-admin loads: TCP only to `127.0.0.1` / `::1` on the
+   emulator ports, and no `node:dns` lookups except loopback literals. A
+   self-test must pass. It sets `METADATA_SERVER_DETECTION=none`, otherwise
+   the Firestore client library probes the GCE metadata server. Not covered:
+   UDP, native addons, worker threads, child processes and code preloaded via
+   `NODE_OPTIONS`; the libraries' two child-process paths (`gcloud` project
+   lookup, mTLS cert provider) are kept unreachable by step 3.
+5. Checks readiness over `127.0.0.1`: the hub lists auth and firestore on the
+   expected ports, Auth reports `ready`, Firestore answers `Ok`.
+6. Loads firebase-admin for `demo-rafiq-rules` and re-checks the project and
+   emulator hosts.
+7. Reads Auth users, root collections and `_seedMeta/demo`. Any blocked
+   connection, any existing data, or a leftover seed marker refuses the run.
+8. Writes with `create()` only: `_seedMeta/demo` (`in_progress`), Auth users
+   with fixed UIDs, one batch of documents, read-back verification, a check
+   that no connection was blocked, then `_seedMeta/demo` (`complete`).
+
+Dataset v1 is six accounts (`admin@`, `supervisor1@`, `teacher@`, `parent@`,
+`student01@`, `student02@rafiq.demo`, UIDs `demo-<role>-NN`) with the same
+`users`, `userPrivate` and role-profile fields `adminProvisionUser` writes.
+`users` documents never carry `phone`.
+
+There is no reset and nothing is deleted. The run is not atomic: Auth users
+are created one by one. If a run fails part-way it exits 1 and
+`_seedMeta/demo` stays `in_progress`, so the next run refuses to start. If
+creating `_seedMeta/demo` itself fails, nothing else was written and the
+marker may or may not exist. Either way, `npm run serve` keeps emulator data
+in memory only: stop the emulators, start them again with `npm run serve`,
+then re-run the seeder.
+
+The seeder files (`seed-emulator*.mjs`) are excluded from the Functions
+upload by `firebase.json` → `functions.ignore`.
+
+The seeder has not been run against the emulators yet; its guards are
+covered by `functions/test/seed_emulator_*.test.mjs`.
+
+## What is created (Dart seeder dataset)
+
+The sections below describe the Dart seeder's full academy. The Node
+seeder's dataset v1 is only the six accounts listed above.
 
 ### Academy
 | Doc | Contents |

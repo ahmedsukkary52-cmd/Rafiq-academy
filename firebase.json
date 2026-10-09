@@ -35,7 +35,8 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        "seed-emulator*.mjs"
       ]
     }
   ],

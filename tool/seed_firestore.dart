@@ -7,7 +7,7 @@
 /// never accepted):
 ///
 /// ```bash
-/// # Local emulators (preferred): firebase emulators:start --project demo-rafiq-rules --only auth,firestore
+/// # Local emulators (preferred): cd functions && npm run serve
 /// flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=emulator
 ///
 /// # Real dev project (rafiq-academy) — password is required

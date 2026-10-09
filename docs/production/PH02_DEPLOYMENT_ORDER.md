@@ -35,6 +35,29 @@ Known limitation: the read-only `logs:*` scripts still pass npm-forwarded
 arguments to the Firebase CLI, so `npm run logs:dev -- --project prod` reads
 production logs. They cannot deploy or write.
 
+## Local emulator testing (separate from deploys)
+
+Emulator testing never deploys and never targets `dev`, `staging` or `prod`.
+Use only `npm run serve` in `functions/`, which calls
+`scripts/serve-emulators.mjs`. It takes no arguments (any extra argument is
+refused before building), builds, and then runs exactly
+`firebase emulators:start --project demo-rafiq-rules --only auth,firestore,functions,storage`.
+
+In emulator mode (`FUNCTIONS_EMULATOR=true`) Functions require a `demo-*`
+project: startup fails if any resolved project ID (`FIREBASE_CONFIG`,
+`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, Admin app options) is not `demo-*`
+or none can be resolved, and the backend gate does not open for the emulator
+in that case. With a real project ID, the Functions emulator would send calls
+for non-emulated services to that real project.
+
+Avoid a bare `firebase emulators:start` or other ad hoc emulator commands:
+without `--project`, the Firebase CLI falls back to its user-level active
+project for this folder, which can be a real project. The Functions emulator
+test suites (`functions/test/*.emulator.test.mjs`) refuse to run unless the
+project ID is `demo-*`. The `rules_test/` suites default to `demo-rafiq-rules`
+and are normally run with `--project demo-rafiq-rules`, but do not
+independently enforce a `demo-*` project.
+
 ## 0. Preconditions (blocking)
 
 | Gate | Why |

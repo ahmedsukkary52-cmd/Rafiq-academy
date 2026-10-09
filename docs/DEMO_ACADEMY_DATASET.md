@@ -15,12 +15,28 @@ initialized. The seeder prints `Target:` and `Project:` before any write.
 | `dev` | `rafiq-academy` |
 | `staging` | `rafiq-academy-staging` (unavailable until its FirebaseOptions exist) |
 
-Local emulators (preferred):
+Local emulators (preferred). Start them only through the fixed entry point,
+then seed in a second terminal:
 
 ```bash
-firebase emulators:start --project demo-rafiq-rules --only auth,firestore
+cd functions && npm run serve
 flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=emulator
 ```
+
+`npm run serve` builds Functions and then runs exactly
+`firebase emulators:start --project demo-rafiq-rules --only auth,firestore,functions,storage`.
+It rejects any extra argument (`npm run serve -- --project ...` fails before
+building). Functions loaded by the emulator refuse to start unless the
+project is a `demo-*` project, and the backend gate stays closed otherwise.
+
+Do not start emulators with a bare `firebase emulators:start` or other ad hoc
+commands: without `--project`, the Firebase CLI uses its user-level active
+project for this folder, which can be a real project.
+
+The `emulator` target uses fake emulator-only credentials (no real API key or
+app ID) and connects Auth to `localhost:9099` and Firestore to
+`localhost:8080` before any read or write. It is local testing only; the
+`dev` target below writes to a real project.
 
 Real dev project (an explicit password is required):
 

@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rafiq_academy/firebase_options.dart';
 
+import '../../tool/seed_firebase.dart';
 import '../../tool/seed_target.dart';
 
 void main() {
@@ -209,6 +211,51 @@ void main() {
         'initialize',
         'seed:demo-rafiq-rules',
       ]);
+    });
+  });
+
+  group('seedFirebaseOptions', () {
+    const realOptions = [
+      DefaultFirebaseOptions.android,
+      DefaultFirebaseOptions.ios,
+    ];
+
+    test('emulator options use the demo project and no real credentials', () {
+      final options = seedFirebaseOptions(SeedTarget.emulator);
+      expect(options.projectId, 'demo-rafiq-rules');
+      for (final real in realOptions) {
+        expect(options.projectId, isNot(real.projectId));
+        expect(options.apiKey, isNot(real.apiKey));
+        expect(options.appId, isNot(real.appId));
+        expect(options.messagingSenderId, isNot(real.messagingSenderId));
+      }
+      for (final value in options.asMap.values.whereType<String>()) {
+        expect(value, isNot(contains('rafiq-academy')), reason: value);
+        expect(value, isNot(contains('AIza')), reason: value);
+      }
+      expect(options.storageBucket, isNull);
+    });
+
+    test('dev options are the existing rafiq-academy registration', () {
+      final options = seedFirebaseOptions(SeedTarget.dev);
+      expect(options, DefaultFirebaseOptions.android);
+      expect(options.projectId, seedDevProjectId);
+    });
+
+    test('staging options are refused until they exist', () {
+      expect(
+        () => seedFirebaseOptions(SeedTarget.staging),
+        throwsA(isA<SeedTargetException>()),
+      );
+    });
+
+    test('no seeder options point at production', () {
+      for (final target in [SeedTarget.emulator, SeedTarget.dev]) {
+        expect(
+          seedFirebaseOptions(target).projectId,
+          isNot(productionProjectId),
+        );
+      }
     });
   });
 

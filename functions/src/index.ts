@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
+import { assertEmulatorProjectIsDemo } from "./emulatorProjectGuard";
 
 admin.initializeApp();
+assertEmulatorProjectIsDemo(process.env, admin.app().options.projectId);
 
 /**
  * WA-0 / D2: Paymob is OUT. Callables remain in source for quarantine/history

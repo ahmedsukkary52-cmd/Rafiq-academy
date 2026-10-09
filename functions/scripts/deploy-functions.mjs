@@ -26,7 +26,7 @@ export const FIREBASERC_PATH = join(REPO_ROOT, ".firebaserc");
 
 export class DeployRefused extends Error {}
 
-const SAFE_ARG = /^[A-Za-z0-9:._-]+$/;
+const SAFE_ARG = /^[A-Za-z0-9:.,_-]+$/;
 
 export function parseTarget(args) {
   if (args.length !== 1) {

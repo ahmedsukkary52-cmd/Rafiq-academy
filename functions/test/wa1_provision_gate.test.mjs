@@ -8,14 +8,16 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 test("B-BILLING gate denies production without env flags", () => {
-  const prev = {
-    PRODUCTION_BACKEND_ENABLED: process.env.PRODUCTION_BACKEND_ENABLED,
-    FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
-    ALLOW_EMULATOR_BACKEND: process.env.ALLOW_EMULATOR_BACKEND,
-  };
-  delete process.env.PRODUCTION_BACKEND_ENABLED;
-  delete process.env.FUNCTIONS_EMULATOR;
-  delete process.env.ALLOW_EMULATOR_BACKEND;
+  const keys = [
+    "PRODUCTION_BACKEND_ENABLED",
+    "FUNCTIONS_EMULATOR",
+    "ALLOW_EMULATOR_BACKEND",
+    "GCLOUD_PROJECT",
+    "GOOGLE_CLOUD_PROJECT",
+    "FIREBASE_CONFIG",
+  ];
+  const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
 
   const resolved = require.resolve("../lib/productionGate.js");
   delete require.cache[resolved];
@@ -27,8 +29,16 @@ test("B-BILLING gate denies production without env flags", () => {
   process.env.ALLOW_EMULATOR_BACKEND = "true";
   assert.throws(() => gate.assertBackendAllowed("adminProvisionUser"));
 
-  // Only the Functions emulator flag opens local backend.
+  // The Functions emulator flag alone does not open the local backend.
   process.env.FUNCTIONS_EMULATOR = "true";
+  assert.throws(() => gate.assertBackendAllowed("adminProvisionUser"));
+
+  // Emulator + real project stays closed.
+  process.env.GCLOUD_PROJECT = "rafiq-academy";
+  assert.throws(() => gate.assertBackendAllowed("adminProvisionUser"));
+
+  // Only the Functions emulator flag with a demo-* project opens local backend.
+  process.env.GCLOUD_PROJECT = "demo-rafiq-rules";
   assert.doesNotThrow(() => gate.assertBackendAllowed("adminProvisionUser"));
 
   for (const [k, v] of Object.entries(prev)) {

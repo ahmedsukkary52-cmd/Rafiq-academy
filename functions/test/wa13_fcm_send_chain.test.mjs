@@ -18,7 +18,13 @@ const chain = require("../lib/notifications/evaluationNotification.js");
 const gate = require("../lib/notifications/pushGate.js");
 
 function withEnv(overrides, run) {
-  const keys = ["PRODUCTION_BACKEND_ENABLED", "FUNCTIONS_EMULATOR"];
+  const keys = [
+    "PRODUCTION_BACKEND_ENABLED",
+    "FUNCTIONS_EMULATOR",
+    "GCLOUD_PROJECT",
+    "GOOGLE_CLOUD_PROJECT",
+    "FIREBASE_CONFIG",
+  ];
   const previous = {};
   for (const key of keys) previous[key] = process.env[key];
   for (const key of keys) delete process.env[key];
@@ -271,9 +277,16 @@ test("WA-13 production sending stays blocked until B-BILLING is verified", () =>
 });
 
 test("WA-13 emulator remains testable and explicit production opt-in works", () => {
-  withEnv({ FUNCTIONS_EMULATOR: "true" }, () => {
+  withEnv({ FUNCTIONS_EMULATOR: "true", GCLOUD_PROJECT: "demo-rafiq-rules" }, () => {
     assert.equal(gate.resolvePushSendMode(), "emulator");
     assert.equal(gate.isPushSendAllowed(gate.resolvePushSendMode()), true);
+  });
+  // The emulator against a real (or unresolved) project must stay blocked.
+  withEnv({ FUNCTIONS_EMULATOR: "true", GCLOUD_PROJECT: "rafiq-academy" }, () => {
+    assert.equal(gate.resolvePushSendMode(), "blocked");
+  });
+  withEnv({ FUNCTIONS_EMULATOR: "true" }, () => {
+    assert.equal(gate.resolvePushSendMode(), "blocked");
   });
   withEnv({ PRODUCTION_BACKEND_ENABLED: "true" }, () => {
     assert.equal(gate.resolvePushSendMode(), "production");

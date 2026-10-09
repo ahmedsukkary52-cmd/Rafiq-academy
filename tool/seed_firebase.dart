@@ -14,19 +14,23 @@ const _emulatorHost = 'localhost';
 const _authEmulatorPort = 9099;
 const _firestoreEmulatorPort = 8080;
 
+/// Emulator-only options. Fake API key and app ID: if the emulator hookup
+/// ever failed, Auth would reject the key instead of reaching a real project
+/// (Auth resolves the project from the API key, not from `projectId`).
+const seedEmulatorFirebaseOptions = FirebaseOptions(
+  apiKey: 'fake-emulator-api-key',
+  appId: '1:000000000000:android:0000000000000000',
+  messagingSenderId: '000000000000',
+  projectId: seedEmulatorProjectId,
+);
+
 /// Options for [target]. The Android app registration is used on desktop
 /// because no desktop Firebase app is registered.
 FirebaseOptions seedFirebaseOptions(SeedTarget target) {
   const dev = DefaultFirebaseOptions.android;
   switch (target) {
     case SeedTarget.emulator:
-      // demo- project: the emulators never reach a real project.
-      return FirebaseOptions(
-        apiKey: dev.apiKey,
-        appId: dev.appId,
-        messagingSenderId: dev.messagingSenderId,
-        projectId: seedEmulatorProjectId,
-      );
+      return seedEmulatorFirebaseOptions;
     case SeedTarget.dev:
       if (dev.projectId != seedDevProjectId) {
         throw SeedTargetException(
@@ -60,13 +64,24 @@ Future<void> initializeSeedFirebase(SeedTargetConfig config) async {
   assertSeedProjectAllowed(app.options.projectId);
 
   if (config.isEmulator) {
-    await FirebaseAuth.instance.useAuthEmulator(
-      _emulatorHost,
-      _authEmulatorPort,
-    );
-    FirebaseFirestore.instance.useFirestoreEmulator(
-      _emulatorHost,
-      _firestoreEmulatorPort,
-    );
+    if (app.options.apiKey != seedEmulatorFirebaseOptions.apiKey ||
+        app.options.appId != seedEmulatorFirebaseOptions.appId) {
+      throw const SeedTargetException(
+        'Firebase was initialized with non-emulator options for the '
+        'emulator target.',
+      );
+    }
+    try {
+      await FirebaseAuth.instance.useAuthEmulator(
+        _emulatorHost,
+        _authEmulatorPort,
+      );
+      FirebaseFirestore.instance.useFirestoreEmulator(
+        _emulatorHost,
+        _firestoreEmulatorPort,
+      );
+    } catch (e) {
+      throw SeedTargetException('Could not connect to the emulators: $e');
+    }
   }
 }

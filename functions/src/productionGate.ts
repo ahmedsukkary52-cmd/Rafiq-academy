@@ -1,4 +1,6 @@
+import { getApps } from "firebase-admin/app";
 import { HttpsError } from "firebase-functions/v2/https";
+import { emulatorProjectProblem, isFunctionsEmulator } from "./emulatorProjectGuard";
 
 /**
  * WA-0 / C12 — Production backend activation gate.
@@ -9,6 +11,7 @@ import { HttpsError } from "firebase-functions/v2/https";
  * Allowed backends:
  * - Firebase Emulator only when FUNCTIONS_EMULATOR === "true"
  *   (set automatically by the Functions emulator — not a free-form env knob)
+ *   AND every resolved project ID is a demo-* project (emulatorProjectGuard)
  * - Explicit PRODUCTION_BACKEND_ENABLED === "true" after B-BILLING Verified
  *
  * Intentionally does NOT honor ALLOW_EMULATOR_BACKEND — that env could be
@@ -20,8 +23,11 @@ export function isProductionBackendEnabled(): boolean {
 }
 
 export function isEmulatorBackendAllowed(): boolean {
-  // Firebase sets this only inside the Functions emulator process.
-  return process.env.FUNCTIONS_EMULATOR === "true";
+  // Firebase sets FUNCTIONS_EMULATOR only inside the Functions emulator
+  // process; a real project ID there would route calls to real services.
+  if (!isFunctionsEmulator()) return false;
+  const appProjectId = getApps()[0]?.options.projectId;
+  return emulatorProjectProblem(process.env, appProjectId) === null;
 }
 
 /**

@@ -55,6 +55,15 @@ test("no npm script invokes firebase deploy outside the wrapper", () => {
   }
 });
 
-test("the emulator script never uses a real project", () => {
-  assert.match(pkg.scripts.serve, /--project demo-[\w-]+/);
+test("serve calls only the fixed-argument emulator wrapper", () => {
+  assert.equal(pkg.scripts.serve, "node scripts/serve-emulators.mjs");
+});
+
+test("no npm script starts the emulators outside the wrapper", () => {
+  for (const [name, cmd] of Object.entries(pkg.scripts)) {
+    assert.doesNotMatch(cmd, /\bemulators:(start|exec)\b/, name);
+    if (name !== "serve") {
+      assert.doesNotMatch(cmd, /serve-emulators\.mjs/, name);
+    }
+  }
 });

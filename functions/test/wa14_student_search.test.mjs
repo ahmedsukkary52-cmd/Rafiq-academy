@@ -20,7 +20,13 @@ const projection = require("../lib/search/studentSearchProjection.js");
 const gate = require("../lib/search/projectionGate.js");
 
 function withEnv(overrides, run) {
-  const keys = ["PRODUCTION_BACKEND_ENABLED", "FUNCTIONS_EMULATOR"];
+  const keys = [
+    "PRODUCTION_BACKEND_ENABLED",
+    "FUNCTIONS_EMULATOR",
+    "GCLOUD_PROJECT",
+    "GOOGLE_CLOUD_PROJECT",
+    "FIREBASE_CONFIG",
+  ];
   const previous = {};
   for (const key of keys) previous[key] = process.env[key];
   for (const key of keys) delete process.env[key];
@@ -594,8 +600,15 @@ test("WA-14 materialization stays blocked until B-BILLING is verified", () => {
     assert.equal(gate.resolveProjectionRunMode(), "blocked");
     assert.equal(gate.isProjectionRunAllowed("blocked"), false);
   });
-  withEnv({ FUNCTIONS_EMULATOR: "true" }, () => {
+  withEnv({ FUNCTIONS_EMULATOR: "true", GCLOUD_PROJECT: "demo-rafiq-rules" }, () => {
     assert.equal(gate.resolveProjectionRunMode(), "emulator");
+  });
+  // The emulator against a real (or unresolved) project must stay blocked.
+  withEnv({ FUNCTIONS_EMULATOR: "true", GCLOUD_PROJECT: "rafiq-academy" }, () => {
+    assert.equal(gate.resolveProjectionRunMode(), "blocked");
+  });
+  withEnv({ FUNCTIONS_EMULATOR: "true" }, () => {
+    assert.equal(gate.resolveProjectionRunMode(), "blocked");
   });
   withEnv({ PRODUCTION_BACKEND_ENABLED: "true" }, () => {
     assert.equal(gate.resolveProjectionRunMode(), "production");

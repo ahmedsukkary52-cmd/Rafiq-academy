@@ -1,6 +1,8 @@
 {
   "projects": {
-    "rafiq-academy": "rafiq-academy"
+    "dev": "rafiq-academy",
+    "staging": "rafiq-academy-staging",
+    "prod": "rafiq-academy-prod"
   },
   "targets": {},
   "etags": {}

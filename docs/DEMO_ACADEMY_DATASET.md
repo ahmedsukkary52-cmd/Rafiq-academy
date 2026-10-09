@@ -5,19 +5,31 @@ Permanent development dataset for Rafiq Academy. Created by expanding
 
 ## How to run
 
+A target is required (`emulator` | `dev` | `staging`). There is no default,
+and production (`rafiq-academy-prod`) is always rejected before Firebase is
+initialized. The seeder prints `Target:` and `Project:` before any write.
+
+| Target | Firebase project |
+|---|---|
+| `emulator` | `demo-rafiq-rules` (local Auth + Firestore emulators) |
+| `dev` | `rafiq-academy` |
+| `staging` | `rafiq-academy-staging` (unavailable until its FirebaseOptions exist) |
+
+Local emulators (preferred):
+
 ```bash
-flutter run -d windows -t tool/seed_firestore.dart
+firebase emulators:start --project demo-rafiq-rules --only auth,firestore
+flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=emulator
 ```
 
-Optional password override:
+Real dev project (an explicit password is required):
 
 ```bash
-flutter run -d windows -t tool/seed_firestore.dart -- --password=YourPassword123!
-# or
-flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_PASSWORD=YourPassword123!
+flutter run -d windows -t tool/seed_firestore.dart --dart-define=SEED_TARGET=dev --dart-define=SEED_PASSWORD=<password>
 ```
 
-Default password for **all** accounts: `SeedDemo123!`
+Default password for **all** accounts on the emulator target: `SeedDemo123!`.
+The `dev` and `staging` targets never fall back to it.
 
 Idempotent: fixed Auth emails + document IDs. Safe to re-run.
 

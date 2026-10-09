@@ -5,6 +5,36 @@ Verified against emulator project `demo-rafiq-rules` only. Emulator results are
 not production evidence; each step below needs its own smoke check in the real
 project.
 
+## Deploy targets
+
+| Alias (`.firebaserc`) | Firebase project |
+|---|---|
+| `dev` | `rafiq-academy` |
+| `staging` | `rafiq-academy-staging` |
+| `prod` | `rafiq-academy-prod` |
+
+**Project status:** `rafiq-academy` is the existing dev project.
+`rafiq-academy-staging` and `rafiq-academy-prod` have **not** been created yet.
+Defining an alias in `.firebaserc` does not create a Firebase project; creating
+each project and configuring its billing and permissions are separate
+prerequisites before anything can be deployed to it.
+
+There is no `default` alias. Every deploy names its project explicitly
+(`firebase deploy --only ... --project <alias>`) and never relies on
+`firebase use` or the CLI's active project. Functions deploy through
+`npm run deploy:dev` / `deploy:staging` / `deploy:prod` in `functions/`,
+which call `scripts/deploy-functions.mjs <target>`. The wrapper checks the
+alias against `.firebaserc`, refuses any extra argument (so
+`npm run deploy:dev -- --project prod` or `-- --only firestore` fails before
+building), and then runs only `npm run build` and
+`firebase deploy --only functions --project <target>`. `deploy:prod` also
+refuses to run unless `CONFIRM_PROD_DEPLOY=rafiq-academy-prod` is set.
+Each step below runs against staging first.
+
+Known limitation: the read-only `logs:*` scripts still pass npm-forwarded
+arguments to the Firebase CLI, so `npm run logs:dev -- --project prod` reads
+production logs. They cannot deploy or write.
+
 ## 0. Preconditions (blocking)
 
 | Gate | Why |

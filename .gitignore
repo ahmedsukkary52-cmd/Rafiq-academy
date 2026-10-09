@@ -48,3 +48,13 @@ app.*.map.json
 rules_test/node_modules/
 unit_out.txt
 .cursor/mcp.json
+
+# Local environment overrides and credentials (never commit).
+# functions/.env and functions/.env.<alias> are non-secret per-project config
+# and are intentionally NOT ignored.
+/.env
+/.env.local
+functions/.env.local
+functions/.secret.local
+*service-account*.json
+*serviceAccountKey*.json

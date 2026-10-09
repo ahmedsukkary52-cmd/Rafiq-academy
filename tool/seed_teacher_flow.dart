@@ -3,17 +3,16 @@
 /// Inserts the minimum documents to unlock Teacher screens with real data.
 /// Reuses existing app models / field shapes. Does not change app architecture.
 ///
-/// Run (from project root), with an existing teacher Auth account:
+/// Run (from project root), with an existing teacher Auth account and an
+/// explicit target (`emulator` | `dev` | `staging`; no default; production is
+/// never accepted):
 ///
 /// ```bash
-/// flutter run -d windows -t tool/seed_teacher_flow.dart --dart-define=SEED_TEACHER_UID=<uid> --dart-define=SEED_TEACHER_EMAIL=<email> --dart-define=SEED_TEACHER_PASSWORD=<password>
+/// flutter run -d windows -t tool/seed_teacher_flow.dart --dart-define=SEED_TARGET=emulator --dart-define=SEED_TEACHER_UID=<uid> --dart-define=SEED_TEACHER_EMAIL=<email> --dart-define=SEED_TEACHER_PASSWORD=<password>
 /// ```
 ///
-/// Or pass CLI args after `--`:
-///
-/// ```bash
-/// flutter run -d android -t tool/seed_teacher_flow.dart -- --teacher-uid=<uid> --teacher-email=<email> --teacher-password=<password>
-/// ```
+/// `--target=<target>`, `--teacher-uid=<uid>`, `--teacher-email=<email>` and
+/// `--teacher-password=<password>` entrypoint args are accepted too.
 ///
 /// Optional overrides:
 ///   --teacher-name=...  --teacher-phone=...  --meeting-link=...
@@ -25,7 +24,6 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:rafiq_academy/core/constants/app_constants.dart';
 import 'package:rafiq_academy/features/auth/data/models/user_model.dart';
@@ -36,8 +34,10 @@ import 'package:rafiq_academy/features/student/data/models/recitation_record_mod
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
-import 'package:rafiq_academy/firebase_options.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
+
+import 'seed_firebase.dart';
+import 'seed_target.dart';
 
 // ── Stable seed IDs (idempotent re-runs) ─────────────────────────────────────
 
@@ -59,20 +59,37 @@ Future<void> main(List<String> rawArgs) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final args = _SeedArgs.parse(rawArgs);
-  if (args.teacherUid.isEmpty) {
-    stderr.writeln(
-      'Missing teacher uid.\n'
-      'Pass --teacher-uid=<uid> or --dart-define=SEED_TEACHER_UID=<uid>\n'
-      'Teacher Auth account must already exist.',
-    );
-    exitCode = 64;
-    return;
-  }
+  final code = await runGuardedSeed(
+    args: rawArgs,
+    definedTarget: const String.fromEnvironment('SEED_TARGET'),
+    preflight: (_) {
+      if (args.teacherUid.isEmpty) {
+        throw const SeedTargetException(
+          'Missing teacher uid. Pass --teacher-uid=<uid> or '
+          '--dart-define=SEED_TEACHER_UID=<uid>. '
+          'Teacher Auth account must already exist.',
+        );
+      }
+    },
+    initialize: (config) async {
+      await initializeSeedFirebase(config);
+      await _signInTeacher(args);
+    },
+    seed: (_) async {
+      final result = await _seedTeacherFlow(FirebaseFirestore.instance, args);
+      stdout.writeln('Seed complete.');
+      stdout.writeln('  teacherUid : ${result.teacherUid}');
+      stdout.writeln('  student1   : ${result.student1Id}');
+      stdout.writeln('  student2   : ${result.student2Id}');
+      stdout.writeln('  halaqaId   : ${result.halaqaId}');
+    },
+    out: stdout.writeln,
+    err: stderr.writeln,
+  );
+  exit(code);
+}
 
-  // Force a configured FirebaseOptions platform (android) so the tool can run
-  // from desktop/CI without a separate windows/linux Firebase app entry.
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.android);
-
+Future<void> _signInTeacher(_SeedArgs args) async {
   final auth = FirebaseAuth.instance;
   if (args.teacherEmail.isNotEmpty && args.teacherPassword.isNotEmpty) {
     stdout.writeln('Signing in as ${args.teacherEmail}…');
@@ -81,12 +98,10 @@ Future<void> main(List<String> rawArgs) async {
       password: args.teacherPassword,
     );
     if (auth.currentUser?.uid != args.teacherUid) {
-      stderr.writeln(
+      throw SeedTargetException(
         'Signed-in uid (${auth.currentUser?.uid}) does not match '
         'SEED_TEACHER_UID (${args.teacherUid}).',
       );
-      exitCode = 1;
-      return;
     }
   } else {
     stdout.writeln(
@@ -94,16 +109,6 @@ Future<void> main(List<String> rawArgs) async {
       '(may fail if Firestore rules require auth).',
     );
   }
-
-  final db = FirebaseFirestore.instance;
-  final result = await _seedTeacherFlow(db, args);
-
-  stdout.writeln('Seed complete.');
-  stdout.writeln('  teacherUid : ${result.teacherUid}');
-  stdout.writeln('  student1   : ${result.student1Id}');
-  stdout.writeln('  student2   : ${result.student2Id}');
-  stdout.writeln('  halaqaId   : ${result.halaqaId}');
-  exit(0);
 }
 
 Future<_SeedResult> _seedTeacherFlow(

@@ -48,10 +48,17 @@ The Dart seeder is idempotent (fixed Auth emails + document IDs).
 `functions/scripts/seed-emulator.mjs` seeds with firebase-admin against the
 local emulators only. It takes no arguments and fails closed, in order:
 
-1. Refuses any argument (exit 64).
-2. Reads the auth / firestore / hub ports from `firebase.json`; hosts, when
-   set, must be `127.0.0.1`.
-3. Refuses the environment if `GOOGLE_APPLICATION_CREDENTIALS`,
+1. Refuses extra Node options before anything else (exit 64): a non-empty
+   `NODE_OPTIONS`, any `node` command-line option (`process.execArgv`), or
+   `npm_config_node_options` (npm `node-options`). Values are never printed.
+   This catches accidental preloads (`--require`, `--import`, `--loader`,
+   `--inspect`, ...); code preloaded on purpose could still falsify it.
+2. Refuses any argument (exit 64).
+3. Reads the auth / firestore / hub / ui ports from `firebase.json`; all four
+   must be pinned there (9099 / 8080 / 4400 / 4000), because the Firebase CLI
+   moves an unpinned hub or UI to another free port. Hosts, when set, must be
+   `127.0.0.1`, and the UI must not be disabled.
+4. Refuses the environment if `GOOGLE_APPLICATION_CREDENTIALS`,
    `CLOUDSDK_CONFIG` or `GOOGLE_API_USE_CLIENT_CERTIFICATE` is set, gcloud
    application default credentials exist on
    disk, any project variable (`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`,
@@ -59,36 +66,125 @@ local emulators only. It takes no arguments and fails closed, in order:
    exactly `demo-rafiq-rules`, a proxy variable is set, or a pre-set emulator
    host differs from `127.0.0.1:<firebase.json port>`. The `demo-` prefix is
    not trusted on its own.
-4. Installs a network allowlist on this process's `net` and `dns` modules
+5. Installs a network allowlist on this process's `net` and `dns` modules
    before firebase-admin loads: TCP only to `127.0.0.1` / `::1` on the
-   emulator ports, and no `node:dns` lookups except loopback literals. A
-   self-test must pass. It sets `METADATA_SERVER_DETECTION=none`, otherwise
-   the Firestore client library probes the GCE metadata server. Not covered:
-   UDP, native addons, worker threads, child processes and code preloaded via
-   `NODE_OPTIONS`; the libraries' two child-process paths (`gcloud` project
-   lookup, mTLS cert provider) are kept unreachable by step 3.
-5. Checks readiness over `127.0.0.1`: the hub lists auth and firestore on the
+   auth, firestore, hub and UI ports, and no `node:dns` lookups except
+   loopback literals. A self-test must pass. It sets
+   `METADATA_SERVER_DETECTION=none`, otherwise the Firestore client library
+   probes the GCE metadata server. Not covered: UDP, native addons, worker
+   threads and child processes; the libraries' two child-process paths
+   (`gcloud` project lookup, mTLS cert provider) are kept unreachable by
+   step 4.
+6. Checks readiness over `127.0.0.1`: the hub lists auth and firestore on the
    expected ports, Auth reports `ready`, Firestore answers `Ok`.
-6. Loads firebase-admin for `demo-rafiq-rules` and re-checks the project and
+7. Proves the running suite belongs to `demo-rafiq-rules` (exit 64 if any
+   evidence is missing or disagrees). `singleProjectMode` is not evidence: the
+   CLI only logs a warning for another project.
+   - Hub `GET /`: the hub's `pid`, `version` and `origins`.
+   - `hub-demo-rafiq-rules.json` in the OS temp directory, which the CLI
+     writes when a hub starts for that project: same `pid`, `version` and
+     `origins`. The file is only read, never created, repaired or deleted.
+   - Hub `GET /emulators`: hub, auth, firestore and ui on `127.0.0.1` and
+     the pinned ports.
+   - Emulator UI `GET /api/config` (same CLI process): `projectId` is exactly
+     `demo-rafiq-rules`, and its emulator entries equal the hub's.
+8. Loads firebase-admin for `demo-rafiq-rules` and re-checks the project and
    emulator hosts.
-7. Reads Auth users, root collections and `_seedMeta/demo`. Any blocked
+9. Reads Auth users, root collections and `_seedMeta/demo`. Any blocked
    connection, any existing data, or a leftover seed marker refuses the run.
-8. Writes with `create()` only: `_seedMeta/demo` (`in_progress`), Auth users
-   with fixed UIDs, one batch of documents, read-back verification, a check
-   that no connection was blocked, then `_seedMeta/demo` (`complete`).
+   If the marker is `in_progress`, it also prints a read-only diagnosis (see
+   "After a failed run") and still refuses.
+10. Writes with `create()` only: `_seedMeta/demo` (`in_progress`, with the
+    hub `pid` and CLI version for diagnosis only), Auth users with fixed
+    UIDs, one batch of documents, read-back verification, a check that no
+    connection was blocked, then `_seedMeta/demo` (`complete`). Each step
+    waits at most `SEED_STEP_TIMEOUT_MS` (60 s). The seeder never retries a
+    step itself; firebase-admin and its client libraries may retry some
+    requests internally under their own policies, which differ by operation.
+    After any failure or timeout the seeder sends no further write and exits
+    1. A write already sent, including the one that sets `complete`, may
+    still be applied later, even after the seeder has exited.
 
 Dataset v1 is six accounts (`admin@`, `supervisor1@`, `teacher@`, `parent@`,
 `student01@`, `student02@rafiq.demo`, UIDs `demo-<role>-NN`) with the same
 `users`, `userPrivate` and role-profile fields `adminProvisionUser` writes.
 `users` documents never carry `phone`.
 
-There is no reset and nothing is deleted. The run is not atomic: Auth users
-are created one by one. If a run fails part-way it exits 1 and
-`_seedMeta/demo` stays `in_progress`, so the next run refuses to start. If
-creating `_seedMeta/demo` itself fails, nothing else was written and the
-marker may or may not exist. Either way, `npm run serve` keeps emulator data
-in memory only: stop the emulators, start them again with `npm run serve`,
-then re-run the seeder.
+### After a failed run
+
+There is no reset, no rollback and nothing is deleted. The run is not
+atomic: Auth users are created one by one. Any failure exits 1, and after
+it the seeder sends no further write. The failed step's own request may
+still have been applied ("landed" before its error) or may be applied later,
+even after the seeder has exited. So a run that failed or timed out while
+completing `_seedMeta/demo` can still leave it `complete`.
+
+| Failed step | What may remain |
+|---|---|
+| Creating `_seedMeta/demo` | Nothing else was written; the marker may or may not exist. |
+| An Auth user (first, middle or last) | The marker (`in_progress`), the earlier users, possibly that user. |
+| The document batch | The marker and all users; the batch is all-or-nothing, so either none or all of its documents. |
+| Read-back verification, or its reads | Everything was written; it did not verify. |
+| Pre-completion blocked-connection check | Everything was written; the marker stays `in_progress`. |
+| Completing `_seedMeta/demo` | Everything was written and verified; the marker may be `in_progress` or `complete`, so treat the dataset as unverified. |
+
+Firestore triggers run in the background in the Functions emulator. Writing
+`users` and `studentProfiles` starts `projectStudentSearchOnUserWrite` and
+`projectStudentSearchOnProfileWrite`, which may create `studentSearch/{id}`
+after the seeder has stopped, including after a failed run. The seeder
+never writes `studentSearch`, and any data found there makes the next run
+refuse. The reviewed trigger list is pinned by
+`functions/test/seed_emulator_triggers_contract.test.mjs`.
+
+**Timeouts.** A step that gets no answer within 60 s stops the run: no
+further write is sent, and the error says `Seed stopped during <step>`. The
+timeout only stops waiting. It does not cancel the request, which may still
+be applied later, so the emulator may hold more data than the run saw. A
+timeout is not proof that the write failed or that nothing was written.
+
+**Diagnosis.** When a later run finds `_seedMeta/demo` in `in_progress`, it
+refuses and then prints a read-only diagnosis. It runs after the same guards
+and identity checks, only reads (`getUser` and document `get`), and prints
+UIDs and counts, never emails, names or phone numbers:
+
+- which of the dataset's demo accounts exist, and how many Auth users exist
+  (one page; it says when there may be more);
+- for each dataset collection, how many of the dataset's fixed document IDs
+  exist, and which other root collections (for example `studentSearch`) are
+  present.
+
+Only the dataset's fixed IDs are checked, so the counts are not a complete
+inventory. A read it could not do is reported as unknown, never as absent. If
+the diagnosis itself fails, it reports the failure, which says nothing about
+which data exists. If the network allowlist blocks a connection attempt
+during the diagnosis, that is reported too and the output is treated as
+incomplete. The diagnosis never makes the session acceptable for
+seeding.
+
+A `complete` marker is refused as well. It means the dataset looks complete,
+not that the run which wrote it succeeded. If a probe or an unexpected error
+leaves the marker's state undetermined, the seeder says it is unknown
+rather than guessing.
+
+- Do not re-run the seeder against a session where it failed while writing.
+- Always start the emulators with `npm run serve` only: never `--import` or
+  `--export-on-exit`, which would carry data into the next session.
+- To retry, stop `npm run serve` (Ctrl+C in its terminal), start a new
+  session with `npm run serve`, then run `npm run seed:emulator`.
+- Stopping and restarting does not by itself prove the emulator is empty.
+  The seeder's own pre-write checks (step 9) decide whether the new session
+  is accepted; if they refuse, investigate instead of working around them.
+
+### Node versions
+
+The Firebase CLI, the Functions emulator, the seeder and the unit tests all
+run on the host's Node (currently Node 24). `functions/package.json`
+`engines.node` is `"20"`, and that is the runtime used on deploy. When the
+requested major version is not installed locally, the CLI prints a warning and
+runs the Functions emulator on the host's Node instead. So local runs do not
+prove Node 20 behavior. No `.nvmrc` is provided.
+
+### Deploy exclusion and status
 
 The seeder files (`seed-emulator*.mjs`) are excluded from the Functions
 upload by `firebase.json` → `functions.ignore`.

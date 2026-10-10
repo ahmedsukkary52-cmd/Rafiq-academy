@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  checkNodePreload,
   checkSeedEnvironment,
   readEmulatorPorts,
   SEED_PROJECT_ID,
@@ -16,7 +17,10 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoFirebaseJson = JSON.parse(readFileSync(join(here, "..", "..", "firebase.json"), "utf8"));
-const PORTS = { auth: 9099, firestore: 8080, hub: 4400 };
+const PORTS = { auth: 9099, firestore: 8080, hub: 4400, ui: 4000 };
+const pinned = (overrides = {}) => ({
+  emulators: { auth: { port: 9099 }, firestore: { port: 8080 }, hub: { port: 4400 }, ui: { port: 4000 }, ...overrides },
+});
 
 const check = (env, { platform = "win32", files = [] } = {}) =>
   checkSeedEnvironment({
@@ -30,24 +34,31 @@ test("the seed project is exactly demo-rafiq-rules", () => {
   assert.equal(SEED_PROJECT_ID, "demo-rafiq-rules");
 });
 
-test("repo firebase.json yields the documented emulator ports", () => {
+test("repo firebase.json pins auth, firestore, hub and ui to the documented ports", () => {
   const { problems, ports } = readEmulatorPorts(repoFirebaseJson);
   assert.deepEqual(problems, []);
   assert.deepEqual(ports, PORTS);
+  assert.equal(repoFirebaseJson.emulators.ui.enabled, true);
 });
 
 test("missing or invalid emulator configuration is refused", () => {
+  assert.deepEqual(readEmulatorPorts(pinned()).problems, []);
   const cases = [
     {},
     { emulators: null },
-    { emulators: { firestore: { port: 8080 } } },
-    { emulators: { auth: { port: 9099 } } },
-    { emulators: { auth: { port: "9099" }, firestore: { port: 8080 } } },
-    { emulators: { auth: { port: 0 }, firestore: { port: 8080 } } },
-    { emulators: { auth: { port: 70000 }, firestore: { port: 8080 } } },
-    { emulators: { auth: 9099, firestore: { port: 8080 } } },
-    { emulators: { auth: { port: 8080 }, firestore: { port: 8080 } } },
-    { emulators: { auth: { port: 9099 }, firestore: { port: 8080 }, hub: { port: 9099 } } },
+    pinned({ auth: undefined }),
+    pinned({ firestore: undefined }),
+    pinned({ hub: undefined }),
+    pinned({ ui: undefined }),
+    pinned({ ui: { enabled: true } }),
+    pinned({ ui: { enabled: false, port: 4000 } }),
+    pinned({ auth: { port: "9099" } }),
+    pinned({ auth: { port: 0 } }),
+    pinned({ auth: { port: 70000 } }),
+    pinned({ auth: 9099 }),
+    pinned({ auth: { port: 8080 } }),
+    pinned({ hub: { port: 9099 } }),
+    pinned({ ui: { port: 4400 } }),
   ];
   for (const json of cases) {
     const { problems, ports } = readEmulatorPorts(json);
@@ -58,9 +69,9 @@ test("missing or invalid emulator configuration is refused", () => {
 
 test("non-loopback emulator hosts in firebase.json are refused", () => {
   for (const host of ["0.0.0.0", "localhost", "::1", "10.0.0.5", "firestore.googleapis.com"]) {
-    for (const name of ["auth", "firestore", "hub"]) {
+    for (const name of ["auth", "firestore", "hub", "ui"]) {
       const json = structuredClone(repoFirebaseJson);
-      json.emulators[name] = { ...(json.emulators[name] ?? { port: 4400 }), host };
+      json.emulators[name] = { ...json.emulators[name], host };
       assert.ok(readEmulatorPorts(json).problems.length > 0, `${name} ${host}`);
     }
   }
@@ -178,6 +189,60 @@ test("proxy variables are refused", () => {
     assert.ok(check({ [key]: "http://127.0.0.1:3128" }).problems.some((p) => p.includes("proxies")), key);
   }
   assert.deepEqual(check({ NO_PROXY: "*" }).problems, []);
+});
+
+test("extra Node options are refused in every spelling, without echoing values", () => {
+  const secretish = "C:/Users/x/AppData/token-agent.js";
+  const nodeOptions = [
+    `--require ${secretish}`,
+    `--require=${secretish}`,
+    `-r ${secretish}`,
+    `--import=${secretish}`,
+    `--import ${secretish}`,
+    `--loader ${secretish}`,
+    `--experimental-loader=${secretish}`,
+    `--experimental_loader ${secretish}`,
+    `"--require" "${secretish}"`,
+    `--max-old-space-size=4096 --require "${secretish}"`,
+    "--inspect",
+    "--max-old-space-size=4096",
+    "  --enable-source-maps  ",
+  ];
+  for (const value of nodeOptions) {
+    for (const key of ["NODE_OPTIONS", "node_options", "Node_Options"]) {
+      const problems = checkNodePreload({ env: { [key]: value }, execArgv: [] });
+      assert.equal(problems.length, 1, `${key}=${value}`);
+      assert.ok(!problems[0].includes(secretish) && !problems[0].includes(value.trim()), problems[0]);
+    }
+  }
+
+  for (const execArgv of [
+    ["--require", secretish],
+    [`--import=${secretish}`],
+    ["--loader", secretish],
+    [`--experimental-loader=${secretish}`],
+    ["--inspect-brk"],
+    ["--env-file=.env"],
+    ["--no-warnings"],
+  ]) {
+    const problems = checkNodePreload({ env: {}, execArgv });
+    assert.equal(problems.length, 1, execArgv.join(" "));
+    assert.ok(!problems[0].includes(secretish), problems[0]);
+  }
+
+  for (const key of ["npm_config_node_options", "NPM_CONFIG_NODE_OPTIONS"]) {
+    for (const value of [`--require ${secretish}`, ""]) {
+      const problems = checkNodePreload({ env: { [key]: value }, execArgv: [] });
+      assert.equal(problems.length, 1, `${key}=${value}`);
+      assert.ok(!problems[0].includes(secretish), problems[0]);
+    }
+  }
+});
+
+test("an empty NODE_OPTIONS and no execArgv pass the preload check", () => {
+  for (const env of [{}, { NODE_OPTIONS: "" }, { NODE_OPTIONS: "   " }, { NODE_OPTIONS: undefined }, { NODE_PATH: "x" }]) {
+    assert.deepEqual(checkNodePreload({ env, execArgv: [] }), [], JSON.stringify(env));
+  }
 });
 
 test("unknown ports refuse the environment", () => {

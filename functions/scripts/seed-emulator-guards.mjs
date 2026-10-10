@@ -9,7 +9,6 @@ import { join } from "node:path";
 
 export const SEED_PROJECT_ID = "demo-rafiq-rules";
 export const LOOPBACK_HOST = "127.0.0.1";
-export const DEFAULT_HUB_PORT = 4400;
 
 // Every env var firebase-admin / @google-cloud/firestore read a project from.
 const PROJECT_ENV_KEYS = [
@@ -30,8 +29,36 @@ function isPort(value) {
 }
 
 /**
+ * Node options that run code before this script (--require, --import,
+ * --loader, --inspect, ...) could undo the guards. The seeder needs none, so
+ * any are refused outright instead of parsing their many spellings. Values
+ * are never echoed.
+ */
+export function checkNodePreload({ env, execArgv }) {
+  const problems = [];
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    const upper = key.toUpperCase();
+    if (upper === "NODE_OPTIONS" && value.trim() !== "") {
+      problems.push(`${key} is set; the emulator seeder runs without extra Node options.`);
+    }
+    if (upper === "NPM_CONFIG_NODE_OPTIONS") {
+      problems.push(`${key} is set (npm "node-options"); the emulator seeder runs without extra Node options.`);
+    }
+  }
+  if (execArgv.length > 0) {
+    problems.push(
+      `node was started with ${execArgv.length} extra option(s); run the seeder only through \`npm run seed:emulator\`.`,
+    );
+  }
+  return problems;
+}
+
+/**
  * Reads the emulator ports from firebase.json. Hosts, when present, must be
- * the IPv4 loopback address; auth and firestore ports must be explicit.
+ * the IPv4 loopback address. auth, firestore, hub and ui ports must all be
+ * explicit: the Firebase CLI moves an unpinned hub or UI to another free port
+ * instead of failing, and the identity check needs to know where they are.
  */
 export function readEmulatorPorts(firebaseJson) {
   const problems = [];
@@ -39,8 +66,11 @@ export function readEmulatorPorts(firebaseJson) {
   if (emulators === null || typeof emulators !== "object") {
     return { problems: ["firebase.json has no \"emulators\" section."], ports: null };
   }
+  if (emulators.ui?.enabled === false) {
+    problems.push("firebase.json emulators.ui.enabled is false; the Emulator UI is needed to verify the project.");
+  }
 
-  const portOf = (name, fallback) => {
+  const portOf = (name) => {
     const entry = emulators[name];
     if (entry !== undefined && (entry === null || typeof entry !== "object")) {
       problems.push(`firebase.json emulators.${name} must be an object.`);
@@ -52,7 +82,7 @@ export function readEmulatorPorts(firebaseJson) {
           `only ${LOOPBACK_HOST} is allowed.`,
       );
     }
-    const port = entry?.port ?? fallback;
+    const port = entry?.port;
     if (!isPort(port)) {
       problems.push(`firebase.json emulators.${name}.port is missing or invalid.`);
       return null;
@@ -63,7 +93,8 @@ export function readEmulatorPorts(firebaseJson) {
   const ports = {
     auth: portOf("auth"),
     firestore: portOf("firestore"),
-    hub: portOf("hub", DEFAULT_HUB_PORT),
+    hub: portOf("hub"),
+    ui: portOf("ui"),
   };
   const values = Object.values(ports).filter((p) => p !== null);
   if (new Set(values).size !== values.length) {

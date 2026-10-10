@@ -1,6 +1,7 @@
-// Preloaded with `node --require` by seed_emulator_run.test.mjs: reports at
-// exit whether any firebase-admin module was loaded into the CJS cache
-// (ESM imports of CJS packages are cached there too).
+// Loaded by seed_emulator_spy_runner.mjs (or preloaded, to prove the seeder
+// refuses preloads) in seed_emulator_run.test.mjs: reports at exit whether
+// any firebase-admin module was loaded into the CJS cache (ESM imports of
+// CJS packages are cached there too).
 const Module = require("node:module");
 const { sep } = require("node:path");
 

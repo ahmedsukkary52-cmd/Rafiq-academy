@@ -325,8 +325,64 @@ class AppLoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: CircularProgressIndicator(color: AppColors.primary),
+    return const _PulseLoadingSkeleton();
+  }
+}
+
+class _PulseLoadingSkeleton extends StatefulWidget {
+  const _PulseLoadingSkeleton();
+
+  @override
+  State<_PulseLoadingSkeleton> createState() => _PulseLoadingSkeletonState();
+}
+
+class _PulseLoadingSkeletonState extends State<_PulseLoadingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.4, end: 0.9).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final bone = AppColors.border.withValues(alpha: _pulse.value);
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) const SizedBox(height: 12),
+                Container(
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: bone,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

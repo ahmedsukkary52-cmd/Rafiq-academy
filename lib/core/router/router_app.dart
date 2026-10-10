@@ -50,6 +50,7 @@ import '../../features/student/presentation/pages/student_badges_page.dart';
 import '../../features/student/presentation/pages/student_evaluation_page.dart';
 // Student
 import '../../features/student/presentation/pages/student_home_page.dart';
+import '../../features/student/presentation/pages/student_journey_map_page.dart';
 import '../../features/mushaf/presentation/pages/mushaf_reader_host.dart';
 import '../../features/student/presentation/pages/student_mushaf_page.dart';
 import '../../features/student/presentation/pages/student_profile_page.dart';
@@ -92,6 +93,7 @@ class AppRoutes {
   static const String studentSettings = '/student/settings';
   static const String studentBadges = '/student/badges';
   static const String studentStreak = '/student/streak';
+  static const String studentJourneyMap = '/student/journey-map';
   static const String studentContent = '/student/content';
 
   /// Halaqa shared content (P0 §8) for the student's own Halaqa.
@@ -356,6 +358,10 @@ class AppRouter {
           GoRoute(
             path: 'streak',
             builder: (_, __) => const StudentStreakPage(),
+          ),
+          GoRoute(
+            path: 'journey-map',
+            builder: (_, __) => const StudentJourneyMapPage(),
           ),
           GoRoute(
             path: 'mushaf',

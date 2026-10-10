@@ -42,6 +42,31 @@ void main() {
       );
     });
 
+    test('student journey map is student-only', () {
+      expect(
+        AppRouteAccess.isAllowed(
+          path: AppRoutes.studentJourneyMap,
+          role: AppRoles.student,
+        ),
+        isTrue,
+      );
+      for (final role in [
+        AppRoles.parent,
+        AppRoles.teacher,
+        AppRoles.supervisor,
+        AppRoles.admin,
+      ]) {
+        expect(
+          AppRouteAccess.isAllowed(
+            path: AppRoutes.studentJourneyMap,
+            role: role,
+          ),
+          isFalse,
+          reason: role,
+        );
+      }
+    });
+
     test('cross-role product shells are denied', () {
       expect(
         AppRouteAccess.isAllowed(path: AppRoutes.admin, role: AppRoles.parent),

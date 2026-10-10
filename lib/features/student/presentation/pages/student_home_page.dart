@@ -44,9 +44,10 @@ class _StudentHomePageState extends State<StudentHomePage> {
   int _currentTab = 0;
 
   // ترتيب القائمة يطابق التصميم في RTL: الرئيسية (يمين) ... حسابي (يسار)
+  // Figma: الرئيسية / مصحفي / ★ (أصفر) / خريطتي (layers) / حسابي
   final _tabs = const [
-    _StudentTab(icon: Icons.home_rounded, label: 'الرئيسية'),
-    _StudentTab(icon: Icons.menu_book_outlined, label: 'مصحفي'),
+    _StudentTab(icon: Icons.home_outlined, label: 'الرئيسية'),
+    _StudentTab(icon: Icons.view_list_outlined, label: 'مصحفي'),
     _StudentTab(icon: Icons.star_rounded, label: '', isElevated: true),
     _StudentTab(icon: Icons.route_outlined, label: 'خطة الحلقة'),
     _StudentTab(icon: Icons.person_outline_rounded, label: 'حسابي'),
@@ -214,6 +215,7 @@ class _StudentHomeTab extends StatelessWidget {
                       unreadNotificationsCount: unreadCount,
                       onNotificationsTap: () =>
                           context.push('/student/notifications'),
+                      onSearchTap: () => context.push(AppRoutes.studentContent),
                       onAvatarTap: () => context.push('/student/avatar'),
                       onCoinsTap: () => onTabChanged(2),
                       onStarsTap: () => context.push(AppRoutes.studentAchieve),
@@ -232,13 +234,11 @@ class _StudentHomeTab extends StatelessWidget {
                     horizontal: AppSizes.paddingM,
                   ),
                   child: StudentQuickActionsWidget(
-                    onClassesTap: () => context.push(AppRoutes.studentSchedule),
-                    onReviewScheduleTap: () =>
+                    onMushafTap: () => onTabChanged(1),
+                    onReviewTap: () =>
                         context.push(AppRoutes.studentReviewSchedule),
-                    onHomeworkTap: () =>
-                        context.push(AppRoutes.studentHomework),
-                    onProgressReportTap: () =>
-                        context.push(AppRoutes.studentProgressReport),
+                    onTeacherTap: () => context.push(AppRoutes.studentChat),
+                    onMapTap: () => context.push(AppRoutes.studentJourneyMap),
                   ),
                 ),
               ),
@@ -300,7 +300,10 @@ class _StudentHomeTab extends StatelessWidget {
                     planName: profile?.currentPlanName ?? '',
                     totalVerses: profile?.totalVersesMemorized ?? 0,
                     completedSurahs: profile?.completedSurahs ?? 0,
+                    totalStars: profile?.totalStars ?? 0,
                     onTap: () => context.push(AppRoutes.studentProgressReport),
+                    onDetailsTap: () =>
+                        context.push(AppRoutes.studentProgressReport),
                   ),
                 ),
               ),
@@ -537,50 +540,71 @@ class _StudentProfileTab extends StatelessWidget {
         final avatarEmoji = AvatarCatalog.byId(
           profile?.avatarId ?? 'fox',
         ).emoji;
+        final shortId = (profile?.uid ?? '').length >= 6
+            ? profile!.uid.substring(0, 6).toUpperCase()
+            : (profile?.uid ?? '----');
+        final pct = (profile?.overallProgressPercent ?? 0)
+            .clamp(0, 100)
+            .toInt();
 
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Header ────────────────────────────────────────────
               Container(
-                padding: EdgeInsetsDirectional.only(
-                  top: MediaQuery.of(context).padding.top + 20,
-                  bottom: AppSizes.paddingL,
-                  start: AppSizes.paddingL,
-                  end: AppSizes.paddingL,
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 12,
+                  bottom: 48,
+                  left: 20,
+                  right: 20,
                 ),
                 decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                  gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(AppSizes.radiusXL),
-                    bottomRight: Radius.circular(AppSizes.radiusXL),
+                    bottomLeft: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
                   ),
                 ),
                 child: Column(
                   children: [
                     Align(
                       alignment: AlignmentDirectional.centerStart,
-                      child: IconButton(
-                        onPressed: () =>
-                            context.push(AppRoutes.studentSettings),
-                        icon: const Icon(
-                          Icons.settings_outlined,
-                          color: Colors.white,
+                      child: Material(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => context.push(AppRoutes.studentSettings),
+                          child: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: Icon(
+                              Icons.settings_outlined,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Container(
-                      width: 84,
-                      height: 84,
-                      decoration: const BoxDecoration(
+                      width: 92,
+                      height: 92,
+                      decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Center(
                         child: Text(
                           avatarEmoji,
-                          style: const TextStyle(fontSize: 40),
+                          style: const TextStyle(fontSize: 44),
                         ),
                       ),
                     ),
@@ -589,41 +613,44 @@ class _StudentProfileTab extends StatelessWidget {
                       profile?.name ?? '...',
                       style: const TextStyle(
                         fontFamily: 'NotoNaskhArabic',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
-                    if ((profile?.halaqaName ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        profile!.halaqaName,
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 13,
-                          color: Colors.white.withOpacity(0.8),
-                        ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'الطالب رقم #$shortId',
+                      style: TextStyle(
+                        fontFamily: 'NotoNaskhArabic',
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
-                    ],
-                    const SizedBox(height: 10),
+                    ),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
+                        horizontal: 16,
+                        vertical: 7,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.secondary,
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusFull,
-                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.secondary.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Text(
-                        'المستوى ${profile?.level ?? 1} 🏅',
+                        'المستوى ${profile?.level ?? 1} • حافظ مجتهد 🏆',
                         style: const TextStyle(
                           fontFamily: 'NotoNaskhArabic',
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF3A2E00),
                         ),
                       ),
                     ),
@@ -632,25 +659,45 @@ class _StudentProfileTab extends StatelessWidget {
               ),
 
               Transform.translate(
-                offset: const Offset(0, -24),
+                offset: const Offset(0, -28),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.paddingL,
-                  ),
-                  child: AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.10),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
                     child: Row(
                       children: [
                         _ProfileStat(
                           value: '${profile?.streakDays ?? 0}',
                           label: 'يوم متواصل',
                         ),
+                        Container(
+                          width: 1,
+                          height: 36,
+                          color: AppColors.border,
+                        ),
                         _ProfileStat(
                           value: '${profile?.totalStars ?? 0}',
                           label: 'نجمة',
                         ),
+                        Container(
+                          width: 1,
+                          height: 36,
+                          color: AppColors.border,
+                        ),
                         _ProfileStat(
-                          value: '${profile?.completedJuz ?? 0}',
-                          label: 'جزء مكتمل',
+                          value: '${profile?.completedSurahs ?? 0}',
+                          label: 'سور محفوظة',
                         ),
                       ],
                     ),
@@ -659,53 +706,51 @@ class _StudentProfileTab extends StatelessWidget {
               ),
 
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.paddingL,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if ((profile?.currentPlanName ?? '').isNotEmpty)
-                      AppCard(
-                        onTap: () => context.push(AppRoutes.studentMushaf),
-                        child: Row(
-                          children: [
-                            const Text('🕌', style: TextStyle(fontSize: 20)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'السورة الحالية',
-                                    style: AppTextStyles.labelSmall,
-                                  ),
-                                  Text(
-                                    '${profile!.currentPlanName} '
-                                    '${profile.overallProgressPercent.toStringAsFixed(0)}%',
-                                    style: AppTextStyles.titleMedium,
-                                  ),
-                                ],
-                              ),
+                    if ((profile?.currentPlanName ?? '').isNotEmpty) ...[
+                      Row(
+                        children: [
+                          const Text('🕌', style: TextStyle(fontSize: 18)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'السورة الحالية',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const Icon(
-                              Icons.chevron_left_rounded,
-                              color: AppColors.textHint,
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${profile!.currentPlanName} $pct%',
+                        textAlign: TextAlign.right,
+                        style: AppTextStyles.titleLarge.copyWith(
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                    const SizedBox(height: AppSizes.paddingM),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: pct / 100,
+                          minHeight: 6,
+                          backgroundColor: AppColors.border,
+                          valueColor: const AlwaysStoppedAnimation(
+                            AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
 
                     _ProfileMenuGroup(
                       items: [
                         _ProfileMenuItem(
-                          icon: Icons.chat_bubble_outline_rounded,
-                          label: 'محادثة المعلم',
-                          onTap: () => context.push(AppRoutes.studentChat),
-                        ),
-                        _ProfileMenuItem(
-                          icon: Icons.military_tech_outlined,
+                          icon: Icons.emoji_events_outlined,
                           label: 'شاراتي وإنجازاتي',
                           onTap: () => context.push(AppRoutes.studentAchieve),
                         ),
@@ -759,10 +804,37 @@ class _StudentProfileTab extends StatelessWidget {
                           label: 'الإعدادات',
                           onTap: () => context.push(AppRoutes.studentSettings),
                         ),
+                        _ProfileMenuItem(
+                          icon: Icons.family_restroom_rounded,
+                          label: 'حساب ولي الأمر',
+                          onTap: () => context.push(AppRoutes.studentSettings),
+                        ),
+                        _ProfileMenuItem(
+                          icon: Icons.help_outline_rounded,
+                          label: 'المساعدة والدعم',
+                          onTap: () => context.push(AppRoutes.studentSettings),
+                        ),
                       ],
                     ),
 
-                    const SizedBox(height: AppSizes.paddingM),
+                    const SizedBox(height: 12),
+
+                    _ProfileMenuGroup(
+                      items: [
+                        _ProfileMenuItem(
+                          icon: Icons.folder_open_rounded,
+                          label: 'مكتبة المحتوى',
+                          onTap: () => context.push(AppRoutes.studentContent),
+                        ),
+                        _ProfileMenuItem(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          label: 'محادثة المعلم',
+                          onTap: () => context.push(AppRoutes.studentChat),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
 
                     _ProfileMenuGroup(
                       items: [
@@ -775,7 +847,7 @@ class _StudentProfileTab extends StatelessWidget {
                       ],
                     ),
 
-                    const SizedBox(height: AppSizes.paddingXL),
+                    const SizedBox(height: 28),
                   ],
                 ),
               ),
@@ -824,8 +896,21 @@ class _ProfileStat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: AppTextStyles.headlineMedium),
-          Text(label, style: AppTextStyles.labelSmall),
+          Text(
+            value,
+            style: AppTextStyles.headlineMedium.copyWith(
+              color: AppColors.primaryDark,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
         ],
       ),
     );
@@ -839,8 +924,19 @@ class _ProfileMenuGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: EdgeInsets.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           for (var i = 0; i < items.length; i++) ...[
@@ -872,11 +968,18 @@ class _ProfileMenuItem extends StatelessWidget {
     final color = isDestructive ? AppColors.error : AppColors.textPrimary;
     return ListTile(
       onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       leading: Icon(
         icon,
         color: isDestructive ? AppColors.error : AppColors.textSecondary,
       ),
-      title: Text(label, style: AppTextStyles.bodyLarge.copyWith(color: color)),
+      title: Text(
+        label,
+        style: AppTextStyles.bodyLarge.copyWith(
+          color: color,
+          fontWeight: isDestructive ? FontWeight.w700 : FontWeight.w600,
+        ),
+      ),
       trailing: isDestructive
           ? null
           : const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
@@ -941,31 +1044,30 @@ class _StudentBottomNav extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () => onChanged(i),
                         behavior: HitTestBehavior.opaque,
-                        child: Center(
-                          child: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.secondary
-                                  : AppColors.primary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      (isSelected
-                                              ? AppColors.secondary
-                                              : AppColors.primary)
-                                          .withOpacity(0.35),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              tab.icon,
-                              color: Colors.white,
-                              size: AppSizes.iconL,
+                        child: Transform.translate(
+                          offset: const Offset(0, -10),
+                          child: Center(
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.secondary.withValues(
+                                      alpha: 0.45,
+                                    ),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                tab.icon,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
                           ),
                         ),
@@ -983,24 +1085,36 @@ class _StudentBottomNav extends StatelessWidget {
                           NotificationBadge(
                             count: i == 0 ? unreadCount : 0,
                             child: Icon(
-                              tab.icon,
+                              isSelected && i == 0
+                                  ? Icons.home_rounded
+                                  : tab.icon,
                               color: isSelected
                                   ? AppColors.primary
                                   : AppColors.textSecondary,
                               size: AppSizes.iconL,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             tab.label,
                             style: AppTextStyles.labelSmall.copyWith(
                               fontSize: 10,
                               fontWeight: isSelected
-                                  ? FontWeight.w600
+                                  ? FontWeight.w700
                                   : FontWeight.w400,
                               color: isSelected
                                   ? AppColors.primary
                                   : AppColors.textSecondary,
+                            ),
+                          ),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            margin: const EdgeInsets.only(top: 3),
+                            width: isSelected ? 5 : 0,
+                            height: isSelected ? 5 : 0,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
                             ),
                           ),
                         ],

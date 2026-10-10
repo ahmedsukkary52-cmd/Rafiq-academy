@@ -52,37 +52,40 @@ class _StudentAchievementsPageState extends State<StudentAchievementsPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: BlocBuilder<StudentBloc, StudentState>(
-            buildWhen: (prev, curr) =>
-                prev.achievementsStatus != curr.achievementsStatus ||
-                prev.achievements != curr.achievements ||
-                prev.achievementsError != curr.achievementsError ||
-                prev.profile != curr.profile,
-            builder: (context, state) {
-              if (state.achievementsStatus == SectionStatus.initial ||
-                  (state.achievementsStatus == SectionStatus.loading &&
-                      state.achievements.isEmpty)) {
-                return const StudentListPageSkeleton();
-              }
+        body: BlocBuilder<StudentBloc, StudentState>(
+          buildWhen: (prev, curr) =>
+              prev.achievementsStatus != curr.achievementsStatus ||
+              prev.achievements != curr.achievements ||
+              prev.achievementsError != curr.achievementsError ||
+              prev.profile != curr.profile,
+          builder: (context, state) {
+            if (state.achievementsStatus == SectionStatus.initial ||
+                (state.achievementsStatus == SectionStatus.loading &&
+                    state.achievements.isEmpty)) {
+              return const StudentListPageSkeleton();
+            }
 
-              if (state.achievementsStatus == SectionStatus.error &&
-                  state.achievements.isEmpty) {
-                return AppErrorWidget(
+            if (state.achievementsStatus == SectionStatus.error &&
+                state.achievements.isEmpty) {
+              return SafeArea(
+                child: AppErrorWidget(
                   message: state.achievementsError ?? 'تعذر تحميل الإنجازات',
                   onRetry: _retryAchievements,
-                );
-              }
+                ),
+              );
+            }
 
-              return CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(child: _Header(state: state)),
-                  if (state.achievements.isEmpty)
-                    const _EmptyAchievements()
-                  else ...[
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                      sliver: SliverToBoxAdapter(
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(child: _Header(state: state)),
+                if (state.achievements.isEmpty)
+                  const _EmptyAchievements()
+                else ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
                         child: Text(
                           'إنجازاتي',
                           style: AppTextStyles.headlineMedium.copyWith(
@@ -91,27 +94,23 @@ class _StudentAchievementsPageState extends State<StudentAchievementsPage> {
                         ),
                       ),
                     ),
-                    SliverList.separated(
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    sliver: SliverList.separated(
                       itemCount: state.achievements.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final achievement = state.achievements[index];
-                        return Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            24,
-                            index == 0 ? 22 : 0,
-                            24,
-                            index == state.achievements.length - 1 ? 28 : 0,
-                          ),
-                          child: _AchievementRow(achievement: achievement),
+                        return _AchievementRow(
+                          achievement: state.achievements[index],
                         );
                       },
                     ),
-                  ],
+                  ),
                 ],
-              );
-            },
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -171,56 +170,52 @@ class _Header extends StatelessWidget {
         .round();
 
     return Container(
-      color: AppColors.dark,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 20,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.dark,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+      ),
       child: Column(
         children: [
-          SizedBox(
-            height: 150,
-            child: Stack(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
               children: [
                 if (Navigator.canPop(context))
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 24),
-                      child: _HeaderButton(
-                        icon: Icons.chevron_left_rounded,
-                        onTap: () => Navigator.maybePop(context),
-                      ),
-                    ),
-                  ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 24),
-                    child: Text(
-                      '🏆 الإنجازات',
-                      style: AppTextStyles.displayMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                  _HeaderButton(
+                    icon: Icons.chevron_right_rounded,
+                    onTap: () => Navigator.maybePop(context),
+                  )
+                else
+                  const SizedBox(width: 48),
+                const Spacer(),
+                Text(
+                  '🏆 الإنجازات',
+                  style: AppTextStyles.headlineMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                      start: 24,
-                      bottom: 16,
-                    ),
-                    child: TextButton(
-                      onPressed: () => context.push(AppRoutes.studentBadges),
-                      child: const Text('الشارات'),
-                    ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => context.push(AppRoutes.studentBadges),
+                  child: const Text(
+                    'الشارات',
+                    style: TextStyle(color: Colors.white70),
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            color: const Color(0xFF2F3B4B),
-            padding: const EdgeInsets.fromLTRB(24, 26, 24, 34),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 _StatTile(
@@ -228,13 +223,13 @@ class _Header extends StatelessWidget {
                   label: 'إنجاز مكتمل',
                   color: AppColors.secondary,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _StatTile(
                   value: '$stars',
                   label: 'نجمة',
                   color: const Color(0xFF24C6CF),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _StatTile(
                   value: '$memorizationAccuracy%',
                   label: 'نسبة التقدم',
@@ -264,10 +259,10 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        height: 108,
+        height: 96,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(22),
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Column(
@@ -277,15 +272,15 @@ class _StatTile extends StatelessWidget {
               value,
               style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: FontWeight.w900,
                 color: color,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               label,
-              style: AppTextStyles.labelMedium.copyWith(color: Colors.white54),
+              style: AppTextStyles.labelSmall.copyWith(color: Colors.white54),
             ),
           ],
         ),
@@ -310,61 +305,67 @@ class _AchievementRow extends StatelessWidget {
     final dateLabel = _formatDate(achievement.date);
 
     return Container(
-      height: 132,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 78,
-            height: 78,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
               color: const Color(0xFFE6F7FF),
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(16),
             ),
             alignment: Alignment.center,
             child: Text(
               _iconFor(achievement.type),
-              style: const TextStyle(fontSize: 30),
+              style: const TextStyle(fontSize: 28),
             ),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: AppTextStyles.headlineMedium.copyWith(
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text('بواسطة $issuer', style: AppTextStyles.bodyMedium),
+                Text(
+                  'بواسطة $issuer',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.bodyMedium,
+                ),
                 const SizedBox(height: 2),
                 Text(
                   dateLabel,
-                  style: AppTextStyles.bodyMedium.copyWith(
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.labelSmall.copyWith(
                     color: AppColors.textHint,
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             _typeLabel(achievement.type),
-            style: AppTextStyles.titleMedium.copyWith(
+            style: AppTextStyles.labelMedium.copyWith(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w700,
             ),
@@ -407,13 +408,13 @@ class _HeaderButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 56,
-        height: 56,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Icon(icon, color: Colors.white),
       ),

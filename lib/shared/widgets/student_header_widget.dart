@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 
+/// Student home header — Figma: teal header, avatar, Hijri date, soft icon chips, stats row.
 class StudentHeaderWidget extends StatelessWidget {
   final String name;
   final String avatarEmoji;
@@ -36,82 +38,80 @@ class StudentHeaderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.primary,
+        gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(AppSizes.radiusXL),
-          bottomRight: Radius.circular(AppSizes.radiusXL),
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 12,
-        left: AppSizes.paddingM,
-        right: AppSizes.paddingM,
-        bottom: AppSizes.paddingL,
+        top: MediaQuery.of(context).padding.top + 10,
+        left: 16,
+        right: 16,
+        bottom: 20,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // ── مجموعة الأيقونات (إشعارات + بحث) ─────────────────
-              Row(
-                children: [
-                  _HeaderIconButton(
-                    icon: Icons.notifications_outlined,
-                    badgeCount: unreadNotificationsCount,
-                    onTap: onNotificationsTap,
-                  ),
-                  if (onSearchTap != null) ...[
-                    const SizedBox(width: 8),
-                    _HeaderIconButton(
-                      icon: Icons.search_rounded,
-                      onTap: onSearchTap!,
-                    ),
-                  ],
-                ],
+              _HeaderCircleButton(
+                icon: Icons.notifications_outlined,
+                showDot: unreadNotificationsCount > 0,
+                onTap: onNotificationsTap,
               ),
-
-              // ── الاسم + الأفاتار ──────────────────────────────────
+              if (onSearchTap != null) ...[
+                const SizedBox(width: 8),
+                _HeaderCircleButton(
+                  icon: Icons.search_rounded,
+                  onTap: onSearchTap!,
+                ),
+              ],
+              const Spacer(),
               GestureDetector(
                 onTap: onAvatarTap,
+                behavior: HitTestBehavior.opaque,
                 child: Row(
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '👋 $name',
+                          '$name 👋',
                           style: const TextStyle(
                             fontFamily: 'NotoNaskhArabic',
                             fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          _formattedToday(),
+                          _hijriToday(),
                           style: TextStyle(
                             fontFamily: 'NotoNaskhArabic',
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.78),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(width: 10),
                     Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Center(
-                        child: Text(
-                          avatarEmoji,
-                          style: const TextStyle(fontSize: 22),
-                        ),
+                        child: Text(avatarEmoji, style: const TextStyle(fontSize: 24)),
                       ),
                     ),
                   ],
@@ -119,38 +119,35 @@ class StudentHeaderWidget extends StatelessWidget {
               ),
             ],
           ),
-
-          const SizedBox(height: 20),
-
-          // ── صف الإحصائيات (عملات / نجوم / سلسلة) ─────────────────
+          const SizedBox(height: 18),
           Row(
             children: [
               Expanded(
-                child: _StatCard(
-                  value: '$coins',
+                child: _StatPill(
+                  icon: Icons.monetization_on_rounded,
+                  iconColor: const Color(0xFFFFD54F),
+                  value: _eastern('$coins'),
                   label: 'عملة',
-                  icon: '🌙',
-                  backgroundColor: AppColors.dark,
                   onTap: onCoinsTap,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _StatCard(
-                  value: '$totalStars',
+                child: _StatPill(
+                  icon: Icons.star_rounded,
+                  iconColor: const Color(0xFFFFD54F),
+                  value: _eastern('$totalStars'),
                   label: 'نجمة',
-                  icon: '⭐',
-                  backgroundColor: Colors.white.withOpacity(0.16),
                   onTap: onStarsTap,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _StatCard(
-                  value: '$streakDays يوم',
-                  label: 'متواصل',
-                  icon: '🔥',
-                  backgroundColor: Colors.white.withOpacity(0.16),
+                child: _StatPill(
+                  icon: Icons.local_fire_department_rounded,
+                  iconColor: const Color(0xFFFF8A65),
+                  value: _eastern('$streakDays'),
+                  label: 'يوم متواصل',
                   onTap: onStreakTap,
                 ),
               ),
@@ -161,7 +158,9 @@ class StudentHeaderWidget extends StatelessWidget {
     );
   }
 
-  String _formattedToday() {
+  String _hijriToday() {
+    HijriCalendar.setLocal('ar');
+    final h = HijriCalendar.now();
     const weekdays = [
       'الإثنين',
       'الثلاثاء',
@@ -171,20 +170,29 @@ class StudentHeaderWidget extends StatelessWidget {
       'السبت',
       'الأحد',
     ];
-    final now = DateTime.now();
-    return weekdays[now.weekday - 1];
+    final weekday = weekdays[DateTime.now().weekday - 1];
+    return '$weekday ${_eastern(h.toFormat('dd MMMM'))}';
+  }
+
+  String _eastern(String input) {
+    const western = '0123456789';
+    const eastern = '٠١٢٣٤٥٦٧٨٩';
+    return input.split('').map((c) {
+      final i = western.indexOf(c);
+      return i >= 0 ? eastern[i] : c;
+    }).join();
   }
 }
 
-class _HeaderIconButton extends StatelessWidget {
+class _HeaderCircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  final int badgeCount;
+  final bool showDot;
 
-  const _HeaderIconButton({
+  const _HeaderCircleButton({
     required this.icon,
     required this.onTap,
-    this.badgeCount = 0,
+    this.showDot = false,
   });
 
   @override
@@ -195,25 +203,25 @@ class _HeaderIconButton extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(AppSizes.radiusM),
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
             ),
             child: Icon(icon, color: Colors.white, size: 20),
           ),
-          if (badgeCount > 0)
+          if (showDot)
             Positioned(
-              top: -2,
-              right: -2,
+              top: 2,
+              left: 2,
               child: Container(
-                width: 10,
-                height: 10,
+                width: 9,
+                height: 9,
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  border: Border.all(color: AppColors.primaryDark, width: 1.5),
                 ),
               ),
             ),
@@ -223,18 +231,18 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
   final String value;
   final String label;
-  final String icon;
-  final Color backgroundColor;
   final VoidCallback? onTap;
 
-  const _StatCard({
+  const _StatPill({
+    required this.icon,
+    required this.iconColor,
     required this.value,
     required this.label,
-    required this.icon,
-    required this.backgroundColor,
     this.onTap,
   });
 
@@ -242,32 +250,38 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(AppSizes.radiusM),
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 4),
+            Icon(icon, size: 22, color: iconColor),
+            const SizedBox(height: 6),
             Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
+                height: 1.1,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 10,
-                color: Colors.white.withOpacity(0.85),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.85),
               ),
             ),
           ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../../../../shared/theme/app_theme.dart';
 import '../../features/student/domain/entities/halaqa_entity.dart';
 
+/// كارت حصة اليوم — Figma dark navy card + full-width join CTA.
 class StudentSessionCardWidget extends StatelessWidget {
   final HalaqaEntity halaqa;
   final VoidCallback onJoinTap;
@@ -23,96 +25,113 @@ class StudentSessionCardWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onDetailsTap,
       child: Container(
+        width: double.infinity,
         decoration: BoxDecoration(
-          color: AppColors.dark,
-          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-        ),
-        padding: const EdgeInsets.all(AppSizes.paddingL),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: onJoinTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusL),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.videocam_rounded, color: Colors.white, size: 18),
-                    SizedBox(width: 6),
-                    Text(
-                      'انضم للجلسة',
-                      style: TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          color: const Color(0xFF2C3440),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+          ],
+        ),
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (nextSchedule != null)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (nextSchedule != null)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          'اليوم — ${nextSchedule.startTime}',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: Colors.white60,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.access_time_rounded,
-                          color: Colors.white60,
-                          size: 14,
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 4),
                   Text(
-                    halaqa.name,
+                    'اليوم — ${nextSchedule.startTime}',
                     style: const TextStyle(
                       fontFamily: 'NotoNaskhArabic',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      fontSize: 12,
+                      color: Colors.white60,
                     ),
-                    textAlign: TextAlign.right,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${halaqa.studentIds.length} طالباً',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: Colors.white60,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.people_outline_rounded,
-                        color: Colors.white60,
-                        size: 14,
-                      ),
-                    ],
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.access_time_rounded,
+                    color: Colors.white60,
+                    size: 15,
                   ),
                 ],
+              ),
+            const SizedBox(height: 8),
+            Text(
+              'حصة الحفظ اليومية',
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontFamily: 'NotoNaskhArabic',
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    halaqa.name,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontFamily: 'NotoNaskhArabic',
+                      fontSize: 13,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: onJoinTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'انضم للحصة',
+                      style: TextStyle(
+                        fontFamily: 'NotoNaskhArabic',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.arrow_back_rounded, size: 18),
+                  ],
+                ),
               ),
             ),
           ],

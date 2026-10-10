@@ -67,7 +67,7 @@ class StudentMushafDashboard extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'تقدم حفظك',
+                                  'تقدم حفظك ومراجعتك',
                                   style: TextStyle(
                                     fontFamily: 'NotoNaskhArabic',
                                     fontSize: 12,
@@ -99,14 +99,27 @@ class StudentMushafDashboard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 28),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             _ProgressCircle(
                               percent: overallProgress ?? 0,
                               label: 'الحفظ',
                               color: Colors.white,
+                              hasValue: overallProgress != null,
+                            ),
+                            const _ProgressCircle(
+                              percent: 0,
+                              label: 'المراجعة',
+                              color: Color(0xFFFFD54F),
+                              hasValue: false,
+                            ),
+                            const _ProgressCircle(
+                              percent: 0,
+                              label: 'الإتقان',
+                              color: Color(0xFFA5D6A7),
+                              hasValue: false,
                             ),
                           ],
                         ),
@@ -306,11 +319,13 @@ class _ProgressCircle extends StatelessWidget {
   final int percent;
   final String label;
   final Color color;
+  final bool hasValue;
 
   const _ProgressCircle({
     required this.percent,
     required this.label,
     required this.color,
+    this.hasValue = true,
   });
 
   @override
@@ -325,7 +340,7 @@ class _ProgressCircle extends StatelessWidget {
               width: 72,
               height: 72,
               child: CircularProgressIndicator(
-                value: percent / 100,
+                value: hasValue ? percent / 100 : 0,
                 strokeWidth: 6,
                 backgroundColor: isWhite
                     ? Colors.white.withOpacity(0.2)
@@ -334,7 +349,7 @@ class _ProgressCircle extends StatelessWidget {
               ),
             ),
             Text(
-              '$percent%',
+              hasValue ? '$percent%' : '—',
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
                 fontSize: 15,

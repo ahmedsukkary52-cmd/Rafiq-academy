@@ -180,47 +180,76 @@ class StudentHadithWidget extends StatelessWidget {
 
   // أحاديث تشجيعية ثابتة تتغيّر يومياً حسب تاريخ الجهاز (محتوى محلي وليس Firestore).
   static const _hadiths = [
-    ('خيركم من تعلم القرآن وعلّمه', 'رواه البخاري'),
-    ('من قرأ حرفاً من كتاب الله فله به حسنة', 'رواه الترمذي'),
-    ('اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه', 'رواه مسلم'),
-    ('الذي يقرأ القرآن وهو ماهر به مع السفرة الكرام البررة', 'رواه البخاري'),
+    ('«خيركم من تعلّم القرآن وعلّمه»', 'صحيح البخاري - رقم ٥٠٢٧'),
+    ('«من قرأ حرفاً من كتاب الله فله به حسنة»', 'رواه الترمذي'),
+    ('«اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه»', 'رواه مسلم'),
+    (
+      '«الذي يقرأ القرآن وهو ماهر به مع السفرة الكرام البررة»',
+      'رواه البخاري',
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    // نختار حديث بناءً على اليوم عشان يتغير يومياً بشكل ثابت
     final index = DateTime.now().day % _hadiths.length;
     final (text, source) = _hadiths[index];
 
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.secondary,
-        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-      ),
-      padding: const EdgeInsets.all(AppSizes.paddingL),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            'حديث اليوم',
-            style: AppTextStyles.labelSmall.copyWith(color: Colors.white70),
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFFFFD54F), Color(0xFFF5B800)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF5B800).withValues(alpha: 0.28),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-          const SizedBox(height: 8),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'حديث اليوم',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text('📢', style: TextStyle(fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             text,
             style: const TextStyle(
               fontFamily: 'NotoNaskhArabic',
               fontSize: 16,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               color: Colors.white,
-              height: 1.6,
+              height: 1.65,
             ),
             textAlign: TextAlign.right,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             source,
-            style: AppTextStyles.labelSmall.copyWith(color: Colors.white70),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontFamily: 'NotoNaskhArabic',
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ],
       ),

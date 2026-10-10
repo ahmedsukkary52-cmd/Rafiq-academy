@@ -314,15 +314,23 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const PopScope(
+      builder: (_) => PopScope(
         canPop: false,
         child: AlertDialog(
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: AppColors.primary),
-              SizedBox(height: 16),
-              Text(
+              SizedBox(
+                width: double.infinity,
+                height: 8,
+                child: LinearProgressIndicator(
+                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.primaryLight,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
                 'جاري رفع التسجيل للمعلم...',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontFamily: 'NotoNaskhArabic'),

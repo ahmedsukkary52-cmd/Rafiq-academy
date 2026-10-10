@@ -113,6 +113,57 @@ class StudentListPageSkeleton extends StatelessWidget {
   }
 }
 
+/// Skeleton for home «درس اليوم» card.
+class StudentDailyTaskSkeleton extends StatelessWidget {
+  const StudentDailyTaskSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StudentPulse(
+      builder: (context, bone) {
+        return Container(
+          height: 178,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              studentSkeletonBar(bone: bone, width: 90, height: 12),
+              const SizedBox(height: 14),
+              studentSkeletonBar(bone: bone, width: 160, height: 22, radius: 8),
+              const SizedBox(height: 10),
+              studentSkeletonBar(bone: bone, width: 120, height: 12),
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: studentSkeletonBar(
+                      bone: bone,
+                      height: 42,
+                      radius: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: studentSkeletonBar(
+                      bone: bone,
+                      height: 42,
+                      radius: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Home dashboard body skeleton (header cards + list blocks).
 class StudentHomeBodySkeleton extends StatelessWidget {
   const StudentHomeBodySkeleton({super.key});

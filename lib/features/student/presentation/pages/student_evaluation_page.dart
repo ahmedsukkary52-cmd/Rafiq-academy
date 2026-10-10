@@ -40,80 +40,81 @@ class _StudentEvaluationsPageState extends State<StudentEvaluationsPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: BlocBuilder<StudentBloc, StudentState>(
-            buildWhen: (previous, current) =>
-                previous.recitationRecords != current.recitationRecords ||
-                previous.recitationStatus != current.recitationStatus ||
-                previous.recitationError != current.recitationError,
-            builder: (context, state) {
-              if (state.recitationStatus == SectionStatus.loading &&
-                  state.recitationRecords.isEmpty) {
-                return const StudentListPageSkeleton();
-              }
+        body: BlocBuilder<StudentBloc, StudentState>(
+          buildWhen: (previous, current) =>
+              previous.recitationRecords != current.recitationRecords ||
+              previous.recitationStatus != current.recitationStatus ||
+              previous.recitationError != current.recitationError,
+          builder: (context, state) {
+            if ((state.recitationStatus == SectionStatus.loading ||
+                    state.recitationStatus == SectionStatus.initial) &&
+                state.recitationRecords.isEmpty) {
+              return const StudentListPageSkeleton();
+            }
 
-              if (state.recitationStatus == SectionStatus.error &&
-                  state.recitationRecords.isEmpty) {
-                return AppErrorWidget(
+            if (state.recitationStatus == SectionStatus.error &&
+                state.recitationRecords.isEmpty) {
+              return SafeArea(
+                child: AppErrorWidget(
                   message: state.recitationError ?? 'تعذر تحميل التقييمات',
                   onRetry: _reload,
-                );
-              }
+                ),
+              );
+            }
 
-              final records = _filteredRecords(state.recitationRecords);
+            final records = _filteredRecords(state.recitationRecords);
 
-              return Column(
-                children: [
-                  _EvaluationsHeader(onBack: () => Navigator.maybePop(context)),
-                  _PeriodTabs(
-                    filters: _filters,
-                    selectedIndex: _filterIndex,
-                    onChanged: (index) => setState(() => _filterIndex = index),
-                  ),
-                  _EvaluationMetrics(records: records),
-                  Expanded(
-                    child: RefreshIndicator(
-                      color: AppColors.primary,
-                      onRefresh: () async {
-                        _reload();
-                        await Future<void>.delayed(
-                          const Duration(milliseconds: 600),
-                        );
-                      },
-                      child: records.isEmpty
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: const [
-                                SizedBox(height: 48),
-                                _EmptyEvaluations(),
-                              ],
-                            )
-                          : ListView.separated(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.fromLTRB(
-                                24,
-                                28,
-                                24,
-                                28,
-                              ),
-                              itemCount: records.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 22),
-                              itemBuilder: (context, index) {
-                                return _EvaluationTimelineItem(
-                                  record: records[index],
-                                  color: index.isEven
-                                      ? AppColors.secondary
-                                      : const Color(0xFF28C5CF),
-                                );
-                              },
-                            ),
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                _reload();
+                await Future<void>.delayed(const Duration(milliseconds: 500));
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _EvaluationsHeader(
+                      onBack: () => Navigator.maybePop(context),
                     ),
                   ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _PeriodTabs(
+                        filters: _filters,
+                        selectedIndex: _filterIndex,
+                        onChanged: (index) =>
+                            setState(() => _filterIndex = index),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                      child: _EvaluationMetrics(records: records),
+                    ),
+                  ),
+                  if (records.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyEvaluations(),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                      sliver: SliverList.separated(
+                        itemCount: records.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return _EvaluationCard(record: records[index]);
+                        },
+                      ),
+                    ),
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -151,28 +152,38 @@ class _EvaluationsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 132,
-      color: AppColors.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Stack(
-        alignment: Alignment.center,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 16,
+        left: 16,
+        right: 16,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      child: Row(
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _SoftIconButton(
-              icon: Icons.chevron_left_rounded,
-              onTap: onBack,
+          _SoftIconButton(
+            icon: Icons.chevron_right_rounded,
+            onTap: onBack,
+          ),
+          const Expanded(
+            child: Text(
+              '📋 التقييمات',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'NotoNaskhArabic',
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
-          const Text(
-            '📋 التقييمات',
-            style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          const SizedBox(width: 44),
         ],
       ),
     );
@@ -192,42 +203,42 @@ class _PeriodTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.surface,
-      padding: const EdgeInsets.fromLTRB(24, 14, 24, 22),
-      child: Row(
-        children: List.generate(filters.length, (index) {
-          final selected = index == selectedIndex;
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 5),
-              child: GestureDetector(
-                onTap: () => onChanged(index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? const Color(0xFF24C6CF)
-                        : const Color(0xFFF3F5F8),
-                    borderRadius: BorderRadius.circular(26),
+    return Row(
+      children: List.generate(filters.length, (index) {
+        final selected = index == selectedIndex;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: index == 0 ? 0 : 4,
+              right: index == filters.length - 1 ? 0 : 4,
+            ),
+            child: GestureDetector(
+              onTap: () => onChanged(index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 44,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : AppColors.surface,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: selected ? AppColors.primary : AppColors.border,
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    filters[index],
-                    style: TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: selected ? Colors.white : AppColors.textSecondary,
-                    ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  filters[index],
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? Colors.white : AppColors.textSecondary,
                   ),
                 ),
               ),
             ),
-          );
-        }),
-      ),
+          ),
+        );
+      }),
     );
   }
 }
@@ -239,40 +250,36 @@ class _EvaluationMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.surface,
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: Row(
-        children: [
-          _MetricTile(
-            value: _averageLabelFor(RecitationType.memorization),
-            label: 'الحفظ',
-            color: const Color(0xFFCFF4DF),
-            textColor: const Color(0xFF20AF68),
-          ),
-          const SizedBox(width: 10),
-          _MetricTile(
-            value: _averageLabelFor(RecitationType.review),
-            label: 'المراجعة',
-            color: const Color(0xFFCFF4F6),
-            textColor: const Color(0xFF14AEB8),
-          ),
-          const SizedBox(width: 10),
-          _MetricTile(
-            value: _behaviorLabel(),
-            label: 'السلوك',
-            color: const Color(0xFFFFF2BF),
-            textColor: const Color(0xFFD9A409),
-          ),
-          const SizedBox(width: 10),
-          _MetricTile(
-            value: '${records.length}',
-            label: 'التقييمات',
-            color: const Color(0xFFE9E1FF),
-            textColor: const Color(0xFF8858FF),
-          ),
-        ],
-      ),
+    return Row(
+      children: [
+        _MetricTile(
+          value: _averageLabelFor(RecitationType.memorization),
+          label: 'الحفظ',
+          color: const Color(0xFFCFF4DF),
+          textColor: const Color(0xFF20AF68),
+        ),
+        const SizedBox(width: 8),
+        _MetricTile(
+          value: _averageLabelFor(RecitationType.review),
+          label: 'المراجعة',
+          color: const Color(0xFFCFF4F6),
+          textColor: const Color(0xFF14AEB8),
+        ),
+        const SizedBox(width: 8),
+        _MetricTile(
+          value: _behaviorLabel(),
+          label: 'السلوك',
+          color: const Color(0xFFFFF2BF),
+          textColor: const Color(0xFFD9A409),
+        ),
+        const SizedBox(width: 8),
+        _MetricTile(
+          value: '${records.length}',
+          label: 'التقييمات',
+          color: const Color(0xFFE9E1FF),
+          textColor: const Color(0xFF8858FF),
+        ),
+      ],
     );
   }
 
@@ -327,11 +334,12 @@ class _MetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        height: 92,
+        height: 78,
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(16),
         ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -339,7 +347,7 @@ class _MetricTile extends StatelessWidget {
               value,
               style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: value.length > 3 ? 14 : 24,
+                fontSize: value.length > 4 ? 12 : 18,
                 fontWeight: FontWeight.w900,
                 color: textColor,
               ),
@@ -347,47 +355,16 @@ class _MetricTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: AppTextStyles.labelMedium.copyWith(
+              style: AppTextStyles.labelSmall.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _EvaluationTimelineItem extends StatelessWidget {
-  final RecitationRecordEntity record;
-  final Color color;
-
-  const _EvaluationTimelineItem({required this.record, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: _EvaluationCard(record: record)),
-        const SizedBox(width: 16),
-        Column(
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-              ),
-            ),
-            Container(width: 4, height: 230, color: const Color(0xFFE4E8EE)),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -400,35 +377,56 @@ class _EvaluationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            '${_formatWeekday(record.date)} ${record.date.day}/${record.date.month}/${record.date.year}',
-            textAlign: TextAlign.right,
-            style: AppTextStyles.bodyMedium,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  record.type == RecitationType.memorization ? 'حفظ' : 'مراجعة',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${_formatWeekday(record.date)} ${record.date.day}/${record.date.month}',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             _titleFor(record),
             textAlign: TextAlign.right,
-            style: AppTextStyles.titleLarge.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -446,17 +444,18 @@ class _EvaluationCard extends StatelessWidget {
             ],
           ),
           if ((record.notes ?? '').isNotEmpty) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F7FA),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '💬 "${record.notes!}"',
+                '💬 ${record.notes!}',
                 textAlign: TextAlign.right,
-                style: AppTextStyles.bodyLarge.copyWith(
+                style: AppTextStyles.bodyMedium.copyWith(
                   color: const Color(0xFF526070),
                 ),
               ),
@@ -500,30 +499,28 @@ class _GradeBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _colorFor(grade);
     return Container(
-      height: 94,
+      height: 72,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(16),
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: AppTextStyles.labelMedium),
-          const SizedBox(height: 8),
+          Text(label, style: AppTextStyles.labelSmall),
+          const SizedBox(height: 6),
           Text(
-            _labelFor(grade),
-            style: AppTextStyles.titleLarge.copyWith(
+            grade.displayLabel,
+            style: AppTextStyles.titleMedium.copyWith(
               color: color,
               fontWeight: FontWeight.w900,
-              fontSize: grade == null ? 13 : null,
+              fontSize: grade == null ? 12 : null,
             ),
           ),
         ],
       ),
     );
   }
-
-  String _labelFor(RecitationGrade? grade) => grade.displayLabel;
 
   Color _colorFor(RecitationGrade? grade) => switch (grade) {
     RecitationGrade.excellent => const Color(0xFF21B773),
@@ -544,13 +541,13 @@ class _SoftIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 54,
-        height: 54,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: const Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFE2E6EC)),
         ),
         child: Icon(icon, color: AppColors.textPrimary),
@@ -565,11 +562,32 @@ class _EmptyEvaluations extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Text(
-        'لا توجد تقييمات معتمدة في هذه الفترة.\nالتسميعات بانتظار مراجعة المعلم لا تظهر هنا.',
-        textAlign: TextAlign.center,
-        style: AppTextStyles.bodyLarge,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.rate_review_outlined,
+            size: 56,
+            color: AppColors.textHint.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'لا توجد تقييمات في هذه الفترة',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'التسميعات بانتظار مراجعة المعلم لا تظهر هنا.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }

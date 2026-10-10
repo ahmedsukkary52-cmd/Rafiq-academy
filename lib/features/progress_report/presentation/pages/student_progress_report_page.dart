@@ -44,104 +44,108 @@ class _ProgressReportView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: BlocBuilder<ProgressReportBloc, ProgressReportState>(
-        buildWhen: (previous, current) =>
-            previous.status != current.status ||
-            previous.report != current.report ||
-            previous.errorMessage != current.errorMessage,
-        builder: (context, state) {
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Container(
-                  padding: EdgeInsets.only(
-                    top: MediaQuery.of(context).padding.top + 8,
-                    bottom: 20,
-                    left: 16,
-                    right: 16,
-                  ),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryDark],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: BlocBuilder<ProgressReportBloc, ProgressReportState>(
+          buildWhen: (previous, current) =>
+              previous.status != current.status ||
+              previous.report != current.report ||
+              previous.errorMessage != current.errorMessage,
+          builder: (context, state) {
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 8,
+                      bottom: 20,
+                      left: 16,
+                      right: 16,
                     ),
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(24),
-                      bottomRight: Radius.circular(24),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryDark],
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                      ),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(24),
+                        bottomRight: Radius.circular(24),
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Spacer(),
-                          const Icon(
-                            Icons.bar_chart_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'تقرير التقدم',
-                            style: TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => context.pop(),
+                              icon: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            const Icon(
+                              Icons.bar_chart_rounded,
                               color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
+                              size: 20,
                             ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            onPressed: () => context.pop(),
-                            icon: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.chevron_right,
+                            const SizedBox(width: 8),
+                            const Text(
+                              'تقرير التقدم',
+                              style: TextStyle(
+                                fontFamily: 'NotoNaskhArabic',
                                 color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'آخر ٣٠ يوماً',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: Colors.white70,
+                            const Spacer(),
+                            const SizedBox(width: 48),
+                          ],
                         ),
-                      ),
-                    ],
+                        Text(
+                          'آخر ٣٠ يوماً',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (state.status == SectionStatus.loading ||
-                  state.status == SectionStatus.initial)
-                const SliverFillRemaining(child: StudentHomeBodySkeleton())
-              else if (state.status == SectionStatus.error)
-                SliverFillRemaining(
-                  child: AppErrorWidget(
-                    message: state.errorMessage ?? 'تعذر تحميل تقرير التقدم',
-                    onRetry: () => _retry(context),
-                  ),
-                )
-              else if (state.report == null)
-                SliverFillRemaining(
-                  child: AppErrorWidget(
-                    message: 'لا توجد بيانات',
-                    onRetry: () => _retry(context),
-                  ),
-                )
-              else
-                _buildLoadedSliver(context, state.report!),
-            ],
-          );
-        },
+                if (state.status == SectionStatus.loading ||
+                    state.status == SectionStatus.initial)
+                  const SliverFillRemaining(child: StudentHomeBodySkeleton())
+                else if (state.status == SectionStatus.error)
+                  SliverFillRemaining(
+                    child: AppErrorWidget(
+                      message: state.errorMessage ?? 'تعذر تحميل تقرير التقدم',
+                      onRetry: () => _retry(context),
+                    ),
+                  )
+                else if (state.report == null)
+                  SliverFillRemaining(
+                    child: AppErrorWidget(
+                      message: 'لا توجد بيانات',
+                      onRetry: () => _retry(context),
+                    ),
+                  )
+                else
+                  _buildLoadedSliver(context, state.report!),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -175,7 +179,7 @@ class _ProgressReportView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Align(
-                    alignment: Alignment.centerRight,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(
                       'الحفظ الأسبوعي',
                       style: AppTextStyles.titleMedium,
@@ -216,7 +220,7 @@ class _SummaryRow extends StatelessWidget {
         Expanded(
           child: AppCard(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('⭐', style: TextStyle(fontSize: 18)),
                 const SizedBox(height: 8),
@@ -233,7 +237,7 @@ class _SummaryRow extends StatelessWidget {
         Expanded(
           child: AppCard(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('📖', style: TextStyle(fontSize: 18)),
                 const SizedBox(height: 8),
@@ -263,7 +267,7 @@ class _AttendanceCard extends StatelessWidget {
       child: Column(
         children: [
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerStart,
             child: Text('معدل الحضور الشهري', style: AppTextStyles.titleMedium),
           ),
           const SizedBox(height: 16),
@@ -391,14 +395,14 @@ class _WeeklyChartCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              Text('الحفظ الأسبوعي', style: AppTextStyles.titleMedium),
+              const Spacer(),
               Text(
                 'تسميعات/يوم',
                 style: AppTextStyles.labelSmall.copyWith(
                   color: AppColors.primary,
                 ),
               ),
-              const Spacer(),
-              Text('الحفظ الأسبوعي', style: AppTextStyles.titleMedium),
             ],
           ),
           const SizedBox(height: 16),
@@ -467,17 +471,16 @@ class _TeacherNotesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('ملاحظات المعلم', style: AppTextStyles.titleMedium),
-              const SizedBox(width: 8),
               const Icon(
                 Icons.chat_bubble_outline,
                 color: AppColors.textSecondary,
               ),
+              const SizedBox(width: 8),
+              Text('ملاحظات المعلم', style: AppTextStyles.titleMedium),
             ],
           ),
           const SizedBox(height: 10),

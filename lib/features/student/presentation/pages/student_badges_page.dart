@@ -43,12 +43,12 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: BlocBuilder<StudentBloc, StudentState>(
+        body: BlocBuilder<StudentBloc, StudentState>(
             buildWhen: (previous, current) =>
                 previous.achievements != current.achievements ||
                 previous.achievementsStatus != current.achievementsStatus ||
-                previous.achievementsError != current.achievementsError,
+                previous.achievementsError != current.achievementsError ||
+                previous.profile != current.profile,
             builder: (context, state) {
               if (state.achievementsStatus == SectionStatus.initial ||
                   (state.achievementsStatus == SectionStatus.loading &&
@@ -69,50 +69,47 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
               return CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Text(
-                        'الجوائز',
-                        style: AppTextStyles.headlineMedium.copyWith(
-                          fontWeight: FontWeight.w800,
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        MediaQuery.of(context).padding.top + 12,
+                        16,
+                        28,
+                      ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFFFFD54F), Color(0xFFF5B800)],
+                        ),
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(28),
+                          bottomRight: Radius.circular(28),
                         ),
                       ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: _StudentAwardsStatsRow(stats: stats),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          const Text('🏆', style: TextStyle(fontSize: 40)),
+                          const SizedBox(height: 8),
                           Text(
-                            'أنواع الجوائز',
-                            style: AppTextStyles.titleLarge.copyWith(
-                              fontWeight: FontWeight.w800,
+                            '${state.profile?.coins ?? 0}',
+                            style: const TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF3A2E00),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1.05,
-                            children: AwardTypeInfo.formTypes
-                                .map(
-                                  (type) => _StudentAwardTypeCard(
-                                    type: type,
-                                    earned: stats.earnedTypes.contains(type),
-                                  ),
-                                )
-                                .toList(),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'عملاتي المتاحة 🪙',
+                            style: TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF5C4A10),
+                            ),
                           ),
                         ],
                       ),
@@ -120,11 +117,56 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: Text(
-                        'جوائزي',
-                        style: AppTextStyles.titleLarge.copyWith(
-                          fontWeight: FontWeight.w800,
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                      child: _StudentAwardsStatsRow(stats: stats),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          'الشارات 🏅',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1.05,
+                          ),
+                      delegate: SliverChildListDelegate(
+                        AwardTypeInfo.formTypes
+                            .map(
+                              (type) => _StudentAwardTypeCard(
+                                type: type,
+                                earned: stats.earnedTypes.contains(type),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          'جوائزي',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ),
@@ -159,7 +201,6 @@ class _StudentBadgesPageState extends State<StudentBadgesPage> {
               );
             },
           ),
-        ),
       ),
     );
   }

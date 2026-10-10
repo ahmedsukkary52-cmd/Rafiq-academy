@@ -101,17 +101,18 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
     _halaqat = state.halaqat;
     if (state.halaqatStatus == SectionStatus.initial ||
         state.halaqatStatus == SectionStatus.loading) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
+      if (_rows.isEmpty) {
+        setState(() {
+          _loading = true;
+          _error = null;
+        });
+      }
       return;
     }
     if (state.halaqatStatus == SectionStatus.error) {
       setState(() {
         _loading = false;
         _error = state.halaqatError ?? 'تعذر تحميل الحلقات';
-        _rows = const [];
       });
       return;
     }
@@ -130,16 +131,16 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
       );
     }
 
-    final key = state.halaqat.map((h) => h.id).join('|');
-    if (key == _halaqaKey && _rows.isNotEmpty) return;
-    _halaqaKey = key;
+    final key = SupervisorRoster.membershipFingerprint(state.halaqat);
+    if (key == _halaqaKey) return;
     _loadSummaries(state);
   }
 
   Future<void> _loadSummaries(SupervisorState state) async {
     final gen = ++_loadGen;
+    _halaqaKey = SupervisorRoster.membershipFingerprint(state.halaqat);
     setState(() {
-      _loading = true;
+      if (_rows.isEmpty) _loading = true;
       _error = null;
       _halaqat = state.halaqat;
     });
@@ -421,7 +422,6 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
           if (state.halaqatStatus == SectionStatus.error) {
             _reloadHalaqat();
           } else {
-            _halaqaKey = '';
             _loadSummaries(state);
           }
         },
@@ -474,7 +474,6 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: () async {
-        _halaqaKey = '';
         await _loadSummaries(context.read<SupervisorBloc>().state);
       },
       child: ListView.separated(

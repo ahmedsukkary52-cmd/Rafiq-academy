@@ -203,6 +203,38 @@ class SupervisorRoster {
       ..sort((a, b) => a.displayName.compareTo(b.displayName));
     return rows;
   }
+
+  /// Changes when a student is added/removed, even if halaqa ids stay the same.
+  static String membershipFingerprint(Iterable<HalaqaEntity> halaqat) {
+    final parts = halaqat.map((h) {
+      final ids =
+          h.studentIds
+              .map((id) => id.trim())
+              .where((id) => id.isNotEmpty)
+              .toList()
+            ..sort();
+      return '${h.id}:${ids.join(',')}';
+    }).toList()..sort();
+    return parts.join('|');
+  }
+
+  /// Source halaqa for a move: keep [preferred] if it is a membership,
+  /// otherwise the only membership when there is exactly one.
+  static String? defaultSourceHalaqaId({
+    required Iterable<HalaqaEntity> halaqat,
+    required String? studentId,
+    String? preferred,
+  }) {
+    final ids = membershipHalaqaIds(
+      halaqat: halaqat,
+      studentId: studentId ?? '',
+    );
+    if (ids.isEmpty) return null;
+    final pref = preferred?.trim() ?? '';
+    if (pref.isNotEmpty && ids.contains(pref)) return pref;
+    if (ids.length == 1) return ids.first;
+    return null;
+  }
 }
 
 /// Client-side validation for Register / Transfer forms (no writes).
@@ -239,7 +271,7 @@ class SupervisorMembershipFormValidation {
     return null;
   }
 
-  /// Transfer form validation (client-side; writes via AcademyAdmissionFirestore).
+  /// Transfer / add-second-halaqa form validation (writes go through BLoC).
   static String? transferError({
     required String studentId,
     required String? sourceHalaqaId,

@@ -20,7 +20,8 @@ import '../widgets/supervisor_loading_skeletons.dart';
 
 /// Transfer / add-to-second-halaqa form.
 /// Writes go through [TransferStudentBetweenHalaqatEvent] /
-/// [AdmitStudentToHalaqaEvent] → AcademyAdmissionFirestore.
+/// [AdmitStudentToHalaqaEvent] → `adminTransferStudent` /
+/// `admitStudentToHalaqa` callables.
 class SupervisorTransferPage extends StatefulWidget {
   final String? preselectedStudentId;
   final String? preselectedSourceHalaqaId;
@@ -107,6 +108,11 @@ class _SupervisorTransferPageState extends State<SupervisorTransferPage> {
           !_roster.any((r) => r.studentId == _studentId)) {
         _studentId = null;
       }
+      _sourceHalaqaId = SupervisorRoster.defaultSourceHalaqaId(
+        halaqat: halaqat,
+        studentId: _studentId,
+        preferred: _sourceHalaqaId,
+      );
     });
   }
 
@@ -288,7 +294,11 @@ class _SupervisorTransferPageState extends State<SupervisorTransferPage> {
                         ? null
                         : (v) => setState(() {
                             _studentId = v;
-                            _sourceHalaqaId = null;
+                            _sourceHalaqaId =
+                                SupervisorRoster.defaultSourceHalaqaId(
+                                  halaqat: halaqat,
+                                  studentId: v,
+                                );
                             _fieldError = null;
                           }),
                   ),

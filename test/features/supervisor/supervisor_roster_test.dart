@@ -71,6 +71,74 @@ void main() {
       expect(rows.first.halaqaIds, ['h1', 'h2']);
       expect(rows.first.isDualMember, isTrue);
     });
+
+    test('membershipFingerprint changes when roster membership changes', () {
+      final before = [
+        _halaqa(id: 'h1', name: 'A', studentIds: const ['s1', 's2']),
+        _halaqa(id: 'h2', name: 'B', studentIds: const ['s3']),
+      ];
+      final afterMove = [
+        _halaqa(id: 'h1', name: 'A', studentIds: const ['s2']),
+        _halaqa(id: 'h2', name: 'B', studentIds: const ['s3', 's1']),
+      ];
+      expect(
+        SupervisorRoster.membershipFingerprint(before),
+        isNot(SupervisorRoster.membershipFingerprint(afterMove)),
+      );
+      expect(
+        SupervisorRoster.membershipFingerprint(before),
+        SupervisorRoster.membershipFingerprint([
+          _halaqa(id: 'h2', name: 'B', studentIds: const ['s3']),
+          _halaqa(id: 'h1', name: 'A', studentIds: const ['s2', 's1']),
+        ]),
+      );
+    });
+
+    test('defaultSourceHalaqaId keeps preferred membership', () {
+      final halaqat = [
+        _halaqa(id: 'h1', name: 'A', studentIds: const ['s1']),
+        _halaqa(id: 'h2', name: 'B', studentIds: const ['s1']),
+      ];
+      expect(
+        SupervisorRoster.defaultSourceHalaqaId(
+          halaqat: halaqat,
+          studentId: 's1',
+          preferred: 'h2',
+        ),
+        'h2',
+      );
+    });
+
+    test('defaultSourceHalaqaId auto-picks the only membership', () {
+      final halaqat = [
+        _halaqa(id: 'h1', name: 'A', studentIds: const ['s1']),
+        _halaqa(id: 'h2', name: 'B', studentIds: const []),
+      ];
+      expect(
+        SupervisorRoster.defaultSourceHalaqaId(
+          halaqat: halaqat,
+          studentId: 's1',
+        ),
+        'h1',
+      );
+    });
+
+    test(
+      'defaultSourceHalaqaId requires a pick for dual without preferred',
+      () {
+        final halaqat = [
+          _halaqa(id: 'h1', name: 'A', studentIds: const ['s1']),
+          _halaqa(id: 'h2', name: 'B', studentIds: const ['s1']),
+        ];
+        expect(
+          SupervisorRoster.defaultSourceHalaqaId(
+            halaqat: halaqat,
+            studentId: 's1',
+          ),
+          isNull,
+        );
+      },
+    );
   });
 
   group('SupervisorMembershipFormValidation', () {
@@ -112,6 +180,19 @@ void main() {
           isMove: true,
         ),
         isNotNull,
+      );
+    });
+
+    test('transfer move allows source membership to empty target', () {
+      expect(
+        SupervisorMembershipFormValidation.transferError(
+          studentId: 's1',
+          sourceHalaqaId: 'h1',
+          targetHalaqaId: 'h3',
+          assignedHalaqat: halaqat,
+          isMove: true,
+        ),
+        isNull,
       );
     });
 

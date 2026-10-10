@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/constants/academy_branding.dart';
 import 'core/di/injection_container.dart';
+import 'core/firebase/app_firebase.dart';
 import 'core/router/router_app.dart';
 import 'core/session/clear_session_projections.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -28,7 +28,6 @@ import 'features/calendar/presentation/bloc/calendar_bloc.dart';
 import 'features/content/presentation/bloc/content_bloc.dart';
 import 'features/chat/presentation/bloc/chat_conversations_bloc.dart';
 import 'features/post/presentation/bloc/posts_bloc.dart';
-import 'firebase_options.dart';
 import 'features/onboarding/presentation/pages/onboarding_page.dart';
 import 'shared/theme/app_locale_config.dart';
 import 'shared/theme/app_preferences_controller.dart';
@@ -36,7 +35,7 @@ import 'shared/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await initializeAppFirebase();
   await initDependencies();
 
   final prefs = await SharedPreferences.getInstance();
@@ -152,7 +151,10 @@ class _MyAppState extends State<MyApp> {
           }
           if (state is AuthAuthenticated) {
             // WA-13 / C11: the app's single FCM registration point.
-            unawaited(sl<FcmTokenRegistrar>().onSignedIn(state.user.uid));
+            // FCM has no emulator; its tokens belong to the production project.
+            if (!useFirebaseEmulator) {
+              unawaited(sl<FcmTokenRegistrar>().onSignedIn(state.user.uid));
+            }
             WidgetsBinding.instance.addPostFrameCallback(
               (_) => _consumePendingPush(),
             );
@@ -162,7 +164,9 @@ class _MyAppState extends State<MyApp> {
           // survive logout on shared devices.
           _pendingPushType = null;
           clearSessionProjections(context);
-          unawaited(sl<FcmTokenRegistrar>().onSignedOut());
+          if (!useFirebaseEmulator) {
+            unawaited(sl<FcmTokenRegistrar>().onSignedOut());
+          }
         },
         child: AppPreferencesScope(
           controller: appPreferences,

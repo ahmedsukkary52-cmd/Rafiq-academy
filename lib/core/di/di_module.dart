@@ -9,6 +9,7 @@ import 'package:internet_connection_checker_plus/internet_connection_checker_plu
 import '../../features/notifications/data/sinks/in_app_academy_event_handler.dart';
 import '../../shared/domain/academy_event_sink.dart';
 import '../../shared/domain/fan_out_academy_event_sink.dart';
+import '../firebase/app_firebase.dart';
 import '../network/network_info.dart';
 
 /// DiModule مسؤول عن تسجيل:
@@ -20,10 +21,14 @@ import '../network/network_info.dart';
 @module
 abstract class DiModule {
   @lazySingleton
-  FirebaseAuth get firebaseAuth => FirebaseAuth.instance;
+  FirebaseAuth get firebaseAuth => useFirebaseEmulator
+      ? FirebaseAuth.instanceFor(app: firebaseEmulatorApp)
+      : FirebaseAuth.instance;
 
   @lazySingleton
-  FirebaseFirestore get firebaseFirestore => FirebaseFirestore.instance;
+  FirebaseFirestore get firebaseFirestore => useFirebaseEmulator
+      ? FirebaseFirestore.instanceFor(app: firebaseEmulatorApp)
+      : FirebaseFirestore.instance;
 
   /// WA-13 / C11 — token lifecycle only. Sending is Cloud Functions + Admin
   /// SDK; the client never holds server credentials.
@@ -31,14 +36,20 @@ abstract class DiModule {
   FirebaseMessaging get firebaseMessaging => FirebaseMessaging.instance;
 
   @lazySingleton
-  FirebaseStorage get firebaseStorage => FirebaseStorage.instance;
+  FirebaseStorage get firebaseStorage => useFirebaseEmulator
+      ? FirebaseStorage.instanceFor(app: firebaseEmulatorApp)
+      : FirebaseStorage.instance;
 
   /// region لازم يطابق الـ region اللي اتنشرت بيه الـ Cloud Functions
   /// (حطيناها europe-west1 في functions/src/paymob/*.ts) - لو
   /// مش متطابقين هياخد رد "not-found" مع إن الـ function منشورة فعلاً.
   @lazySingleton
-  FirebaseFunctions get firebaseFunctions =>
-      FirebaseFunctions.instanceFor(region: 'europe-west1');
+  FirebaseFunctions get firebaseFunctions => useFirebaseEmulator
+      ? FirebaseFunctions.instanceFor(
+          app: firebaseEmulatorApp,
+          region: functionsRegion,
+        )
+      : FirebaseFunctions.instanceFor(region: 'europe-west1');
 
   @lazySingleton
   InternetConnection get internetConnection => InternetConnection();

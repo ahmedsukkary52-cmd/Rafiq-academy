@@ -4,4 +4,12 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:networkSecurityConfig="@xml/debug_network_security_config">
+        <!-- false only for USE_FIREBASE_EMULATOR=true builds
+             (android/app/build.gradle.kts). -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="${firebaseMessagingAutoInitEnabled}" />
+    </application>
 </manifest>

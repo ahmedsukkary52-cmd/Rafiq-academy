@@ -379,7 +379,8 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String vodafoneCashDestination,
   }) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid =
+          FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       await firestore
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.paymentPublicDocId)
@@ -436,7 +437,8 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
       if (gracePeriodDays < 0) {
         throw const ServerException('gracePeriodDays يجب أن يكون ≥ 0');
       }
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid =
+          FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       await firestore
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.pricingDefaultsDocId)
@@ -502,7 +504,8 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           'مبلغ قاعدة التسعير يجب أن يكون أكبر من صفر',
         );
       }
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid =
+          FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       final id = rule.id.trim().isEmpty
           ? firestore.collection(FirestoreCollections.pricingRules).doc().id
           : rule.id.trim();

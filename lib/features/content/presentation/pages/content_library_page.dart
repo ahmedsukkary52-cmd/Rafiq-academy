@@ -22,8 +22,13 @@ import '../bloc/content_state.dart';
 
 class ContentLibraryPage extends StatefulWidget {
   final String? halaqaId;
+  final bool embeddedInAdmin;
 
-  const ContentLibraryPage({super.key, this.halaqaId});
+  const ContentLibraryPage({
+    super.key,
+    this.halaqaId,
+    this.embeddedInAdmin = false,
+  });
 
   @override
   State<ContentLibraryPage> createState() => _ContentLibraryPageState();
@@ -177,28 +182,37 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
   Widget _buildScaffold() {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('المحتوى المشترك'),
-        actions: [
-          if (_canUpload)
-            TextButton.icon(
-              onPressed: _pickAndUploadFile,
-              icon: const Icon(
-                Icons.upload_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: const Text(
-                '+ رفع',
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  color: Colors.white,
-                  fontSize: 13,
-                ),
-              ),
+      appBar: widget.embeddedInAdmin
+          ? null
+          : AppBar(
+              title: const Text('المحتوى المشترك'),
+              actions: [
+                if (_canUpload)
+                  TextButton.icon(
+                    onPressed: _pickAndUploadFile,
+                    icon: const Icon(
+                      Icons.upload_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    label: const Text(
+                      '+ رفع',
+                      style: TextStyle(
+                        fontFamily: 'NotoNaskhArabic',
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
+      floatingActionButton: widget.embeddedInAdmin && _canUpload
+          ? FloatingActionButton.extended(
+              onPressed: _pickAndUploadFile,
+              icon: const Icon(Icons.upload_rounded),
+              label: const Text('رفع ملف'),
+            )
+          : null,
       body: BlocBuilder<ContentLibraryBloc, ContentLibraryState>(
         buildWhen: (previous, current) =>
             previous.filesStatus != current.filesStatus ||

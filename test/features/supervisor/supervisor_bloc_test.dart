@@ -8,12 +8,15 @@ import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dar
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/read_models/supervisor_day_board.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';
+import 'package:rafiq_academy/features/supervisor/domain/usecases/admit_student_to_halaqa_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_halaqat_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor_day_board_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/issue_achievement_usecase.dart';
+import 'package:rafiq_academy/features/supervisor/domain/usecases/payment_review_usecases.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_student_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/submit_supervisor_report_usecase.dart';
+import 'package:rafiq_academy/features/supervisor/domain/usecases/transfer_student_between_halaqat_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_event.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_state.dart';
@@ -93,6 +96,15 @@ class _Register extends Fake implements RegisterNewStudentUseCase {
 
 class _UnusedReport extends Fake implements SubmitSupervisorReportUseCase {}
 
+class _UnusedAdmit extends Fake implements AdmitStudentToHalaqaUseCase {}
+
+class _UnusedTransfer extends Fake
+    implements TransferStudentBetweenHalaqatUseCase {}
+
+class _UnusedPayments extends Fake implements GetSupervisedPaymentsUseCase {}
+
+class _UnusedReview extends Fake implements ReviewPaymentProofUseCase {}
+
 class _Harness {
   final halaqat = _Halaqat();
   final board = _Board();
@@ -106,6 +118,10 @@ class _Harness {
     getSupervisedAbsenceRequests: absence,
     issueAchievement: issue,
     submitSupervisorReport: _UnusedReport(),
+    admitStudentToHalaqa: _UnusedAdmit(),
+    transferStudentBetweenHalaqat: _UnusedTransfer(),
+    getSupervisedPayments: _UnusedPayments(),
+    reviewPaymentProof: _UnusedReview(),
     registerNewStudent: register,
   );
 }

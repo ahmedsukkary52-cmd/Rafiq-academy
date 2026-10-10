@@ -18,6 +18,7 @@ import '../../domain/entities/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../utils/teacher_workflow_ownership.dart';
 import '../widgets/excuses/teacher_excuses_history_skeleton.dart';
 
 /// Resolves a display name for an استئذان row (presentation only).
@@ -128,6 +129,7 @@ class _TeacherExcusesPageState extends State<TeacherExcusesPage> {
   }
 
   void _review(AbsenceRequestEntity request, AbsenceRequestStatus decision) {
+    if (!TeacherWorkflowOwnership.canExecute(context)) return;
     final teacherId = _teacherId;
     final halaqaId = _halaqaId?.trim();
     if (teacherId == null || halaqaId == null || halaqaId.isEmpty) return;

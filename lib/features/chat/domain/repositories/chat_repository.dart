@@ -21,7 +21,14 @@ abstract class ChatUploadTask {
 
 abstract class ChatRepository {
   /// Stream لقائمة كل محادثات المستخدم الحالي، مرتبة بآخر رسالة (الأحدث أولاً)
-  Stream<Either<Failure, List<ConversationEntity>>> watchConversations(String uid);
+  Stream<Either<Failure, List<ConversationEntity>>> watchConversations(
+    String uid,
+  );
+
+  /// Admin oversight: all academy conversations without joining as participant.
+  Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
+    required String observerUid,
+  });
 
   /// Newest [limit] messages, in ascending time order.
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(

@@ -398,7 +398,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         ParentPaymentProofContract.amountPaidConfirmedField:
             FieldValue.delete(),
         ParentPaymentProofContract.remainingAmountField: FieldValue.delete(),
-        // Intentionally omit status / paidAt — Supervisor/Admin confirms.
+        // Parent never sets status/paidAt or supervisor review outcome fields.
       });
     } on ServerException {
       rethrow;

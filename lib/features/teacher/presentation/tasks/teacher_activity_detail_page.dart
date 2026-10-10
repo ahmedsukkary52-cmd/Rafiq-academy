@@ -66,18 +66,16 @@ class _TeacherActivityDetailPageState extends State<TeacherActivityDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('تفاصيل المهمة'),
-      ),
+      appBar: AppBar(title: const Text('تفاصيل المهمة')),
       body: switch (_status) {
         ActivityListLoadState.loading => const Padding(
-            padding: EdgeInsets.all(AppSizes.paddingM),
-            child: TeacherTasksListSkeleton(itemCount: 4),
-          ),
+          padding: EdgeInsets.all(AppSizes.paddingM),
+          child: TeacherTasksListSkeleton(itemCount: 4),
+        ),
         ActivityListLoadState.error => AppErrorWidget(
-            message: _error ?? 'حدث خطأ',
-            onRetry: _load,
-          ),
+          message: _error ?? 'حدث خطأ',
+          onRetry: _load,
+        ),
         ActivityListLoadState.loaded => _DetailBody(activity: _activity!),
       },
     );
@@ -123,7 +121,10 @@ class _DetailBody extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  UserAvatar(name: activity.teacherName, size: AppSizes.avatarM),
+                  UserAvatar(
+                    name: activity.teacherName,
+                    size: AppSizes.avatarM,
+                  ),
                 ],
               ),
               const SizedBox(height: 14),

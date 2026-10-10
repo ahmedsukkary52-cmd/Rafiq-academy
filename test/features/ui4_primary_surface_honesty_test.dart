@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/presentation/bloc_status.dart';
 import 'package:rafiq_academy/features/admin/presentation/pages/admin_home_page.dart';
+import 'package:rafiq_academy/features/admin/presentation/pages/admin_management_tab.dart';
+import 'package:rafiq_academy/features/admin/presentation/pages/admin_settings_tab.dart';
 import 'package:rafiq_academy/features/auth/domain/entities/user_entity.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_event.dart';
@@ -367,13 +369,25 @@ void main() {
 
   group('UI-4 AdminHomePage honesty', () {
     testWidgets('P0-02 operational hub without Coming Soon', (tester) async {
-      await tester.pumpWidget(_wrap(const AdminHomePage()));
+      await tester.pumpWidget(_wrap(const AdminManagementTab()));
       expect(find.text('Coming Soon'), findsNothing);
       expect(find.text('واجهة الإدارة غير مفعّلة بعد'), findsNothing);
       for (final label in AdminHomePage.actionLabels) {
         expect(find.text(label), findsOneWidget);
       }
-      expect(find.byTooltip('تسجيل الخروج'), findsOneWidget);
+    });
+
+    testWidgets('settings tab exposes a real logout action', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          BlocProvider<AuthBloc>.value(
+            value: _FakeAuthBloc(const AuthUnauthenticated()),
+            child: const AdminSettingsTab(),
+          ),
+        ),
+      );
+      expect(find.text('Coming Soon'), findsNothing);
+      expect(find.text('تسجيل الخروج'), findsOneWidget);
     });
   });
 

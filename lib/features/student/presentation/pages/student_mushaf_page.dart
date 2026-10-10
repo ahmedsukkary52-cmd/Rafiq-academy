@@ -5,12 +5,15 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -645,23 +648,33 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   void _submitRecitation() {
     if (_recordedFilePath == null) return;
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('رفع التسجيل', textAlign: TextAlign.right),
-        content: const Text(
-          'رفع التسجيل غير متاح حالياً حتى يتم تفعيل خدمة رفع الملفات.',
-          textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('حسناً'),
+    if (!AppCapabilities.audioUploadsEnabled) {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('إرسال التسميع', textAlign: TextAlign.right),
+          content: const Text(
+            'إرسال التسجيل من المصحف غير مفعّل حالياً. استخدم واجب التسميع من صفحة واجباتي عندما يكون متاحاً.',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                context.push(AppRoutes.studentHomework);
+              },
+              child: const Text('فتح واجباتي'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إغلاق'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
   }
 
   String _toArabicDigits(int n) {
@@ -1206,7 +1219,9 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 children: [
                   Expanded(
                     child: AppButton(
-                      label: 'رفع التسجيل',
+                      label: AppCapabilities.audioUploadsEnabled
+                          ? 'رفع التسجيل'
+                          : 'إرسال عبر الواجبات',
                       onPressed: _submitRecitation,
                     ),
                   ),

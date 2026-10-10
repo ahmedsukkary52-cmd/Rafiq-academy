@@ -37,6 +37,9 @@ class ChatRoomPage extends StatefulWidget {
   final ChatVoiceRecorder Function()? recorderFactory;
   final ChatAttachmentPicker? pickAttachment;
 
+  /// Silent oversight: hide composer; do not join as participant.
+  final bool readOnly;
+
   const ChatRoomPage({
     super.key,
     required this.conversationId,
@@ -46,6 +49,7 @@ class ChatRoomPage extends StatefulWidget {
     this.mediaLoader,
     this.recorderFactory,
     this.pickAttachment,
+    this.readOnly = false,
   });
 
   @override
@@ -189,7 +193,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         await Clipboard.setData(ClipboardData(text: msg.text));
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم نسخ النص', textAlign: TextAlign.right)),
+          const SnackBar(
+            content: Text('تم نسخ النص', textAlign: TextAlign.right),
+          ),
         );
       case 'edit':
         await _editMessage(msg);
@@ -290,14 +296,29 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
               children: [
                 _header(),
                 Expanded(child: _buildMessages()),
-                ChatComposer(
-                  controller: _messageCtrl,
-                  onSendText: _sendText,
-                  onAttachment: _sendAttachment,
-                  recorderFactory:
-                      widget.recorderFactory ?? RecordChatVoiceRecorder.new,
-                  pickAttachment: widget.pickAttachment ?? pickChatAttachment,
-                ),
+                if (widget.readOnly)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                    color: AppColors.surface,
+                    child: Text(
+                      'وضع مراقبة — قراءة فقط',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                else
+                  ChatComposer(
+                    controller: _messageCtrl,
+                    onSendText: _sendText,
+                    onAttachment: _sendAttachment,
+                    recorderFactory:
+                        widget.recorderFactory ?? RecordChatVoiceRecorder.new,
+                    pickAttachment: widget.pickAttachment ?? pickChatAttachment,
+                  ),
               ],
             ),
           ),

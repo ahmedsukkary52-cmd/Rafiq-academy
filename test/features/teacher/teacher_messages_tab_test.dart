@@ -69,6 +69,8 @@ class _Watch extends Fake implements WatchConversationsUseCase {
 
 class _UnusedStart extends Fake implements GetOrCreateConversationUseCase {}
 
+class _UnusedWatchAll extends Fake implements WatchAllConversationsUseCase {}
+
 void main() {
   tearDown(() async {
     await sl.reset();
@@ -80,6 +82,7 @@ void main() {
     sl.registerSingleton<ChatConversationsBloc>(
       ChatConversationsBloc(
         watchConversations: _Watch(),
+        watchAllConversations: _UnusedWatchAll(),
         getOrCreateConversation: _UnusedStart(),
       ),
     );

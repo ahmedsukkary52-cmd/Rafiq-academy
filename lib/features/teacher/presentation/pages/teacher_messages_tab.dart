@@ -21,10 +21,11 @@ import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../bloc/teacher_bloc.dart';
 
-/// Teacher Messages inbox — Figma 09 (`1:1314`) Phase 1 UI.
+/// Teacher Messages inbox — Figma 09 (`1:1314`).
 ///
-/// Filters are presentation-only over existing conversations. Teacher→parent
-/// chats start from the student card / profile (`teacher_contact_parent.dart`).
+/// Filters are presentation-only over existing conversations. Parent chats are
+/// allowed by [ChatPermissionPolicy] and usually started from roster/profile
+/// via [contactStudentParent]; the inbox filter surfaces those threads.
 class TeacherMessagesTab extends StatefulWidget {
   const TeacherMessagesTab({super.key});
 
@@ -665,7 +666,8 @@ class _MessagesListSkeletonState extends State<_MessagesListSkeleton>
 }
 
 /// Policy-filtered contacts for teacher `+` (students + supervisors of halaqat).
-/// Parents are not listed here; they are reached via the student card / profile.
+/// Parents are opened from roster/profile ([contactStudentParent]), not listed
+/// here as a free-form directory (ownership / known student link only).
 class _NewChatPickerSheet extends StatefulWidget {
   final String teacherUid;
   final String teacherRole;

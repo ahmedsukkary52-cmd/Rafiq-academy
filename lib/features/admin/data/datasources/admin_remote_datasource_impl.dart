@@ -5,13 +5,21 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/admin_communication_settings_contract.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/academy_payment_settings_contract.dart';
 import '../../../../shared/domain/pricing_rules_contract.dart';
+import '../../../../shared/utils/firestore_in_query.dart';
+import '../../domain/admin_grant_reward_params.dart';
 import '../../domain/admin_ops_broadcast.dart';
 import '../../domain/entities/academy_stats_entity.dart';
+import '../../domain/entities/admin_directory_entity.dart';
+import '../../domain/entities/admin_halaqa_roster_entity.dart';
+import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
+import '../../domain/entities/admin_payment_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
+import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
 import '../../domain/entities/teacher_management_entity.dart';
 import 'admin_remote_datasource.dart';
@@ -53,9 +61,9 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         totalStudents: results[0].count ?? 0,
         totalTeachers: results[1].count ?? 0,
         totalHalaqat: results[2].count ?? 0,
+        // Academy-wide attendance % requires server aggregation (not in functions/).
         overallAttendancePercent: 0,
-        // يتحسب بـ Cloud Function
-        totalVersesMemorizedThisMonth: 0, // يتحسب بـ Cloud Function
+        totalVersesMemorizedThisMonth: 0,
       );
     } catch (e) {
       throw ServerException(e.toString());
@@ -104,6 +112,40 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   }
 
   @override
+  Future<List<AdminPaymentEntity>> getPayments() async {
+    try {
+      final snap = await firestore
+          .collection(FirestoreCollections.payments)
+          .get();
+
+      final payments = snap.docs.map((doc) {
+        final data = doc.data();
+        final dueRaw = data['dueDate'];
+        final paidRaw = data['paidAt'];
+        return AdminPaymentEntity(
+          id: doc.id,
+          studentId: data['studentId'] as String? ?? '',
+          parentId: data['parentId'] as String? ?? '',
+          amount: (data['amount'] ?? 0).toDouble(),
+          status: data['status'] as String? ?? 'due',
+          dueDate: dueRaw is Timestamp ? dueRaw.toDate() : null,
+          paidAt: paidRaw is Timestamp ? paidRaw.toDate() : null,
+          method: data['method'] as String?,
+        );
+      }).toList();
+
+      payments.sort((a, b) {
+        final aDate = a.dueDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = b.dueDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+      return payments;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
   Future<void> approveNewStudent({
     required String studentId,
     required String halaqaId,
@@ -123,6 +165,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     } on ServerException {
       rethrow;
     } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
   }
@@ -141,6 +184,28 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     }
   }
 
+  ComplaintEntity _complaintFromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? const {};
+    final createdRaw = data['createdAt'];
+    final updatedRaw = data['updatedAt'];
+    return ComplaintEntity(
+      id: doc.id,
+      senderId: data['senderId'] ?? '',
+      senderRole: data['senderRole'] ?? '',
+      subject: data['subject'] ?? '',
+      message: data['message'] ?? '',
+      status: data['status'] ?? ComplaintStatuses.open,
+      response: data['response'] as String?,
+      createdAt: createdRaw is Timestamp
+          ? createdRaw.toDate()
+          : DateTime.fromMillisecondsSinceEpoch(0),
+      priority: data['priority'] as String? ?? ComplaintPriorities.normal,
+      assigneeId: data['assigneeId'] as String?,
+      assigneeRole: data['assigneeRole'] as String?,
+      updatedAt: updatedRaw is Timestamp ? updatedRaw.toDate() : null,
+    );
+  }
+
   @override
   Future<List<ComplaintEntity>> getComplaints() async {
     try {
@@ -149,19 +214,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           .orderBy('createdAt', descending: true)
           .get();
 
-      return snap.docs.map((doc) {
-        final data = doc.data();
-        return ComplaintEntity(
-          id: doc.id,
-          senderId: data['senderId'] ?? '',
-          senderRole: data['senderRole'] ?? '',
-          subject: data['subject'] ?? '',
-          message: data['message'] ?? '',
-          status: data['status'] ?? 'open',
-          response: data['response'] as String?,
-          createdAt: (data['createdAt'] as Timestamp).toDate(),
-        );
-      }).toList();
+      return snap.docs.map(_complaintFromDoc).toList();
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -173,19 +226,44 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String response,
   }) async {
     try {
-      await firestore
-          .collection(FirestoreCollections.complaints)
-          .doc(complaintId)
-          .update({'response': response, 'status': 'resolved'});
+      await updateComplaint(
+        complaintId: complaintId,
+        response: response,
+        status: ComplaintStatuses.resolved,
+      );
     } catch (e) {
       throw ServerException(e.toString());
     }
   }
 
-  /// Admin ops broadcast — **not** [AcademyEventSink] (H3 / A-H15 quarantine).
-  ///
-  /// Role/`all` audience fan-out via `notifications.add`. Schema owned by
-  /// [AdminOpsBroadcast]; do not route through W4/W5 academy facts.
+  @override
+  Future<void> updateComplaint({
+    required String complaintId,
+    String? status,
+    String? priority,
+    String? assigneeId,
+    String? assigneeRole,
+    String? response,
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (status != null) updates['status'] = status;
+      if (priority != null) updates['priority'] = priority;
+      if (assigneeId != null) updates['assigneeId'] = assigneeId;
+      if (assigneeRole != null) updates['assigneeRole'] = assigneeRole;
+      if (response != null) updates['response'] = response;
+
+      await firestore
+          .collection(FirestoreCollections.complaints)
+          .doc(complaintId)
+          .update(updates);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
   @override
   Future<void> sendBroadcastNotification({
     required String title,
@@ -209,7 +287,6 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   @override
   Future<List<TeacherManagementEntity>> getAllTeachers() async {
     try {
-      // الخطوة 1: نجيب كل المستخدمين اللي دورهم "معلم" (للاسم والصورة)
       final usersSnap = await firestore
           .collection(FirestoreCollections.users)
           .where('role', isEqualTo: AppRoles.teacher)
@@ -217,11 +294,6 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
 
       if (usersSnap.docs.isEmpty) return [];
 
-      // الخطوة 2: نجيب بروفايل كل معلم (النصاب والتقييم) بالتوازي.
-      // ملاحظة: ده N قراءة منفصلة بعدد المعلمين (مش query واحد)، لأن
-      // Firestore مفيهوش joins. مقبول طالما عدد المعلمين بالعشرات،
-      // لو الأكاديمية كبرت جداً (مئات المعلمين) هنحتاج نفكر في تجميع
-      // البيانات دي مسبقاً (denormalization) بدل القراءة المباشرة.
       final profileFutures = usersSnap.docs.map((userDoc) {
         return firestore
             .collection(FirestoreCollections.teacherProfiles)
@@ -243,6 +315,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           performanceRating: (profileData?['performanceRating'] as num?)
               ?.toDouble(),
           weeklyQuota: (profileData?['weeklyQuota'] ?? 0) as int,
+          isActive: userData['isActive'] as bool? ?? true,
         );
       });
     } catch (e) {
@@ -294,9 +367,6 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           .where('date', isLessThanOrEqualTo: Timestamp.fromDate(to))
           .get();
 
-      // بنحوّل كل تاريخ لـ "يوم بس" (من غير وقت) ونشيل التكرار، عشان
-      // لو المعلم سجّل حضور لأكتر من طالب في نفس اليوم، يحسب يوم واحد
-      // بس في سجل النشاط مش يتكرر بعدد الطلاب.
       final uniqueDates = <DateTime>{};
       for (final doc in snapshot.docs) {
         final timestamp = (doc.data())['date'] as Timestamp;
@@ -379,8 +449,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String vodafoneCashDestination,
   }) async {
     try {
-      final uid =
-          FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
+      final uid = FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       await firestore
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.paymentPublicDocId)
@@ -437,8 +506,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
       if (gracePeriodDays < 0) {
         throw const ServerException('gracePeriodDays يجب أن يكون ≥ 0');
       }
-      final uid =
-          FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
+      final uid = FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       await firestore
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.pricingDefaultsDocId)
@@ -504,8 +572,7 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           'مبلغ قاعدة التسعير يجب أن يكون أكبر من صفر',
         );
       }
-      final uid =
-          FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
+      final uid = FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       final id = rule.id.trim().isEmpty
           ? firestore.collection(FirestoreCollections.pricingRules).doc().id
           : rule.id.trim();
@@ -572,6 +639,163 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     }
   }
 
+  Future<Map<String, Map<String, dynamic>>> _loadUsersByIds(
+    Iterable<String> ids,
+  ) async {
+    final unique = ids
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (unique.isEmpty) return const {};
+
+    final out = <String, Map<String, dynamic>>{};
+    for (final chunk in FirestoreInQuery.chunkIds(unique)) {
+      final snap = await firestore
+          .collection(FirestoreCollections.users)
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        out[doc.id] = doc.data();
+      }
+    }
+    return out;
+  }
+
+  @override
+  Future<List<AdminHalaqaRosterEntity>> getAcademyStudentRoster() async {
+    try {
+      final halaqaSnap = await firestore
+          .collection(FirestoreCollections.halaqat)
+          .get();
+
+      final roster = <AdminHalaqaRosterEntity>[];
+      for (final hDoc in halaqaSnap.docs) {
+        final hData = hDoc.data();
+        final studentIds = List<String>.from(hData['studentIds'] ?? const []);
+        final users = await _loadUsersByIds(studentIds);
+
+        final students = studentIds.map((sid) {
+          final u = users[sid] ?? const <String, dynamic>{};
+          return AdminRosterStudentEntity(
+            uid: sid,
+            name: u['name'] as String? ?? sid,
+            phone: u['phone'] as String?,
+            profileImageUrl: u['profileImageUrl'] as String?,
+            isActive: u['isActive'] as bool? ?? true,
+          );
+        }).toList()..sort((a, b) => a.name.compareTo(b.name));
+
+        roster.add(
+          AdminHalaqaRosterEntity(
+            id: hDoc.id,
+            name: hData['name'] as String? ?? hDoc.id,
+            teacherId: hData['teacherId'] as String? ?? '',
+            supervisorId: hData['supervisorId'] as String? ?? '',
+            status: hData['status'] as String? ?? 'active',
+            students: students,
+          ),
+        );
+      }
+
+      roster.sort((a, b) => a.name.compareTo(b.name));
+      return roster;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<RegistrationRequestEntity>> getRegistrationRequests() async {
+    try {
+      final usersSnap = await firestore
+          .collection(FirestoreCollections.users)
+          .where('role', isEqualTo: AppRoles.student)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      if (usersSnap.docs.isEmpty) return const [];
+
+      final pending = <RegistrationRequestEntity>[];
+      for (final userDoc in usersSnap.docs) {
+        final profileSnap = await firestore
+            .collection(FirestoreCollections.studentProfiles)
+            .doc(userDoc.id)
+            .get();
+        final profileData = profileSnap.data() ?? const <String, dynamic>{};
+        final halaqaId = profileData['halaqaId'] as String?;
+        if (halaqaId != null && halaqaId.trim().isNotEmpty) continue;
+
+        final userData = userDoc.data();
+        final createdRaw = userData['createdAt'] ?? profileData['createdAt'];
+        pending.add(
+          RegistrationRequestEntity(
+            studentId: userDoc.id,
+            name: userData['name'] as String? ?? userDoc.id,
+            phone: userData['phone'] as String?,
+            email: userData['email'] as String?,
+            profileImageUrl: userData['profileImageUrl'] as String?,
+            registeredAt: createdRaw is Timestamp ? createdRaw.toDate() : null,
+          ),
+        );
+      }
+
+      pending.sort((a, b) => a.name.compareTo(b.name));
+      return pending;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> rejectRegistrationRequest({required String studentId}) async {
+    try {
+      await firestore
+          .collection(FirestoreCollections.users)
+          .doc(studentId.trim())
+          .update({'isActive': false});
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> approveRegistrationRequest({
+    required String studentId,
+    required String halaqaId,
+    String? teacherId,
+    String? supervisorId,
+  }) async {
+    try {
+      // Halaqa staff is server-owned (no staff-assignment callable exists),
+      // so admission only accepts the halaqa's current teacher/supervisor.
+      final halaqaDoc = await firestore
+          .collection(FirestoreCollections.halaqat)
+          .doc(halaqaId.trim())
+          .get();
+      if (!halaqaDoc.exists) {
+        throw const ServerException('الحلقة غير موجودة');
+      }
+      final hData = halaqaDoc.data() ?? const <String, dynamic>{};
+      bool differs(String? requested, String field) {
+        final wanted = requested?.trim() ?? '';
+        return wanted.isNotEmpty &&
+            wanted != ((hData[field] as String?)?.trim() ?? '');
+      }
+
+      if (differs(teacherId, 'teacherId') ||
+          differs(supervisorId, 'supervisorId')) {
+        throw const ServerException(
+          'تغيير معلم أو مشرف الحلقة غير متاح من هنا. اختر الحلقة المناسبة.',
+        );
+      }
+      await approveNewStudent(studentId: studentId, halaqaId: halaqaId);
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
   @override
   Future<void> reinstatePaymentAccess({
     required String parentId,
@@ -589,5 +813,185 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
       if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
+  }
+
+  @override
+  Future<List<AdminHalaqaSummaryEntity>> getAllHalaqat() async {
+    try {
+      final snap = await firestore
+          .collection(FirestoreCollections.halaqat)
+          .get();
+      return snap.docs.map((doc) {
+        final data = doc.data();
+        final studentIds = List<String>.from(data['studentIds'] ?? const []);
+        return AdminHalaqaSummaryEntity(
+          id: doc.id,
+          name: data['name'] as String? ?? doc.id,
+          teacherId: data['teacherId'] as String? ?? '',
+          supervisorId: data['supervisorId'] as String? ?? '',
+          studentCount: studentIds.length,
+        );
+      }).toList()..sort((a, b) => a.name.compareTo(b.name));
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<AdminStaffSummaryEntity>> getAllSupervisors() async {
+    try {
+      final snap = await firestore
+          .collection(FirestoreCollections.users)
+          .where('role', isEqualTo: AppRoles.supervisor)
+          .where('isActive', isEqualTo: true)
+          .get();
+      return snap.docs
+          .map(
+            (doc) => AdminStaffSummaryEntity(
+              uid: doc.id,
+              name: doc.data()['name'] as String? ?? doc.id,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<CommunicationSettingsEntity> getCommunicationSettings() async {
+    try {
+      final doc = await firestore
+          .doc(AdminCommunicationSettingsContract.docPath)
+          .get();
+      if (!doc.exists) return CommunicationSettingsEntity.defaults();
+
+      final data = doc.data() ?? AdminCommunicationSettingsContract.defaults();
+      return CommunicationSettingsEntity(
+        autoReplyOutsideHours:
+            data[AdminCommunicationSettingsContract.autoReplyOutsideHoursField]
+                as bool? ??
+            true,
+        broadcastsNeedApproval:
+            data[AdminCommunicationSettingsContract.broadcastsNeedApprovalField]
+                as bool? ??
+            true,
+        maxFileSizeMb:
+            (data[AdminCommunicationSettingsContract.maxFileSizeMbField]
+                    as num?)
+                ?.toInt() ??
+            25,
+        allowedFileTypes:
+            data[AdminCommunicationSettingsContract.allowedFileTypesField]
+                as String? ??
+            'PDF, JPG, MP3, MP4',
+        conversationRetentionDays:
+            (data[AdminCommunicationSettingsContract
+                        .conversationRetentionDaysField]
+                    as num?)
+                ?.toInt() ??
+            365,
+      );
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> saveCommunicationSettings(
+    CommunicationSettingsEntity settings,
+  ) async {
+    try {
+      await firestore.doc(AdminCommunicationSettingsContract.docPath).set({
+        AdminCommunicationSettingsContract.autoReplyOutsideHoursField:
+            settings.autoReplyOutsideHours,
+        AdminCommunicationSettingsContract.broadcastsNeedApprovalField:
+            settings.broadcastsNeedApproval,
+        AdminCommunicationSettingsContract.maxFileSizeMbField:
+            settings.maxFileSizeMb,
+        AdminCommunicationSettingsContract.allowedFileTypesField:
+            settings.allowedFileTypes,
+        AdminCommunicationSettingsContract.conversationRetentionDaysField:
+            settings.conversationRetentionDays,
+        AdminCommunicationSettingsContract.updatedAtField:
+            FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// Admin reward chips → `grantAward` AWARD_TYPE_KEYS.
+  static const Map<String, String> _rewardTypeKeys = {
+    'star': 'performance_stars',
+    'badge': 'completion_badge',
+    'certificate': 'achievement',
+  };
+
+  @override
+  Future<void> grantReward(AdminGrantRewardParams params) async {
+    try {
+      final targetId = params.targetId.trim();
+      String halaqaId;
+      List<String> recipients;
+      if (params.targetKind == AdminRewardTargetKind.student) {
+        halaqaId = params.halaqaId?.trim() ?? '';
+        if (halaqaId.isEmpty) {
+          final rosters = await firestore
+              .collection(FirestoreCollections.halaqat)
+              .where('studentIds', arrayContains: targetId)
+              .limit(1)
+              .get();
+          if (rosters.docs.isEmpty) {
+            throw const ServerException('الطالب غير مسجل في أي حلقة');
+          }
+          halaqaId = rosters.docs.first.id;
+        }
+        recipients = [targetId];
+      } else {
+        final halaqaDoc = await firestore
+            .collection(FirestoreCollections.halaqat)
+            .doc(targetId)
+            .get();
+        if (!halaqaDoc.exists) {
+          throw const ServerException('الحلقة غير موجودة');
+        }
+        recipients = List<String>.from(
+          halaqaDoc.data()?['studentIds'] ?? const <String>[],
+        );
+        if (recipients.isEmpty) {
+          throw const ServerException('لا يوجد طلاب في هذه الحلقة');
+        }
+        halaqaId = targetId;
+      }
+
+      final type = params.type.trim();
+      await functions.httpsCallable('grantAward').call(<String, dynamic>{
+        'awardId': firestore
+            .collection(FirestoreCollections.achievements)
+            .doc()
+            .id,
+        'type': _rewardTypeKeys[type] ?? type,
+        'title': params.title.trim(),
+        'description': params.description?.trim() ?? '',
+        'studentName': params.studentName ?? '',
+        'halaqaId': halaqaId,
+        'halaqaIds': [halaqaId],
+        'recipientStudentIds': recipients,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<String> ensureAdminInternalChat({required String adminUid}) async {
+    // Conversations are callable-created only, and no callable creates the
+    // multi-admin group yet.
+    throw const ServerException('مجموعة الإدارة الداخلية غير متاحة حاليًا');
   }
 }

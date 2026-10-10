@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
+import 'package:rafiq_academy/features/supervisor/domain/usecases/admit_student_to_halaqa_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_halaqat_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor_day_board_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/issue_achievement_usecase.dart';
+import 'package:rafiq_academy/features/supervisor/domain/usecases/payment_review_usecases.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/register_new_student_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/submit_supervisor_report_usecase.dart';
+import 'package:rafiq_academy/features/supervisor/domain/usecases/transfer_student_between_halaqat_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_bloc.dart';
-import 'package:rafiq_academy/features/supervisor/presentation/pages/supervisor_home_page.dart';
+import 'package:rafiq_academy/features/supervisor/presentation/widgets/issue_achievement_dialog.dart';
 
 class _Unused1 extends Fake implements GetSupervisedHalaqatUseCase {}
 
@@ -23,12 +26,24 @@ class _Unused5 extends Fake implements SubmitSupervisorReportUseCase {}
 
 class _Unused6 extends Fake implements RegisterNewStudentUseCase {}
 
+class _Unused7 extends Fake implements AdmitStudentToHalaqaUseCase {}
+
+class _Unused8 extends Fake implements TransferStudentBetweenHalaqatUseCase {}
+
+class _Unused9 extends Fake implements GetSupervisedPaymentsUseCase {}
+
+class _Unused10 extends Fake implements ReviewPaymentProofUseCase {}
+
 SupervisorBloc _bloc() => SupervisorBloc(
   getSupervisedHalaqat: _Unused1(),
   getSupervisorDayBoard: _Unused2(),
   getSupervisedAbsenceRequests: _Unused3(),
   issueAchievement: _Unused4(),
   submitSupervisorReport: _Unused5(),
+  admitStudentToHalaqa: _Unused7(),
+  transferStudentBetweenHalaqat: _Unused8(),
+  getSupervisedPayments: _Unused9(),
+  reviewPaymentProof: _Unused10(),
   registerNewStudent: _Unused6(),
 );
 

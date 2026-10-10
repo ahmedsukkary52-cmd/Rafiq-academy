@@ -26,26 +26,21 @@ Future<void> contactStudentParent({
       return;
     }
 
-    final parentsEither =
-        await sl<ParentRepository>().getParentIdsByStudentIds([studentId]);
+    final parentsEither = await sl<ParentRepository>().getParentIdsByStudentIds(
+      [studentId],
+    );
     if (!context.mounted) return;
 
-    final parentIds = parentsEither.fold<List<String>?>(
-      (_) {
-        AppSnackBar.showInfo(
-          context,
-          'تعذر التحقق من ولي الأمر حالياً. حاول مرة أخرى.',
-        );
-        return null;
-      },
-      (map) => map[studentId] ?? const <String>[],
-    );
-    if (parentIds == null) return;
-    if (parentIds.isEmpty) {
+    final parentIds = parentsEither.fold<List<String>?>((_) {
       AppSnackBar.showInfo(
         context,
-        'لا يوجد ولي أمر مرتبط بهذا الطالب',
+        'تعذر التحقق من ولي الأمر حالياً. حاول مرة أخرى.',
       );
+      return null;
+    }, (map) => map[studentId] ?? const <String>[]);
+    if (parentIds == null) return;
+    if (parentIds.isEmpty) {
+      AppSnackBar.showInfo(context, 'لا يوجد ولي أمر مرتبط بهذا الطالب');
       return;
     }
 
@@ -94,10 +89,7 @@ Future<void> contactStudentParent({
     final conversation = state.startedConversation!;
     context.push(
       '/teacher/chat/${conversation.id}',
-      extra: {
-        'name': parent.name,
-        'imageUrl': parent.profileImageUrl,
-      },
+      extra: {'name': parent.name, 'imageUrl': parent.profileImageUrl},
     );
   } catch (_) {
     if (!context.mounted) return;

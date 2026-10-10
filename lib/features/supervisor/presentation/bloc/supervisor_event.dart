@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 abstract class SupervisorEvent extends Equatable {
@@ -10,7 +11,6 @@ abstract class SupervisorEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// تحميل الحلقات اللي تحت إشراف المشرف
 class LoadSupervisedHalaqatEvent extends SupervisorEvent {
   final String supervisorId;
 
@@ -20,12 +20,10 @@ class LoadSupervisedHalaqatEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId];
 }
 
-/// Derive today's oversight board from already-loaded supervised halaqat (W6).
 class LoadSupervisorDayBoardEvent extends SupervisorEvent {
   const LoadSupervisorDayBoardEvent();
 }
 
-/// Read-only استئذان projection for today (W7 Slice 3).
 class LoadSupervisedAbsenceRequestsEvent extends SupervisorEvent {
   final String supervisorId;
   final DateTime date;
@@ -39,7 +37,6 @@ class LoadSupervisedAbsenceRequestsEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId, date];
 }
 
-/// إرسال تشجيع/وسام لطالب متميز
 class IssueAchievementEvent extends SupervisorEvent {
   final AchievementIssueEntity data;
 
@@ -53,7 +50,6 @@ class ResetIssueAchievementEvent extends SupervisorEvent {
   const ResetIssueAchievementEvent();
 }
 
-/// رفع تقرير دوري أو بلاغ للإدارة
 class SubmitSupervisorReportEvent extends SupervisorEvent {
   final SupervisorReportEntity report;
 
@@ -65,6 +61,52 @@ class SubmitSupervisorReportEvent extends SupervisorEvent {
 
 class ResetSubmitReportEvent extends SupervisorEvent {
   const ResetSubmitReportEvent();
+}
+
+/// Admit existing student into an assigned halaqa (Academy Admission).
+class AdmitStudentToHalaqaEvent extends SupervisorEvent {
+  final String supervisorId;
+  final String halaqaId;
+  final String studentId;
+
+  const AdmitStudentToHalaqaEvent({
+    required this.supervisorId,
+    required this.halaqaId,
+    required this.studentId,
+  });
+
+  @override
+  List<Object?> get props => [supervisorId, halaqaId, studentId];
+}
+
+class ResetAdmitStudentEvent extends SupervisorEvent {
+  const ResetAdmitStudentEvent();
+}
+
+class TransferStudentBetweenHalaqatEvent extends SupervisorEvent {
+  final String supervisorId;
+  final String studentId;
+  final String sourceHalaqaId;
+  final String targetHalaqaId;
+
+  const TransferStudentBetweenHalaqatEvent({
+    required this.supervisorId,
+    required this.studentId,
+    required this.sourceHalaqaId,
+    required this.targetHalaqaId,
+  });
+
+  @override
+  List<Object?> get props => [
+    supervisorId,
+    studentId,
+    sourceHalaqaId,
+    targetHalaqaId,
+  ];
+}
+
+class ResetTransferStudentEvent extends SupervisorEvent {
+  const ResetTransferStudentEvent();
 }
 
 /// تسجيل ملتحق جديد في حلقة
@@ -85,7 +127,32 @@ class ResetRegisterStudentEvent extends SupervisorEvent {
   const ResetRegisterStudentEvent();
 }
 
-/// Clear projection on logout so the next identity cannot inherit state (H1).
 class ClearSupervisorSessionEvent extends SupervisorEvent {
   const ClearSupervisorSessionEvent();
+}
+
+class LoadSupervisedPaymentsEvent extends SupervisorEvent {
+  final String supervisorId;
+  final List<String> studentIds;
+
+  const LoadSupervisedPaymentsEvent({
+    required this.supervisorId,
+    required this.studentIds,
+  });
+
+  @override
+  List<Object?> get props => [supervisorId, studentIds];
+}
+
+class ReviewPaymentProofEvent extends SupervisorEvent {
+  final PaymentReviewParams params;
+
+  const ReviewPaymentProofEvent(this.params);
+
+  @override
+  List<Object?> get props => [params];
+}
+
+class ResetReviewPaymentEvent extends SupervisorEvent {
+  const ResetReviewPaymentEvent();
 }

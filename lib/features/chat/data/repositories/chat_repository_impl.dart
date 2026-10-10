@@ -33,7 +33,9 @@ class ChatRepositoryImpl implements ChatRepository {
         handleError: (error, stackTrace, sink) {
           final denied =
               error is FirebaseException && error.code == 'permission-denied';
-          sink.add(Left(ServerFailure(denied ? _accessLost : error.toString())));
+          sink.add(
+            Left(ServerFailure(denied ? _accessLost : error.toString())),
+          );
         },
       );
 
@@ -50,6 +52,13 @@ class ChatRepositoryImpl implements ChatRepository {
   Stream<Either<Failure, List<ConversationEntity>>> watchConversations(
     String uid,
   ) => remoteDatasource.watchConversations(uid).transform(_toEither());
+
+  @override
+  Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
+    required String observerUid,
+  }) => remoteDatasource
+      .watchAllConversations(observerUid: observerUid)
+      .transform(_toEither());
 
   @override
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(

@@ -12,32 +12,39 @@ class _Unset {
 const _unset = _Unset();
 
 class SupervisorState extends Equatable {
-  // ── الحلقات تحت الإشراف ───────────────────────────────────────────────
   final SectionStatus halaqatStatus;
   final List<HalaqaEntity> halaqat;
   final String? halaqatError;
 
-  // ── نظرة يوم الإشراف (W6) ─────────────────────────────────────────────
   final SectionStatus dayBoardStatus;
   final SupervisorDayBoard dayBoard;
   final String? dayBoardError;
 
-  // ── استئذان اليوم (W7 Slice 3 — read-only projection) ─────────────────
   final SectionStatus absenceRequestsStatus;
   final List<AbsenceRequestEntity> absenceRequests;
   final String? absenceRequestsError;
 
-  // ── إرسال تشجيع/وسام ──────────────────────────────────────────────────
   final SubmissionStatus issueAchievementStatus;
   final String? issueAchievementError;
 
-  // ── رفع تقرير ─────────────────────────────────────────────────────────
   final SubmissionStatus submitReportStatus;
   final String? submitReportError;
 
-  // ── تسجيل ملتحق جديد ──────────────────────────────────────────────────
+  final SubmissionStatus admitStudentStatus;
+  final String? admitStudentError;
+
+  final SubmissionStatus transferStudentStatus;
+  final String? transferStudentError;
+
   final SubmissionStatus registerStudentStatus;
   final String? registerStudentError;
+
+  final SectionStatus paymentsStatus;
+  final List<PaymentEntity> payments;
+  final String? paymentsError;
+
+  final SubmissionStatus reviewPaymentStatus;
+  final String? reviewPaymentError;
 
   const SupervisorState({
     this.halaqatStatus = SectionStatus.initial,
@@ -53,8 +60,17 @@ class SupervisorState extends Equatable {
     this.issueAchievementError,
     this.submitReportStatus = SubmissionStatus.idle,
     this.submitReportError,
+    this.admitStudentStatus = SubmissionStatus.idle,
+    this.admitStudentError,
+    this.transferStudentStatus = SubmissionStatus.idle,
+    this.transferStudentError,
     this.registerStudentStatus = SubmissionStatus.idle,
     this.registerStudentError,
+    this.paymentsStatus = SectionStatus.initial,
+    this.payments = const [],
+    this.paymentsError,
+    this.reviewPaymentStatus = SubmissionStatus.idle,
+    this.reviewPaymentError,
   });
 
   factory SupervisorState.initial() => const SupervisorState();
@@ -73,8 +89,17 @@ class SupervisorState extends Equatable {
     Object? issueAchievementError = _unset,
     SubmissionStatus? submitReportStatus,
     Object? submitReportError = _unset,
+    SubmissionStatus? admitStudentStatus,
+    Object? admitStudentError = _unset,
+    SubmissionStatus? transferStudentStatus,
+    Object? transferStudentError = _unset,
     SubmissionStatus? registerStudentStatus,
     Object? registerStudentError = _unset,
+    SectionStatus? paymentsStatus,
+    List<PaymentEntity>? payments,
+    Object? paymentsError = _unset,
+    SubmissionStatus? reviewPaymentStatus,
+    Object? reviewPaymentError = _unset,
   }) {
     return SupervisorState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -102,11 +127,29 @@ class SupervisorState extends Equatable {
       submitReportError: identical(submitReportError, _unset)
           ? this.submitReportError
           : submitReportError as String?,
+      admitStudentStatus: admitStudentStatus ?? this.admitStudentStatus,
+      admitStudentError: identical(admitStudentError, _unset)
+          ? this.admitStudentError
+          : admitStudentError as String?,
+      transferStudentStatus:
+          transferStudentStatus ?? this.transferStudentStatus,
+      transferStudentError: identical(transferStudentError, _unset)
+          ? this.transferStudentError
+          : transferStudentError as String?,
       registerStudentStatus:
           registerStudentStatus ?? this.registerStudentStatus,
       registerStudentError: identical(registerStudentError, _unset)
           ? this.registerStudentError
           : registerStudentError as String?,
+      paymentsStatus: paymentsStatus ?? this.paymentsStatus,
+      payments: payments ?? this.payments,
+      paymentsError: identical(paymentsError, _unset)
+          ? this.paymentsError
+          : paymentsError as String?,
+      reviewPaymentStatus: reviewPaymentStatus ?? this.reviewPaymentStatus,
+      reviewPaymentError: identical(reviewPaymentError, _unset)
+          ? this.reviewPaymentError
+          : reviewPaymentError as String?,
     );
   }
 
@@ -125,7 +168,16 @@ class SupervisorState extends Equatable {
     issueAchievementError,
     submitReportStatus,
     submitReportError,
+    admitStudentStatus,
+    admitStudentError,
+    transferStudentStatus,
+    transferStudentError,
     registerStudentStatus,
     registerStudentError,
+    paymentsStatus,
+    payments,
+    paymentsError,
+    reviewPaymentStatus,
+    reviewPaymentError,
   ];
 }

@@ -3,10 +3,23 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/admin/presentation/pages/admin_access_page.dart';
 import '../../features/admin/presentation/pages/admin_accounts_page.dart';
+import '../../features/admin/presentation/pages/admin_admit_page.dart';
+import '../../features/admin/presentation/pages/admin_announcements_page.dart';
+import '../../features/admin/presentation/pages/admin_broadcast_page.dart';
+import '../../features/admin/presentation/pages/admin_chat_inbox_page.dart';
+import '../../features/admin/presentation/pages/admin_communication_hub_page.dart';
+import '../../features/admin/presentation/pages/admin_complaints_page.dart';
+import '../../features/admin/presentation/pages/admin_complaints_review_page.dart';
+import '../../features/admin/presentation/pages/admin_embedded_pages.dart';
 import '../../features/admin/presentation/pages/admin_halaqat_page.dart';
 import '../../features/admin/presentation/pages/admin_home_page.dart';
+import '../../features/admin/presentation/pages/admin_internal_chat_page.dart';
 import '../../features/admin/presentation/pages/admin_membership_page.dart';
+import '../../features/admin/presentation/pages/admin_misc_pages.dart';
+import '../../features/admin/presentation/pages/admin_oversight_pages.dart';
 import '../../features/admin/presentation/pages/admin_parent_links_page.dart';
+import '../../features/admin/presentation/pages/admin_registration_requests_page.dart';
+import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/admin/presentation/pages/payment_review_page.dart';
 import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
@@ -129,13 +142,57 @@ class AppRoutes {
   static const String supervisorPayments = '/supervisor/payments';
   static const String admin = '/admin';
 
-  // Admin operational subpages (P0-02 / P0-03)
+  // Admin operational subpages (P0-02 / P0-03), callable-backed.
   static const String adminAccounts = '/admin/accounts';
   static const String adminParentLinks = '/admin/parent-links';
+
+  /// Halaqa + weekly schedule creation (`adminCreateHalaqa`).
   static const String adminHalaqat = '/admin/halaqat';
   static const String adminMembership = '/admin/membership';
+
+  /// Payment proof review (`reviewPaymentProof`).
   static const String adminPayments = '/admin/payments';
   static const String adminAccess = '/admin/access';
+
+  static const String adminAdmit = '/admin/admit';
+  static const String adminComplaints = '/admin/complaints';
+  static const String adminBroadcast = '/admin/broadcast';
+  static const String adminTeachers = '/admin/teachers';
+  static const String adminContent = '/admin/content';
+  static const String adminNotifications = '/admin/notifications';
+  static const String adminCommunication = '/admin/communication';
+  static const String adminCommunicationAnalytics =
+      '/admin/communication-analytics';
+  static const String adminChat = '/admin/chat';
+  static const String adminChatRoom = '/admin/chat/:conversationId';
+  static const String adminComplaintsReview = '/admin/complaints-review';
+  static const String adminRegistration = '/admin/registration-requests';
+  static const String adminAnnouncements = '/admin/announcements';
+  static const String adminReports = '/admin/reports';
+  static const String adminRewards = '/admin/rewards';
+  static const String adminInternalNotes = '/admin/internal-notes';
+  static const String adminCommunicationSettings =
+      '/admin/communication-settings';
+
+  /// Legacy entry point; redirects to [adminHalaqat] (schedule required, D8).
+  static const String adminCreateHalaqa = '/admin/create-halaqa';
+  static const String adminFinanceDetail = '/admin/finance-detail';
+
+  /// Read-only list of `payments` documents.
+  static const String adminPaymentsOverview = '/admin/payments-overview';
+  static const String adminSupervisors = '/admin/supervisors';
+
+  /// Read-only academy-wide halaqat directory.
+  static const String adminHalaqatDirectory = '/admin/halaqat-directory';
+  static const String adminStudent = '/admin/student/:studentId';
+
+  /// Admin view of [StudentProfilePage]. Pass [halaqaId] when opening from roster.
+  static String adminStudentProfile(String studentId, {String? halaqaId}) {
+    final id = studentId.trim();
+    final scoped = halaqaId?.trim() ?? '';
+    if (scoped.isEmpty) return '/admin/student/$id';
+    return '/admin/student/$id?halaqaId=${Uri.encodeQueryComponent(scoped)}';
+  }
 }
 
 /// Pure role → home route and path allowlist used by [AppRouter] (H8 / A-H11).
@@ -482,10 +539,6 @@ class AppRouter {
             builder: (_, __) => const AdminParentLinksPage(),
           ),
           GoRoute(
-            path: 'halaqat',
-            builder: (_, __) => const AdminHalaqatPage(),
-          ),
-          GoRoute(
             path: 'membership',
             builder: (_, __) => const AdminMembershipPage(),
           ),
@@ -494,6 +547,112 @@ class AppRouter {
             builder: (_, __) => const PaymentReviewPage(isAdmin: true),
           ),
           GoRoute(path: 'access', builder: (_, __) => const AdminAccessPage()),
+          GoRoute(path: 'admit', builder: (_, __) => const AdminAdmitPage()),
+          GoRoute(
+            path: 'complaints',
+            builder: (_, __) => const AdminComplaintsPage(),
+          ),
+          GoRoute(
+            path: 'broadcast',
+            builder: (_, __) => const AdminBroadcastPage(),
+          ),
+          GoRoute(
+            path: 'teachers',
+            builder: (_, __) => const AdminTeachersPage(),
+          ),
+          GoRoute(
+            path: 'content',
+            builder: (_, __) => const AdminContentPage(),
+          ),
+          GoRoute(
+            path: 'notifications',
+            builder: (_, __) => const AdminNotificationsPage(),
+          ),
+          GoRoute(
+            path: 'communication',
+            builder: (_, __) => const AdminCommunicationHubPage(),
+          ),
+          GoRoute(
+            path: 'communication-analytics',
+            builder: (_, __) => const AdminCommunicationAnalyticsPage(),
+          ),
+          GoRoute(
+            path: 'chat',
+            builder: (_, __) => const AdminChatInboxPage(),
+            routes: [
+              GoRoute(
+                path: ':conversationId',
+                builder: (_, state) {
+                  final extra = ChatRouteExtra.parse(state.extra);
+                  return ChatRoomPage(
+                    conversationId: state.pathParameters['conversationId']!,
+                    otherUserName: extra[ChatRouteExtra.nameKey] ?? 'محادثة',
+                    otherUserImage: extra[ChatRouteExtra.imageKey],
+                    readOnly: ChatRouteExtra.isReadOnly(state.extra),
+                  );
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: 'complaints-review',
+            builder: (_, __) => const AdminComplaintsReviewPage(),
+          ),
+          GoRoute(
+            path: 'registration-requests',
+            builder: (_, __) => const AdminRegistrationRequestsPage(),
+          ),
+          GoRoute(
+            path: 'student/:studentId',
+            builder: (_, state) => StudentProfilePage(
+              studentId: state.pathParameters['studentId']!,
+              halaqaId: state.uri.queryParameters['halaqaId'],
+            ),
+          ),
+          GoRoute(
+            path: 'announcements',
+            builder: (_, __) => const AdminAnnouncementsPage(),
+          ),
+          GoRoute(
+            path: 'reports',
+            builder: (_, __) => const AdminReportsPage(),
+          ),
+          GoRoute(
+            path: 'rewards',
+            builder: (_, __) => const AdminRewardsPage(),
+          ),
+          GoRoute(
+            path: 'internal-notes',
+            builder: (_, __) => const AdminInternalChatPage(),
+          ),
+          GoRoute(
+            path: 'communication-settings',
+            builder: (_, __) => const AdminCommunicationSettingsPage(),
+          ),
+          GoRoute(
+            path: 'create-halaqa',
+            redirect: (_, __) => AppRoutes.adminHalaqat,
+          ),
+          GoRoute(
+            path: 'finance-detail',
+            builder: (_, __) => const AdminFinanceDetailPage(),
+          ),
+          GoRoute(
+            path: 'payments-overview',
+            builder: (_, __) => const AdminPaymentsReviewPage(),
+          ),
+          GoRoute(
+            path: 'supervisors',
+            builder: (_, __) => const AdminSupervisorsPage(),
+          ),
+          GoRoute(
+            path: 'halaqat',
+            builder: (_, __) => const AdminHalaqatPage(),
+          ),
+          GoRoute(
+            path: 'halaqat-directory',
+            builder: (_, __) => const AdminHalaqatDirectoryPage(),
+          ),
         ],
       ),
     ],
@@ -503,7 +662,6 @@ class AppRouter {
       body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
     ),
   );
-
 }
 
 class _BlocListenable extends ChangeNotifier {

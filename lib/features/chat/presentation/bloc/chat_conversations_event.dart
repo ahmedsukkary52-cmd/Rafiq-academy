@@ -18,6 +18,15 @@ class StartWatchingConversationsEvent extends ChatConversationsEvent {
   List<Object?> get props => [uid];
 }
 
+/// Admin oversight: watch every conversation without joining as a participant.
+class StartWatchingAllConversationsEvent extends ChatConversationsEvent {
+  final String observerUid;
+  const StartWatchingAllConversationsEvent(this.observerUid);
+
+  @override
+  List<Object?> get props => [observerUid];
+}
+
 /// بدء (أو استكمال) محادثة مع طرف معيّن - بيُستخدم لما المستخدم يضغط
 /// "راسل المشرف" مثلاً من شاشة تانية، قبل ما ندخل شاشة المحادثة نفسها.
 class StartConversationEvent extends ChatConversationsEvent {

@@ -19,11 +19,13 @@ class AchievementModel extends AchievementEntity {
 
   factory AchievementModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final recipients =
-        AchievementsFirestoreContract.resolveRecipientStudentIds(data);
+    final recipients = AchievementsFirestoreContract.resolveRecipientStudentIds(
+      data,
+    );
     return AchievementModel(
       id: doc.id,
-      studentId: data[AchievementsFirestoreContract.studentIdField] ??
+      studentId:
+          data[AchievementsFirestoreContract.studentIdField] ??
           (recipients.isNotEmpty ? recipients.first : ''),
       type: typeFromFirestoreKey(
         data[AchievementsFirestoreContract.typeField] ?? '',

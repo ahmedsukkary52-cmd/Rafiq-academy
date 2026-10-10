@@ -178,7 +178,7 @@ class _OverallGradeBadge extends StatelessWidget {
 class StudentHadithWidget extends StatelessWidget {
   const StudentHadithWidget({super.key});
 
-  // قائمة أحاديث تشجيعية مؤقتة (يمكن استبدالها بـ API لاحقاً)
+  // أحاديث تشجيعية ثابتة تتغيّر يومياً حسب تاريخ الجهاز (محتوى محلي وليس Firestore).
   static const _hadiths = [
     ('خيركم من تعلم القرآن وعلّمه', 'رواه البخاري'),
     ('من قرأ حرفاً من كتاب الله فله به حسنة', 'رواه الترمذي'),

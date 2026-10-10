@@ -17,9 +17,11 @@ import '../../domain/repositories/teacher_repository.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../utils/teacher_workflow_ownership.dart';
 import '../widgets/teacher_home_figma_cards.dart';
 import '../widgets/teacher_loading_skeletons.dart';
+import '../widgets/teacher_pending_absence_section.dart';
 
 /// Teacher Attendance — Figma 1:914 + session-scoped Firestore via [TeacherBloc].
 class TeacherAttendancePage extends StatefulWidget {
@@ -68,9 +70,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
 
   void _ensureHalaqatLoaded(TeacherBloc bloc) {
     if (_halaqaFromState(bloc.state) != null) return;
-    final auth = context
-        .read<AuthBloc>()
-        .state;
+    final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
     bloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
   }
@@ -87,6 +87,19 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
       LoadHalaqaAttendanceEvent(
         halaqaId: widget.halaqaId,
         date: open.sessionDate,
+      ),
+    );
+    _loadPendingAbsence(open.sessionDate);
+  }
+
+  void _loadPendingAbsence(DateTime date) {
+    final teacherId = _teacherUid();
+    if (teacherId == null || teacherId.isEmpty) return;
+    context.read<TeacherBloc>().add(
+      LoadPendingAbsenceRequestsEvent(
+        teacherId: teacherId,
+        halaqaId: widget.halaqaId,
+        date: AttendancePolicy.dayStart(date),
       ),
     );
   }
@@ -162,6 +175,48 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     context.read<TeacherBloc>().add(
       LoadHalaqaAttendanceEvent(halaqaId: widget.halaqaId, date: day),
     );
+    _loadPendingAbsence(day);
+  }
+
+  void _onAbsenceReviewStatusChanged(TeacherState state) {
+    if (state.absenceReviewStatus == SubmissionStatus.success) {
+      AppSnackBar.showSuccess(context, 'تم تحديث طلب الاستئذان');
+      context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
+    } else if (state.absenceReviewStatus == SubmissionStatus.error &&
+        state.absenceReviewError != null) {
+      AppSnackBar.showError(context, state.absenceReviewError!);
+      context.read<TeacherBloc>().add(const ResetAbsenceReviewEvent());
+    }
+  }
+
+  void _reviewAbsence(
+    AbsenceRequestEntity request,
+    AbsenceRequestStatus decision,
+  ) {
+    if (!TeacherWorkflowOwnership.canExecute(context)) return;
+    final teacherId = _teacherUid();
+    if (teacherId == null || teacherId.isEmpty) {
+      AppSnackBar.showError(context, 'تعذر تحديد هوية المعلم');
+      return;
+    }
+    context.read<TeacherBloc>().add(
+      ReviewAbsenceRequestEvent(
+        requestId: request.id,
+        halaqaId: widget.halaqaId,
+        teacherId: teacherId,
+        decision: decision,
+      ),
+    );
+  }
+
+  String _studentNameFor(
+    String studentId,
+    List<HalaqaStudentSummaryEntity> students,
+  ) {
+    for (final s in students) {
+      if (s.uid == studentId) return s.name;
+    }
+    return 'طالب';
   }
 
   void _shiftDate(int days, {required bool locked}) {
@@ -199,8 +254,10 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     );
   }
 
-  bool _hasUnsavedChanges(List<HalaqaStudentSummaryEntity> students,
-      AttendanceOpenModel open,) {
+  bool _hasUnsavedChanges(
+    List<HalaqaStudentSummaryEntity> students,
+    AttendanceOpenModel open,
+  ) {
     if (_suppressDirtyUntilHydrate) return false;
     return _attendanceService.hasUnsavedChanges(
       rosterStudentIds: students.map((s) => s.uid),
@@ -254,8 +311,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           'سجّل حضور جميع الطلاب قبل الحفظ',
         AttendanceSaveBlockReason.nothingToSave =>
           'سجّل حضور جميع الطلاب قبل الحفظ',
-        AttendanceSaveBlockReason.missingSessionId =>
-          'تعذر تحديد جلسة الحضور',
+        AttendanceSaveBlockReason.missingSessionId => 'تعذر تحديد جلسة الحضور',
         null => 'تعذر حفظ الحضور',
       };
       AppSnackBar.showError(context, message);
@@ -274,10 +330,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
     if (state.attendanceSubmissionStatus == SubmissionStatus.success) {
       AppSnackBar.showSuccess(context, 'تم حفظ الحضور');
       if (state.attendanceEventsUnpublished) {
-        AppSnackBar.showInfo(
-          context,
-          'الحضور محفوظ — تعذر إرسال إشعار الغياب',
-        );
+        AppSnackBar.showInfo(context, 'الحضور محفوظ — تعذر إرسال إشعار الغياب');
       }
       setState(() => _suppressDirtyUntilHydrate = true);
       context.read<TeacherBloc>().add(const ResetAttendanceSubmissionEvent());
@@ -299,14 +352,19 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           // Snackbar exactly once per submission status transition.
           BlocListener<TeacherBloc, TeacherState>(
             listenWhen: (prev, curr) =>
-            prev.attendanceSubmissionStatus !=
+                prev.attendanceSubmissionStatus !=
                 curr.attendanceSubmissionStatus,
             listener: (context, state) => _onSubmissionStatusChanged(state),
+          ),
+          BlocListener<TeacherBloc, TeacherState>(
+            listenWhen: (prev, curr) =>
+                prev.absenceReviewStatus != curr.absenceReviewStatus,
+            listener: (context, state) => _onAbsenceReviewStatusChanged(state),
           ),
           // Hydrate draft when roster / day marks load (not on save success).
           BlocListener<TeacherBloc, TeacherState>(
             listenWhen: (prev, curr) =>
-            prev.dayAttendance != curr.dayAttendance ||
+                prev.dayAttendance != curr.dayAttendance ||
                 prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
                 prev.students != curr.students ||
                 prev.studentsStatus != curr.studentsStatus ||
@@ -321,7 +379,7 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
         ],
         child: BlocBuilder<TeacherBloc, TeacherState>(
           buildWhen: (prev, curr) =>
-          prev.dayAttendance != curr.dayAttendance ||
+              prev.dayAttendance != curr.dayAttendance ||
               prev.dayAttendanceStatus != curr.dayAttendanceStatus ||
               prev.dayAttendanceError != curr.dayAttendanceError ||
               prev.dayAttendanceDate != curr.dayAttendanceDate ||
@@ -331,16 +389,20 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               prev.studentsHalaqaId != curr.studentsHalaqaId ||
               prev.halaqat != curr.halaqat ||
               prev.attendanceSubmissionStatus !=
-                  curr.attendanceSubmissionStatus,
+                  curr.attendanceSubmissionStatus ||
+              prev.pendingAbsenceRequests != curr.pendingAbsenceRequests ||
+              prev.pendingAbsenceRequestsStatus !=
+                  curr.pendingAbsenceRequestsStatus ||
+              prev.pendingAbsenceRequestsError !=
+                  curr.pendingAbsenceRequestsError ||
+              prev.absenceReviewStatus != curr.absenceReviewStatus,
           builder: (context, state) {
             final open = _openModel(state);
             final submitting =
-                state.attendanceSubmissionStatus ==
-                    SubmissionStatus.submitting;
+                state.attendanceSubmissionStatus == SubmissionStatus.submitting;
             final dateLocked = submitting;
             final canEdit = canWrite && open.canEdit && !submitting;
-            final studentsForHalaqa =
-            state.studentsHalaqaId == widget.halaqaId
+            final studentsForHalaqa = state.studentsHalaqaId == widget.halaqaId
                 ? state.students
                 : const <HalaqaStudentSummaryEntity>[];
             final dirty = _hasUnsavedChanges(studentsForHalaqa, open);
@@ -364,62 +426,59 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
               backgroundColor: AppColors.background,
               body: widget.embedded
                   ? Column(
-                children: [
-                  _EmbeddedHeader(
-                    onCalendar: () => _pickDate(locked: dateLocked),
-                    canEdit: canEdit,
-                  ),
-                  Expanded(child: body),
-                ],
-              )
+                      children: [
+                        _EmbeddedHeader(
+                          onCalendar: () => _pickDate(locked: dateLocked),
+                          canEdit: canEdit,
+                        ),
+                        Expanded(child: body),
+                      ],
+                    )
                   : Stack(
-                children: [
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 340,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                      ),
-                    ),
-                  ),
-                  Column(
-                    children: [
-                      _AttendanceHeader(
-                        onBack: () {
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/teacher');
-                          }
-                        },
-                        onCalendar: () =>
-                            _pickDate(locked: dateLocked),
-                      ),
-                      Expanded(
-                        child: Container(
-                          width: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: AppColors.background,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(
-                                AppSizes.radiusXL,
-                              ),
-                              topRight: Radius.circular(
-                                AppSizes.radiusXL,
-                              ),
+                      children: [
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 340,
+                            decoration: const BoxDecoration(
+                              gradient: AppColors.primaryGradient,
                             ),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: body,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                        Column(
+                          children: [
+                            _AttendanceHeader(
+                              onBack: () {
+                                if (context.canPop()) {
+                                  context.pop();
+                                } else {
+                                  context.go('/teacher');
+                                }
+                              },
+                              onCalendar: () => _pickDate(locked: dateLocked),
+                            ),
+                            Expanded(
+                              child: Container(
+                                width: double.infinity,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.background,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(AppSizes.radiusXL),
+                                    topRight: Radius.circular(
+                                      AppSizes.radiusXL,
+                                    ),
+                                  ),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: body,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
             );
           },
         ),
@@ -518,6 +577,22 @@ class _TeacherAttendancePageState extends State<TeacherAttendancePage> {
           ),
         ),
         const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: TeacherPendingAbsenceSection(
+            status: state.pendingAbsenceRequestsStatus,
+            requests: state.pendingAbsenceRequestsHalaqaId == widget.halaqaId
+                ? state.pendingAbsenceRequests
+                : const [],
+            error: state.pendingAbsenceRequestsError,
+            canReview: canWrite,
+            reviewing: state.absenceReviewStatus == SubmissionStatus.submitting,
+            studentName: (id) => _studentNameFor(id, students),
+            onRetry: () => _loadPendingAbsence(open.sessionDate),
+            onReview: _reviewAbsence,
+          ),
+        ),
+        const SizedBox(height: 16),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -580,10 +655,7 @@ class _AttendanceHeader extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onCalendar;
 
-  const _AttendanceHeader({
-    required this.onBack,
-    required this.onCalendar,
-  });
+  const _AttendanceHeader({required this.onBack, required this.onCalendar});
 
   @override
   Widget build(BuildContext context) {
@@ -592,10 +664,7 @@ class _AttendanceHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, top + 8, 16, 40),
       child: Row(
         children: [
-          _HeaderCircleButton(
-            icon: Icons.chevron_right_rounded,
-            onTap: onBack,
-          ),
+          _HeaderCircleButton(icon: Icons.chevron_right_rounded, onTap: onBack),
           Expanded(
             child: Text(
               'الحضور والغياب',
@@ -620,10 +689,7 @@ class _EmbeddedHeader extends StatelessWidget {
   final VoidCallback onCalendar;
   final bool canEdit;
 
-  const _EmbeddedHeader({
-    required this.onCalendar,
-    required this.canEdit,
-  });
+  const _EmbeddedHeader({required this.onCalendar, required this.canEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -868,10 +934,7 @@ class _RegisterCard extends StatelessWidget {
   final List<_RegisterStudent> students;
   final void Function(String id, AttendanceStatus status) onStatusChanged;
 
-  const _RegisterCard({
-    required this.students,
-    required this.onStatusChanged,
-  });
+  const _RegisterCard({required this.students, required this.onStatusChanged});
 
   @override
   Widget build(BuildContext context) {

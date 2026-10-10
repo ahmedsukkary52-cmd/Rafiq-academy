@@ -58,6 +58,8 @@ class _Start extends Fake implements GetOrCreateConversationUseCase {
   }
 }
 
+class _UnusedWatchAll extends Fake implements WatchAllConversationsUseCase {}
+
 Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 10));
 
 void main() {
@@ -70,6 +72,7 @@ void main() {
     start = _Start();
     bloc = ChatConversationsBloc(
       watchConversations: watch,
+      watchAllConversations: _UnusedWatchAll(),
       getOrCreateConversation: start,
     );
   });

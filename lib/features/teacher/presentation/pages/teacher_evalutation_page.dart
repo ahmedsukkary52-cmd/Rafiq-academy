@@ -240,7 +240,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
                       previous.studentsStatus != current.studentsStatus ||
                       previous.students != current.students,
                   builder: (context, state) {
-                    final isRefreshing = _shellReady &&
+                    final isRefreshing =
+                        _shellReady &&
                         (state.evaluationsStatus == SectionStatus.loading);
 
                     return Column(
@@ -287,13 +288,13 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
                                           _filters[i],
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style:
-                                              AppTextStyles.labelMedium.copyWith(
-                                            color: selected
-                                                ? AppColors.onPrimary
-                                                : AppColors.textSecondary,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                          style: AppTextStyles.labelMedium
+                                              .copyWith(
+                                                color: selected
+                                                    ? AppColors.onPrimary
+                                                    : AppColors.textSecondary,
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                         ),
                                       ),
                                     ),
@@ -323,7 +324,8 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
   }
 
   Widget _buildList(TeacherState state) {
-    final isInitialLoading = !_shellReady &&
+    final isInitialLoading =
+        !_shellReady &&
         (state.evaluationsStatus == SectionStatus.loading ||
             state.evaluationsStatus == SectionStatus.initial);
 
@@ -387,11 +389,13 @@ class _TeacherEvaluationsPageState extends State<TeacherEvaluationsPage> {
           return _EvaluationCard(
             record: record,
             isLast: i == items.length - 1,
-            onReviewPending: record.isPendingReview &&
+            onReviewPending:
+                record.isPendingReview &&
                     TeacherWorkflowOwnership.canExecute(context)
                 ? () => _showReviewPendingSheet(context, record)
                 : null,
-            onEdit: !record.isPendingReview &&
+            onEdit:
+                !record.isPendingReview &&
                     TeacherWorkflowOwnership.canExecute(context) &&
                     sl<EvaluationService>().canOpenSessionEvaluation(record)
                 ? () => _showEditEvaluationSheet(record)
@@ -595,9 +599,7 @@ class _EvaluationCard extends StatelessWidget {
                   ),
                 ),
                 if (!isLast)
-                  Expanded(
-                    child: Container(width: 2, color: AppColors.border),
-                  ),
+                  Expanded(child: Container(width: 2, color: AppColors.border)),
               ],
             ),
           ),
@@ -735,8 +737,9 @@ class _EvaluationCard extends StatelessWidget {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceGrey,
-                            borderRadius:
-                                BorderRadius.circular(AppSizes.radiusM),
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusM,
+                            ),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -904,8 +907,7 @@ class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
             top: AppSizes.paddingL,
             left: AppSizes.paddingM,
             right: AppSizes.paddingM,
-            bottom:
-                MediaQuery.viewInsetsOf(context).bottom + AppSizes.paddingL,
+            bottom: MediaQuery.viewInsetsOf(context).bottom + AppSizes.paddingL,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -970,7 +972,8 @@ class _ReviewPendingSheetState extends State<_ReviewPendingSheet> {
                       p.recitationSubmissionStatus !=
                       c.recitationSubmissionStatus,
                   builder: (context, state) {
-                    final loading = state.recitationSubmissionStatus ==
+                    final loading =
+                        state.recitationSubmissionStatus ==
                         SubmissionStatus.submitting;
                     return AppButton(
                       label: 'حفظ المراجعة',
@@ -1052,10 +1055,7 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
     return live.isNotEmpty ? live : widget.seedRecords;
   }
 
-  void _reopenFromService({
-    String? studentId,
-    RecitationType? type,
-  }) {
+  void _reopenFromService({String? studentId, RecitationType? type}) {
     final result = sl<EvaluationService>().openEvaluation(
       halaqaId: _model.halaqaId,
       records: _recordsSource(),
@@ -1080,9 +1080,7 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
   }
 
   void _retryStudents() {
-    context.read<TeacherBloc>().add(
-      LoadHalaqaStudentsEvent(_model.halaqaId),
-    );
+    context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(_model.halaqaId));
   }
 
   @override
@@ -1125,8 +1123,7 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
             top: AppSizes.paddingL,
             left: AppSizes.paddingM,
             right: AppSizes.paddingM,
-            bottom:
-                MediaQuery.viewInsetsOf(context).bottom + AppSizes.paddingL,
+            bottom: MediaQuery.viewInsetsOf(context).bottom + AppSizes.paddingL,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -1199,10 +1196,9 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
                         ],
                       );
                     }
-                    final value = _model.studentId != null &&
-                            state.students.any(
-                              (s) => s.uid == _model.studentId,
-                            )
+                    final value =
+                        _model.studentId != null &&
+                            state.students.any((s) => s.uid == _model.studentId)
                         ? _model.studentId
                         : null;
                     return DropdownButtonFormField<String>(
@@ -1213,8 +1209,7 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
                         filled: true,
                         fillColor: AppColors.surfaceGrey,
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSizes.radiusM),
+                          borderRadius: BorderRadius.circular(AppSizes.radiusM),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -1227,8 +1222,9 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
                             ),
                           )
                           .toList(),
-                      onChanged:
-                          _model.identityLocked ? null : _onStudentChanged,
+                      onChanged: _model.identityLocked
+                          ? null
+                          : _onStudentChanged,
                     );
                   },
                 ),
@@ -1282,7 +1278,8 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
                       previous.recitationSubmissionStatus !=
                       current.recitationSubmissionStatus,
                   builder: (context, state) {
-                    final isLoading = state.recitationSubmissionStatus ==
+                    final isLoading =
+                        state.recitationSubmissionStatus ==
                         SubmissionStatus.submitting;
                     return AppButton(
                       label: _model.mode == EvaluationSheetMode.edit
@@ -1342,9 +1339,9 @@ class _SheetLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: AppTextStyles.labelLarge),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(text, style: AppTextStyles.labelLarge),
+  );
 }
 
 class _TypeChip extends StatelessWidget {

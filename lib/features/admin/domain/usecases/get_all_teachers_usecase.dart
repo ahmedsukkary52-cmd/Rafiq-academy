@@ -14,7 +14,6 @@ class GetAllTeachersUseCase
 
   @override
   Future<Either<Failure, List<TeacherManagementEntity>>> call(
-      NoParams params,
-      ) =>
-      repository.getAllTeachers();
+    NoParams params,
+  ) => repository.getAllTeachers();
 }

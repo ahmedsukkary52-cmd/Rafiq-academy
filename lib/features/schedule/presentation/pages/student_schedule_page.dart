@@ -10,6 +10,7 @@ import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../student/presentation/widgets/student_loading_skeletons.dart';
 import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../bloc/schedule_bloc.dart';
@@ -89,7 +90,7 @@ class _ScheduleView extends StatelessWidget {
         builder: (context, state) {
           if (state.status == SectionStatus.loading ||
               state.status == SectionStatus.initial) {
-            return const AppLoadingWidget();
+            return const StudentListPageSkeleton();
           }
 
           if (state.status == SectionStatus.error) {

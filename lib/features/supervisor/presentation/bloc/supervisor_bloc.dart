@@ -3,12 +3,15 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/repositories/parent_repository.dart';
+import '../../domain/usecases/admit_student_to_halaqa_usecase.dart';
 import '../../domain/usecases/get_supervised_absence_requests_usecase.dart';
 import '../../domain/usecases/get_supervised_halaqat_usecase.dart';
 import '../../domain/usecases/get_supervisor_day_board_usecase.dart';
 import '../../domain/usecases/issue_achievement_usecase.dart';
+import '../../domain/usecases/payment_review_usecases.dart';
 import '../../domain/usecases/register_new_student_usecase.dart';
 import '../../domain/usecases/submit_supervisor_report_usecase.dart';
+import '../../domain/usecases/transfer_student_between_halaqat_usecase.dart';
 import 'supervisor_event.dart';
 import 'supervisor_state.dart';
 
@@ -19,6 +22,10 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
   final GetSupervisedAbsenceRequestsUseCase getSupervisedAbsenceRequests;
   final IssueAchievementUseCase issueAchievement;
   final SubmitSupervisorReportUseCase submitSupervisorReport;
+  final AdmitStudentToHalaqaUseCase admitStudentToHalaqa;
+  final TransferStudentBetweenHalaqatUseCase transferStudentBetweenHalaqat;
+  final GetSupervisedPaymentsUseCase getSupervisedPayments;
+  final ReviewPaymentProofUseCase reviewPaymentProof;
   final RegisterNewStudentUseCase registerNewStudent;
 
   String? _supervisorId;
@@ -29,6 +36,10 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     required this.getSupervisedAbsenceRequests,
     required this.issueAchievement,
     required this.submitSupervisorReport,
+    required this.admitStudentToHalaqa,
+    required this.transferStudentBetweenHalaqat,
+    required this.getSupervisedPayments,
+    required this.reviewPaymentProof,
     required this.registerNewStudent,
   }) : super(SupervisorState.initial()) {
     on<LoadSupervisedHalaqatEvent>(_onLoadHalaqat);
@@ -38,6 +49,13 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<ResetIssueAchievementEvent>(_onResetIssueAchievement);
     on<SubmitSupervisorReportEvent>(_onSubmitReport);
     on<ResetSubmitReportEvent>(_onResetSubmitReport);
+    on<AdmitStudentToHalaqaEvent>(_onAdmitStudent);
+    on<ResetAdmitStudentEvent>(_onResetAdmitStudent);
+    on<TransferStudentBetweenHalaqatEvent>(_onTransferStudent);
+    on<ResetTransferStudentEvent>(_onResetTransferStudent);
+    on<LoadSupervisedPaymentsEvent>(_onLoadPayments);
+    on<ReviewPaymentProofEvent>(_onReviewPayment);
+    on<ResetReviewPaymentEvent>(_onResetReviewPayment);
     on<RegisterNewStudentEvent>(_onRegisterStudent);
     on<ResetRegisterStudentEvent>(_onResetRegisterStudent);
     on<ClearSupervisorSessionEvent>(_onClearSession);
@@ -231,6 +249,175 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       state.copyWith(
         submitReportStatus: SubmissionStatus.idle,
         submitReportError: null,
+      ),
+    );
+  }
+
+  Future<void> _onAdmitStudent(
+    AdmitStudentToHalaqaEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        admitStudentStatus: SubmissionStatus.submitting,
+        admitStudentError: null,
+      ),
+    );
+
+    final result = await admitStudentToHalaqa(
+      AdmitStudentParams(
+        supervisorId: event.supervisorId,
+        halaqaId: event.halaqaId,
+        studentId: event.studentId,
+      ),
+    );
+
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
+          admitStudentStatus: SubmissionStatus.error,
+          admitStudentError: failure.message,
+        ),
+      ),
+      (_) async {
+        emit(state.copyWith(admitStudentStatus: SubmissionStatus.success));
+        add(LoadSupervisedHalaqatEvent(event.supervisorId));
+      },
+    );
+  }
+
+  void _onResetAdmitStudent(
+    ResetAdmitStudentEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        admitStudentStatus: SubmissionStatus.idle,
+        admitStudentError: null,
+      ),
+    );
+  }
+
+  Future<void> _onTransferStudent(
+    TransferStudentBetweenHalaqatEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        transferStudentStatus: SubmissionStatus.submitting,
+        transferStudentError: null,
+      ),
+    );
+
+    final result = await transferStudentBetweenHalaqat(
+      TransferStudentParams(
+        supervisorId: event.supervisorId,
+        studentId: event.studentId,
+        sourceHalaqaId: event.sourceHalaqaId,
+        targetHalaqaId: event.targetHalaqaId,
+      ),
+    );
+
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
+          transferStudentStatus: SubmissionStatus.error,
+          transferStudentError: failure.message,
+        ),
+      ),
+      (_) async {
+        emit(state.copyWith(transferStudentStatus: SubmissionStatus.success));
+        add(LoadSupervisedHalaqatEvent(event.supervisorId));
+      },
+    );
+  }
+
+  void _onResetTransferStudent(
+    ResetTransferStudentEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        transferStudentStatus: SubmissionStatus.idle,
+        transferStudentError: null,
+      ),
+    );
+  }
+
+  Future<void> _onLoadPayments(
+    LoadSupervisedPaymentsEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        paymentsStatus: SectionStatus.loading,
+        paymentsError: null,
+      ),
+    );
+    final result = await getSupervisedPayments(
+      SupervisedPaymentsParams(
+        supervisorId: event.supervisorId,
+        studentIds: event.studentIds,
+      ),
+    );
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.error,
+          paymentsError: failure.message,
+        ),
+      ),
+      (payments) => emit(
+        state.copyWith(
+          paymentsStatus: SectionStatus.loaded,
+          payments: payments,
+          paymentsError: null,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onReviewPayment(
+    ReviewPaymentProofEvent event,
+    Emitter<SupervisorState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        reviewPaymentStatus: SubmissionStatus.submitting,
+        reviewPaymentError: null,
+      ),
+    );
+    final result = await reviewPaymentProof(event.params);
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
+          reviewPaymentStatus: SubmissionStatus.error,
+          reviewPaymentError: failure.message,
+        ),
+      ),
+      (_) async {
+        emit(state.copyWith(reviewPaymentStatus: SubmissionStatus.success));
+        final studentIds = {
+          for (final h in state.halaqat) ...h.studentIds,
+        }.toList();
+        add(
+          LoadSupervisedPaymentsEvent(
+            supervisorId: event.params.supervisorId,
+            studentIds: studentIds,
+          ),
+        );
+      },
+    );
+  }
+
+  void _onResetReviewPayment(
+    ResetReviewPaymentEvent event,
+    Emitter<SupervisorState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        reviewPaymentStatus: SubmissionStatus.idle,
+        reviewPaymentError: null,
       ),
     );
   }

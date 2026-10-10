@@ -116,11 +116,8 @@ class GetTeacherHomeFeedUseCase
       final awardsEither = await awardsRepository.getGrantedAwards(halaqa.id);
       awardsEither.fold(
         (_) {},
-        (awards) => _appendAwardActivities(
-          activities,
-          halaqa: halaqa,
-          awards: awards,
-        ),
+        (awards) =>
+            _appendAwardActivities(activities, halaqa: halaqa, awards: awards),
       );
     }
 

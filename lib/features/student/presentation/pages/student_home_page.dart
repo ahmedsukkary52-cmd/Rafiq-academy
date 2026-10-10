@@ -30,6 +30,7 @@ import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
 import '../../../mushaf/presentation/pages/mushaf_reader_host.dart';
+import '../widgets/student_loading_skeletons.dart';
 import 'student_badges_page.dart';
 
 class StudentHomePage extends StatefulWidget {
@@ -173,7 +174,7 @@ class _StudentHomeTab extends StatelessWidget {
                 state.profileStatus == SectionStatus.loading);
 
         if (waitingForProfile) {
-          return const AppLoadingWidget();
+          return const StudentHomeBodySkeleton();
         }
 
         if (state.profileStatus == SectionStatus.error &&
@@ -372,7 +373,7 @@ class _StudentHomeTab extends StatelessWidget {
         const SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-            child: SizedBox(height: 120, child: AppLoadingWidget()),
+            child: SizedBox(height: 120, child: StudentHomeBodySkeleton()),
           ),
         ),
       ];
@@ -758,16 +759,6 @@ class _StudentProfileTab extends StatelessWidget {
                           label: 'الإعدادات',
                           onTap: () => context.push(AppRoutes.studentSettings),
                         ),
-                        const _ProfileMenuItem(
-                          icon: Icons.family_restroom_rounded,
-                          label: 'حساب ولي الأمر',
-                          trailing: 'Coming Soon',
-                        ),
-                        const _ProfileMenuItem(
-                          icon: Icons.help_outline_rounded,
-                          label: 'المساعدة والدعم',
-                          trailing: 'Coming Soon',
-                        ),
                       ],
                     ),
 
@@ -868,14 +859,12 @@ class _ProfileMenuItem extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final bool isDestructive;
-  final String? trailing;
 
   const _ProfileMenuItem({
     required this.icon,
     required this.label,
     this.onTap,
     this.isDestructive = false,
-    this.trailing,
   });
 
   @override
@@ -890,13 +879,6 @@ class _ProfileMenuItem extends StatelessWidget {
       title: Text(label, style: AppTextStyles.bodyLarge.copyWith(color: color)),
       trailing: isDestructive
           ? null
-          : trailing != null
-          ? Text(
-              trailing!,
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.textHint,
-              ),
-            )
           : const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
     );
   }

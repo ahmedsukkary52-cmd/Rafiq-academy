@@ -17,6 +17,12 @@ import '../models/chat_models.dart';
 abstract class ChatRemoteDatasource {
   Stream<List<ConversationModel>> watchConversations(String uid);
 
+  /// Academy-wide conversation stream for Admin oversight (no participant filter).
+  /// Does not add the Admin to [participantIds].
+  Stream<List<ConversationModel>> watchAllConversations({
+    required String observerUid,
+  });
+
   /// Newest [limit] messages, returned in ascending time order.
   Stream<List<MessageModel>> watchMessages(
     String conversationId, {
@@ -102,6 +108,31 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   }
 
   @override
+  Stream<List<ConversationModel>> watchAllConversations({
+    required String observerUid,
+  }) {
+    // No orderBy: docs missing `lastMessageAt` would be excluded from an
+    // ordered query. Sort client-side so Admin oversight sees every thread.
+    return _conversationsRef.snapshots().map((snapshot) {
+      final list = snapshot.docs
+          .map(
+            (doc) =>
+                ConversationModel.fromFirestore(doc, currentUid: observerUid),
+          )
+          .toList();
+      list.sort((a, b) {
+        final aAt = a.lastMessageAt;
+        final bAt = b.lastMessageAt;
+        if (aAt == null && bAt == null) return 0;
+        if (aAt == null) return 1;
+        if (bAt == null) return -1;
+        return bAt.compareTo(aAt);
+      });
+      return list;
+    });
+  }
+
+  @override
   Stream<List<MessageModel>> watchMessages(
     String conversationId, {
     required int limit,
@@ -144,7 +175,10 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
 
       final doc = await _conversationsRef.doc(conversationId).get();
       if (doc.exists) {
-        return ConversationModel.fromFirestore(doc, currentUid: currentUser.uid);
+        return ConversationModel.fromFirestore(
+          doc,
+          currentUid: currentUser.uid,
+        );
       }
 
       // Rare race: CF wrote but read missed — return local projection.
@@ -209,13 +243,15 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
       messageId: messageId,
       draft: draft,
     );
-    final task = storage.ref(path).putFile(
-      File(draft.localPath),
-      SettableMetadata(
-        contentType: draft.contentType,
-        customMetadata: {'uploaderId': uploaderId},
-      ),
-    );
+    final task = storage
+        .ref(path)
+        .putFile(
+          File(draft.localPath),
+          SettableMetadata(
+            contentType: draft.contentType,
+            customMetadata: {'uploaderId': uploaderId},
+          ),
+        );
     return _FirebaseChatUploadTask(task, path);
   }
 
@@ -248,7 +284,10 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     }
   }
 
-  static String _callableMessage(FirebaseFunctionsException e, String fallback) {
+  static String _callableMessage(
+    FirebaseFunctionsException e,
+    String fallback,
+  ) {
     final message = e.message?.trim() ?? '';
     final isArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(message);
     if (isArabic) return message;
@@ -265,9 +304,17 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required String uid,
   }) async {
     try {
-      await _conversationsRef.doc(conversationId).update({
-        'unreadCounts.$uid': 0,
-      });
+      final conversationRef = _conversationsRef.doc(conversationId);
+      final snap = await conversationRef.get();
+      final data = snap.data() as Map<String, dynamic>? ?? const {};
+      final participantIds = List<String>.from(
+        data['participantIds'] ?? const <String>[],
+      );
+      // Silent Admin oversight: never write unreadCounts for non-participants
+      // (would leak observer presence into the conversation document).
+      if (!participantIds.contains(uid)) return;
+
+      await conversationRef.update({'unreadCounts.$uid': 0});
     } catch (e) {
       throw ServerException(e.toString());
     }

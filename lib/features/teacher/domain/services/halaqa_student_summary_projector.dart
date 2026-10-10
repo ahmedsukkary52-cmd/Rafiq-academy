@@ -19,23 +19,25 @@ class HalaqaStudentSummaryProjector {
     required DateTime now,
     double? overallProgressPercent,
   }) {
-    final riskStart =
-        now.subtract(const Duration(days: StudentAtRiskPolicy.windowDays));
-    final attendanceStart =
-        now.subtract(const Duration(days: attendanceWindowDays));
+    final riskStart = now.subtract(
+      const Duration(days: StudentAtRiskPolicy.windowDays),
+    );
+    final attendanceStart = now.subtract(
+      const Duration(days: attendanceWindowDays),
+    );
 
     final studentMarks = attendanceMarks
         .where((m) => m.studentId.trim() == base.uid)
         .where((m) => !m.date.isBefore(attendanceStart))
         .toList();
     final unique = AttendancePolicy.uniqueDayStatuses(studentMarks);
-    final attendancePercent =
-        AttendancePolicy.attendancePercentFromStatuses(unique);
+    final attendancePercent = AttendancePolicy.attendancePercentFromStatuses(
+      unique,
+    );
 
-    final studentRecitations = recitations
-        .where((r) => r.studentId.trim() == base.uid)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final studentRecitations =
+        recitations.where((r) => r.studentId.trim() == base.uid).toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     String? lastGradeLabel;
     for (final record in studentRecitations) {
@@ -46,8 +48,9 @@ class HalaqaStudentSummaryProjector {
       break;
     }
 
-    final marksInRiskWindow =
-        studentMarks.where((m) => !m.date.isBefore(riskStart));
+    final marksInRiskWindow = studentMarks.where(
+      (m) => !m.date.isBefore(riskStart),
+    );
     final hasRecentEvaluation = studentRecitations.any(
       (r) => !r.date.isBefore(riskStart),
     );

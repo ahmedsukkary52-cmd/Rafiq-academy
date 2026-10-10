@@ -1,14 +1,35 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
+import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
 
+HalaqaEntity _halaqa(String id) => HalaqaEntity(
+  id: id,
+  name: id,
+  teacherId: 't1',
+  supervisorId: 'sup1',
+  studentIds: const ['s1'],
+  schedule: const [],
+  meetingLink: '',
+  status: 'active',
+);
+
 class _FakeTeacherRepository implements TeacherRepository {
+  final List<HalaqaEntity> halaqat;
   SendAssignmentParams? lastParams;
-  Either<Failure, AcademyEventPublication> result =
-      const Right(AcademyEventPublication.none());
+  Either<Failure, AcademyEventPublication> result = const Right(
+    AcademyEventPublication.none(),
+  );
+
+  _FakeTeacherRepository({this.halaqat = const []});
+
+  @override
+  Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(
+    String teacherId,
+  ) async => Right(halaqat);
 
   @override
   Future<Either<Failure, AcademyEventPublication>> sendAssignment({
@@ -43,12 +64,13 @@ void main() {
       teacherId: 't1',
     );
 
-    test('forwards assignment params and returns publication', () async {
+    test('forwards assignment params when halaqa is owned', () async {
       const publication = AcademyEventPublication(
         eventCount: 2,
         eventsPublished: true,
       );
-      final repo = _FakeTeacherRepository()..result = const Right(publication);
+      final repo = _FakeTeacherRepository(halaqat: [_halaqa('h1')])
+        ..result = const Right(publication);
       final useCase = SendAssignmentUseCase(repo);
 
       final result = await useCase(params);
@@ -57,8 +79,18 @@ void main() {
       expect(repo.lastParams, params);
     });
 
+    test('rejects assignment for unowned halaqa', () async {
+      final repo = _FakeTeacherRepository(halaqat: [_halaqa('other')]);
+      final useCase = SendAssignmentUseCase(repo);
+
+      final result = await useCase(params);
+
+      expect(result.isLeft(), isTrue);
+      expect(repo.lastParams, isNull);
+    });
+
     test('surfaces repository failure unchanged', () async {
-      final repo = _FakeTeacherRepository()
+      final repo = _FakeTeacherRepository(halaqat: [_halaqa('h1')])
         ..result = const Left(ServerFailure('deny'));
       final useCase = SendAssignmentUseCase(repo);
 

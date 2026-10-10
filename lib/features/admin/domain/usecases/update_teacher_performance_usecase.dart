@@ -12,9 +12,7 @@ class UpdateTeacherPerformanceUseCase
   UpdateTeacherPerformanceUseCase(this.repository);
 
   @override
-  Future<Either<Failure, Unit>> call(
-      UpdateTeacherPerformanceParams params,
-      ) =>
+  Future<Either<Failure, Unit>> call(UpdateTeacherPerformanceParams params) =>
       repository.updateTeacherPerformance(
         teacherId: params.teacherId,
         rating: params.rating,

@@ -7,6 +7,7 @@ import '../../../../core/network/network_info.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../data_sources/supervisor_remote_datasource.dart';
@@ -60,6 +61,26 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> admitStudentToHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+    required String studentId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.admitStudentToHalaqa(
+        supervisorId: supervisorId,
+        halaqaId: halaqaId,
+        studentId: studentId,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  @override
   Future<Either<Failure, Unit>> registerNewStudent({
     required String halaqaId,
     required String studentId,
@@ -69,6 +90,26 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
       await remoteDatasource.registerNewStudent(
         halaqaId: halaqaId,
         studentId: studentId,
+      );
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  Future<Either<Failure, Unit>> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.transferStudentBetweenHalaqat(
+        supervisorId: supervisorId,
+        studentId: studentId,
+        sourceHalaqaId: sourceHalaqaId,
+        targetHalaqaId: targetHalaqaId,
       );
       return const Right(unit);
     } on ServerException catch (e) {
@@ -102,6 +143,37 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
           date: date,
         ),
       );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<PaymentEntity>>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getPaymentsForStudents(
+          supervisorId: supervisorId,
+          studentIds: studentIds,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> reviewPaymentProof(
+    PaymentReviewParams params,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.reviewPaymentProof(params);
+      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

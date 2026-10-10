@@ -10,6 +10,7 @@ import '../../domain/entities/recitation_record_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
+import '../widgets/student_loading_skeletons.dart';
 
 class StudentEvaluationsPage extends StatefulWidget {
   const StudentEvaluationsPage({super.key});
@@ -48,7 +49,7 @@ class _StudentEvaluationsPageState extends State<StudentEvaluationsPage> {
             builder: (context, state) {
               if (state.recitationStatus == SectionStatus.loading &&
                   state.recitationRecords.isEmpty) {
-                return const AppLoadingWidget();
+                return const StudentListPageSkeleton();
               }
 
               if (state.recitationStatus == SectionStatus.error &&

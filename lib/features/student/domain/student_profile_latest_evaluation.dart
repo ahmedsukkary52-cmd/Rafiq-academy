@@ -22,9 +22,7 @@ class StudentProfileLatestEvaluation {
   });
 
   bool get hasAnyGrade =>
-      memorizationGrade != null ||
-      reviewGrade != null ||
-      behaviorGrade != null;
+      memorizationGrade != null || reviewGrade != null || behaviorGrade != null;
 }
 
 StudentProfileLatestEvaluation? pickLatestStudentProfileEvaluation(

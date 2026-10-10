@@ -1,15 +1,35 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
+import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/features/teacher/domain/usecases/save_day_attendance_usecase.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
 
+HalaqaEntity _halaqa(String id) => HalaqaEntity(
+  id: id,
+  name: id,
+  teacherId: 't1',
+  supervisorId: 'sup1',
+  studentIds: const ['s1'],
+  schedule: const [],
+  meetingLink: '',
+  status: 'active',
+);
+
 class _FakeTeacherRepository implements TeacherRepository {
+  final List<HalaqaEntity> halaqat;
   List<AttendanceRecordEntity>? lastRecords;
   Either<Failure, AcademyEventPublication> result =
       const Right(AcademyEventPublication.none());
+
+  _FakeTeacherRepository({this.halaqat = const []});
+
+  @override
+  Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(
+    String teacherId,
+  ) async => Right(halaqat);
 
   @override
   Future<Either<Failure, AcademyEventPublication>> saveDayAttendance(
@@ -43,7 +63,8 @@ void main() {
         eventCount: 1,
         eventsPublished: true,
       );
-      final repo = _FakeTeacherRepository()..result = const Right(publication);
+      final repo = _FakeTeacherRepository(halaqat: [_halaqa('h1')])
+        ..result = const Right(publication);
       final useCase = SaveDayAttendanceUseCase(repo);
 
       final result = await useCase(records);
@@ -53,7 +74,7 @@ void main() {
     });
 
     test('surfaces repository failure unchanged', () async {
-      final repo = _FakeTeacherRepository()
+      final repo = _FakeTeacherRepository(halaqat: [_halaqa('h1')])
         ..result = const Left(ServerFailure('offline'));
       final useCase = SaveDayAttendanceUseCase(repo);
 

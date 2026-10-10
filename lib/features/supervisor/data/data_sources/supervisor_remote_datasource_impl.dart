@@ -9,8 +9,11 @@ import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
 import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
+import '../../../parent/data/models/parent_model.dart';
+import '../../../parent/domain/parent_payment_proof.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 @LazySingleton(as: SupervisorRemoteDatasource)
@@ -75,7 +78,23 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   /// Academy Admission via the admitStudentToHalaqa callable: supervised-halaqa
   /// scope, student role, duplicate and max-2 cap are enforced transactionally.
   @override
+  Future<void> admitStudentToHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+    required String studentId,
+  }) {
+    return _callAdmission(halaqaId: halaqaId, studentId: studentId);
+  }
+
+  @override
   Future<void> registerNewStudent({
+    required String halaqaId,
+    required String studentId,
+  }) {
+    return _callAdmission(halaqaId: halaqaId, studentId: studentId);
+  }
+
+  Future<void> _callAdmission({
     required String halaqaId,
     required String studentId,
   }) async {
@@ -84,6 +103,28 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       await callable.call(<String, dynamic>{
         'halaqaId': halaqaId.trim(),
         'studentId': studentId.trim(),
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// adminTransferStudent requires the caller to supervise both halaqat.
+  @override
+  Future<void> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  }) async {
+    try {
+      final callable = functions.httpsCallable('adminTransferStudent');
+      await callable.call(<String, dynamic>{
+        'studentId': studentId.trim(),
+        'fromHalaqaId': sourceHalaqaId.trim(),
+        'toHalaqaId': targetHalaqaId.trim(),
       });
     } on FirebaseFunctionsException catch (e) {
       throw ServerException(e.message ?? e.code);
@@ -166,6 +207,85 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       }
       AbsenceRequestFirestoreReads.sortSupervisorDay(items);
       return items;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<PaymentModel>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  }) async {
+    try {
+      final sid = supervisorId.trim();
+      if (sid.isEmpty) {
+        throw const ServerException('معرّف المشرف غير صالح');
+      }
+
+      // Scope from supervised halaqat — do not trust client studentIds alone.
+      final supervised = await getSupervisedHalaqat(sid);
+      final allowed = <String>{for (final h in supervised) ...h.studentIds};
+      final requested = FirestoreInQuery.normalizeIds(studentIds).toSet();
+      final ids = requested.isEmpty ? allowed : requested.intersection(allowed);
+      if (ids.isEmpty) return const [];
+
+      // Rules only allow reads by the supervisor of the student's primary
+      // halaqa, so query per student and skip students supervised elsewhere.
+      final byId = <String, PaymentModel>{};
+      for (final studentId in ids) {
+        try {
+          final snap = await firestore
+              .collection(FirestoreCollections.payments)
+              .where('studentId', isEqualTo: studentId)
+              .get();
+          for (final doc in snap.docs) {
+            byId[doc.id] = PaymentModel.fromFirestore(doc);
+          }
+        } on FirebaseException catch (e) {
+          if (e.code != 'permission-denied') rethrow;
+        }
+      }
+
+      final list = byId.values.toList()
+        ..sort((a, b) {
+          final aPending = a.hasProofAwaitingReview ? 0 : 1;
+          final bPending = b.hasProofAwaitingReview ? 0 : 1;
+          if (aPending != bPending) return aPending.compareTo(bPending);
+          return b.dueDate.compareTo(a.dueDate);
+        });
+      return list;
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  /// The reviewPaymentProof callable derives status, paidAt and
+  /// remainingAmount and enforces supervised-halaqa scope server-side.
+  @override
+  Future<void> reviewPaymentProof(PaymentReviewParams params) async {
+    final paymentId = params.paymentId.trim();
+    if (paymentId.isEmpty) {
+      throw const ServerException('بيانات المراجعة غير صالحة');
+    }
+    final notes = params.notes?.trim();
+    try {
+      final callable = functions.httpsCallable('reviewPaymentProof');
+      await callable.call(<String, dynamic>{
+        'paymentId': paymentId,
+        'decision': switch (params.decision) {
+          PaymentReviewDecision.approved => 'approve',
+          PaymentReviewDecision.rejected => 'reject',
+          PaymentReviewDecision.partial => 'partial',
+        },
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (params.amountPaidConfirmed != null)
+          'amountPaidConfirmed': params.amountPaidConfirmed,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? e.code);
     } catch (e) {
       throw ServerException(e.toString());
     }

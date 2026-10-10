@@ -5,10 +5,10 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/halaqa_day_readiness.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
 import '../../domain/read_models/supervisor_day_board.dart';
 import '../escalation/supervisor_escalation_guidance.dart';
 import '../escalation/supervisor_fact_provenance.dart';
+import 'supervisor_loading_skeletons.dart';
 
 /// Presentation-only ordering for Rule 3 (exception-first).
 ///
@@ -57,9 +57,9 @@ class SupervisorDayBoardSection extends StatelessWidget {
         const _BoardHeader(),
         const SizedBox(height: 12),
         switch (status) {
-          SectionStatus.initial || SectionStatus.loading => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: AppLoadingWidget(),
+          SectionStatus.initial || SectionStatus.loading => const SizedBox(
+            height: 220,
+            child: SupervisorListCardsSkeleton(itemCount: 2),
           ),
           SectionStatus.error => _BoardCard(
             child: Column(

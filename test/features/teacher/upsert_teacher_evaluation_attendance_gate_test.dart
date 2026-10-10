@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
+import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
@@ -10,11 +11,28 @@ import 'package:rafiq_academy/shared/domain/evaluation_service.dart';
 
 const _session = 'h1_20260927';
 
+const _ownedHalaqa = HalaqaEntity(
+  id: 'h1',
+  name: 'h1',
+  teacherId: 't1',
+  supervisorId: 'sup1',
+  studentIds: ['s1'],
+  schedule: [],
+  meetingLink: '',
+  status: 'active',
+);
+
 class _FakeTeacherRepository implements TeacherRepository {
   final Either<Failure, List<AttendanceRecordEntity>> attendance;
   RecitationRecordEntity? upserted;
+  bool ownsHalaqa = true;
 
   _FakeTeacherRepository(this.attendance);
+
+  @override
+  Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(
+    String teacherId,
+  ) async => ownsHalaqa ? const Right([_ownedHalaqa]) : const Right([]);
 
   @override
   Future<Either<Failure, List<AttendanceRecordEntity>>>
@@ -118,6 +136,20 @@ void main() {
       final (result, repo) = await _run(
         Right([_mark(AttendanceStatus.present, sessionId: 'h1_20260926')]),
       );
+
+      expect(result.isLeft(), isTrue);
+      expect(repo.upserted, isNull);
+    });
+
+    test('present student in a halaqa the teacher does not own is not evaluated',
+        () async {
+      final repo = _FakeTeacherRepository(
+        Right([_mark(AttendanceStatus.present)]),
+      )..ownsHalaqa = false;
+      final result = await UpsertTeacherEvaluationUseCase(
+        repo,
+        const EvaluationService(),
+      )(_params());
 
       expect(result.isLeft(), isTrue);
       expect(repo.upserted, isNull);

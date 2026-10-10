@@ -1,6 +1,8 @@
 import '../../../../shared/data/absence_request_model.dart';
+import '../../../parent/data/models/parent_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 abstract class SupervisorRemoteDatasource {
@@ -9,6 +11,22 @@ abstract class SupervisorRemoteDatasource {
   Future<void> issueAchievement(AchievementIssueEntity data);
 
   Future<void> submitReport(SupervisorReportEntity report);
+
+  /// Admit / add existing student to [halaqaId] via Academy Admission Workflow.
+  /// Requires [halaqaId] to be supervised by [supervisorId].
+  Future<void> admitStudentToHalaqa({
+    required String supervisorId,
+    required String halaqaId,
+    required String studentId,
+  });
+
+  /// Immediate move between supervised halaqat (Dual-Halaqa transfer).
+  Future<void> transferStudentBetweenHalaqat({
+    required String supervisorId,
+    required String studentId,
+    required String sourceHalaqaId,
+    required String targetHalaqaId,
+  });
 
   Future<void> registerNewStudent({
     required String halaqaId,
@@ -23,4 +41,11 @@ abstract class SupervisorRemoteDatasource {
     required List<String> halaqaIds,
     required DateTime date,
   });
+
+  Future<List<PaymentModel>> getPaymentsForStudents({
+    required String supervisorId,
+    required List<String> studentIds,
+  });
+
+  Future<void> reviewPaymentProof(PaymentReviewParams params);
 }

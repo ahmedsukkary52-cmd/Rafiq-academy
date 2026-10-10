@@ -9,6 +9,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../student/presentation/widgets/student_loading_skeletons.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/progress_report_entity.dart';
@@ -121,7 +122,7 @@ class _ProgressReportView extends StatelessWidget {
               ),
               if (state.status == SectionStatus.loading ||
                   state.status == SectionStatus.initial)
-                const SliverFillRemaining(child: AppLoadingWidget())
+                const SliverFillRemaining(child: StudentHomeBodySkeleton())
               else if (state.status == SectionStatus.error)
                 SliverFillRemaining(
                   child: AppErrorWidget(
@@ -474,7 +475,9 @@ class _TeacherNotesCard extends StatelessWidget {
               Text('ملاحظات المعلم', style: AppTextStyles.titleMedium),
               const SizedBox(width: 8),
               const Icon(
-                  Icons.chat_bubble_outline, color: AppColors.textSecondary),
+                Icons.chat_bubble_outline,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
           const SizedBox(height: 10),

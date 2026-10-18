@@ -328,7 +328,17 @@ service cloud.firestore {
     // adminAddHalaqaSlot (D8 ≥1 slot, D9 conflict engine, teacher lock). No
     // client — not even Admin — creates a Halaqa or edits schedule/teacher.
     match /halaqat/{halaqaId} {
-      allow read: if signedIn();
+      // Role read regardless of isActive, so deactivating a student never
+      // widens their reads. Non-student reads are unchanged.
+      function isStudentAccount() {
+        return exists(/databases/$(database)/documents/users/$(uid()))
+          && userDoc().get('role', '') == 'student';
+      }
+
+      // A student reads only Halaqat whose roster (studentIds) lists them.
+      allow read: if signedIn()
+        && (!isStudentAccount()
+          || uid() in resource.data.get('studentIds', []));
       allow create: if false;
       allow delete: if false;
       allow update: if isAdmin()

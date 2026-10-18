@@ -327,6 +327,107 @@ test('PH02 halaqa: client create denied (P0-04 callable); Admin non-conflict edi
   await assertFails(authed('supervisor1').doc('halaqat/h1').update({ name: 'y' }));
 });
 
+test('Halaqa reads: a student reads only Halaqat whose roster lists them', async () => {
+  await seedAll({
+    'halaqat/h2': {
+      name: 'H2',
+      teacherId: 'teacher2',
+      supervisorId: 'supervisor1',
+      studentIds: ['student3'],
+      status: 'active',
+      meetingLink: 'https://meet.example.test/h2',
+    },
+    'users/student4': { name: 'student4', role: 'student', isActive: false },
+  });
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('halaqat/h1').update({ meetingLink: 'https://meet.example.test/h1' });
+  });
+
+  const student1 = authed('student1');
+  const own = await assertSucceeds(student1.doc('halaqat/h1').get());
+  if (own.data().meetingLink !== 'https://meet.example.test/h1') {
+    throw new Error('member student could not read its own meetingLink');
+  }
+  await assertSucceeds(
+    student1.collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+  await assertFails(student1.doc('halaqat/h2').get());
+  await assertFails(student1.doc('halaqat/missing').get());
+  await assertFails(student1.collection('halaqat').get());
+  await assertFails(student1.collection('halaqat').where('status', '==', 'active').get());
+  await assertSucceeds(authed('student3').doc('halaqat/h2').get());
+
+  await assertFails(authed('student4').doc('halaqat/h1').get());
+  await assertFails(testEnv.unauthenticatedContext().firestore().doc('halaqat/h1').get());
+
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('halaqat/h1').update({ studentIds: [] });
+  });
+  await assertFails(student1.doc('halaqat/h1').get());
+});
+
+test('Halaqa reads: a deactivated student still on the roster reads only that Halaqa', async () => {
+  await seedAll({
+    'users/student5': { name: 'student5', role: 'student', isActive: false },
+    'studentProfiles/student5': { uid: 'student5', halaqaId: 'h1', points: 0 },
+    'halaqat/h2': {
+      name: 'H2',
+      teacherId: 'teacher2',
+      supervisorId: 'supervisor1',
+      studentIds: ['student3'],
+      status: 'active',
+    },
+  });
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('halaqat/h1').update({ studentIds: ['student1', 'student5'] });
+  });
+
+  const student5 = authed('student5');
+  await assertSucceeds(student5.doc('halaqat/h1').get());
+  await assertFails(student5.doc('halaqat/h2').get());
+  await assertFails(student5.collection('halaqat').get());
+});
+
+test('Halaqa reads: admin, teacher, supervisor and parent reads and queries unchanged', async () => {
+  await seedAll({
+    'halaqat/h2': {
+      name: 'H2',
+      teacherId: 'teacher2',
+      supervisorId: 'supervisor1',
+      studentIds: ['student3'],
+      status: 'active',
+    },
+  });
+
+  const admin = authed('admin1');
+  await assertSucceeds(admin.doc('halaqat/h2').get());
+  await assertSucceeds(admin.collection('halaqat').get());
+  await assertSucceeds(admin.collection('halaqat').where('status', '==', 'active').get());
+
+  const teacher = authed('teacher1');
+  await assertSucceeds(teacher.doc('halaqat/h1').get());
+  await assertSucceeds(teacher.doc('halaqat/h2').get());
+  await assertSucceeds(
+    teacher
+      .collection('halaqat')
+      .where('teacherId', '==', 'teacher1')
+      .where('status', '==', 'active')
+      .get(),
+  );
+
+  const supervisor = authed('supervisor1');
+  await assertSucceeds(supervisor.doc('halaqat/h2').get());
+  await assertSucceeds(
+    supervisor.collection('halaqat').where('supervisorId', '==', 'supervisor1').get(),
+  );
+
+  const parent = authed('parent1');
+  await assertSucceeds(parent.doc('halaqat/h1').get());
+  await assertSucceeds(
+    parent.collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+});
+
 test('PH02 halaqa: membership locks are server-only', async () => {
   for (const uid of ALL_ROLES) {
     const db = authed(uid);

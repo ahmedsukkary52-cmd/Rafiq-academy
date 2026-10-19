@@ -116,6 +116,59 @@ attendance / evaluations / membership / coins / award counters directly; those w
 failing at step 5, so enforce a minimum app version (or wait for adoption)
 before step 5.
 
+**B10 minimum-version gate.** The build carries a gate that reads the public
+document `appConfig/clientVersion` before restoring the session and again
+whenever the app returns to the foreground. Schema:
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `minimumBuildNumber` | integer, 1 to 2100000000 | yes | Builds whose number is lower see a blocking Arabic update screen. |
+| `androidUpdateUrl` | `https://` string | no | Store link for the Android update button. |
+| `iosUpdateUrl` | `https://` string | no | Store link for the iOS update button. |
+
+Store it as a Firestore integer, not a double. Other fields are ignored. If
+the document is missing or malformed, or the server and cache are both
+unreachable, the app is allowed (fails open). A URL that is present but not a
+valid `https` link with a host makes the whole document malformed. With no
+URL for the platform, the screen shows retry only. No store URLs exist yet,
+so no update button appears until they are added.
+
+Rules: anyone, signed out included, may `get` only this document; `list` and
+every client write (Admin included) are denied. Change it only through the
+approved deployment procedure (Firebase console or Admin SDK by the release
+owner), never from the app.
+
+Order:
+
+1. Bump the `+N` in `pubspec.yaml` and `kAppBuildNumber` in
+   `lib/core/constants/app_build_number.dart` together;
+   `test/core/constants/app_build_number_test.dart` fails if they differ.
+   The gate compares against `kAppBuildNumber`, the constant compiled into
+   the app, not the store build number. Do not pass `--build-number` to
+   `flutter build` unless the constant is changed to the same value. If the
+   store number is overridden (say 42) while `kAppBuildNumber` stays lower
+   (say 1), setting `minimumBuildNumber` to the store number makes the newest
+   build block itself; recovery is lowering the value in the console.
+2. Create `appConfig/clientVersion` with `minimumBuildNumber` not exceeding
+   the `kAppBuildNumber` compiled into the gated build being distributed,
+   before distributing that build.
+3. Verify before distributing: read the document back (console or Admin SDK)
+   and confirm `minimumBuildNumber` is an integer no higher than that
+   `kAppBuildNumber`, and that any store URL is the intended `https` link.
+   Open the gated build on a test device and confirm it reaches login or the
+   role home, not the update screen. Before §5 (Firestore rules deployment),
+   the gate fails open. Therefore, repeat the device check once the Firestore
+   rules deployment is live.
+4. Distribute the gated build and replace every older build on test devices.
+   Builds made before B10 have no gate and cannot be blocked; they must be
+   replaced by hand.
+5. Only then deploy step 5. The `appConfig` read rule ships in the same
+   `firestore.rules` file, so before step 5 the gate's read is denied and the
+   gate fails open; it starts blocking only after step 5 is live.
+6. For later breaking changes, raise `minimumBuildNumber` to the first
+   compatible build's `kAppBuildNumber` before deploying the change, after
+   the same read-back and device check.
+
 ## 5. Firestore rules
 
 Deploy `firestore.rules`. This is the step that actually closes the client

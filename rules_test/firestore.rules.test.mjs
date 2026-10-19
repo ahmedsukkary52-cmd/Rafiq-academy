@@ -1597,3 +1597,73 @@ test('WA-16 every client create update delete of auditLogs is denied', async () 
   await assertFails(unauth.doc('auditLogs/log1').update({ action: 'tampered' }));
   await assertFails(unauth.doc('auditLogs/log1').delete());
 });
+
+// ── B10 — appConfig/clientVersion minimum-version gate ─────────────────────
+
+const CLIENT_VERSION = 'appConfig/clientVersion';
+const ALL_ROLES = ['admin1', 'student1', 'parent1', 'teacher1', 'supervisor1'];
+
+async function seedClientVersion() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await seed(ctx.firestore(), CLIENT_VERSION, { minimumBuildNumber: 2 });
+    await seed(ctx.firestore(), 'appConfig/other', { secret: true });
+  });
+}
+
+test('B10 signed-out client may get appConfig/clientVersion', async () => {
+  await seedClientVersion();
+  const db = testEnv.unauthenticatedContext().firestore();
+  const snap = await assertSucceeds(db.doc(CLIENT_VERSION).get());
+  assert.equal(snap.data().minimumBuildNumber, 2);
+});
+
+test('B10 signed-out get of a missing clientVersion is allowed', async () => {
+  const db = testEnv.unauthenticatedContext().firestore();
+  const snap = await assertSucceeds(db.doc(CLIENT_VERSION).get());
+  assert.equal(snap.exists, false);
+});
+
+test('B10 every role may get appConfig/clientVersion', async () => {
+  await seedClientVersion();
+  for (const uid of ALL_ROLES) {
+    await assertSucceeds(authed(uid).doc(CLIENT_VERSION).get());
+  }
+});
+
+test('B10 other appConfig documents and list are denied to everyone', async () => {
+  await seedClientVersion();
+  const clients = [
+    testEnv.unauthenticatedContext().firestore(),
+    ...ALL_ROLES.map(authed),
+  ];
+  for (const db of clients) {
+    await assertFails(db.doc('appConfig/other').get());
+    await assertFails(db.collection('appConfig').get());
+    await assertFails(
+      db.collection('appConfig').where('minimumBuildNumber', '>=', 1).get(),
+    );
+  }
+});
+
+test('B10 no client, Admin included, may write appConfig', async () => {
+  await seedClientVersion();
+  const clients = [
+    testEnv.unauthenticatedContext().firestore(),
+    ...ALL_ROLES.map(authed),
+  ];
+  for (const db of clients) {
+    await assertFails(db.doc(CLIENT_VERSION).set({ minimumBuildNumber: 1 }));
+    await assertFails(db.doc(CLIENT_VERSION).update({ minimumBuildNumber: 99 }));
+    await assertFails(db.doc(CLIENT_VERSION).delete());
+    await assertFails(db.doc('appConfig/new').set({ minimumBuildNumber: 1 }));
+  }
+});
+
+test('B10 neighbouring academySettings permissions are unchanged', async () => {
+  await assertSucceeds(authed('admin1').doc('academySettings/communication').get());
+  await assertSucceeds(authed('parent1').doc('academySettings/paymentPublic').get());
+  await assertFails(authed('parent1').doc('academySettings/communication').get());
+  await assertFails(
+    testEnv.unauthenticatedContext().firestore().doc('academySettings/paymentPublic').get(),
+  );
+});

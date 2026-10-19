@@ -22,6 +22,9 @@ import '../../features/admin/presentation/pages/admin_registration_requests_page
 import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/admin/presentation/pages/payment_review_page.dart';
 import '../../features/analytics/presentation/pages/analytics_dashboard_page.dart';
+import '../../features/app_update/presentation/bloc/client_version_gate_bloc.dart';
+import '../../features/app_update/presentation/pages/update_required_page.dart';
+import '../../features/app_update/presentation/version_gate_redirect.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
@@ -77,6 +80,9 @@ class AppRoutes {
   /// D1 / WA-1 — public self-registration removed. Path kept only so deep links
   /// redirect to login (no RegisterPage route).
   static const String register = '/register';
+
+  /// B10 — blocking screen for a build below the configured minimum.
+  static const String updateRequired = '/update-required';
 
   // Student
   static const String student = '/student';
@@ -275,37 +281,41 @@ class AuthRedirect {
 
 class AppRouter {
   final AuthBloc authBloc;
+  final ClientVersionGateBloc versionGate;
   final ValueNotifier<bool> onboardingSeen;
 
-  AppRouter({required this.authBloc, required this.onboardingSeen});
+  AppRouter({
+    required this.authBloc,
+    required this.versionGate,
+    required this.onboardingSeen,
+  });
 
   late final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
     refreshListenable: Listenable.merge([
-      _BlocListenable(authBloc),
+      _BlocListenable(authBloc.stream),
+      _BlocListenable(versionGate.stream),
       onboardingSeen,
     ]),
 
     redirect: (BuildContext context, GoRouterState state) {
-      final authState = authBloc.state;
       final currentPath = state.matchedLocation;
-
-      // أول تشغيل للتطبيق → الأونبوردنج قبل أي حاجة تانية
-      if (!onboardingSeen.value) {
-        return currentPath == AppRoutes.onboarding
-            ? null
-            : AppRoutes.onboarding;
-      }
-      if (currentPath == AppRoutes.onboarding) {
-        return AppRoutes.splash;
-      }
-
-      return AuthRedirect.resolve(state: authState, path: currentPath);
+      return VersionGateRedirect.resolve(
+        status: versionGate.state.status,
+        path: currentPath,
+        splashPath: AppRoutes.splash,
+        updatePath: AppRoutes.updateRequired,
+        otherwise: () => _onboardingThenAuth(currentPath),
+      );
     },
 
     routes: [
       // ── Auth ──────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.updateRequired,
+        builder: (_, __) => const UpdateRequiredPage(),
+      ),
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (_, __) => OnboardingPage(onboardingSeen: onboardingSeen),
@@ -668,10 +678,21 @@ class AppRouter {
       body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
     ),
   );
+
+  String? _onboardingThenAuth(String currentPath) {
+    // أول تشغيل للتطبيق → الأونبوردنج قبل أي حاجة تانية
+    if (!onboardingSeen.value) {
+      return currentPath == AppRoutes.onboarding ? null : AppRoutes.onboarding;
+    }
+    if (currentPath == AppRoutes.onboarding) {
+      return AppRoutes.splash;
+    }
+    return AuthRedirect.resolve(state: authBloc.state, path: currentPath);
+  }
 }
 
 class _BlocListenable extends ChangeNotifier {
-  _BlocListenable(AuthBloc bloc) {
-    bloc.stream.listen((_) => notifyListeners());
+  _BlocListenable(Stream<Object?> states) {
+    states.listen((_) => notifyListeners());
   }
 }

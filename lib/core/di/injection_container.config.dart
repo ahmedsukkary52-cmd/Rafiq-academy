@@ -87,6 +87,14 @@ import 'package:rafiq_academy/features/admin/presentation/bloc/admin_operations_
     as _i195;
 import 'package:rafiq_academy/features/admin/presentation/bloc/payment_review_bloc.dart'
     as _i866;
+import 'package:rafiq_academy/features/app_update/data/client_version_repository_impl.dart'
+    as _i1902;
+import 'package:rafiq_academy/features/app_update/data/client_version_source.dart'
+    as _i1901;
+import 'package:rafiq_academy/features/app_update/domain/client_version_repository.dart'
+    as _i1903;
+import 'package:rafiq_academy/features/app_update/presentation/bloc/client_version_gate_bloc.dart'
+    as _i1904;
 import 'package:rafiq_academy/features/analytics/data/datasources/analytics_remote_datasource.dart'
     as _i797;
 import 'package:rafiq_academy/features/analytics/data/datasources/analytics_remote_datasource_impl.dart'
@@ -667,6 +675,15 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i756.ScheduleRemoteDatasource>(
       () => _i1027.ScheduleRemoteDatasourceImpl(gh<_i974.FirebaseFirestore>()),
+    );
+    gh.lazySingleton<_i1901.ClientVersionSource>(
+      () => _i1901.FirestoreClientVersionSource(gh<_i974.FirebaseFirestore>()),
+    );
+    gh.lazySingleton<_i1903.ClientVersionRepository>(
+      () => _i1902.ClientVersionRepositoryImpl(gh<_i1901.ClientVersionSource>()),
+    );
+    gh.factory<_i1904.ClientVersionGateBloc>(
+      () => _i1904.ClientVersionGateBloc(gh<_i1903.ClientVersionRepository>()),
     );
     gh.lazySingleton<_i817.AdminOperationsRepository>(
       () => _i523.AdminOperationsRepositoryImpl(

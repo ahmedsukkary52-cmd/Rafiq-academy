@@ -445,6 +445,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // B10 — minimum-version gate, read before sign-in. Public get of the one
+    // document only; no client (Admin included) may list or write it. It is
+    // changed only through the deployment procedure (Admin SDK / console).
+    match /appConfig/{docId} {
+      allow get: if docId == 'clientVersion';
+      allow list: if false;
+      allow write: if false;
+    }
+
     // C3 — academy settings (WAVE_A: Parent read paymentPublic only; Admin RW)
     // paymentPublic is the Parent-safe projection: only the locked C3 fields
     // may ever be written, so private Admin config cannot leak into it.

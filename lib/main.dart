@@ -10,6 +10,8 @@ import 'core/di/injection_container.dart';
 import 'core/firebase/app_firebase.dart';
 import 'core/router/router_app.dart';
 import 'core/session/clear_session_projections.dart';
+import 'features/app_update/presentation/bloc/client_version_gate_bloc.dart';
+import 'features/app_update/presentation/version_gate_session.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/student/presentation/bloc/student_bloc.dart';
@@ -62,16 +64,26 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  late final AuthBloc authBloc = sl<AuthBloc>()
-    ..add(const CheckAuthStatusEvent());
+  late final AuthBloc authBloc = sl<AuthBloc>();
+
+  /// B10 — session restoration waits until this first reports allowed.
+  late final ClientVersionGateBloc versionGate = sl<ClientVersionGateBloc>()
+    ..add(const ClientVersionCheckRequested());
 
   /// One router for the app lifetime so push taps can navigate it.
   late final GoRouter _router = AppRouter(
     authBloc: authBloc,
+    versionGate: versionGate,
     onboardingSeen: widget.onboardingSeen,
   ).router;
 
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  StreamSubscription<ClientVersionGateState>? _versionGateSub;
+  late final _authStart = AuthStartAfterGate(
+    () => authBloc.add(const CheckAuthStatusEvent()),
+  );
+  late final AppLifecycleListener _lifecycle;
 
   StreamSubscription<String>? _pushOpenSub;
 
@@ -84,6 +96,10 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    _versionGateSub = versionGate.stream.listen(_authStart.onGateState);
+    _lifecycle = AppLifecycleListener(
+      onResume: () => versionGate.add(const ClientVersionCheckRequested()),
+    );
     final opens = sl<NotificationOpenPort>();
     _pushOpenSub = opens.openedTypes().listen(_onPushOpened);
     unawaited(
@@ -96,6 +112,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _pushOpenSub?.cancel();
+    _versionGateSub?.cancel();
+    _lifecycle.dispose();
+    versionGate.close();
     super.dispose();
   }
 
@@ -121,6 +140,7 @@ class _MyAppState extends State<MyApp> {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: authBloc),
+        BlocProvider.value(value: versionGate),
         BlocProvider.value(value: sl<StudentBloc>()),
         BlocProvider.value(value: sl<TeacherBloc>()),
         BlocProvider.value(value: sl<ParentBloc>()),
@@ -192,7 +212,9 @@ class _MyAppState extends State<MyApp> {
                       data: MediaQuery.of(
                         context,
                       ).copyWith(textScaler: TextScaler.linear(fontSize.scale)),
-                      child: child ?? const SizedBox.shrink(),
+                      child: VersionGateSessionGuard(
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     ),
                   );
                 },

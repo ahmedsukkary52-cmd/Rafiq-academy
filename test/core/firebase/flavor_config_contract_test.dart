@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/firebase/app_flavor.dart';
 
 const _devApplicationId = 'com.example.rafiq_academy';
+const _stagingApplicationId = 'com.basmaacademy.app.staging';
 const _prodApplicationId = 'com.basmaacademy.app';
 
 /// Index of the `}` closing the block whose body starts at [bodyStart].
@@ -98,6 +99,8 @@ android {
   test('Gradle flavors set the expected application IDs and app names', () {
     expect(_applicationId(flavors['dev']!), _devApplicationId);
     expect(_appName(flavors['dev']!), 'بصمة (تطوير)');
+    expect(_applicationId(flavors['staging']!), _stagingApplicationId);
+    expect(_appName(flavors['staging']!), 'بصمة (تجريبي)');
     expect(_applicationId(flavors['prod']!), _prodApplicationId);
     expect(_appName(flavors['prod']!), 'بصمة');
   });

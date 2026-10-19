@@ -11,15 +11,17 @@ FirebaseOptions _options(String projectId) => FirebaseOptions(
 
 void main() {
   group('parseAppFlavor', () {
-    test('accepts dev and prod', () {
+    test('accepts dev, staging and prod', () {
       expect(parseAppFlavor('dev'), AppFlavor.dev);
+      expect(parseAppFlavor('staging'), AppFlavor.staging);
       expect(parseAppFlavor('prod'), AppFlavor.prod);
     });
 
     test('refuses to guess a missing or unknown flavor', () {
       expect(() => parseAppFlavor(null), throwsStateError);
       expect(() => parseAppFlavor(''), throwsStateError);
-      expect(() => parseAppFlavor('staging'), throwsStateError);
+      expect(() => parseAppFlavor('stage'), throwsStateError);
+      expect(() => parseAppFlavor('Staging'), throwsStateError);
       expect(() => parseAppFlavor('Dev'), throwsStateError);
     });
   });
@@ -38,6 +40,17 @@ void main() {
         () => firebaseOptionsFor(
           AppFlavor.dev,
           devOptions: () => _options('rafiq-academy-prod'),
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('staging refuses to start until its project is configured', () {
+      expect(stagingFirebaseProjectId, 'rafiq-academy-staging');
+      expect(
+        () => firebaseOptionsFor(
+          AppFlavor.staging,
+          devOptions: () => _options(devFirebaseProjectId),
         ),
         throwsStateError,
       );

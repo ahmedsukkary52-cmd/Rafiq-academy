@@ -47,13 +47,20 @@ android {
     // Each flavor's applicationId must match an Android app registered in
     // that flavor's Firebase project, or the google-services plugin fails
     // the build. dev keeps the ID registered in rafiq-academy until
-    // com.basmaacademy.app.dev is registered there.
+    // com.basmaacademy.app.dev is registered there. staging and prod have no
+    // src/<flavor>/google-services.json yet, so their builds stop at that
+    // step instead of falling back to the dev project.
     flavorDimensions += "env"
     productFlavors {
         create("dev") {
             dimension = "env"
             applicationId = "com.example.rafiq_academy"
             resValue("string", "app_name", "بصمة (تطوير)")
+        }
+        create("staging") {
+            dimension = "env"
+            applicationId = "com.basmaacademy.app.staging"
+            resValue("string", "app_name", "بصمة (تجريبي)")
         }
         create("prod") {
             dimension = "env"

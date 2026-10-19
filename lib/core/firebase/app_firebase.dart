@@ -5,11 +5,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../firebase_options.dart';
+import 'app_flavor.dart';
 
 /// `flutter run --dart-define=USE_FIREBASE_EMULATOR=true` routes the app to
-/// the local Emulator Suite. Debug builds only; absent or false keeps the
-/// production project.
+/// the local Emulator Suite. Debug builds only; absent or false uses the
+/// build flavor's project (see app_flavor.dart).
 const bool useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
 
 /// Must match the region the callables are deployed to (functions/src).
@@ -58,7 +58,7 @@ FirebaseApp get firebaseEmulatorApp =>
 Future<void> initializeAppFirebase() async {
   if (!useFirebaseEmulator) {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+      options: firebaseOptionsFor(currentAppFlavor()),
     );
     return;
   }

@@ -36,8 +36,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.rafiq_academy"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -46,10 +44,29 @@ android {
         versionName = flutter.versionName
     }
 
+    // Each flavor's applicationId must match an Android app registered in
+    // that flavor's Firebase project, or the google-services plugin fails
+    // the build. dev keeps the ID registered in rafiq-academy until
+    // com.basmaacademy.app.dev is registered there.
+    flavorDimensions += "env"
+    productFlavors {
+        create("dev") {
+            dimension = "env"
+            applicationId = "com.example.rafiq_academy"
+            resValue("string", "app_name", "بصمة (تطوير)")
+        }
+        create("prod") {
+            dimension = "env"
+            applicationId = "com.basmaacademy.app"
+            resValue("string", "app_name", "بصمة")
+        }
+    }
+
     buildTypes {
         debug {
             // Native FCM auto-init runs at process start, before Dart, against
-            // the production project from google-services.json.
+            // the project in this variant's google-services.json (dev:
+            // rafiq-academy).
             manifestPlaceholders["firebaseMessagingAutoInitEnabled"] =
                 (!useFirebaseEmulator).toString()
         }

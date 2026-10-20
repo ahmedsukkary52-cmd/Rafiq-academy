@@ -3,6 +3,11 @@
  * mirrored by storage.rules (paths, MIME allow-lists, size ceilings).
  */
 
+import {
+  CONTACT_INFO_REJECTION_MESSAGE,
+  detectContactInfo,
+} from "../privacy/contactInfoPolicy";
+
 export type ChatMessageType = "text" | "image" | "voice" | "file";
 
 export const CHAT_MESSAGE_TYPES: readonly ChatMessageType[] = [
@@ -152,6 +157,9 @@ export function normalizeMessageText(raw: unknown): string {
       `الرسالة أطول من ${CHAT_TEXT_MAX_CHARS} حرف`,
     );
   }
+  if (detectContactInfo(text) !== null) {
+    throw new ChatInputError("invalid-argument", CONTACT_INFO_REJECTION_MESSAGE);
+  }
   return text;
 }
 
@@ -237,6 +245,14 @@ export function parseSendChatMessageInput(raw: unknown): ParsedSendInput {
       throw new ChatInputError("invalid-argument", "اسم الملف غير صالح");
     }
     fileName = media.fileName.trim();
+  }
+  // The object name is persisted in media.storagePath, so it is checked even
+  // when a separate display name is supplied.
+  if (
+    detectContactInfo(fileName) !== null
+    || detectContactInfo(parts.fileName) !== null
+  ) {
+    throw new ChatInputError("invalid-argument", CONTACT_INFO_REJECTION_MESSAGE);
   }
 
   let durationMs: number | null = null;

@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../../domain/policies/chat_media_policy.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -86,16 +87,21 @@ class ChatRepositoryImpl implements ChatRepository {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
-  }) => _guard(() async {
-    await remoteDatasource.sendMessage(
-      conversationId: conversationId,
-      messageId: messageId,
-      type: type,
-      text: text,
-      media: media,
-    );
-    return unit;
-  });
+  }) async {
+    final violation =
+        contactInfoViolation(text) ?? contactInfoViolation(media?.fileName);
+    if (violation != null) return Left(ValidationFailure(violation));
+    return _guard(() async {
+      await remoteDatasource.sendMessage(
+        conversationId: conversationId,
+        messageId: messageId,
+        type: type,
+        text: text,
+        media: media,
+      );
+      return unit;
+    });
+  }
 
   @override
   Future<Either<Failure, ChatUploadTask>> startAttachmentUpload({
@@ -161,12 +167,16 @@ class ChatRepositoryImpl implements ChatRepository {
     required String conversationId,
     required String messageId,
     required String text,
-  }) => _guard(() async {
-    await remoteDatasource.editMessage(
-      conversationId: conversationId,
-      messageId: messageId,
-      text: text,
-    );
-    return unit;
-  });
+  }) async {
+    final violation = contactInfoViolation(text);
+    if (violation != null) return Left(ValidationFailure(violation));
+    return _guard(() async {
+      await remoteDatasource.editMessage(
+        conversationId: conversationId,
+        messageId: messageId,
+        text: text,
+      );
+      return unit;
+    });
+  }
 }

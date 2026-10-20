@@ -706,7 +706,7 @@ test("an in_progress marker prints a read-only diagnosis of UIDs and counts, and
   assert.match(text, /Firestore users: 0 of 6 dataset documents exist\./);
   assert.match(text, /never makes the session acceptable for seeding/);
   for (const account of DEMO_ACCOUNTS) {
-    for (const value of [account.email, account.name, account.phone]) assert.ok(!text.includes(value), value);
+    for (const value of [account.email, account.name]) assert.ok(!text.includes(value), value);
   }
 
   const afterLoad = next.calls.slice(next.calls.findIndex((c) => c.startsWith("loadAdmin")) + 1);

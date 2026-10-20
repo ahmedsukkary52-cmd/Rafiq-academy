@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
 import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
+import { findContactFieldKey } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
 import { assertCallerIsAdmin, parseProvisionRole, ProvisionRole } from "./assertAdmin";
 
@@ -11,7 +12,6 @@ interface AdminProvisionUserRequest {
   password: string;
   name: string;
   role: string;
-  phone?: string;
   isActive?: boolean;
 }
 
@@ -97,12 +97,17 @@ export const adminProvisionUser = onCall<
 
   const actorUid = await assertCallerIsAdmin(request.auth?.uid);
 
+  if (findContactFieldKey(request.data) !== null) {
+    throw new HttpsError(
+      "invalid-argument",
+      "لا يتم حفظ أرقام الهواتف الشخصية في التطبيق",
+    );
+  }
+
   const email = requireNonEmptyString(request.data?.email, "email");
   const password = requireNonEmptyString(request.data?.password, "password");
   const name = requireNonEmptyString(request.data?.name, "name");
   const role = parseProvisionRole(request.data?.role);
-  const phone =
-    typeof request.data?.phone === "string" ? request.data.phone.trim() : "";
   const isActive =
     typeof request.data?.isActive === "boolean" ? request.data.isActive : true;
 
@@ -131,18 +136,7 @@ export const adminProvisionUser = onCall<
       email,
       isActive,
       createdAt: FieldValue.serverTimestamp(),
-      // phone intentionally omitted from users (D16 / userPrivate)
     });
-
-    if (phone.length > 0) {
-      await db.collection("userPrivate").doc(uid).set(
-        {
-          phone,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      );
-    }
 
     await writeRoleProfile(db, uid, role, name);
     await writeAuditLog({

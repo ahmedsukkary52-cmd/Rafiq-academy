@@ -216,7 +216,7 @@ void main() {
       );
     });
 
-    test('provision omits a blank phone and returns the uid', () async {
+    test('provision sends no phone and returns the uid', () async {
       functions.handlers['adminProvisionUser'] = (_) => {'uid': 'newUid'};
 
       final uid = await ds.provisionUser(
@@ -224,7 +224,6 @@ void main() {
         password: 'secret1',
         name: ' طالب ',
         role: 'student',
-        phone: '  ',
       );
 
       expect(uid, 'newUid');

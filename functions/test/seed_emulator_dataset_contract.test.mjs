@@ -1,6 +1,6 @@
 /**
  * Demo dataset v1 contract (scripts/seed-emulator-dataset.mjs): fixed UIDs,
- * no phone on users, and field names identical to what adminProvisionUser
+ * no personal phone numbers anywhere, and field names identical to what adminProvisionUser
  * writes today, read from the current sources. Pure: nothing is written.
  */
 import { test } from "node:test";
@@ -106,12 +106,16 @@ test("roles are provisionable roles", () => {
   }
 });
 
-test("users documents never carry a phone; phones live only in userPrivate", () => {
-  for (const doc of docsIn("users")) assert.equal("phone" in doc.data, false, doc.id);
-  for (const doc of dataset.documents) {
-    if (doc.collection !== "userPrivate") assert.equal("phone" in doc.data, false, `${doc.collection}/${doc.id}`);
+test("no personal phone number is seeded anywhere (no-phone policy)", () => {
+  const contactKeys = ["phone", "phoneNumber", "mobile", "whatsapp", "parentPhone", "guardianPhone"];
+  for (const account of DEMO_ACCOUNTS) {
+    for (const key of contactKeys) assert.equal(key in account, false, `${account.uid}.${key}`);
   }
-  assert.equal(docsIn("userPrivate").length, DEMO_ACCOUNTS.length);
+  for (const doc of dataset.documents) {
+    for (const key of contactKeys) assert.equal(key in doc.data, false, `${doc.collection}/${doc.id}.${key}`);
+  }
+  assert.doesNotMatch(JSON.stringify(dataset), /phone|whatsapp|\b05\d{8}\b|\b01[0125]\d{8}\b/i);
+  assert.doesNotMatch(datasetSource.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ""), /phone/i);
 });
 
 test("users fields equal adminProvisionUser and are a subset of UserModel.toFirestore", () => {
@@ -125,8 +129,13 @@ test("users fields equal adminProvisionUser and are a subset of UserModel.toFire
   }
 });
 
-test("userPrivate and role profile fields equal adminProvisionUser", () => {
-  for (const collection of ["userPrivate", "studentProfiles", "parentProfiles", "teacherProfiles"]) {
+test("like adminProvisionUser, the dataset writes no userPrivate document", () => {
+  assert.doesNotMatch(provisionSource, /collection\("userPrivate"\)/);
+  assert.equal(docsIn("userPrivate").length, 0);
+});
+
+test("role profile fields equal adminProvisionUser", () => {
+  for (const collection of ["studentProfiles", "parentProfiles", "teacherProfiles"]) {
     const expected = provisionKeys(collection);
     assert.ok(docsIn(collection).length > 0, collection);
     for (const doc of docsIn(collection)) assert.deepEqual(keysOf(doc), expected, `${collection}/${doc.id}`);
@@ -143,7 +152,7 @@ test("each account gets exactly the profile adminProvisionUser gives its role", 
 
 test("only known collections are written; all fit in one batch", () => {
   const collections = new Set(dataset.documents.map((d) => d.collection));
-  assert.deepEqual([...collections].sort(), ["parentProfiles", "studentProfiles", "teacherProfiles", "userPrivate", "users"]);
+  assert.deepEqual([...collections].sort(), ["parentProfiles", "studentProfiles", "teacherProfiles", "users"]);
   for (const c of collections) assert.match(rulesSource, new RegExp(`match /${c}/\\{`), c);
   assert.doesNotMatch(rulesSource, new RegExp(`match /${SEED_META.collection}/`), "seed marker stays under the catch-all deny");
   assert.ok(dataset.documents.length < 500);

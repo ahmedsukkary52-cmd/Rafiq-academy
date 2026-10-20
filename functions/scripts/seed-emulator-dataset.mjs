@@ -1,5 +1,6 @@
 // Demo dataset v1 for the emulator seeder: accounts plus the documents
-// adminProvisionUser writes for them (users, userPrivate, role profiles).
+// adminProvisionUser writes for them (users, role profiles). No personal
+// phone numbers are seeded anywhere.
 // Pure data and write orchestration; firebase-admin handles are injected.
 //
 // Writes use create() only, so nothing that already exists is overwritten,
@@ -15,12 +16,12 @@ export const DEMO_PASSWORD = "SeedDemo123!";
 export const SERVER_TIMESTAMP = Object.freeze({ serverTimestamp: true });
 
 export const DEMO_ACCOUNTS = Object.freeze([
-  { uid: "demo-admin-01", email: "admin@rafiq.demo", name: "خالد عبدالرحمن", role: "admin", phone: "0500000101" },
-  { uid: "demo-supervisor-01", email: "supervisor1@rafiq.demo", name: "فهد السبيعي", role: "supervisor", phone: "0500000201" },
-  { uid: "demo-teacher-01", email: "teacher@rafiq.demo", name: "عبدالله الحربي", role: "teacher", phone: "0500000301" },
-  { uid: "demo-parent-01", email: "parent@rafiq.demo", name: "محمد العتيبي", role: "parent", phone: "0500000401" },
-  { uid: "demo-student-01", email: "student01@rafiq.demo", name: "أحمد محمد", role: "student", phone: "0500000501" },
-  { uid: "demo-student-02", email: "student02@rafiq.demo", name: "سارة علي", role: "student", phone: "0500000502" },
+  { uid: "demo-admin-01", email: "admin@rafiq.demo", name: "خالد عبدالرحمن", role: "admin" },
+  { uid: "demo-supervisor-01", email: "supervisor1@rafiq.demo", name: "فهد السبيعي", role: "supervisor" },
+  { uid: "demo-teacher-01", email: "teacher@rafiq.demo", name: "عبدالله الحربي", role: "teacher" },
+  { uid: "demo-parent-01", email: "parent@rafiq.demo", name: "محمد العتيبي", role: "parent" },
+  { uid: "demo-student-01", email: "student01@rafiq.demo", name: "أحمد محمد", role: "student" },
+  { uid: "demo-student-02", email: "student02@rafiq.demo", name: "سارة علي", role: "student" },
 ].map((a) => Object.freeze(a)));
 
 /** Same field set as adminProvisionUser's writeRoleProfile. */
@@ -81,11 +82,6 @@ export function buildDemoDataset(accounts = DEMO_ACCOUNTS) {
         isActive: true,
         createdAt: SERVER_TIMESTAMP,
       },
-    });
-    documents.push({
-      collection: "userPrivate",
-      id: account.uid,
-      data: { phone: account.phone, updatedAt: SERVER_TIMESTAMP },
     });
     const profile = roleProfile(account);
     if (profile !== null) documents.push({ ...profile, id: account.uid });

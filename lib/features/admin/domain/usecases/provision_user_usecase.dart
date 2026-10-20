@@ -18,7 +18,6 @@ class ProvisionUserUseCase extends UseCase<String, ProvisionUserParams> {
         password: params.password,
         name: params.name,
         role: params.role,
-        phone: params.phone,
         isActive: params.isActive,
       );
 }

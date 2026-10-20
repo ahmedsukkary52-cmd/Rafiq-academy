@@ -39,7 +39,6 @@ class _ProvisionFormState extends State<_ProvisionForm> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _phone = TextEditingController();
   String _role = AppRoles.student;
 
   @override
@@ -47,7 +46,6 @@ class _ProvisionFormState extends State<_ProvisionForm> {
     _name.dispose();
     _email.dispose();
     _password.dispose();
-    _phone.dispose();
     super.dispose();
   }
 
@@ -60,7 +58,6 @@ class _ProvisionFormState extends State<_ProvisionForm> {
           password: _password.text,
           name: _name.text.trim(),
           role: _role,
-          phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         ),
       ),
     );
@@ -116,15 +113,6 @@ class _ProvisionFormState extends State<_ProvisionForm> {
                 validator: (v) => (v ?? '').length < 6
                     ? 'كلمة المرور 6 أحرف على الأقل'
                     : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phone,
-                keyboardType: TextInputType.phone,
-                textDirection: TextDirection.ltr,
-                decoration: const InputDecoration(
-                  labelText: 'رقم الهاتف (اختياري)',
-                ),
               ),
               const SizedBox(height: 16),
               AdminSubmitButton(label: 'إنشاء الحساب', onPressed: _submit),

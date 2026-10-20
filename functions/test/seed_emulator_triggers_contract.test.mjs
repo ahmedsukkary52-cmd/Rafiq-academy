@@ -138,7 +138,7 @@ test("layer 3: source definitions exported from index.ts equal the compiled endp
 
 test("only the reviewed triggers fire on seeded or derived collections", () => {
   const seeded = [...new Set([...buildDemoDataset().documents.map((d) => d.collection), SEED_META.collection])].sort();
-  assert.deepEqual(seeded, ["_seedMeta", "parentProfiles", "studentProfiles", "teacherProfiles", "userPrivate", "users"]);
+  assert.deepEqual(seeded, ["_seedMeta", "parentProfiles", "studentProfiles", "teacherProfiles", "users"]);
   const watched = new Set([...seeded, ...DERIVED_COLLECTIONS]);
   const firing = Object.entries(compiledManifest().events)
     .filter(([, { document }]) => {

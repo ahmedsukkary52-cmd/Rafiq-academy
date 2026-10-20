@@ -72,7 +72,6 @@ abstract class AdminRemoteDatasource {
     required String password,
     required String name,
     required String role,
-    String? phone,
     bool isActive = true,
   });
 

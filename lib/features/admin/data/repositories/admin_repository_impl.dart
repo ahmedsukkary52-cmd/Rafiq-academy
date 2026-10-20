@@ -166,7 +166,6 @@ class AdminRepositoryImpl implements AdminRepository {
     required String password,
     required String name,
     required String role,
-    String? phone,
     bool isActive = true,
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
@@ -177,7 +176,6 @@ class AdminRepositoryImpl implements AdminRepository {
           password: password,
           name: name,
           role: role,
-          phone: phone,
           isActive: isActive,
         ),
       );

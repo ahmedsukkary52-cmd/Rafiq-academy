@@ -76,7 +76,6 @@ abstract class AdminRepository {
     required String password,
     required String name,
     required String role,
-    String? phone,
     bool isActive,
   });
 
@@ -268,7 +267,6 @@ class ProvisionUserParams extends Equatable {
   final String password;
   final String name;
   final String role;
-  final String? phone;
   final bool isActive;
 
   const ProvisionUserParams({
@@ -276,12 +274,11 @@ class ProvisionUserParams extends Equatable {
     required this.password,
     required this.name,
     required this.role,
-    this.phone,
     this.isActive = true,
   });
 
   @override
-  List<Object?> get props => [email, password, name, role, phone, isActive];
+  List<Object?> get props => [email, password, name, role, isActive];
 }
 
 class ApproveRegistrationParams extends Equatable {

@@ -226,93 +226,101 @@ export const softDeleteChatMessage = onCall(
 /**
  * Edit own message within the C9 time window.
  */
+export async function editChatMessageCore(
+  db: admin.firestore.Firestore,
+  callerUid: string,
+  rawData: unknown,
+) {
+  const data = (rawData ?? {}) as Record<string, unknown>;
+  const conversationId = requireOtherUid(data.conversationId);
+  const messageId = requireOtherUid(data.messageId);
+  let text: string;
+  try {
+    text = normalizeMessageText(data.text);
+  } catch (e) {
+    if (e instanceof ChatInputError) throw new HttpsError(e.code, e.message);
+    throw e;
+  }
+  if (text.length === 0) {
+    throw new HttpsError("invalid-argument", "نص الرسالة مطلوب");
+  }
+
+  const role = await loadUserRole(db, callerUid);
+  if (!role) {
+    throw new HttpsError("permission-denied", "الحساب غير مفعّل");
+  }
+  const convRef = db.collection("conversations").doc(conversationId);
+  const msgRef = convRef.collection("messages").doc(messageId);
+
+  await db.runTransaction(async (tx) => {
+    const convSnap = await tx.get(convRef);
+    if (!convSnap.exists) {
+      throw new HttpsError("not-found", "المحادثة غير موجودة");
+    }
+    const participantIds = Array.isArray(convSnap.data()?.participantIds)
+      ? (convSnap.data()!.participantIds as unknown[])
+          .filter((x): x is string => typeof x === "string")
+      : [];
+    if (!participantIds.includes(callerUid)) {
+      throw new HttpsError("permission-denied", "لست مشاركاً في المحادثة");
+    }
+
+    const msgSnap = await tx.get(msgRef);
+    if (!msgSnap.exists) {
+      throw new HttpsError("not-found", "الرسالة غير موجودة");
+    }
+    const msg = msgSnap.data() ?? {};
+    const senderId =
+      typeof msg.senderId === "string" ? msg.senderId : "";
+    const sentAtRaw = msg.sentAt;
+    const sentAt =
+      sentAtRaw instanceof Timestamp
+        ? sentAtRaw.toDate()
+        : sentAtRaw instanceof Date
+          ? sentAtRaw
+          : new Date(0);
+    if (
+      !canEditMessage({
+        senderId,
+        callerUid,
+        sentAt,
+        alreadyDeleted: msg.deleted === true,
+      })
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "غير مسموح بتعديل هذه الرسالة",
+      );
+    }
+    if ((msg.type ?? "text") !== "text") {
+      throw new HttpsError(
+        "failed-precondition",
+        "لا يمكن تعديل رسائل الوسائط",
+      );
+    }
+
+    tx.update(msgRef, {
+      text,
+      editedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    if (convSnap.data()?.lastMessageId === messageId) {
+      tx.update(convRef, {
+        lastMessage: messagePreview("text", text),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+  });
+
+  return { conversationId, messageId, edited: true };
+}
+
 export const editChatMessage = onCall(
   { region: "europe-west1" },
   async (request) => {
     assertBackendAllowed("editChatMessage");
     const callerUid = requireUid(request.auth?.uid);
-    const conversationId = requireOtherUid(request.data?.conversationId);
-    const messageId = requireOtherUid(request.data?.messageId);
-    let text: string;
-    try {
-      text = normalizeMessageText(request.data?.text);
-    } catch (e) {
-      if (e instanceof ChatInputError) throw new HttpsError(e.code, e.message);
-      throw e;
-    }
-    if (text.length === 0) {
-      throw new HttpsError("invalid-argument", "نص الرسالة مطلوب");
-    }
-
-    const db = admin.firestore();
-    const role = await loadUserRole(db, callerUid);
-    if (!role) {
-      throw new HttpsError("permission-denied", "الحساب غير مفعّل");
-    }
-    const convRef = db.collection("conversations").doc(conversationId);
-    const msgRef = convRef.collection("messages").doc(messageId);
-
-    await db.runTransaction(async (tx) => {
-      const convSnap = await tx.get(convRef);
-      if (!convSnap.exists) {
-        throw new HttpsError("not-found", "المحادثة غير موجودة");
-      }
-      const participantIds = Array.isArray(convSnap.data()?.participantIds)
-        ? (convSnap.data()!.participantIds as unknown[])
-            .filter((x): x is string => typeof x === "string")
-        : [];
-      if (!participantIds.includes(callerUid)) {
-        throw new HttpsError("permission-denied", "لست مشاركاً في المحادثة");
-      }
-
-      const msgSnap = await tx.get(msgRef);
-      if (!msgSnap.exists) {
-        throw new HttpsError("not-found", "الرسالة غير موجودة");
-      }
-      const msg = msgSnap.data() ?? {};
-      const senderId =
-        typeof msg.senderId === "string" ? msg.senderId : "";
-      const sentAtRaw = msg.sentAt;
-      const sentAt =
-        sentAtRaw instanceof Timestamp
-          ? sentAtRaw.toDate()
-          : sentAtRaw instanceof Date
-            ? sentAtRaw
-            : new Date(0);
-      if (
-        !canEditMessage({
-          senderId,
-          callerUid,
-          sentAt,
-          alreadyDeleted: msg.deleted === true,
-        })
-      ) {
-        throw new HttpsError(
-          "permission-denied",
-          "غير مسموح بتعديل هذه الرسالة",
-        );
-      }
-      if ((msg.type ?? "text") !== "text") {
-        throw new HttpsError(
-          "failed-precondition",
-          "لا يمكن تعديل رسائل الوسائط",
-        );
-      }
-
-      tx.update(msgRef, {
-        text,
-        editedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      if (convSnap.data()?.lastMessageId === messageId) {
-        tx.update(convRef, {
-          lastMessage: messagePreview("text", text),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-    });
-
-    return { conversationId, messageId, edited: true };
+    return editChatMessageCore(admin.firestore(), callerUid, request.data);
   },
 );
 

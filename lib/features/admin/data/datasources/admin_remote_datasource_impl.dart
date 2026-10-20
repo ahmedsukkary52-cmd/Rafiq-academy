@@ -393,7 +393,6 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required String password,
     required String name,
     required String role,
-    String? phone,
     bool isActive = true,
   }) async {
     try {
@@ -403,7 +402,6 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         'password': password,
         'name': name.trim(),
         'role': role.trim(),
-        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
         'isActive': isActive,
       });
       final data = result.data;

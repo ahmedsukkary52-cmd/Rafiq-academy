@@ -100,6 +100,10 @@ Deploy all exports in `functions/src/index.ts`. PH-02 additions:
   Supervisor when both halaqat are supervised by the caller (no client UI yet).
 - Triggers: `notifyParentsOnEvaluation` (evaluation + homework-review
   fan-out, IDs-only FCM payload), `notifyOnAssignmentCreated`.
+- B14: `setHalaqaMeetingLink` (Admin set/update/clear; assigned Supervisor
+  add-only) and the shared link validation in `adminCreateHalaqa`. Step 5
+  removes the only other `meetingLink` write path, so this callable must be
+  live and smoke-checked before step 5.
 
 Smoke (real project, test accounts only): one attendance save, one
 evaluation (exactly one `evaluation_create_or_correct` audit with
@@ -107,7 +111,10 @@ evaluation (exactly one `evaluation_create_or_correct` audit with
 correction of that evaluation (one more audit with `actorRole: "admin"`,
 `createdAt` unchanged), one avatar purchase with insufficient coins (must fail), one
 admission into a 3rd halaqa (must fail), one Teacher award (recipient
-`totalStars` +1 exactly once).
+`totalStars` +1 exactly once). B14: an Admin sets, updates and clears a test
+halaqa's link (one `halaqa_meeting_link_change` audit each, no URL in it);
+the assigned Supervisor can add a link only while none is stored; another
+Supervisor, a Teacher and a Student are denied; an `http://` link is rejected.
 
 ## 4. Client release
 
@@ -175,8 +182,8 @@ Deploy `firestore.rules`. This is the step that actually closes the client
 write paths (payments review, attendance, live evaluation, `studentIds`,
 server-owned profile fields, user-addressed notifications, Student/Parent
 directory scans, off-roster / multi-recipient client achievements, student
-submissions at live-evaluation ids or carrying `createdAt`). Until it ships,
-the old paths remain open.
+submissions at live-evaluation ids or carrying `createdAt`, and direct Admin
+writes of `halaqat.meetingLink`). Until it ships, the old paths remain open.
 
 ## 6. Storage rules
 
@@ -195,3 +202,5 @@ release set consistent).
 - Functions and client can roll back independently while old rules are live.
 - After step 5, rolling back the client without rolling back rules breaks
   attendance, evaluation, admission, avatar and award flows — roll back rules first.
+- After step 5, rolling Functions back to a build without `setHalaqaMeetingLink`
+  leaves no way to change a meeting link until rules are rolled back too.

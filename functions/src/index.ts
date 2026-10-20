@@ -67,3 +67,4 @@ export {
   adminAddHalaqaSlot,
   adminCreateHalaqa,
 } from "./halaqa/halaqaScheduleFunctions";
+export { setHalaqaMeetingLink } from "./halaqa/meetingLinkFunctions";

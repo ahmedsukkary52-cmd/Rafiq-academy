@@ -314,6 +314,10 @@ Implementation and evidence: `P0_COMPLETION_REPORT.md`.
 - **P7 — Shared Content.** Content is scoped to one Halaqa. Storage lives at `content_library/{halaqaId}/{uploaderUid}/…`, and the legacy `content/` path is read/delete only. Allowed files are PDF, audio, images and Word documents, up to 50 MB. The 50 MB cap is an engineering default, not a plan limit.
 - **P8 — Halaqa plan («خطة الحلقة»).** It is a read-only projection of the student's lesson homework (`newMemorizationRange` and `reviewRange`, plus `isSubmitted`). The start point is the earliest recorded assignment. It shows no percentages and does not parse `versesRange`. The Mushaf last-read position is not progress.
 - **P9 — Halaqa creation and roster.** These go through callables only: `adminCreateHalaqa`, `adminAddHalaqaSlot`, `admitStudentToHalaqa` and `adminTransferStudent`. A client may edit only the non-conflict fields `name`, `supervisorId` and `meetingLink`. `teacherId`, `schedule` and `studentIds` are frozen for clients.
+
+  > **Amendment (B14).** `meetingLink` is no longer client-editable. It is
+  > written only by `adminCreateHalaqa` and `setHalaqaMeetingLink`; see
+  > `B14_MEETING_LINKS.md`. Clients may still edit `name` and `supervisorId`.
 - **P10 — Notification deep links.** Destinations are deterministic by type and role. Payloads carry the type only, and the role allowlist is re-checked on open. A type with no destination for the role shows «هذا الإشعار لا يرتبط بصفحة متاحة لحسابك».
 
 ### Deferred (documented, not implemented)

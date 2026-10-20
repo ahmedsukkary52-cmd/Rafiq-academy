@@ -18,6 +18,8 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rules = readFileSync(join(__dirname, '..', 'firestore.rules'), 'utf8');
@@ -322,9 +324,32 @@ test('PH02 halaqa: client create denied (P0-04 callable); Admin non-conflict edi
   await assertFails(
     db.doc('halaqat/h9').set({ name: 'x', schedule: [{ day: 1 }], studentIds: [] }),
   );
-  await assertSucceeds(db.doc('halaqat/h1').update({ meetingLink: 'https://meet.example/x' }));
+  await assertSucceeds(db.doc('halaqat/h1').update({ name: 'حلقة معدلة' }));
   await assertFails(db.doc('halaqat/h1').update({ teacherId: 'teacher2' }));
   await assertFails(authed('supervisor1').doc('halaqat/h1').update({ name: 'y' }));
+});
+
+test('B14 halaqa: meetingLink is callable-only (setHalaqaMeetingLink) for every role', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('halaqat/h1').update({ meetingLink: 'https://meet.example.test/a' });
+  });
+  const unauthed = testEnv.unauthenticatedContext().firestore();
+  for (const db of [...ALL_ROLES.map(authed), unauthed]) {
+    await assertFails(db.doc('halaqat/h1').update({ meetingLink: 'https://meet.example.test/x' }));
+    await assertFails(db.doc('halaqat/h1').update({ meetingLink: '' }));
+    await assertFails(
+      db.doc('halaqat/h1').update({ meetingLink: firebase.firestore.FieldValue.delete() }),
+    );
+    await assertFails(
+      db.doc('halaqat/h1').update({ name: 'y', meetingLink: 'https://meet.example.test/y' }),
+    );
+  }
+  const admin = authed('admin1');
+  await assertSucceeds(admin.doc('halaqat/h1').update({ name: 'حلقة معدلة', status: 'active' }));
+  const after = await assertSucceeds(admin.doc('halaqat/h1').get());
+  if (after.data().meetingLink !== 'https://meet.example.test/a') {
+    throw new Error('unrelated admin edit changed meetingLink');
+  }
 });
 
 test('Halaqa reads: a student reads only Halaqat whose roster lists them', async () => {

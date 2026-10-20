@@ -66,6 +66,7 @@ export const AUDIT_ACTION = {
   relationshipChildrenChange: "relationship_children_change",
   halaqaCreate: "halaqa_create",
   halaqaScheduleChange: "halaqa_schedule_change",
+  halaqaMeetingLinkChange: "halaqa_meeting_link_change",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];

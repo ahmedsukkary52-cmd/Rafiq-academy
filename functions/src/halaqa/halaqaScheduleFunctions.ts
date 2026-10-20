@@ -39,6 +39,11 @@ import {
 } from "../authority/callerContext";
 import { assertBackendAllowed } from "../productionGate";
 import {
+  HALAQA_MEETING_LINKS_COLLECTION,
+  canonicalMeetingLinkData,
+  optionalMeetingLink,
+} from "./meetingLinkFunctions";
+import {
   parseClockTime,
   weekdayFromSlotDayLabel,
 } from "../sessions/sessionMaterialization";
@@ -274,7 +279,7 @@ export async function adminCreateHalaqaCore(
   const name = requireText(data.name, "name", MAX_HALAQA_NAME_LENGTH);
   const teacherId = requireText(data.teacherId, "teacherId");
   const supervisorId = optionalText(data.supervisorId, 128);
-  const meetingLink = optionalText(data.meetingLink, 500);
+  const meetingLink = optionalMeetingLink(data.meetingLink);
   const requestId = optionalText(data.requestId, 64);
   if (requestId && !REQUEST_ID_PATTERN.test(requestId)) {
     throw new HttpsError("invalid-argument", "requestId غير صالح");
@@ -349,6 +354,12 @@ export async function adminCreateHalaqaCore(
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    const linkRef = db.collection(HALAQA_MEETING_LINKS_COLLECTION).doc(halaqaRef.id);
+    if (meetingLink) {
+      tx.set(linkRef, canonicalMeetingLinkData(meetingLink));
+    } else {
+      tx.delete(linkRef);
+    }
     tx.set(
       db.collection("teacherProfiles").doc(teacherId),
       { halaqatIds: FieldValue.arrayUnion(halaqaRef.id) },

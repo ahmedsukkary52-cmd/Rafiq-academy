@@ -341,8 +341,43 @@ service cloud.firestore {
           || uid() in resource.data.get('studentIds', []));
       allow create: if false;
       allow delete: if false;
+      // meetingLink is written only by adminCreateHalaqa / setHalaqaMeetingLink
+      // (shared URL validation, supervisor scope, audit).
       allow update: if isAdmin()
-        && !changedKeys().hasAny(['studentIds', 'schedule', 'teacherId', 'createdBy', 'createdAt']);
+        && !changedKeys().hasAny(['studentIds', 'schedule', 'teacherId', 'createdBy', 'createdAt', 'meetingLink']);
+    }
+
+    // B14 — canonical meeting link { meetingLink, updatedAt }, written only by
+    // setHalaqaMeetingLink / adminCreateHalaqa. Rules cannot hide fields, so
+    // access is per document; listing is Admin-only. The legacy
+    // halaqat.meetingLink field stays readable through halaqat until stripped.
+    match /halaqaMeetingLinks/{halaqaId} {
+      function ownStudentProfilePath() {
+        return /databases/$(database)/documents/studentProfiles/$(uid());
+      }
+
+      // Fails closed against normalizeLifecycle (JS trim + exact 'archived'):
+      // any string containing lowercase 'archived' counts as archived, even
+      // unusual values the backend would normalize to active. Missing and
+      // non-string values stay active.
+      function isArchivedLifecycle(profile) {
+        return profile.get('lifecycle', null) is string
+          && profile.get('lifecycle', null).replace('archived', '')
+            != profile.get('lifecycle', null);
+      }
+
+      function isEligibleRosterStudent() {
+        return hasRole('student')
+          && exists(ownStudentProfilePath())
+          && !isArchivedLifecycle(get(ownStudentProfilePath()).data)
+          && isStudentOnRoster(halaqaId, uid());
+      }
+
+      allow get: if isAdmin()
+        || (isSupervisor() && isSupervisorOfHalaqa(halaqaId))
+        || isEligibleRosterStudent();
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
     }
 
     // P0-04 — per-teacher schedule serialization locks (CF-only).

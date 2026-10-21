@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../shared/domain/meeting_link_policy.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/meeting_link_dialog.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../admin/domain/entities/admin_operations_entities.dart';
+import '../../../admin/domain/usecases/admin_operations_usecases.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
 import '../../../teacher/domain/repositories/teacher_repository.dart';
 import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
 import '../bloc/supervisor_bloc.dart';
+import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
@@ -31,6 +38,40 @@ class _SupervisorHalaqaDetailPageState
   List<HalaqaStudentSummaryEntity> _students = const [];
   String _query = '';
   bool _showStudents = false;
+  bool _savingLink = false;
+
+  /// Supervisors may only add a link while none is stored (B14); the
+  /// callable enforces this and the halaqa scope.
+  Future<void> _addMeetingLink(HalaqaEntity halaqa) async {
+    if (_savingLink) return;
+    final result = await showMeetingLinkDialog(
+      context,
+      currentLink: halaqa.meetingLink,
+      canClear: false,
+    );
+    if (result == null || result.clear || !mounted) return;
+    setState(() => _savingLink = true);
+    final outcome = await sl<SetHalaqaMeetingLinkUseCase>()(
+      SetHalaqaMeetingLinkParams(
+        halaqaId: halaqa.id,
+        meetingLink: result.link!,
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _savingLink = false);
+    outcome.fold(
+      (f) => AppSnackBar.showError(context, 'لم يُحفظ الرابط: ${f.message}'),
+      (change) {
+        AppSnackBar.showSuccess(context, meetingLinkChangeMessage(change));
+        final auth = context.read<AuthBloc>().state;
+        if (auth is AuthAuthenticated) {
+          context.read<SupervisorBloc>().add(
+            LoadSupervisedHalaqatEvent(auth.user.uid),
+          );
+        }
+      },
+    );
+  }
 
   HalaqaEntity? _find(List<HalaqaEntity> list) {
     for (final h in list) {
@@ -136,6 +177,12 @@ class _SupervisorHalaqaDetailPageState
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              _SupervisorMeetingLinkCard(
+                link: halaqa.meetingLink.trim(),
+                saving: _savingLink,
+                onAdd: () => _addMeetingLink(halaqa),
+              ),
               if (_showStudents) ...[
                 const SizedBox(height: 20),
                 Text(
@@ -197,6 +244,82 @@ class _SupervisorHalaqaDetailPageState
           ),
         );
       },
+    );
+  }
+}
+
+class _SupervisorMeetingLinkCard extends StatelessWidget {
+  final String link;
+  final bool saving;
+  final VoidCallback onAdd;
+
+  const _SupervisorMeetingLinkCard({
+    required this.link,
+    required this.saving,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = joinableMeetingUri(link) != null;
+    final (title, note) = link.isEmpty
+        ? (
+            'لم يُضبط رابط الاجتماع بعد',
+            'أضف رابط الاجتماع ليتمكن الطلاب من الانضمام.',
+          )
+        : valid
+        ? ('رابط الاجتماع مضبوط', 'تعديل الرابط أو حذفه متاح للمسؤول.')
+        : ('رابط الاجتماع المحفوظ غير صالح', 'تواصل مع المسؤول لتحديث الرابط.');
+    return AppCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.videocam_outlined,
+                color: link.isNotEmpty && valid
+                    ? AppColors.primary
+                    : AppColors.error,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (link.isNotEmpty && valid) ...[
+            const SizedBox(height: 6),
+            Text(
+              link,
+              textDirection: TextDirection.ltr,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall,
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            note,
+            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
+          ),
+          if (link.isEmpty) ...[
+            const SizedBox(height: 8),
+            AppButton(
+              key: const Key('supervisorAddMeetingLink'),
+              label: 'إضافة رابط',
+              height: 40,
+              isLoading: saving,
+              onPressed: saving ? null : onAdd,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

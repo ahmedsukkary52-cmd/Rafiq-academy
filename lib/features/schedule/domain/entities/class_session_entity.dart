@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../shared/domain/meeting_link_policy.dart';
+
 enum ClassSessionStatus { live, upcoming, ended }
 
 enum ClassSessionType { memorization, review, tajweed, other }
@@ -27,8 +29,8 @@ class ClassSessionEntity extends Equatable {
     this.topic,
   });
 
-  bool get canJoin =>
-      status == ClassSessionStatus.live && meetingLink.trim().isNotEmpty;
+  /// Same rule as the Join buttons: a valid stored link; no time window.
+  bool get canJoin => joinableMeetingUri(meetingLink) != null;
 
   @override
   List<Object?> get props => [

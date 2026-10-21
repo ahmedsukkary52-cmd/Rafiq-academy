@@ -148,6 +148,19 @@ class AdminOperationsRemoteDatasourceImpl
   }
 
   @override
+  Future<MeetingLinkChange> setHalaqaMeetingLink({
+    required String halaqaId,
+    String? meetingLink,
+    bool clear = false,
+  }) async {
+    final data = await _call('setHalaqaMeetingLink', {
+      'halaqaId': halaqaId,
+      if (clear) 'clear': true else 'meetingLink': meetingLink ?? '',
+    });
+    return meetingLinkChangeFromWire(data['operation']);
+  }
+
+  @override
   Future<void> transferStudent({
     required String studentId,
     required String fromHalaqaId,

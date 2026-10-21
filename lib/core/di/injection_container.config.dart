@@ -800,6 +800,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i321.AddHalaqaSlotUseCase>(
       () => _i321.AddHalaqaSlotUseCase(gh<_i817.AdminOperationsRepository>()),
     );
+    gh.lazySingleton<_i321.SetHalaqaMeetingLinkUseCase>(
+      () => _i321.SetHalaqaMeetingLinkUseCase(
+        gh<_i817.AdminOperationsRepository>(),
+      ),
+    );
     gh.lazySingleton<_i321.TransferStudentUseCase>(
       () => _i321.TransferStudentUseCase(gh<_i817.AdminOperationsRepository>()),
     );
@@ -1362,6 +1367,7 @@ extension GetItInjectableX on _i174.GetIt {
         linkParentChild: gh<_i321.LinkParentChildUseCase>(),
         createHalaqa: gh<_i321.CreateHalaqaUseCase>(),
         addHalaqaSlot: gh<_i321.AddHalaqaSlotUseCase>(),
+        setMeetingLink: gh<_i321.SetHalaqaMeetingLinkUseCase>(),
         admitStudent: gh<_i928.ApproveNewStudentUseCase>(),
         transferStudent: gh<_i321.TransferStudentUseCase>(),
         reinstatePaymentAccess: gh<_i606.ReinstatePaymentAccessUseCase>(),

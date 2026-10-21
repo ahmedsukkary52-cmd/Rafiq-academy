@@ -82,6 +82,19 @@ class AdminOperationsRepositoryImpl implements AdminOperationsRepository {
   );
 
   @override
+  Future<Either<Failure, MeetingLinkChange>> setHalaqaMeetingLink({
+    required String halaqaId,
+    String? meetingLink,
+    bool clear = false,
+  }) => _run(
+    () => remoteDatasource.setHalaqaMeetingLink(
+      halaqaId: halaqaId,
+      meetingLink: meetingLink,
+      clear: clear,
+    ),
+  );
+
+  @override
   Future<Either<Failure, Unit>> transferStudent({
     required String studentId,
     required String fromHalaqaId,

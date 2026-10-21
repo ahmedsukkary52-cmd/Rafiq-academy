@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/meeting_link_policy.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/meeting_link_dialog.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
@@ -47,6 +49,28 @@ class _HalaqatBody extends StatelessWidget {
     if (slot == null || !context.mounted) return;
     context.read<AdminOperationsBloc>().add(
       AddHalaqaSlotEvent(AddHalaqaSlotParams(halaqaId: halaqa.id, slot: slot)),
+    );
+  }
+
+  Future<void> _openMeetingLink(
+    BuildContext context,
+    HalaqaEntity halaqa,
+  ) async {
+    final result = await showMeetingLinkDialog(
+      context,
+      currentLink: halaqa.meetingLink,
+      canClear: true,
+    );
+    if (result == null || !context.mounted) return;
+    context.read<AdminOperationsBloc>().add(
+      SetHalaqaMeetingLinkEvent(
+        result.clear
+            ? SetHalaqaMeetingLinkParams.clear(halaqa.id)
+            : SetHalaqaMeetingLinkParams(
+                halaqaId: halaqa.id,
+                meetingLink: result.link!,
+              ),
+      ),
     );
   }
 
@@ -97,6 +121,12 @@ class _HalaqatBody extends StatelessWidget {
                           ),
                       ],
                     ),
+                  _MeetingLinkRow(
+                    link: h.meetingLink.trim(),
+                    onEdit: state.isSubmitting
+                        ? null
+                        : () => _openMeetingLink(context, h),
+                  ),
                   Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: TextButton.icon(
@@ -117,6 +147,50 @@ class _HalaqatBody extends StatelessWidget {
             icon: const Icon(Icons.add_rounded),
             label: const Text('إنشاء حلقة'),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MeetingLinkRow extends StatelessWidget {
+  final String link;
+  final VoidCallback? onEdit;
+
+  const _MeetingLinkRow({required this.link, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = joinableMeetingUri(link) != null;
+    final status = link.isEmpty
+        ? 'رابط الاجتماع: لم يُضبط بعد'
+        : valid
+        ? 'رابط الاجتماع:'
+        : 'رابط الاجتماع المحفوظ غير صالح — حدّثه';
+    return Row(
+      children: [
+        Icon(
+          Icons.videocam_outlined,
+          size: 18,
+          color: link.isNotEmpty && valid ? AppColors.primary : AppColors.error,
+        ),
+        const SizedBox(width: 6),
+        Text(status, style: AppTextStyles.labelSmall),
+        if (link.isNotEmpty && valid) ...[
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              link,
+              textDirection: TextDirection.ltr,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall,
+            ),
+          ),
+        ] else
+          const Spacer(),
+        TextButton(
+          onPressed: onEdit,
+          child: Text(link.isEmpty ? 'إضافة رابط' : 'تعديل الرابط'),
         ),
       ],
     );
@@ -209,8 +283,11 @@ class _CreateHalaqaSheetState extends State<_CreateHalaqaSheet> {
               TextField(
                 controller: _link,
                 textDirection: TextDirection.ltr,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
                 decoration: const InputDecoration(
                   labelText: 'رابط الاجتماع (اختياري)',
+                  helperText: 'رابط https:// من تطبيق الاجتماع',
                 ),
               ),
               const SizedBox(height: 16),

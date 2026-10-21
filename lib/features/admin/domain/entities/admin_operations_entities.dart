@@ -76,6 +76,23 @@ class ParentLinkResult extends Equatable {
   List<Object?> get props => [childrenIds, changed];
 }
 
+/// Outcome of `setHalaqaMeetingLink` (`unchanged` when nothing was written).
+enum MeetingLinkChange { set, update, clear, unchanged }
+
+MeetingLinkChange meetingLinkChangeFromWire(Object? raw) => switch (raw) {
+  'set' => MeetingLinkChange.set,
+  'update' => MeetingLinkChange.update,
+  'clear' => MeetingLinkChange.clear,
+  _ => MeetingLinkChange.unchanged,
+};
+
+String meetingLinkChangeMessage(MeetingLinkChange change) => switch (change) {
+  MeetingLinkChange.set => 'تم حفظ رابط الاجتماع',
+  MeetingLinkChange.update => 'تم تحديث رابط الاجتماع',
+  MeetingLinkChange.clear => 'تم حذف رابط الاجتماع',
+  MeetingLinkChange.unchanged => 'لم يتغير رابط الاجتماع',
+};
+
 enum PaymentReviewDecision { approve, reject, partial }
 
 extension PaymentReviewDecisionWire on PaymentReviewDecision {

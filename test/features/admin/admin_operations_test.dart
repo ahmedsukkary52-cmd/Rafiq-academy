@@ -84,6 +84,21 @@ class _FakeOpsRepo implements AdminOperationsRepository {
     return const Right('s1');
   }
 
+  Failure? meetingLinkFailure;
+
+  @override
+  Future<Either<Failure, MeetingLinkChange>> setHalaqaMeetingLink({
+    required String halaqaId,
+    String? meetingLink,
+    bool clear = false,
+  }) async {
+    calls.add(
+      clear ? 'link-clear:$halaqaId' : 'link-set:$halaqaId:$meetingLink',
+    );
+    if (meetingLinkFailure != null) return Left(meetingLinkFailure!);
+    return Right(clear ? MeetingLinkChange.clear : MeetingLinkChange.update);
+  }
+
   @override
   Future<Either<Failure, Unit>> transferStudent({
     required String studentId,
@@ -169,6 +184,7 @@ AdminOperationsBloc _opsBloc(_FakeOpsRepo ops, _FakeAdminRepo admin) =>
       linkParentChild: LinkParentChildUseCase(ops),
       createHalaqa: CreateHalaqaUseCase(ops),
       addHalaqaSlot: AddHalaqaSlotUseCase(ops),
+      setMeetingLink: SetHalaqaMeetingLinkUseCase(ops),
       admitStudent: ApproveNewStudentUseCase(admin),
       transferStudent: TransferStudentUseCase(ops),
       reinstatePaymentAccess: ReinstatePaymentAccessUseCase(admin),
@@ -437,6 +453,93 @@ void main() {
         await bloc.close();
       },
     );
+
+    test(
+      'B14 create halaqa rejects a non-https meeting link locally',
+      () async {
+        final ops = _FakeOpsRepo();
+        final result = await CreateHalaqaUseCase(ops)(
+          const CreateHalaqaParams(
+            name: 'حلقة',
+            teacherId: 't1',
+            schedule: [_slot],
+            requestId: 'req_12345678',
+            meetingLink: 'http://meet.example.com/abc',
+          ),
+        );
+        expect(result.isLeft(), isTrue);
+        expect(ops.calls, isEmpty);
+      },
+    );
+
+    test('B14 edit sends the trimmed link and reloads the directory', () async {
+      final ops = _FakeOpsRepo();
+      final bloc = _opsBloc(ops, _FakeAdminRepo());
+      bloc.add(
+        const SetHalaqaMeetingLinkEvent(
+          SetHalaqaMeetingLinkParams(
+            halaqaId: 'h1',
+            meetingLink: '  https://meet.example.com/new  ',
+          ),
+        ),
+      );
+      await _settle();
+      expect(ops.calls, contains('link-set:h1:https://meet.example.com/new'));
+      expect(bloc.state.submissionStatus, SubmissionStatus.success);
+      expect(bloc.state.message, 'تم تحديث رابط الاجتماع');
+      await bloc.close();
+    });
+
+    test('B14 invalid link never reaches the callable', () async {
+      final ops = _FakeOpsRepo();
+      final bloc = _opsBloc(ops, _FakeAdminRepo());
+      for (final bad in [
+        '',
+        'meet.example.com/abc',
+        'https://user:pw@meet.example.com',
+        'https://meet.example.com/a b',
+      ]) {
+        bloc.add(
+          SetHalaqaMeetingLinkEvent(
+            SetHalaqaMeetingLinkParams(halaqaId: 'h1', meetingLink: bad),
+          ),
+        );
+        await _settle();
+        expect(bloc.state.submissionStatus, SubmissionStatus.error);
+      }
+      expect(ops.calls.where((c) => c.startsWith('link-')), isEmpty);
+      await bloc.close();
+    });
+
+    test('B14 clear is explicit and separate from an empty save', () async {
+      final ops = _FakeOpsRepo();
+      final bloc = _opsBloc(ops, _FakeAdminRepo());
+      bloc.add(
+        const SetHalaqaMeetingLinkEvent(SetHalaqaMeetingLinkParams.clear('h1')),
+      );
+      await _settle();
+      expect(ops.calls, contains('link-clear:h1'));
+      expect(bloc.state.message, 'تم حذف رابط الاجتماع');
+      await bloc.close();
+    });
+
+    test('B14 server rejection is surfaced without echoing the link', () async {
+      final ops = _FakeOpsRepo()
+        ..meetingLinkFailure = const ServerFailure('رابط الاجتماع غير صالح');
+      final bloc = _opsBloc(ops, _FakeAdminRepo());
+      bloc.add(
+        const SetHalaqaMeetingLinkEvent(
+          SetHalaqaMeetingLinkParams(
+            halaqaId: 'h1',
+            meetingLink: 'https://meet.example.com/x',
+          ),
+        ),
+      );
+      await _settle();
+      expect(bloc.state.submissionStatus, SubmissionStatus.error);
+      expect(bloc.state.message, isNot(contains('meet.example.com')));
+      await bloc.close();
+    });
   });
 
   group('PaymentReviewBloc (P0-03)', () {

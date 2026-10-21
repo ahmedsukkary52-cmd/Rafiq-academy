@@ -37,6 +37,14 @@ abstract class AdminOperationsRepository {
     required HalaqaSlotInput slot,
   });
 
+  /// Admin (any halaqa) or the assigned supervisor (add-only); the callable
+  /// decides. Exactly one of [meetingLink] / [clear] is meaningful.
+  Future<Either<Failure, MeetingLinkChange>> setHalaqaMeetingLink({
+    required String halaqaId,
+    String? meetingLink,
+    bool clear = false,
+  });
+
   Future<Either<Failure, Unit>> transferStudent({
     required String studentId,
     required String fromHalaqaId,

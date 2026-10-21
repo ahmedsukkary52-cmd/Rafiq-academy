@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
@@ -12,6 +11,7 @@ import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/presentation/widgets/student_loading_skeletons.dart';
 import '../../../student/presentation/bloc/student_bloc.dart';
+import '../../../student/presentation/widgets/halaqa_meeting_join.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../bloc/schedule_bloc.dart';
 
@@ -147,7 +147,8 @@ class _ScheduleView extends StatelessWidget {
               if (featured != null) ...[
                 _FeaturedSessionCard(
                   session: featured,
-                  onJoin: () => _joinSession(context, featured),
+                  onJoin: () =>
+                      joinHalaqaMeeting(context, _currentHalaqaId(context)),
                 ),
                 const SizedBox(height: 16),
                 if ((featured.topic ?? '').isNotEmpty)
@@ -178,30 +179,8 @@ class _ScheduleView extends StatelessWidget {
     );
   }
 
-  Future<void> _joinSession(
-    BuildContext context,
-    ClassSessionEntity session,
-  ) async {
-    final link = session.meetingLink.trim();
-    if (link.isEmpty || session.status != ClassSessionStatus.live) {
-      AppSnackBar.showInfo(
-        context,
-        'رابط الحصة لسه مش متاح — الحصة لسه ما بدأتش',
-      );
-      return;
-    }
-    final uri = Uri.tryParse(link);
-    if (uri == null || !uri.hasScheme) {
-      AppSnackBar.showError(context, 'رابط الحصة غير صالح');
-      return;
-    }
-    final ok =
-        await canLaunchUrl(uri) &&
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      AppSnackBar.showError(context, 'تعذر فتح رابط الحصة');
-    }
-  }
+  String _currentHalaqaId(BuildContext context) =>
+      context.read<StudentBloc>().state.profile?.halaqaId?.trim() ?? halaqaId;
 }
 
 class _FeaturedSessionCard extends StatelessWidget {

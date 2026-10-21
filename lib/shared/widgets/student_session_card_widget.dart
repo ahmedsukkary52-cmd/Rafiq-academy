@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 import '../../features/student/domain/entities/halaqa_entity.dart';
+import '../domain/meeting_link_policy.dart';
 
 /// كارت حصة اليوم — Figma dark navy card + full-width join CTA.
 class StudentSessionCardWidget extends StatelessWidget {
@@ -134,6 +135,21 @@ class StudentSessionCardWidget extends StatelessWidget {
                 ),
               ),
             ),
+            if (joinableMeetingUri(halaqa.meetingLink) == null) ...[
+              const SizedBox(height: 8),
+              Text(
+                halaqa.meetingLink.trim().isEmpty
+                    ? 'لم يُضبط رابط الاجتماع لهذه الحلقة بعد'
+                    : 'رابط الاجتماع المحفوظ غير صالح',
+                key: const Key('sessionCardLinkStatus'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 12,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
           ],
         ),
       ),

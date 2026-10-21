@@ -31,6 +31,13 @@ abstract class AdminOperationsRemoteDatasource {
     required HalaqaSlotInput slot,
   });
 
+  /// `setHalaqaMeetingLink`: [meetingLink] to set, or [clear] to remove.
+  Future<MeetingLinkChange> setHalaqaMeetingLink({
+    required String halaqaId,
+    String? meetingLink,
+    bool clear = false,
+  });
+
   Future<void> transferStudent({
     required String studentId,
     required String fromHalaqaId,

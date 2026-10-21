@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
+import '../../../../shared/domain/meeting_link_policy.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../entities/admin_operations_entities.dart';
 import '../repositories/admin_operations_repository.dart';
@@ -128,6 +129,11 @@ class CreateHalaqaUseCase extends UseCase<String, CreateHalaqaParams> {
       final error = validateSlotInput(slot);
       if (error != null) return Future.value(Left(ValidationFailure(error)));
     }
+    final link = params.meetingLink?.trim() ?? '';
+    final linkError = link.isEmpty ? null : meetingLinkErrorText(link);
+    if (linkError != null) {
+      return Future.value(Left(ValidationFailure(linkError)));
+    }
     return repository.createHalaqa(
       name: params.name.trim(),
       teacherId: params.teacherId.trim(),
@@ -161,6 +167,57 @@ class AddHalaqaSlotUseCase extends UseCase<String, AddHalaqaSlotParams> {
     return repository.addHalaqaSlot(
       halaqaId: params.halaqaId,
       slot: params.slot,
+    );
+  }
+}
+
+class SetHalaqaMeetingLinkParams extends Equatable {
+  final String halaqaId;
+
+  /// Ignored when [clear] is true.
+  final String meetingLink;
+
+  /// Explicit removal; an empty [meetingLink] never clears.
+  final bool clear;
+
+  const SetHalaqaMeetingLinkParams({
+    required this.halaqaId,
+    this.meetingLink = '',
+    this.clear = false,
+  });
+
+  const SetHalaqaMeetingLinkParams.clear(this.halaqaId)
+    : meetingLink = '',
+      clear = true;
+
+  @override
+  List<Object?> get props => [halaqaId, meetingLink, clear];
+}
+
+/// B14 — `setHalaqaMeetingLink`. Authority (admin / assigned supervisor
+/// add-only) and the final URL policy are enforced by the callable.
+@lazySingleton
+class SetHalaqaMeetingLinkUseCase
+    extends UseCase<MeetingLinkChange, SetHalaqaMeetingLinkParams> {
+  final AdminOperationsRepository repository;
+  SetHalaqaMeetingLinkUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, MeetingLinkChange>> call(
+    SetHalaqaMeetingLinkParams params,
+  ) {
+    final halaqaId = params.halaqaId.trim();
+    if (halaqaId.isEmpty) {
+      return Future.value(const Left(ValidationFailure('الحلقة غير محددة')));
+    }
+    if (params.clear) {
+      return repository.setHalaqaMeetingLink(halaqaId: halaqaId, clear: true);
+    }
+    final error = meetingLinkErrorText(params.meetingLink);
+    if (error != null) return Future.value(Left(ValidationFailure(error)));
+    return repository.setHalaqaMeetingLink(
+      halaqaId: halaqaId,
+      meetingLink: params.meetingLink.trim(),
     );
   }
 }

@@ -51,6 +51,14 @@ class AddHalaqaSlotEvent extends AdminOperationsEvent {
   List<Object?> get props => [params];
 }
 
+class SetHalaqaMeetingLinkEvent extends AdminOperationsEvent {
+  final SetHalaqaMeetingLinkParams params;
+  const SetHalaqaMeetingLinkEvent(this.params);
+
+  @override
+  List<Object?> get props => [params];
+}
+
 class AdmitStudentEvent extends AdminOperationsEvent {
   final String studentId;
   final String halaqaId;

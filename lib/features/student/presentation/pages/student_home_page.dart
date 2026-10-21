@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
@@ -25,11 +24,11 @@ import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../domain/entities/avatar_catalog.dart';
-import '../../domain/entities/halaqa_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
 import '../../../mushaf/presentation/pages/mushaf_reader_host.dart';
+import '../widgets/halaqa_meeting_join.dart';
 import '../widgets/student_loading_skeletons.dart';
 import 'student_badges_page.dart';
 
@@ -361,7 +360,7 @@ class _StudentHomeTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
             child: StudentSessionCardWidget(
               halaqa: state.halaqa!,
-              onJoinTap: () => _openHalaqaMeeting(context, state.halaqa!),
+              onJoinTap: () => joinHalaqaMeeting(context, state.halaqa!.id),
               onDetailsTap: () => context.push(AppRoutes.studentSchedule),
             ),
           ),
@@ -449,34 +448,6 @@ class _StudentHomeTab extends StatelessWidget {
         ),
       ),
     ];
-  }
-
-  Future<void> _openHalaqaMeeting(
-    BuildContext context,
-    HalaqaEntity halaqa,
-  ) async {
-    final link = halaqa.meetingLink.trim();
-    if (link.isEmpty) {
-      AppSnackBar.showInfo(
-        context,
-        'رابط الحصة لسه مش متاح — الحصة لسه ما بدأتش',
-      );
-      return;
-    }
-
-    final uri = Uri.tryParse(link);
-    if (uri == null ||
-        !(uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https'))) {
-      AppSnackBar.showError(context, 'رابط الحصة غير صالح');
-      return;
-    }
-
-    final launched =
-        await canLaunchUrl(uri) &&
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && context.mounted) {
-      AppSnackBar.showError(context, 'تعذر فتح رابط الحصة');
-    }
   }
 }
 

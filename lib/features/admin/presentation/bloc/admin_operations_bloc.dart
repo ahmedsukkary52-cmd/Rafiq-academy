@@ -34,6 +34,7 @@ class AdminOperationsBloc
   final LinkParentChildUseCase linkParentChild;
   final CreateHalaqaUseCase createHalaqa;
   final AddHalaqaSlotUseCase addHalaqaSlot;
+  final SetHalaqaMeetingLinkUseCase setMeetingLink;
   final ApproveNewStudentUseCase admitStudent;
   final TransferStudentUseCase transferStudent;
   final ReinstatePaymentAccessUseCase reinstatePaymentAccess;
@@ -46,6 +47,7 @@ class AdminOperationsBloc
     required this.linkParentChild,
     required this.createHalaqa,
     required this.addHalaqaSlot,
+    required this.setMeetingLink,
     required this.admitStudent,
     required this.transferStudent,
     required this.reinstatePaymentAccess,
@@ -56,6 +58,7 @@ class AdminOperationsBloc
     on<LinkParentChildEvent>(_onLink, transformer: droppable());
     on<CreateHalaqaEvent>(_onCreateHalaqa, transformer: droppable());
     on<AddHalaqaSlotEvent>(_onAddSlot, transformer: droppable());
+    on<SetHalaqaMeetingLinkEvent>(_onSetMeetingLink, transformer: droppable());
     on<AdmitStudentEvent>(_onAdmit, transformer: droppable());
     on<TransferStudentEvent>(_onTransfer, transformer: droppable());
     on<ReinstateParentAccessEvent>(_onReinstate, transformer: droppable());
@@ -212,6 +215,16 @@ class AdminOperationsBloc
     emit,
     action: () => addHalaqaSlot(event.params),
     successMessage: (_) => 'تمت إضافة الموعد',
+    reloadDirectory: true,
+  );
+
+  Future<void> _onSetMeetingLink(
+    SetHalaqaMeetingLinkEvent event,
+    Emitter<AdminOperationsState> emit,
+  ) => _runAction<MeetingLinkChange>(
+    emit,
+    action: () => setMeetingLink(event.params),
+    successMessage: meetingLinkChangeMessage,
     reloadDirectory: true,
   );
 

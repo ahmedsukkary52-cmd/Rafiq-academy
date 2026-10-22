@@ -1,0 +1,5 @@
+// prod flavor. PROVISIONAL bundle ID, taken from the Android prod
+// applicationId: confirm it before creating the App Store Connect record,
+// after which it cannot change. The prod Firebase project does not exist yet.
+PRODUCT_BUNDLE_IDENTIFIER = com.basmaacademy.app
+APP_DISPLAY_NAME = بصمة

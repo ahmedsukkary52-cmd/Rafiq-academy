@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Rafiq Academy</string>
+	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,9 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>يستخدم رفيق الميكروفون لتسجيل الرسائل الصوتية في المحادثات.</string>
+	<string>يستخدم بصمة الميكروفون لتسجيل التلاوة والرسائل الصوتية في المحادثات.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>يستخدم رفيق مكتبة الصور لإرسال صورة في المحادثات.</string>
+	<string>يستخدم بصمة مكتبة الصور لإرسال صورة في المحادثات.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

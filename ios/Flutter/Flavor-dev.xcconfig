@@ -1,0 +1,4 @@
+// dev flavor: Firebase project rafiq-academy. Keeps the bundle ID that is
+// registered there (lib/firebase_options.dart iosBundleId).
+PRODUCT_BUNDLE_IDENTIFIER = com.example.rafiqAcademy
+APP_DISPLAY_NAME = بصمة (تطوير)

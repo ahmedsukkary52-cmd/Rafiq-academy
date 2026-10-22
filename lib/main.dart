@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/di/injection_container.dart';
+import 'core/firebase/app_flavor.dart';
 import 'core/router/router_app.dart';
 import 'core/session/clear_session_projections.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -21,14 +22,13 @@ import 'features/calendar/presentation/bloc/calendar_bloc.dart';
 import 'features/content/presentation/bloc/content_bloc.dart';
 import 'features/chat/presentation/bloc/chat_conversations_bloc.dart';
 import 'features/post/presentation/bloc/posts_bloc.dart';
-import 'firebase_options.dart';
 import 'features/onboarding/presentation/pages/onboarding_page.dart';
 import 'shared/theme/app_preferences_controller.dart';
 import 'shared/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: firebaseOptionsFor(currentAppFlavor()));
   await initDependencies();
 
   final prefs = await SharedPreferences.getInstance();

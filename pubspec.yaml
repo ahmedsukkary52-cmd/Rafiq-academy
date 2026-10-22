@@ -81,6 +81,9 @@ dev_dependencies:
   injectable_generator: ^2.12.1
 
 flutter:
+  # Android builds without --flavor use dev (rafiq-academy); prod is explicit
+  # only.
+  default-flavor: dev
   uses-material-design: true
   assets:
     - assets/data/audio_durations.json

@@ -1,0 +1,95 @@
+# Codemagic CI/CD for بصمة (Basma).
+#
+# Every workflow is manual (no triggering), holds no secrets and deploys
+# nothing. Signing material lives only in Codemagic's encrypted team settings
+# and is referenced here by name. The comment above each workflow lists what
+# it still needs.
+#
+# Do not pass --build-number or --build-name: the pubspec.yaml version (+N)
+# is the only source of the build number, which the planned minimum-version
+# gate (B10) relies on. Bump it in the repo instead.
+
+definitions:
+  environment: &flutter_env
+    flutter: 3.44.9
+    java: 17
+
+workflows:
+  android-dev-check:
+    name: Android dev - analyze, test, debug APK
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      <<: *flutter_env
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+      - name: Analyze (errors fail the build)
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Test
+        script: flutter test
+      - name: Build dev debug APK (rafiq-academy)
+        script: flutter build apk --flavor dev --debug
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+
+  # Blocked until the prod Firebase project exists and
+  # android/app/src/prod/google-services.json is added (B1, B2), and the Play
+  # upload keystore is uploaded to Codemagic as "basma_upload_key" (B8).
+  # Without the key, Gradle stops the prod release build on purpose.
+  android-prod-release:
+    name: Android prod - signed AAB (blocked, see comment)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      <<: *flutter_env
+      android_signing:
+        - basma_upload_key
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+      - name: Test
+        script: flutter test
+      - name: Build prod release AAB
+        script: flutter build appbundle --flavor prod --release
+    artifacts:
+      - build/app/outputs/bundle/prodRelease/*.aab
+      - build/app/outputs/mapping/prodRelease/mapping.txt
+
+  # Unsigned iOS builds: no Apple Developer account, certificates or profiles.
+  # The dev and prod flavors (configurations and schemes) are added to the
+  # Xcode project here by ios/scripts/configure_flavors.rb; the result is
+  # exported for review so it can be committed once a build has passed.
+  # A prod build compiles but cannot start until the prod Firebase project
+  # exists (firebaseOptionsFor(prod) throws by design).
+  ios-unsigned-check:
+    name: iOS dev and prod - unsigned builds (no Apple account)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    environment:
+      <<: *flutter_env
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+      - name: Add the iOS flavors to the Xcode project
+        script: |
+          gem list -i xcodeproj > /dev/null || gem install --user-install --no-document xcodeproj
+          ruby ios/scripts/configure_flavors.rb
+      - name: Build dev iOS app without code signing
+        script: flutter build ios --flavor dev --release --no-codesign
+      # Both flavors build to build/ios/iphoneos/Runner.app, so the dev app is
+      # archived before the prod build replaces it.
+      - name: Archive the dev app and export the generated Xcode project
+        script: |
+          mkdir -p build/ios-artifacts build/ios-flavor-setup
+          ditto -c -k --keepParent build/ios/iphoneos/Runner.app build/ios-artifacts/Runner-dev-unsigned.zip
+          zip -r build/ios-flavor-setup/ios-flavor-project.zip ios/Runner.xcodeproj ios/Podfile.lock
+      - name: Build prod iOS app without code signing
+        script: flutter build ios --flavor prod --release --no-codesign
+      - name: Archive the prod app
+        script: ditto -c -k --keepParent build/ios/iphoneos/Runner.app build/ios-artifacts/Runner-prod-unsigned.zip
+    artifacts:
+      - build/ios-artifacts/*.zip
+      - build/ios-flavor-setup/*.zip

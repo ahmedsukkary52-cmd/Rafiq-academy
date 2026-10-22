@@ -48,13 +48,13 @@ void main() {
   );
 
   group('GetOrCreateConversationUseCase', () {
-    test('rejects teacher↔parent without calling repository', () async {
+    test('rejects student↔parent without calling repository', () async {
       final repo = _FakeChatRepository();
       final useCase = GetOrCreateConversationUseCase(repo);
 
       final result = await useCase(
         const GetOrCreateConversationParams(
-          currentUser: teacher,
+          currentUser: student,
           otherUser: parent,
         ),
       );
@@ -65,6 +65,27 @@ void main() {
         (_) => fail('expected Left'),
       );
       expect(repo.getOrCreateCalls, 0);
+    });
+
+    test('allows teacher↔parent and forwards to repository', () async {
+      const conversation = ConversationEntity(
+        id: 'p1_t1',
+        participants: [teacher, parent],
+        unreadCount: 0,
+      );
+      final repo = _FakeChatRepository()
+        ..getOrCreateResult = const Right(conversation);
+      final useCase = GetOrCreateConversationUseCase(repo);
+
+      final result = await useCase(
+        const GetOrCreateConversationParams(
+          currentUser: teacher,
+          otherUser: parent,
+        ),
+      );
+
+      expect(result, const Right(conversation));
+      expect(repo.getOrCreateCalls, 1);
     });
 
     test('allows teacher↔student and forwards to repository', () async {

@@ -9,19 +9,28 @@ import 'package:rafiq_academy/shared/theme/app_theme.dart';
 
 /// Captures stats + empty/filled session cards for Figma visual comparison.
 /// Output: docs/figma_teacher_refs/captures/
+///
+/// Opt-in only, because it overwrites the tracked PNGs and raster `toImage`
+/// can hang under `flutter test` on CI:
+///   macOS/Linux: FIGMA_CAPTURE=1 flutter test test/features/teacher/teacher_home_figma_capture_test.dart
+///   PowerShell:  $env:FIGMA_CAPTURE='1'; flutter test test/features/teacher/teacher_home_figma_capture_test.dart
 void main() {
+  final enabled = Platform.environment['FIGMA_CAPTURE'] == '1';
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final outDir = Directory('docs/figma_teacher_refs/captures');
 
   setUpAll(() {
+    if (!enabled) return;
     if (!outDir.existsSync()) {
       outDir.createSync(recursive: true);
     }
   });
 
   Future<void> capture(WidgetTester tester, String name) async {
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     final boundary = tester.renderObject<RenderRepaintBoundary>(
       find.byKey(const ValueKey('capture-root')),
     );
@@ -73,7 +82,7 @@ void main() {
       ),
     );
     await capture(tester, 'home_stats_empty_session');
-  });
+  }, skip: !enabled);
 
   testWidgets('capture filled session + stats (Figma success state)', (
     tester,
@@ -101,5 +110,5 @@ void main() {
       ),
     );
     await capture(tester, 'home_stats_filled_session');
-  });
+  }, skip: !enabled);
 }

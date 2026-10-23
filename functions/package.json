@@ -2,7 +2,8 @@
   "name": "functions",
   "description": "Cloud Functions - رفيق أكاديمية تحفيظ القرآن",
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('lib', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc",
     "build:watch": "tsc --watch",
     "serve": "node scripts/serve-emulators.mjs",
     "seed:emulator": "node scripts/seed-emulator.mjs",

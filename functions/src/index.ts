@@ -15,7 +15,6 @@ assertEmulatorProjectIsDemo(process.env, admin.app().options.projectId);
 // export { paymobWebhook } from "./paymob/paymobWebhook";
 
 export { adminProvisionUser } from "./admin/adminProvisionUser";
-export { adminMigrateUserPhones } from "./admin/adminMigrateUserPhones";
 export {
   adminGenerateInvoice,
   adminReinstatePaymentAccess,

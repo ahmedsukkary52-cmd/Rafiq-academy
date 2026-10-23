@@ -608,7 +608,7 @@ test("a rejected marker create left nothing, so only then does a later run on th
 test("a write that does not answer stops the run: no later write, no completion, and it may still land", async () => {
   const cases = [
     { key: `create ${MARKER}`, last: `create ${MARKER}`, phase: SEED_MARKER_PHASE },
-    { key: `createUser ${UIDS[2]}`, last: `createUser ${UIDS[2]}`, phase: `Auth user ${DATASET.authUsers[2].email}` },
+    { key: `createUser ${UIDS[2]}`, last: `createUser ${UIDS[2]}`, phase: `Auth user ${UIDS[2]}` },
     { key: "commit", last: `commit ${DOC_COUNT}`, phase: "Firestore documents" },
     { key: `update ${MARKER}`, last: `update ${MARKER}`, phase: SEED_COMPLETION_PHASE },
   ];

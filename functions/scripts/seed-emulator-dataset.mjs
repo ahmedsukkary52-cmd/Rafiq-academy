@@ -1,6 +1,6 @@
 // Demo dataset v1 for the emulator seeder: accounts plus the documents
-// adminProvisionUser writes for them (users, role profiles). No personal
-// phone numbers are seeded anywhere.
+// adminProvisionUser writes for them (users, userPrivate email, role
+// profiles). No personal phone numbers are seeded anywhere.
 // Pure data and write orchestration; firebase-admin handles are injected.
 //
 // Writes use create() only, so nothing that already exists is overwritten,
@@ -78,9 +78,17 @@ export function buildDemoDataset(accounts = DEMO_ACCOUNTS) {
       data: {
         name: account.name,
         role: account.role,
-        email: account.email,
         isActive: true,
         createdAt: SERVER_TIMESTAMP,
+      },
+    });
+    documents.push({
+      collection: "userPrivate",
+      id: account.uid,
+      data: {
+        email: account.email,
+        emailSource: "auth",
+        emailUpdatedAt: SERVER_TIMESTAMP,
       },
     });
     const profile = roleProfile(account);
@@ -218,8 +226,8 @@ export async function writeDemoDataset({
   );
 
   for (const user of dataset.authUsers) {
-    await step(`Auth user ${user.email}`, () => auth.createUser(user));
-    log(`  created Auth user ${user.email} (${user.uid})`);
+    await step(`Auth user ${user.uid}`, () => auth.createUser(user));
+    log(`  created Auth user ${user.uid}`);
   }
 
   await step("Firestore documents", async () => {
@@ -251,7 +259,7 @@ export async function verifyDemoDataset({ dataset, auth, db }) {
   const problems = [];
   for (const user of dataset.authUsers) {
     const record = await auth.getUser(user.uid);
-    if (record.email !== user.email) problems.push(`Auth user ${user.uid} has email ${record.email}.`);
+    if (record.email !== user.email) problems.push(`Auth user ${user.uid} has a different email.`);
   }
   for (const doc of dataset.documents) {
     const snap = await db.collection(doc.collection).doc(doc.id).get();

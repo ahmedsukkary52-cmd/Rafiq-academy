@@ -1,7 +1,7 @@
 /**
  * Demo dataset v1 contract (scripts/seed-emulator-dataset.mjs): fixed UIDs,
- * no personal phone numbers anywhere, and field names identical to what adminProvisionUser
- * writes today, read from the current sources. Pure: nothing is written.
+ * no personal phone numbers anywhere, email only in userPrivate, and field names identical
+ * to what adminProvisionUser writes today, read from the current sources. Pure: nothing is written.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -65,8 +65,9 @@ function objectKeysAfter(source, anchor) {
     .sort();
 }
 
+// Matches both `collection(c).doc(uid).set({` and `batch.set(db.collection(c).doc(uid), {`.
 const provisionKeys = (collection) =>
-  objectKeysAfter(provisionSource, new RegExp(`collection\\("${collection}"\\)\\.doc\\(uid\\)\\.set\\(`));
+  objectKeysAfter(provisionSource, new RegExp(`collection\\("${collection}"\\)\\.doc\\(uid\\)(?:\\.set\\(|,)`));
 
 const dataset = buildDemoDataset();
 const docsIn = (collection) => dataset.documents.filter((d) => d.collection === collection);
@@ -114,13 +115,16 @@ test("no personal phone number is seeded anywhere (no-phone policy)", () => {
   for (const doc of dataset.documents) {
     for (const key of contactKeys) assert.equal(key in doc.data, false, `${doc.collection}/${doc.id}.${key}`);
   }
+  for (const doc of docsIn("userPrivate")) {
+    assert.deepEqual(keysOf(doc), ["email", "emailSource", "emailUpdatedAt"], doc.id);
+  }
   assert.doesNotMatch(JSON.stringify(dataset), /phone|whatsapp|\b05\d{8}\b|\b01[0125]\d{8}\b/i);
   assert.doesNotMatch(datasetSource.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ""), /phone/i);
 });
 
 test("users fields equal adminProvisionUser and are a subset of UserModel.toFirestore", () => {
   const expected = provisionKeys("users");
-  assert.deepEqual(expected, ["createdAt", "email", "isActive", "name", "role"]);
+  assert.deepEqual(expected, ["createdAt", "isActive", "name", "role"]);
   const toFirestore = userModelSource.slice(userModelSource.indexOf("toFirestore()"));
   const dartKeys = [...toFirestore.slice(0, toFirestore.indexOf("};")).matchAll(/'(\w+)':/g)].map((m) => m[1]);
   for (const doc of docsIn("users")) {
@@ -129,9 +133,20 @@ test("users fields equal adminProvisionUser and are a subset of UserModel.toFire
   }
 });
 
-test("like adminProvisionUser, the dataset writes no userPrivate document", () => {
-  assert.doesNotMatch(provisionSource, /collection\("userPrivate"\)/);
-  assert.equal(docsIn("userPrivate").length, 0);
+test("email lives only in userPrivate, with the fields adminProvisionUser writes", () => {
+  const expected = provisionKeys("userPrivate");
+  assert.deepEqual(expected, ["email", "emailSource", "emailUpdatedAt"]);
+  assert.equal(docsIn("userPrivate").length, DEMO_ACCOUNTS.length);
+  for (const a of DEMO_ACCOUNTS) {
+    const priv = docsIn("userPrivate").find((d) => d.id === a.uid);
+    assert.ok(priv, a.uid);
+    assert.deepEqual(keysOf(priv), expected, a.uid);
+    assert.equal(priv.data.email === a.email, true, `${a.uid}: email matches its Auth account`);
+    assert.equal(priv.data.emailSource, "auth", a.uid);
+  }
+  for (const doc of dataset.documents.filter((d) => d.collection !== "userPrivate")) {
+    assert.equal("email" in doc.data, false, `${doc.collection}/${doc.id}`);
+  }
 });
 
 test("role profile fields equal adminProvisionUser", () => {
@@ -152,7 +167,7 @@ test("each account gets exactly the profile adminProvisionUser gives its role", 
 
 test("only known collections are written; all fit in one batch", () => {
   const collections = new Set(dataset.documents.map((d) => d.collection));
-  assert.deepEqual([...collections].sort(), ["parentProfiles", "studentProfiles", "teacherProfiles", "users"]);
+  assert.deepEqual([...collections].sort(), ["parentProfiles", "studentProfiles", "teacherProfiles", "userPrivate", "users"]);
   for (const c of collections) assert.match(rulesSource, new RegExp(`match /${c}/\\{`), c);
   assert.doesNotMatch(rulesSource, new RegExp(`match /${SEED_META.collection}/`), "seed marker stays under the catch-all deny");
   assert.ok(dataset.documents.length < 500);

@@ -26,6 +26,7 @@ import {
   stringList,
 } from "../authority/callerContext";
 import { cairoYmd, normalizeCairoYmd } from "../billing/cairoTime";
+import { contactInfoViolation } from "../privacy/contactInfoPolicy";
 import {
   ATTENDANCE_STATUSES,
   buildAbsenceNotification,
@@ -418,6 +419,10 @@ export async function upsertSessionEvaluationCore(
   const grade = parseGrade(data.grade, "grade");
   const behaviorGrade = parseGrade(data.behaviorGrade, "behaviorGrade");
   const notes = optionalText(data.notes, MAX_EVALUATION_NOTES_LENGTH);
+  const notesViolation = contactInfoViolation(notes);
+  if (notesViolation) {
+    throw new HttpsError("invalid-argument", notesViolation);
+  }
 
   const role = await loadCallerRole(db, uid);
   const isAdmin = role === "admin";

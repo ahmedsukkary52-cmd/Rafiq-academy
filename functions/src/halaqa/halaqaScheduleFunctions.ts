@@ -37,6 +37,7 @@ import {
   requireText,
   stringList,
 } from "../authority/callerContext";
+import { contactInfoViolation } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
 import {
   HALAQA_MEETING_LINKS_COLLECTION,
@@ -279,6 +280,10 @@ export async function adminCreateHalaqaCore(
   const name = requireText(data.name, "name", MAX_HALAQA_NAME_LENGTH);
   const teacherId = requireText(data.teacherId, "teacherId");
   const supervisorId = optionalText(data.supervisorId, 128);
+  const halaqaTextViolation = contactInfoViolation(name);
+  if (halaqaTextViolation) {
+    throw new HttpsError("invalid-argument", halaqaTextViolation);
+  }
   const meetingLink = optionalMeetingLink(data.meetingLink);
   const requestId = optionalText(data.requestId, 64);
   if (requestId && !REQUEST_ID_PATTERN.test(requestId)) {

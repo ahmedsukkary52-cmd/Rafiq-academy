@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,10 +25,6 @@ const provisionSrc = readFileSync(
 );
 const billingSrc = readFileSync(
   join(srcDir, "admin", "adminBilling.ts"),
-  "utf8",
-);
-const phonesSrc = readFileSync(
-  join(srcDir, "admin", "adminMigrateUserPhones.ts"),
   "utf8",
 );
 const slotsSrc = readFileSync(
@@ -102,10 +98,6 @@ test("WA-16 action vocabulary is frozen", () => {
   assert.equal(contract.AUDIT_ACTION.userUnarchive, "user_unarchive");
   assert.equal(contract.AUDIT_ACTION.invoiceCreate, "invoice_create");
   assert.equal(
-    contract.AUDIT_ACTION.migrateUserPhones,
-    "admin_migrate_user_phones",
-  );
-  assert.equal(
     contract.AUDIT_ACTION.migrateHalaqaSlotIds,
     "halaqa_schedule_slotid_migrate",
   );
@@ -166,9 +158,17 @@ test("WA-16 migration target ids are deterministic", () => {
     "lifecycle_bf_start",
   );
   assert.equal(
-    write.migrationTargetId("phones_migrate", "full"),
-    "phones_migrate_full",
+    write.migrationTargetId("search_bf", "full"),
+    "search_bf_full",
   );
+});
+
+test("WA-16 the phone migration action is retired (no phone storage policy)", () => {
+  assert.ok(!Object.values(contract.AUDIT_ACTION).includes("admin_migrate_user_phones"));
+  assert.ok(!contract.AUDIT_METADATA_ALLOWLIST.has("preservedExistingPrivate"));
+  assert.ok(!existsSync(join(srcDir, "admin", "adminMigrateUserPhones.ts")));
+  const index = readFileSync(join(srcDir, "index.ts"), "utf8");
+  assert.ok(!index.includes("adminMigrateUserPhones"));
 });
 
 // ── Writer normalization (source contracts) ────────────────────────────────
@@ -217,17 +217,6 @@ test("WA-16 invoice audits only when created === true path runs", () => {
   assert.ok(invoiceAudit.includes("pricingRuleVersion"));
   assert.ok(invoiceAudit.includes("amount"));
   assert.ok(invoiceAudit.includes("currency"));
-});
-
-test("WA-16 phone migrate audits only when migrated > 0", () => {
-  const code = stripComments(phonesSrc);
-  assert.ok(code.includes("if (migrated > 0)"));
-  assert.ok(code.includes("AUDIT_ACTION.migrateUserPhones"));
-  assert.ok(code.includes('migrationTargetId("phones_migrate", "full")'));
-  assert.ok(code.includes("migratedCount"));
-  const auditCall = code.slice(code.indexOf("writeAuditLog("), code.indexOf("writeAuditLog(") + 450);
-  assert.ok(!auditCall.includes("actorUid:"));
-  assert.ok(!auditCall.includes("createdAt:"));
 });
 
 test("WA-16 slot migrate audits only when work occurred", () => {
@@ -298,7 +287,6 @@ test("WA-16 no NEW audit path emits actorUid or createdAt", () => {
   for (const [name, src] of [
     ["provision", provisionSrc],
     ["billing", billingSrc],
-    ["phones", phonesSrc],
     ["slots", slotsSrc],
     ["lifecycle", lifecycleSrc],
     ["search", searchSrc],

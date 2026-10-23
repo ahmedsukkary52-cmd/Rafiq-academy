@@ -130,13 +130,21 @@ export const adminProvisionUser = onCall<
     const uid = authUser.uid;
     const db = admin.firestore();
 
-    await db.collection("users").doc(uid).set({
+    // Email never goes on users/{uid} (readable by other active users); it
+    // lives in userPrivate/{uid}, which only the owner and Admin can read.
+    const batch = db.batch();
+    batch.set(db.collection("users").doc(uid), {
       name,
       role,
-      email,
       isActive,
       createdAt: FieldValue.serverTimestamp(),
     });
+    batch.set(db.collection("userPrivate").doc(uid), {
+      email,
+      emailSource: "auth",
+      emailUpdatedAt: FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
 
     await writeRoleProfile(db, uid, role, name);
     await writeAuditLog({

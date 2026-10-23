@@ -110,7 +110,24 @@ test('PH01 storage: posts / content / awards uploads are staff-only', async () =
   await assertFails(image(storageOf('student1').ref('posts/student1/a.jpg')));
   await assertFails(image(storageOf('parent1').ref('content/parent1/a.jpg')));
   await assertFails(image(storageOf('student1').ref('awards/student1/a.jpg')));
-  await assertSucceeds(image(storageOf('teacher1').ref('posts/teacher1/a.jpg')));
+  // Posts: legacy author folder is closed; uploads are Halaqa-scoped.
+  await assertFails(image(storageOf('teacher1').ref('posts/teacher1/a.jpg')));
+  await assertSucceeds(
+    storageOf('teacher1')
+      .ref('posts/ph01h1/Ph01PostAaaaaaaaaaaa/att_0.jpg')
+      .put(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), {
+        contentType: 'image/jpeg',
+        customMetadata: { uploaderId: 'teacher1' },
+      }),
+  );
+  await assertFails(
+    storageOf('student1')
+      .ref('posts/ph01h1/Ph01PostBbbbbbbbbbbb/att_0.jpg')
+      .put(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), {
+        contentType: 'image/jpeg',
+        customMetadata: { uploaderId: 'student1' },
+      }),
+  );
   // P0 §8: new library uploads are Halaqa-scoped; legacy content/ is closed.
   await assertFails(image(storageOf('teacher1').ref('content/teacher1/a.jpg')));
   await assertSucceeds(image(storageOf('teacher1').ref('content_library/ph01h1/teacher1/a.jpg')));

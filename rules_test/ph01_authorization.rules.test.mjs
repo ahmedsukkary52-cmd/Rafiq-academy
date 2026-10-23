@@ -272,7 +272,8 @@ test('PH01 roles: no client may hard-delete a halaqa', async () => {
 // ── 3. Phone privacy (C16 / D16) ───────────────────────────────────────────
 
 test('PH01 phone: only Admin reads another user phone', async () => {
-  await assertSucceeds(authed('admin1').doc('userPrivate/student1').get());
+  // userPrivate docs that still carry a phone are closed to every client.
+  await assertFails(authed('admin1').doc('userPrivate/student1').get());
   await assertSucceeds(authed('admin1').doc('users/legacyPhone').get());
   for (const uid of ['parent2', 'teacher1', 'supervisor1', 'student2']) {
     await assertFails(authed(uid).doc('userPrivate/student1').get());
@@ -283,8 +284,8 @@ test('PH01 phone: only Admin reads another user phone', async () => {
 
 // Rules cannot prove field *absence* for list queries, so a legacy users doc
 // that still carries `phone` would be listable. Clients can never write phone
-// onto users (tested above); adminMigrateUserPhones must have moved every
-// legacy phone into userPrivate before deploy (PH-01 deploy gate).
+// onto users (tested above); the no-phone data cleanup must remove every
+// legacy phone before deploy (PH-01 deploy gate).
 test('PH01 phone: post-migration non-Admin users lists carry no phone', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().doc('users/legacyPhone').delete();
@@ -312,6 +313,25 @@ test('PH01 phone: no client can write phone onto identity or profiles', async ()
     authed('parent1').doc('parentProfiles/parent1').update({ phone: '0100' }),
   );
   await assertFails(authed('student1').doc('userPrivate/student1').set({ phone: '1' }));
+});
+
+test('PH01 phone: no client can add any contact field (no-phone policy)', async () => {
+  for (const key of ['phoneNumber', 'mobile', 'whatsapp', 'parentPhone', 'guardianPhone']) {
+    await assertFails(authed('student1').doc('users/student1').update({ [key]: '0501234567' }));
+    await assertFails(authed('admin1').doc('users/student1').update({ [key]: '0501234567' }));
+  }
+  await assertSucceeds(authed('student1').doc('users/student1').update({ name: 'Renamed' }));
+});
+
+test('PH01 phone: user-written activity replies and progress reject contact fields', async () => {
+  const replies = authed('student1').collection('assignments/act1/activityResponses');
+  await assertFails(replies.add({ studentId: 'student1', text: 'x', phone: '0501234567' }));
+  await assertSucceeds(replies.add({ studentId: 'student1', text: 'x' }));
+
+  const progress = authed('student1').doc('listeningProgress/student1_s1');
+  await assertFails(progress.set({ userId: 'student1', whatsapp: '0501234567' }));
+  await assertSucceeds(progress.set({ userId: 'student1', surahAudioId: 's1' }));
+  await assertFails(progress.update({ mobile: '0501234567' }));
 });
 
 // ── 4. Payments (C2 / C3 / C4 / C5) ────────────────────────────────────────
@@ -431,6 +451,43 @@ test('PH01 settings: paymentPublic carries only the locked public fields', async
   );
   for (const uid of ['teacher1', 'student1', 'supervisor1']) {
     await assertFails(authed(uid).doc('academySettings/paymentPublic').get());
+  }
+});
+
+// DEVELOPMENT PLACEHOLDERS — not real academy payment details.
+const DEV_WALLET = '01000000000';
+const DEV_INSTAPAY = 'dev-placeholder@instapay';
+
+test('PH01 settings: InstaPay destination is a separate, bounded field', async () => {
+  const admin = authed('admin1');
+  await assertSucceeds(
+    admin.doc('academySettings/paymentPublic').set({ instapayDestination: DEV_INSTAPAY }),
+  );
+  await assertSucceeds(
+    admin.doc('academySettings/paymentPublic').set(
+      { vodafoneCashDestination: DEV_WALLET, updatedBy: 'admin1' },
+      { merge: true },
+    ),
+  );
+  await assertFails(
+    admin.doc('academySettings/paymentPublic').set({ instapayDestination: 42 }),
+  );
+  await assertFails(
+    admin.doc('academySettings/paymentPublic').set({ instapayDestination: 'x'.repeat(201) }),
+  );
+  await assertFails(
+    admin.doc('academySettings/paymentPublic').set({ vodafoneCashDestination: '0'.repeat(33) }),
+  );
+  await assertFails(
+    admin.doc('academySettings/paymentPublic').set({ instapayPhone: DEV_WALLET }),
+  );
+  for (const uid of ['parent1', 'teacher1', 'student1', 'supervisor1']) {
+    await assertFails(
+      authed(uid).doc('academySettings/paymentPublic').set(
+        { instapayDestination: DEV_INSTAPAY },
+        { merge: true },
+      ),
+    );
   }
 });
 
@@ -834,6 +891,14 @@ test('PH01 evaluation: student submits own pending homework recitation', async (
       reviewStatus: 'pending',
     }),
   );
+  await assertFails(
+    authed('student1').collection('recitationRecords').add({
+      studentId: 'student1',
+      halaqaId: 'h1',
+      reviewStatus: 'pending',
+      phone: '0501234567',
+    }),
+  );
 });
 
 test('PH01 evaluation: only the halaqa Teacher reviews a pending submission', async () => {
@@ -862,6 +927,9 @@ const absence = (overrides = {}) => ({
 
 test('PH01 absence: linked Parent submits; Teacher of halaqa classifies', async () => {
   const id = 'absenceRequests/h1_student1_20260929';
+  // First submit pre-reads a missing doc (client existence probe).
+  await assertSucceeds(authed('parent1').doc(id).get());
+  await assertFails(authed('teacher1').doc(id).get());
   await assertFails(
     authed('parent2').doc(id).set(absence({ requestedBy: 'parent2' })),
   );
@@ -1331,6 +1399,15 @@ test('PH01 privacy: achievements are own/linked/staff scoped', async () => {
       grantedBy: 'teacher2',
       title: 'y',
     },
+    // Multi-recipient grant: studentId is only the first recipient.
+    'achievements/a3': {
+      studentId: 'student2',
+      recipientStudentIds: ['student2', 'student1'],
+      halaqaId: 'h1',
+      halaqaIds: ['h1'],
+      grantedBy: 'admin1',
+      title: 'ز',
+    },
   });
   const s1 = authed('student1');
   await assertSucceeds(
@@ -1349,6 +1426,32 @@ test('PH01 privacy: achievements are own/linked/staff scoped', async () => {
   await assertFails(s1.collection('achievements').get());
   await assertSucceeds(authed('parent1').doc('achievements/a1').get());
   await assertFails(authed('parent1').doc('achievements/a2').get());
+  // Multi-recipient: linked parent of a non-primary recipient may get by id.
+  await assertSucceeds(authed('parent1').doc('achievements/a3').get());
+  await assertFails(authed('parent2').doc('achievements/a1').get());
+
+  // Parent list queries that need get(parentProfiles)+hasAny cannot be proven
+  // from query constraints alone (Firestore denies the whole list). Single-doc
+  // gets above remain the ownership-preserving path until awards carry a
+  // denormalized parent-visible key written by the grant callable.
+  await assertFails(
+    authed('parent1')
+      .collection('achievements')
+      .where('recipientStudentIds', 'array-contains', 'student1')
+      .get(),
+  );
+  await assertFails(
+    authed('parent1')
+      .collection('achievements')
+      .where('recipientStudentIds', 'array-contains', 'student2')
+      .get(),
+  );
+  await assertFails(
+    authed('parent1')
+      .collection('achievements')
+      .where('studentId', '==', 'student1')
+      .get(),
+  );
   await assertSucceeds(
     authed('teacher1')
       .collection('achievements')

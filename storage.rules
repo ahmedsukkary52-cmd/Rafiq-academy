@@ -26,6 +26,10 @@ service firebase.storage {
         : '';
     }
 
+    function hasActiveProfile() {
+      return signedIn() && activeRole() != '';
+    }
+
     function isAdmin() {
       return signedIn() && activeRole() == 'admin';
     }
@@ -71,6 +75,31 @@ service firebase.storage {
 
     function isImage() {
       return request.resource.contentType.matches('image/.*');
+    }
+
+    /// Proofs, award and activity images: JPEG / PNG / WebP only, and the
+    /// object name's extension must agree with the declared content type.
+    /// Rules see only the declared type and size, never the file bytes.
+    function isAllowedImageObject(fileName) {
+      return request.resource.size > 0
+        && (
+          (
+            fileName.matches('^[A-Za-z0-9_-]{1,64}[.](jpg|jpeg)$')
+            && request.resource.contentType == 'image/jpeg'
+          )
+          || (
+            fileName.matches('^[A-Za-z0-9_-]{1,64}[.]png$')
+            && request.resource.contentType == 'image/png'
+          )
+          || (
+            fileName.matches('^[A-Za-z0-9_-]{1,64}[.]webp$')
+            && request.resource.contentType == 'image/webp'
+          )
+        );
+    }
+
+    function underActivityImageSize() {
+      return request.resource.size < 10 * 1024 * 1024;
     }
 
     function underMaxProofSize() {
@@ -201,12 +230,16 @@ service firebase.storage {
           )
         );
 
+      // `resource == null`: an upload over an existing object is evaluated
+      // as create, and a submitted proof's bytes must never change under
+      // its server-issued proof cycle.
       allow create: if signedIn()
+        && resource == null
         && isParentRole()
         && uid() == parentId
         && nonEmpty(fileName)
         && paymentOwnedByParent(parentId, paymentId)
-        && isImage()
+        && isAllowedImageObject(fileName)
         && underMaxProofSize();
 
       allow update: if false;
@@ -281,28 +314,22 @@ service firebase.storage {
         && uid() == teacherId
         && isStaff()
         && nonEmpty(fileName)
-        && isImage()
+        && isAllowedImageObject(fileName)
         && underAwardImageSize();
 
       allow update, delete: if false;
     }
 
-    // ── WA-12 posts/{authorId}/{fileName} ──────────────────────────────────
-    // Upload precedes posts/{postId}; ownership is path authorId only.
-    // Create is create-only: existing objects cannot be overwritten via create.
+    // ── Legacy posts/{authorId}/{fileName} (pre-hardening, not Halaqa-scoped)
+    // Closed for writes; new uploads use posts/{halaqaId}/{postId}/… below.
+    // Author and Admin keep read for migration. Download-URL tokens already
+    // handed out for these objects bypass Rules until revoked.
     match /posts/{authorId}/{fileName} {
       allow read: if signedIn()
-        && nonEmpty(authorId)
-        && nonEmpty(fileName);
+        && nonEmpty(fileName)
+        && (uid() == authorId || isAdmin());
 
-      allow create: if signedIn()
-        && resource == null
-        && uid() == authorId
-        && isStaff()
-        && nonEmpty(fileName);
-
-      allow update: if false;
-      allow delete: if false;
+      allow write: if false;
     }
 
     // ── Legacy content/{uploadedBy}/{fileName} (pre-P0, not Halaqa-scoped) ─
@@ -320,8 +347,10 @@ service firebase.storage {
 
     // ── P0 §8 content_library/{halaqaId}/{uploadedBy}/{fileName} ───────────
     // Halaqa shared content: same audience as Firestore contentLibrary.
+    // Deactivated staff still named on the halaqa hold no authority there.
     function isStaffOfHalaqaDoc(halaqaId) {
-      return nonEmpty(halaqaId)
+      return hasActiveProfile()
+        && nonEmpty(halaqaId)
         && firestore.exists(/databases/(default)/documents/halaqat/$(halaqaId))
         && (
           halaqaDoc(halaqaId).data.get('teacherId', '') == uid()
@@ -380,6 +409,89 @@ service firebase.storage {
         && (isAdmin() || isStaffOfHalaqaDoc(halaqaId));
     }
 
+    // ── posts/{halaqaId}/{postId}/{fileName} ───────────────────────────────
+    // Same audience as Firestore posts/{postId} (canAccessHalaqaCommunity).
+    // Upload precedes the post doc (client pre-generates postId); objects are
+    // readable only while that live post targets this Halaqa and was authored
+    // by the uploader, so a deleted post's files are hidden from members.
+    function postDocPath(postId) {
+      return /databases/(default)/documents/posts/$(postId);
+    }
+
+    function postExists(postId) {
+      return firestore.exists(postDocPath(postId));
+    }
+
+    function postData(postId) {
+      return firestore.get(postDocPath(postId)).data;
+    }
+
+    function postObjectIs(fileName, extPattern, contentType, maxBytes) {
+      return fileName.matches('^att_[0-9]{1,2}[.]' + extPattern + '$')
+        && request.resource.contentType == contentType
+        && request.resource.size < maxBytes;
+    }
+
+    /// PDF ≤20 MB, JPEG/PNG ≤10 MB, MP3/WAV ≤20 MB, MP4 ≤50 MB (post picker).
+    function isAllowedPostObject(fileName) {
+      return request.resource.size > 0
+        && (
+          postObjectIs(fileName, 'pdf', 'application/pdf', 20 * 1024 * 1024)
+          || postObjectIs(fileName, '(jpg|jpeg)', 'image/jpeg', 10 * 1024 * 1024)
+          || postObjectIs(fileName, 'png', 'image/png', 10 * 1024 * 1024)
+          || postObjectIs(fileName, 'mp3', 'audio/mpeg', 20 * 1024 * 1024)
+          || postObjectIs(fileName, 'wav', 'audio/wav', 20 * 1024 * 1024)
+          || postObjectIs(fileName, 'mp4', 'video/mp4', 50 * 1024 * 1024)
+        );
+    }
+
+    match /posts/{halaqaId}/{postId}/{fileName} {
+      allow get: if signedIn()
+        && nonEmpty(fileName)
+        && (
+          isAdmin()
+          || (
+            postExists(postId)
+            && postData(postId).get('audienceTarget', '') == halaqaId
+            && postData(postId).get('halaqaId', '') == halaqaId
+            && resource.metadata.get('uploaderId', '')
+                == postData(postId).get('authorId', '')
+            && (
+              isStaffOfHalaqaDoc(halaqaId)
+              || isStudentOnHalaqa(halaqaId)
+              || isLinkedParentOfHalaqa(halaqaId)
+            )
+          )
+        );
+
+      allow list: if isAdmin();
+
+      // Mirrors Firestore authorCanTarget: Admin, or this Halaqa's staff.
+      allow create: if signedIn()
+        && resource == null
+        && postId.matches('^[A-Za-z0-9]{20}$')
+        && isStaff()
+        && (
+          isStaffOfHalaqaDoc(halaqaId)
+          || (
+            isAdmin()
+            && firestore.exists(/databases/(default)/documents/halaqat/$(halaqaId))
+          )
+        )
+        && !postExists(postId)
+        && request.resource.metadata != null
+        && request.resource.metadata.get('uploaderId', '') == uid()
+        && isAllowedPostObject(fileName);
+
+      allow update: if false;
+
+      // Failed / abandoned posts: the uploader removes its own objects while
+      // no post doc references the folder.
+      allow delete: if signedIn()
+        && resource.metadata.get('uploaderId', '') == uid()
+        && !postExists(postId);
+    }
+
     // ── WA-12 halaqa_activities/{activityId}/{studentId}/{folder}/{file} ───
     // Live SSOT: assignments/{activityId} + halaqat/{halaqaId}.studentIds.
     // Never authorize via legacy collection name "halaqaActivity".
@@ -424,7 +536,8 @@ service firebase.storage {
 
     /// Teacher / Supervisor of the assignment's halaqa (roster SSOT doc).
     function isStaffOfAssignmentHalaqa(activityId) {
-      return assignmentHasHalaqaId(activityId)
+      return hasActiveProfile()
+        && assignmentHasHalaqaId(activityId)
         && (
           halaqaDoc(assignmentHalaqaId(activityId)).data.get('teacherId', '') == uid()
           || halaqaDoc(assignmentHalaqaId(activityId)).data.get('supervisorId', '') == uid()
@@ -450,6 +563,8 @@ service firebase.storage {
         && uid() == studentId
         && folder == 'images'
         && nonEmpty(fileName)
+        && isAllowedImageObject(fileName)
+        && underActivityImageSize()
         && studentOnAssignmentHalaqa(activityId, studentId);
 
       allow update: if false;

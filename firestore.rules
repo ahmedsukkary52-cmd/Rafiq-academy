@@ -2,10 +2,11 @@ rules_version = '2';
 
 // WA-2 authorization foundation (C1–C4, C10, C16; D1, D2, D14, D16).
 // Wired in firebase.json for versioning/emulator — do NOT deploy until
-// B-BILLING Verified and phone migration plan acknowledged.
+// B-BILLING Verified and the legacy phone data cleanup is complete.
 //
-// Self-phone: own-read of userPrivate allowed (freeze recommendation).
-// Absolute Admin-only self-phone remains IMPORTANT TBD — not reinvented here.
+// No-personal-phone policy: no client write may add a contact field
+// (contactFieldKeys). userPrivate holds only the private email; any doc
+// still carrying a legacy contact field is unreadable by every client.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -49,10 +50,30 @@ service cloud.firestore {
       return signedIn() && uid() == userId;
     }
 
+    // Legacy read guard: documents written before the no-phone policy may
+    // still carry `phone` until the data cleanup removes it.
     function hasExposedPhone(data) {
       return 'phone' in data
         && data.phone is string
         && data.phone.size() > 0;
+    }
+
+    // No-personal-phone policy: mirrors CONTACT_FIELD_KEYS in
+    // functions/src/privacy/contactInfoPolicy.ts.
+    function contactFieldKeys() {
+      return ['phone', 'phoneNumber', 'mobile', 'whatsapp', 'parentPhone', 'guardianPhone'];
+    }
+
+    function hasContactField(data) {
+      return data.keys().hasAny(contactFieldKeys());
+    }
+
+    // Updates may remove a legacy contact field but never add or change one.
+    function writesContactField() {
+      return request.resource.data.diff(resource.data).addedKeys()
+          .hasAny(contactFieldKeys())
+        || request.resource.data.diff(resource.data).changedKeys()
+          .hasAny(contactFieldKeys());
     }
 
     function roleUnchanged() {
@@ -94,14 +115,16 @@ service cloud.firestore {
       return get(halaqaPath(halaqaId)).data;
     }
 
+    // Staff relationship helpers require an active profile: a deactivated
+    // teacher/supervisor still named on a halaqa holds no authority there.
     function isTeacherOfHalaqa(halaqaId) {
-      return signedIn()
+      return hasActiveProfile()
         && halaqaExists(halaqaId)
         && halaqaData(halaqaId).get('teacherId', '') == uid();
     }
 
     function isSupervisorOfHalaqa(halaqaId) {
-      return signedIn()
+      return hasActiveProfile()
         && halaqaExists(halaqaId)
         && halaqaData(halaqaId).get('supervisorId', '') == uid();
     }
@@ -128,7 +151,7 @@ service cloud.firestore {
     /// C13: roster-derived, CF-maintained staff scope across every halaqa the
     /// student belongs to (covers the second halaqa, unlike the UI pointer).
     function isRosterStaffOf(studentId) {
-      return signedIn()
+      return hasActiveProfile()
         && studentId is string
         && exists(/databases/$(database)/documents/studentSearch/$(studentId))
         && uid() in get(
@@ -187,23 +210,24 @@ service cloud.firestore {
         || isLinkedParentOfHalaqa(halaqaId);
     }
 
-    // ── users (identity; phone must live in userPrivate) ───────────────
+    // ── users (identity; personal phone numbers are never stored) ──────
     match /users/{userId} {
-      allow get: if signedIn() && (
-        isAdmin()
-        || isSelf(userId)
-        || !hasExposedPhone(resource.data)
-      );
+      // Self stays readable while deactivated: sign-in reads it to show the
+      // disabled-account message. Reading another profile needs an active
+      // profile. Rules cannot hide single fields, so an active caller can
+      // still see another user's email until it leaves this document.
+      allow get: if isSelf(userId)
+        || isAdmin()
+        || (hasActiveProfile() && !hasExposedPhone(resource.data));
 
       // §16.3: Student/Parent never scan the directory; they may only list
       // Admin contact cards (Parent "contact Admin"). Staff keep roster lists.
-      allow list: if signedIn() && (
-        isAdmin()
+      allow list: if isAdmin()
         || (
-          !hasExposedPhone(resource.data)
+          hasActiveProfile()
+          && !hasExposedPhone(resource.data)
           && (isStaffRole() || resource.data.role == 'admin')
-        )
-      );
+        );
 
       allow create: if false;
       allow delete: if false;
@@ -214,20 +238,30 @@ service cloud.firestore {
           && roleUnchanged()
           && isActiveUnchanged()
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'isActive', 'phone', 'createdAt', 'lifecycle'])
+              .hasAny(['role', 'isActive', 'phone', 'createdAt', 'lifecycle', 'email'])
           && !hasExposedPhone(request.resource.data)
+          && !writesContactField()
         )
         || (
           isAdmin()
           && roleUnchanged()
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['email'])
           && !hasExposedPhone(request.resource.data)
+          && !writesContactField()
         )
       );
     }
 
-    // ── Admin-only / self phone vault (D16) ────────────────────────────
+    // ── Private email (owner / Admin only) ─────────────────────────────
+    // Written only server-side (adminProvisionUser, approved migration).
+    // No list, so no bulk export. A document still carrying a legacy
+    // contact field stays unreadable until the server-side phone cleanup
+    // strips that field.
     match /userPrivate/{userId} {
-      allow read: if isAdmin() || isSelf(userId);
+      allow get: if (isAdmin() || (isSelf(userId) && hasActiveProfile()))
+        && (resource == null || !hasContactField(resource.data));
+      allow list: if false;
       allow write: if false;
     }
 
@@ -242,7 +276,8 @@ service cloud.firestore {
       allow update: if (isSelf(parentId) || isAdmin())
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['childrenIds', 'phone'])
-        && !hasExposedPhone(request.resource.data);
+        && !hasExposedPhone(request.resource.data)
+        && !writesContactField();
     }
 
     match /studentProfiles/{studentId} {
@@ -276,6 +311,7 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(serverOwnedProfileFields())
         && !hasExposedPhone(request.resource.data)
+        && !writesContactField()
         && isAdmin();
     }
 
@@ -310,7 +346,8 @@ service cloud.firestore {
         )
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['phone'])
-        && !hasExposedPhone(request.resource.data);
+        && !hasExposedPhone(request.resource.data)
+        && !writesContactField();
     }
 
     // Legacy / OUT — quarantine writes (D24)
@@ -394,64 +431,12 @@ service cloud.firestore {
     }
 
     // ── Payments ───────────────────────────────────────────────────────
-    function paymentParentOwned() {
-      return resource.data.parentId == uid();
-    }
-
-    function paymentAmountUnchanged() {
-      return request.resource.data.amount == resource.data.amount;
-    }
-
-    function paymentStatusUnchanged() {
-      return request.resource.data.status == resource.data.status;
-    }
-
-    function paymentIdentityUnchanged() {
-      return request.resource.data.parentId == resource.data.parentId
-        && (
-          !('studentId' in resource.data)
-          || request.resource.data.studentId == resource.data.studentId
-        );
-    }
-
-    function parentProofOnlyUpdate() {
-      // Parent may set proof fields + pending_review and clear prior review
-      // fields (FieldValue.delete → field absent on request.resource), but must
-      // never set paid/overdue/amount or reviewer conclusion fields.
-      return isParent()
-        && paymentParentOwned()
-        && paymentAmountUnchanged()
-        && paymentStatusUnchanged()
-        && paymentIdentityUnchanged()
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'amount',
-          'status',
-          'paidAt',
-          'overdueAt',
-          'dueDate',
-          'parentId',
-          'studentId',
-          'pricingRuleId',
-          'pricingRuleVersion',
-          'issuedAt',
-          'periodKey',
-          'currency'
-        ])
-        && (
-          !('reviewStatus' in request.resource.data)
-          || request.resource.data.reviewStatus == 'pending_review'
-        )
-        && !('reviewedBy' in request.resource.data)
-        && !('reviewedAt' in request.resource.data)
-        && !('reviewNotes' in request.resource.data)
-        && !('amountPaidConfirmed' in request.resource.data)
-        && !('remainingAmount' in request.resource.data);
-    }
-
     // C4 / C16 (PH-02): review outcomes, `status=paid`, reviewer identity and
     // review timestamps are written only by the reviewPaymentProof callable
-    // (transactional + audited). Clients keep read access and the Parent
-    // proof submission below; no client writes a review conclusion.
+    // (transactional + audited). The current proof pointer, its server-issued
+    // `proofCycleId`, the used-name history and `pending_review` are written
+    // only by the submitPaymentProof callable after it verified the uploaded
+    // Storage object. Clients keep read access and never write payments.
     match /payments/{paymentId} {
       allow read: if signedIn() && (
         isAdmin()
@@ -460,9 +445,7 @@ service cloud.firestore {
       );
       allow create: if false;
       allow delete: if false;
-      allow update: if signedIn()
-        && resource.data.get('status', '') != 'paid'
-        && parentProofOnlyUpdate();
+      allow update: if false;
     }
 
     // C2 — clients never write paymentAccess; Teacher/Student cannot read.
@@ -492,15 +475,29 @@ service cloud.firestore {
     // C3 — academy settings (WAVE_A: Parent read paymentPublic only; Admin RW)
     // paymentPublic is the Parent-safe projection: only the locked C3 fields
     // may ever be written, so private Admin config cannot leak into it.
+    // Vodafone Cash and InstaPay destinations are independent fields; format
+    // is validated client-side, the rules bound type and length only.
     match /academySettings/{docId} {
+      function optionalBoundedString(data, field, maxLen) {
+        return !(field in data)
+          || (data[field] is string && data[field].size() <= maxLen);
+      }
+
       allow read: if isAdmin()
         || (docId == 'paymentPublic' && isParent());
       allow write: if isAdmin()
         && (
           docId != 'paymentPublic'
-          || request.resource.data.keys().hasOnly([
-            'vodafoneCashDestination', 'updatedAt', 'updatedBy'
-          ])
+          || (
+            request.resource.data.keys().hasOnly([
+              'vodafoneCashDestination', 'instapayDestination',
+              'updatedAt', 'updatedBy'
+            ])
+            && optionalBoundedString(
+              request.resource.data, 'vodafoneCashDestination', 32)
+            && optionalBoundedString(
+              request.resource.data, 'instapayDestination', 200)
+          )
         );
     }
 
@@ -552,7 +549,8 @@ service cloud.firestore {
           && d.get('reviewStatus', '') == 'pending'
           && isStudentOnRoster(d.halaqaId, uid())
           && !recordId.matches('.*_(memorization|review)$')
-          && !d.keys().hasAny(['grade', 'behaviorGrade', 'sessionId', 'createdAt']);
+          && !d.keys().hasAny(['grade', 'behaviorGrade', 'sessionId', 'createdAt'])
+          && !hasContactField(d);
       }
 
       function teacherReviewOfPendingOk() {
@@ -585,11 +583,17 @@ service cloud.firestore {
           ]);
       }
 
-      allow read: if isAdmin()
-        || (signedIn() && resource.data.requestedBy == uid())
-        || (signedIn() && resource.data.studentId == uid())
-        || isStaffOfHalaqa(resource.data.halaqaId)
-        || isLinkedParentOf(resource.data.studentId);
+      // Missing-doc get: the parent client pre-reads before the first
+      // submit. resource is null then, so resource.data checks must not run.
+      allow read: if resource == null
+        ? isParent()
+        : (
+          isAdmin()
+          || (signedIn() && resource.data.requestedBy == uid())
+          || (signedIn() && resource.data.studentId == uid())
+          || isStaffOfHalaqa(resource.data.halaqaId)
+          || isLinkedParentOf(resource.data.studentId)
+        );
       allow create: if parentRequestOk();
       allow update: if (
           resource.data.get('status', '') == 'pending'
@@ -608,30 +612,41 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Awards: credited awards (multi-recipient, points/totalStars) are
-    // written only by the grantAward callable. The one client create left is
-    // the Supervisor's record-only achievement (no credit): single student,
-    // on the roster of a halaqa the caller staffs, actor = caller.
+    // Awards: written only by callables, each keyed by a client operation id
+    // so retries replay instead of duplicating — grantAward (credited,
+    // totalStars) and issueAchievement (record-only, no credit).
     match /achievements/{achievementId} {
-      function recordOnlyAchievementOk() {
-        let d = request.resource.data;
-        return d.get('grantedBy', '') == uid()
-          && d.get('issuedBy', uid()) == uid()
-          && (isAdmin() || isStaffOfHalaqa(d.get('halaqaId', '')))
-          && isStudentOnRoster(d.get('halaqaId', ''), d.get('studentId', ''))
-          && d.keys().hasOnly([
-            'studentId', 'type', 'halaqaId', 'title', 'note',
-            'grantedBy', 'issuedBy', 'grantedAt', 'date'
-          ]);
+      // get vs list are split on purpose. Parent ownership needs
+      // get(parentProfiles), which Firestore cannot prove for list queries, so
+      // parent *lists* stay denied while single-doc gets remain allowed.
+      function isLinkedParentOfAnyRecipient() {
+        return isParent()
+          && exists(/databases/$(database)/documents/parentProfiles/$(uid()))
+          && resource.data.keys().hasAll(['recipientStudentIds'])
+          && resource.data.recipientStudentIds is list
+          && get(/databases/$(database)/documents/parentProfiles/$(uid()))
+              .data.get('childrenIds', [])
+              .hasAny(resource.data.recipientStudentIds);
       }
 
-      allow read: if isAdmin()
+      allow get: if isAdmin()
         || isStaffRole()
         || (signedIn() && resource.data.get('studentId', '') == uid())
-        || (signedIn() && uid() in resource.data.recipientStudentIds)
-        || isLinkedParentOf(resource.data.get('studentId', ''));
-      allow create: if recordOnlyAchievementOk();
-      allow update, delete: if false;
+        || (signedIn()
+            && resource.data.keys().hasAll(['recipientStudentIds'])
+            && resource.data.recipientStudentIds is list
+            && uid() in resource.data.recipientStudentIds)
+        || isLinkedParentOf(resource.data.get('studentId', ''))
+        || isLinkedParentOfAnyRecipient();
+
+      // Same student/staff constraints as before the parent-get fix — no
+      // get(parentProfiles), or student/staff list queries break.
+      allow list: if isAdmin()
+        || isStaffRole()
+        || (signedIn() && resource.data.get('studentId', '') == uid())
+        || (signedIn() && uid() in resource.data.recipientStudentIds);
+
+      allow create, update, delete: if false;
     }
 
     // Homework + halaqa activities (assignments SSOT).
@@ -691,13 +706,15 @@ service cloud.firestore {
         || isStudentOnRoster(resource.data.halaqaId, uid())
         || isLinkedParentOf(resource.data.studentId);
       allow create: if teacherCreateOk()
-        && !request.resource.data.keys().hasAny(['completedAt']);
+        && !request.resource.data.keys().hasAny(['completedAt'])
+        && !hasContactField(request.resource.data);
       // P0-05: `completedAt` is the server-set legacy reward anchor; no
       // client may set, move or clear it (a reopen can never re-credit).
       allow update: if (
           isTeacherOfHalaqa(resource.data.get('halaqaId', ''))
           && assignmentIdentityFrozen()
           && !changedKeys().hasAny(['completedAt'])
+          && !writesContactField()
         )
         || studentOwnHomeworkUpdate()
         || studentActivityCounterUpdate();
@@ -714,7 +731,8 @@ service cloud.firestore {
           || isStudentOnRoster(activityHalaqaId(), uid());
         allow create: if signedIn()
           && request.resource.data.get('studentId', '') == uid()
-          && isStudentOnRoster(activityHalaqaId(), uid());
+          && isStudentOnRoster(activityHalaqaId(), uid())
+          && !hasContactField(request.resource.data);
         allow update, delete: if false;
       }
     }
@@ -742,7 +760,8 @@ service cloud.firestore {
         && !request.resource.data.keys()
             .hasAny(serverOwnedNotificationFields())
         && request.resource.data.get('readBy', []) == []
-        && request.resource.data.get('audience', '') in broadcastAudiences();
+        && request.resource.data.get('audience', '') in broadcastAudiences()
+        && !hasContactField(request.resource.data);
       // Readers may only add themselves to readBy.
       allow update: if isNotificationAudience()
         && changedKeys().hasOnly(['readBy'])
@@ -761,9 +780,10 @@ service cloud.firestore {
 
     match /supervisorReports/{reportId} {
       allow read: if isAdmin()
-        || (signedIn() && resource.data.supervisorId == uid());
+        || (hasActiveProfile() && resource.data.supervisorId == uid());
       allow create: if isSupervisor()
-        && request.resource.data.get('supervisorId', '') == uid();
+        && request.resource.data.get('supervisorId', '') == uid()
+        && !hasContactField(request.resource.data);
       allow update, delete: if false;
     }
 
@@ -791,8 +811,10 @@ service cloud.firestore {
       allow read: if isAdmin() || canAccessHalaqaCommunity(postHalaqaId());
       allow create: if signedIn()
         && request.resource.data.get('authorId', '') == uid()
-        && authorCanTarget(request.resource.data);
+        && authorCanTarget(request.resource.data)
+        && !hasContactField(request.resource.data);
       allow update: if canAccessHalaqaCommunity(postHalaqaId())
+        && !writesContactField()
         && request.resource.data.get('halaqaId', '') == resource.data.get('halaqaId', '')
         && request.resource.data.get('audienceTarget', '')
             == resource.data.get('audienceTarget', '')
@@ -833,7 +855,8 @@ service cloud.firestore {
 
         allow read: if isAdmin() || canAccessHalaqaCommunity(commentPostHalaqaId());
         allow create: if request.resource.data.get('authorId', '') == uid()
-          && canAccessHalaqaCommunity(commentPostHalaqaId());
+          && canAccessHalaqaCommunity(commentPostHalaqaId())
+          && !hasContactField(request.resource.data);
         allow update, delete: if false;
       }
     }
@@ -841,7 +864,8 @@ service cloud.firestore {
     match /calendarEvents/{eventId} {
       allow read: if signedIn();
       allow create: if (isAdmin() || isStaffRole())
-        && request.resource.data.get('createdBy', '') == uid();
+        && request.resource.data.get('createdBy', '') == uid()
+        && !hasContactField(request.resource.data);
       allow update: if false;
       allow delete: if isAdmin()
         || (isStaffRole() && resource.data.get('createdBy', '') == uid());
@@ -866,7 +890,8 @@ service cloud.firestore {
       allow read: if isAdmin()
         || canAccessHalaqaCommunity(resource.data.get('halaqaId', ''));
       allow create: if contentShapeOk(request.resource.data)
-        && (isAdmin() || isStaffOfHalaqa(request.resource.data.get('halaqaId', '')));
+        && (isAdmin() || isStaffOfHalaqa(request.resource.data.get('halaqaId', '')))
+        && !hasContactField(request.resource.data);
       allow update: if false;
       allow delete: if isAdmin()
         || isStaffOfHalaqa(resource.data.get('halaqaId', ''));
@@ -885,10 +910,12 @@ service cloud.firestore {
     match /listeningProgress/{progressId} {
       allow read: if signedIn() && resource.data.userId == uid();
       allow create: if signedIn()
-        && request.resource.data.get('userId', '') == uid();
+        && request.resource.data.get('userId', '') == uid()
+        && !hasContactField(request.resource.data);
       allow update: if signedIn()
         && resource.data.get('userId', '') == uid()
-        && request.resource.data.get('userId', '') == uid();
+        && request.resource.data.get('userId', '') == uid()
+        && !writesContactField();
       allow delete: if false;
     }
 
@@ -971,7 +998,7 @@ service cloud.firestore {
     // Teacher of session or Admin. Identity / snapshot fields immutable.
     match /sessions/{id} {
       function sessionTeacher() {
-        return signedIn()
+        return hasActiveProfile()
           && resource.data.teacherId is string
           && resource.data.teacherId == uid();
       }

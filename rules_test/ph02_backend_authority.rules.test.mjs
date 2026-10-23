@@ -136,6 +136,17 @@ test.beforeEach(async () => {
 
 // ── C4 / C16 payment review ────────────────────────────────────────────────
 
+function proofSubmission(paymentId) {
+  return {
+    proofStoragePath: `payment_proofs/parent1/${paymentId}/1760000000000.jpg`,
+    proofFileName: '1760000000000.jpg',
+    proofSubmittedBy: 'parent1',
+    proofSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    method: 'vodafone_cash',
+    reviewStatus: 'pending_review',
+  };
+}
+
 test('PH02 payments: no client role writes a review conclusion', async () => {
   const conclusions = [
     { status: 'paid', reviewStatus: 'approved', paidAt: new Date() },
@@ -151,21 +162,15 @@ test('PH02 payments: no client role writes a review conclusion', async () => {
   }
 });
 
-test('PH02 payments: Parent still submits proof on an unpaid invoice', async () => {
-  await assertSucceeds(
-    authed('parent1').doc('payments/payDue').update({
-      reviewStatus: 'pending_review',
-      proofImageUrl: 'https://example.test/p.jpg',
-      proofSubmittedAt: new Date(),
-    }),
+test('PH02 payments: proof submission is callable-only, even on an unpaid invoice', async () => {
+  await assertFails(
+    authed('parent1').doc('payments/payDue').update(proofSubmission('payDue')),
   );
 });
 
 test('PH02 payments: a paid invoice is final for the Parent too', async () => {
   await assertFails(
-    authed('parent1').doc('payments/payPaid').update({
-      proofImageUrl: 'https://example.test/again.jpg',
-    }),
+    authed('parent1').doc('payments/payPaid').update(proofSubmission('payPaid')),
   );
 });
 
@@ -591,7 +596,7 @@ test('PH02 C16: no client forges an audit, whatever actorRole it claims', async 
   await assertSucceeds(authed('admin1').doc('auditLogs/existing').get());
 });
 
-test('PH02 achievements: Supervisor record-only issue is roster-scoped; credit is callable-only', async () => {
+test('PH02 achievements: every award write is callable-only (record-only and credited)', async () => {
   await seedAll({
     'users/supervisor2': { name: 's2', role: 'supervisor', isActive: true },
     'halaqat/h2': {
@@ -613,8 +618,11 @@ test('PH02 achievements: Supervisor record-only issue is roster-scoped; credit i
     date: new Date(),
     ...overrides,
   });
-  await assertSucceeds(authed('supervisor1').collection('achievements').add(issue('supervisor1')));
-  await assertSucceeds(authed('admin1').collection('achievements').add(issue('admin1')));
+  // The former record-only client path is closed too: a client-generated id
+  // could not make retries idempotent, so issueAchievement writes it now.
+  await assertFails(authed('supervisor1').collection('achievements').add(issue('supervisor1')));
+  await assertFails(authed('admin1').collection('achievements').add(issue('admin1')));
+  await assertFails(authed('teacher1').doc('achievements/op_teacher1').set(issue('teacher1')));
 
   const sup = authed('supervisor1').collection('achievements');
   // Off-roster student (the empty-halaqa manual id path) / unsupervised halaqa.

@@ -20,6 +20,8 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rules = readFileSync(join(__dirname, '..', 'firestore.rules'), 'utf8');
@@ -143,14 +145,17 @@ test('non-Admin cannot read another userPrivate phone', async () => {
   await assertFails(db.doc('userPrivate/student1').get());
 });
 
-test('Admin can read userPrivate phone', async () => {
+// No-phone policy: a userPrivate doc still carrying a legacy phone is
+// unreadable by every client (Admin and owner included) until the
+// server-side cleanup strips the field; phone values never reach a client.
+test('Admin cannot read a userPrivate doc that still carries a phone', async () => {
   const db = authed('admin1');
-  await assertSucceeds(db.doc('userPrivate/student1').get());
+  await assertFails(db.doc('userPrivate/student1').get());
 });
 
-test('self can read own userPrivate phone', async () => {
+test('self cannot read own userPrivate doc that still carries a phone', async () => {
   const db = authed('student1');
-  await assertSucceeds(db.doc('userPrivate/student1').get());
+  await assertFails(db.doc('userPrivate/student1').get());
 });
 
 test('non-Admin cannot read legacy users doc with exposed phone', async () => {
@@ -340,14 +345,30 @@ test('Parent cannot set reviewNotes on payment proof', async () => {
   );
 });
 
-test('Parent may resubmit proof fields to pending_review without privileged keys', async () => {
+test('Parent cannot write proof fields directly (submitPaymentProof callable only)', async () => {
   const db = authed('parent1');
-  await assertSucceeds(
+  await assertFails(
+    db.doc('payments/pay1').update({
+      proofStoragePath: 'payment_proofs/parent1/pay1/a.jpg',
+      proofDownloadUrl: firebase.firestore.FieldValue.delete(),
+      proofFileName: 'a.jpg',
+      proofSubmittedBy: 'parent1',
+      proofSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      method: 'vodafone_cash',
+      reviewStatus: 'pending_review',
+    }),
+  );
+});
+
+test('Parent proof submission cannot carry a download URL', async () => {
+  const db = authed('parent1');
+  await assertFails(
     db.doc('payments/pay1').update({
       proofStoragePath: 'payment_proofs/parent1/pay1/a.jpg',
       proofDownloadUrl: 'https://example.com/a.jpg',
       proofFileName: 'a.jpg',
       proofSubmittedBy: 'parent1',
+      proofSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
       method: 'vodafone_cash',
       reviewStatus: 'pending_review',
     }),
@@ -1184,6 +1205,12 @@ test('WA-13 malformed device token documents denied', async () => {
 test('WA-13 fcmTokens parent document is not client writable', async () => {
   await assertFails(authed('parent1').doc('fcmTokens/parent1').set({ x: 1 }));
   await assertSucceeds(authed('parent1').doc('fcmTokens/parent1').get());
+
+  // Token ownership is server-only: no client may read or claim an owner.
+  const owner = authed('parent1').doc('fcmTokenOwners/somehash');
+  await assertFails(owner.get());
+  await assertFails(owner.set({ uid: 'parent1', deviceId: 'dev_a' }));
+  await assertFails(authed('admin1').doc('fcmTokenOwners/somehash').get());
 });
 
 test('WA-13 notificationDeliveries are CF-only send state', async () => {

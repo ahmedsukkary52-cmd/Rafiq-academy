@@ -460,23 +460,34 @@ test('WA-12 recitation write/read remain denied while gated OFF', async () => {
 
 // ── posts/ ──────────────────────────────────────────────────────────────────
 
-test('WA-12 posts: unauthenticated create denied; owner create/read allowed', async () => {
+// Legacy posts/{authorId}/… is closed for writes; Halaqa-scoped
+// posts/{halaqaId}/{postId}/… is covered by media_hardening.storage.rules.test.mjs.
+async function legacyPostPut(path) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.storage().ref(path).put(jpegBytes(), { contentType: 'image/jpeg' });
+  });
+}
+
+test('WA-12 posts (legacy): no new uploads; author/Admin read only', async () => {
   const path = 'posts/teacher1/1.jpg';
   await assertFails(putImage(unauthStorage().ref(path)));
-  await assertSucceeds(putImage(authedStorage('teacher1').ref(path)));
-  await assertSucceeds(authedStorage('student1').ref(path).getDownloadURL());
+  await assertFails(putImage(authedStorage('teacher1').ref(path)));
+  await legacyPostPut(path);
+  await assertSucceeds(authedStorage('teacher1').ref(path).getDownloadURL());
+  await assertSucceeds(authedStorage('admin1').ref(path).getDownloadURL());
+  await assertFails(authedStorage('student1').ref(path).getDownloadURL());
+  await assertFails(unauthStorage().ref(path).getDownloadURL());
 });
 
-test('WA-12 posts: different user create denied; owner overwrite/update/delete denied', async () => {
+test('WA-12 posts (legacy): other user create denied; overwrite/delete denied', async () => {
   const path = 'posts/teacher1/2.jpg';
   await assertFails(putImage(authedStorage('student1').ref(path)));
-  // Owner initial create allowed.
-  await assertSucceeds(putImage(authedStorage('teacher1').ref(path)));
-  // Same owner overwrite of existing object denied (create requires resource == null).
+  await legacyPostPut(path);
   await assertFails(
     authedStorage('teacher1').ref(path).put(jpegBytes(), { contentType: 'image/jpeg' }),
   );
   await assertFails(authedStorage('teacher1').ref(path).delete());
+  await assertFails(authedStorage('admin1').ref(path).delete());
 });
 
 // ── content/ ────────────────────────────────────────────────────────────────

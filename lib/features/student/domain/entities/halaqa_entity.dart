@@ -26,9 +26,10 @@ class HalaqaEntity extends Equatable {
   final String supervisorId;
   final List<String> studentIds;
   final List<HalaqaScheduleEntity> schedule;
-  final String meetingLink;
   final String status;
 
+  /// The meeting link is not part of the halaqa: read it from
+  /// `halaqaMeetingLinks/{id}` via `GetHalaqaMeetingLinkUseCase` (B14).
   const HalaqaEntity({
     required this.id,
     required this.name,
@@ -36,7 +37,6 @@ class HalaqaEntity extends Equatable {
     required this.supervisorId,
     required this.studentIds,
     required this.schedule,
-    required this.meetingLink,
     required this.status,
   });
 
@@ -50,7 +50,6 @@ class HalaqaEntity extends Equatable {
     supervisorId,
     studentIds,
     schedule,
-    meetingLink,
     status,
   ];
 }

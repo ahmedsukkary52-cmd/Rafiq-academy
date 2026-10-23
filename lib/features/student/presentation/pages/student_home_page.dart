@@ -107,7 +107,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
             const MushafBlocScope(child: MushafReaderHost()),
             const StudentBadgesPage(),
             const _StudentPlanTab(),
-            const _StudentProfileTab(),
+            const StudentProfileTab(),
           ],
         ),
         bottomNavigationBar: _StudentBottomNav(
@@ -497,8 +497,8 @@ class _StudentPlanTabState extends State<_StudentPlanTab> {
   }
 }
 
-class _StudentProfileTab extends StatelessWidget {
-  const _StudentProfileTab();
+class StudentProfileTab extends StatelessWidget {
+  const StudentProfileTab({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -775,16 +775,6 @@ class _StudentProfileTab extends StatelessWidget {
                           label: 'الإعدادات',
                           onTap: () => context.push(AppRoutes.studentSettings),
                         ),
-                        _ProfileMenuItem(
-                          icon: Icons.family_restroom_rounded,
-                          label: 'حساب ولي الأمر',
-                          onTap: () => context.push(AppRoutes.studentSettings),
-                        ),
-                        _ProfileMenuItem(
-                          icon: Icons.help_outline_rounded,
-                          label: 'المساعدة والدعم',
-                          onTap: () => context.push(AppRoutes.studentSettings),
-                        ),
                       ],
                     ),
 
@@ -908,14 +898,19 @@ class _ProfileMenuGroup extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            items[i],
-            if (i != items.length - 1)
-              const Divider(height: 1, indent: 16, endIndent: 16),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              items[i],
+              if (i != items.length - 1)
+                const Divider(height: 1, indent: 16, endIndent: 16),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

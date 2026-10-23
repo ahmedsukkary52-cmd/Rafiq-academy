@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../shared/domain/meeting_link_policy.dart';
+import '../../../../shared/domain/halaqa_meeting_link.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../../shared/widgets/halaqa_meeting_link_builder.dart';
 import '../../../../shared/widgets/meeting_link_dialog.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
@@ -55,11 +56,13 @@ class _HalaqatBody extends StatelessWidget {
   Future<void> _openMeetingLink(
     BuildContext context,
     HalaqaEntity halaqa,
+    MeetingLinkLoaded current,
   ) async {
     final result = await showMeetingLinkDialog(
       context,
-      currentLink: halaqa.meetingLink,
+      currentLink: current.joinableLink ?? '',
       canClear: true,
+      storedLinkExists: current.link != null,
     );
     if (result == null || !context.mounted) return;
     context.read<AdminOperationsBloc>().add(
@@ -121,11 +124,16 @@ class _HalaqatBody extends StatelessWidget {
                           ),
                       ],
                     ),
-                  _MeetingLinkRow(
-                    link: h.meetingLink.trim(),
-                    onEdit: state.isSubmitting
-                        ? null
-                        : () => _openMeetingLink(context, h),
+                  HalaqaMeetingLinkBuilder(
+                    halaqaId: h.id,
+                    reloadToken: state.halaqat,
+                    builder: (context, view, reload) => _MeetingLinkRow(
+                      view: view,
+                      onRetry: reload,
+                      onEdit: state.isSubmitting || view is! MeetingLinkLoaded
+                          ? null
+                          : () => _openMeetingLink(context, h, view),
+                    ),
                   ),
                   Align(
                     alignment: AlignmentDirectional.centerEnd,
@@ -154,29 +162,44 @@ class _HalaqatBody extends StatelessWidget {
 }
 
 class _MeetingLinkRow extends StatelessWidget {
-  final String link;
+  final MeetingLinkView view;
   final VoidCallback? onEdit;
+  final VoidCallback onRetry;
 
-  const _MeetingLinkRow({required this.link, required this.onEdit});
+  const _MeetingLinkRow({
+    required this.view,
+    required this.onEdit,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final valid = joinableMeetingUri(link) != null;
-    final status = link.isEmpty
-        ? 'رابط الاجتماع: لم يُضبط بعد'
-        : valid
-        ? 'رابط الاجتماع:'
-        : 'رابط الاجتماع المحفوظ غير صالح — حدّثه';
+    final view = this.view;
+    final link = view is MeetingLinkLoaded ? view.joinableLink : null;
+    final missing =
+        view is MeetingLinkLoaded &&
+        view.availability == MeetingLinkAvailability.missing;
+    final status = switch (view) {
+      MeetingLinkLoading() => 'رابط الاجتماع: جارٍ التحقق…',
+      MeetingLinkDenied() => 'لا تملك صلاحية عرض رابط الاجتماع',
+      MeetingLinkFailed() => 'تعذر تحميل رابط الاجتماع',
+      MeetingLinkLoaded(:final availability) => switch (availability) {
+        MeetingLinkAvailability.missing => 'رابط الاجتماع: لم يُضبط بعد',
+        MeetingLinkAvailability.joinable => 'رابط الاجتماع:',
+        MeetingLinkAvailability.invalid =>
+          'رابط الاجتماع المحفوظ غير صالح — حدّثه',
+      },
+    };
     return Row(
       children: [
         Icon(
           Icons.videocam_outlined,
           size: 18,
-          color: link.isNotEmpty && valid ? AppColors.primary : AppColors.error,
+          color: link != null ? AppColors.primary : AppColors.error,
         ),
         const SizedBox(width: 6),
         Text(status, style: AppTextStyles.labelSmall),
-        if (link.isNotEmpty && valid) ...[
+        if (link != null) ...[
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -188,10 +211,17 @@ class _MeetingLinkRow extends StatelessWidget {
           ),
         ] else
           const Spacer(),
-        TextButton(
-          onPressed: onEdit,
-          child: Text(link.isEmpty ? 'إضافة رابط' : 'تعديل الرابط'),
-        ),
+        if (view is MeetingLinkFailed)
+          TextButton(
+            key: const Key('adminMeetingLinkRetry'),
+            onPressed: onRetry,
+            child: const Text('إعادة المحاولة'),
+          )
+        else
+          TextButton(
+            onPressed: onEdit,
+            child: Text(missing ? 'إضافة رابط' : 'تعديل الرابط'),
+          ),
       ],
     );
   }

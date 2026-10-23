@@ -8,7 +8,6 @@ HalaqaScheduleSource halaqaScheduleSourceFromEntity(HalaqaEntity h) {
   return HalaqaScheduleSource(
     halaqaId: h.id,
     name: h.name,
-    meetingLink: h.meetingLink,
     schedule: h.schedule
         .map(
           (s) => HalaqaScheduleSlot(

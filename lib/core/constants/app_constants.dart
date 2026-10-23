@@ -26,6 +26,7 @@ class FirestoreCollections {
   static const String auditLogs = 'auditLogs';
   static const String pricingRules = 'pricingRules';
   static const String halaqat = 'halaqat';
+  static const String halaqaMeetingLinks = 'halaqaMeetingLinks';
   static const String reviewSchedules = 'reviewSchedules';
   static const String recitationRecords = 'recitationRecords';
   static const String attendanceRecords = 'attendanceRecords';

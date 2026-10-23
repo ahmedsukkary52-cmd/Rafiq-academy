@@ -18,7 +18,6 @@ const _ownedHalaqa = HalaqaEntity(
   supervisorId: 'sup1',
   studentIds: ['s1'],
   schedule: [],
-  meetingLink: '',
   status: 'active',
 );
 

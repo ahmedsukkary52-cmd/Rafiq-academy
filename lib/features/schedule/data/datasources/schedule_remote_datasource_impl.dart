@@ -29,7 +29,6 @@ class ScheduleRemoteDatasourceImpl implements ScheduleRemoteDatasource {
       return HalaqaScheduleSourceModel(
         halaqaId: doc.id,
         name: (data['name'] as String?)?.trim() ?? '',
-        meetingLink: (data['meetingLink'] as String?)?.trim() ?? '',
         schedule: rawSchedule
             .whereType<Map>()
             .map(

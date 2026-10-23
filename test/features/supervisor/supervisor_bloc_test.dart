@@ -43,7 +43,6 @@ const _halaqa = HalaqaEntity(
   supervisorId: 'sup1',
   studentIds: [],
   schedule: [],
-  meetingLink: '',
   status: 'active',
 );
 

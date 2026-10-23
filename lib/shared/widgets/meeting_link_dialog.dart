@@ -17,24 +17,34 @@ class MeetingLinkDialogResult {
 /// Edit dialog for one halaqa's meeting link. The field starts with
 /// [currentLink], so saving without edits never loses it; an unchanged save
 /// returns null. Clearing is a separate, confirmed action shown only when
-/// [canClear] and a link exists.
+/// [canClear] and a link exists — [currentLink], or [storedLinkExists] for a
+/// stored value that must not be displayed (an invalid link).
 Future<MeetingLinkDialogResult?> showMeetingLinkDialog(
   BuildContext context, {
   required String currentLink,
   required bool canClear,
+  bool storedLinkExists = false,
 }) {
   return showDialog<MeetingLinkDialogResult>(
     context: context,
-    builder: (_) =>
-        _MeetingLinkDialog(currentLink: currentLink.trim(), canClear: canClear),
+    builder: (_) => _MeetingLinkDialog(
+      currentLink: currentLink.trim(),
+      canClear: canClear,
+      storedLinkExists: storedLinkExists,
+    ),
   );
 }
 
 class _MeetingLinkDialog extends StatefulWidget {
   final String currentLink;
   final bool canClear;
+  final bool storedLinkExists;
 
-  const _MeetingLinkDialog({required this.currentLink, required this.canClear});
+  const _MeetingLinkDialog({
+    required this.currentLink,
+    required this.canClear,
+    required this.storedLinkExists,
+  });
 
   @override
   State<_MeetingLinkDialog> createState() => _MeetingLinkDialogState();
@@ -69,7 +79,9 @@ class _MeetingLinkDialogState extends State<_MeetingLinkDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final showClear = widget.canClear && widget.currentLink.isNotEmpty;
+    final showClear =
+        widget.canClear &&
+        (widget.currentLink.isNotEmpty || widget.storedLinkExists);
     return AlertDialog(
       title: Text(
         widget.currentLink.isEmpty ? 'إضافة رابط الاجتماع' : 'رابط الاجتماع',

@@ -25,7 +25,6 @@ void main() {
             endTime: '11:00',
           ),
         ],
-        meetingLink: '',
         status: 'active',
       );
 

@@ -15,7 +15,6 @@ HalaqaEntity _halaqa({
     supervisorId: 'sup1',
     studentIds: studentIds,
     schedule: const [],
-    meetingLink: '',
     status: 'active',
   );
 }

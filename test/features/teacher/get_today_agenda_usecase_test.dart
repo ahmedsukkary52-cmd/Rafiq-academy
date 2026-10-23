@@ -30,7 +30,6 @@ HalaqaEntity _halaqa({
     supervisorId: 'sup1',
     studentIds: studentIds,
     schedule: [HalaqaScheduleEntity(day: day, startTime: start, endTime: end)],
-    meetingLink: '',
     status: 'active',
   );
 }

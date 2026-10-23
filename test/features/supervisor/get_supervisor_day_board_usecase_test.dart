@@ -34,7 +34,6 @@ HalaqaEntity _halaqa({
     schedule: [
       HalaqaScheduleEntity(day: day, startTime: start, endTime: '10:00'),
     ],
-    meetingLink: '',
     status: 'active',
   );
 }

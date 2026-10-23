@@ -65,7 +65,6 @@ class _FakeStudentRepository implements StudentRepository {
       supervisorId: 'sup1',
       studentIds: const ['s1'],
       schedule: const [],
-      meetingLink: '',
       status: 'active',
     ),
   );

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 import '../../features/student/domain/entities/halaqa_entity.dart';
-import '../domain/meeting_link_policy.dart';
+import '../domain/halaqa_meeting_link.dart';
+import 'halaqa_meeting_link_builder.dart';
 
 /// كارت حصة اليوم — Figma dark navy card + full-width join CTA.
 class StudentSessionCardWidget extends StatelessWidget {
@@ -135,24 +136,58 @@ class StudentSessionCardWidget extends StatelessWidget {
                 ),
               ),
             ),
-            if (joinableMeetingUri(halaqa.meetingLink) == null) ...[
-              const SizedBox(height: 8),
-              Text(
-                halaqa.meetingLink.trim().isEmpty
-                    ? 'لم يُضبط رابط الاجتماع لهذه الحلقة بعد'
-                    : 'رابط الاجتماع المحفوظ غير صالح',
-                key: const Key('sessionCardLinkStatus'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 12,
-                  color: Colors.white70,
-                ),
-              ),
-            ],
+            HalaqaMeetingLinkBuilder(
+              halaqaId: halaqa.id,
+              builder: (context, view, reload) {
+                final status = _linkStatusText(view);
+                if (status == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        status,
+                        key: const Key('sessionCardLinkStatus'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'NotoNaskhArabic',
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      if (view is MeetingLinkFailed)
+                        TextButton(
+                          key: const Key('sessionCardLinkRetry'),
+                          onPressed: reload,
+                          child: const Text(
+                            'إعادة المحاولة',
+                            style: TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
 }
+
+/// Hint under the Join button; null while loading or when joinable.
+String? _linkStatusText(MeetingLinkView view) => switch (view) {
+  MeetingLinkLoading() => null,
+  MeetingLinkLoaded(:final availability) => switch (availability) {
+    MeetingLinkAvailability.joinable => null,
+    MeetingLinkAvailability.missing => 'لم يُضبط رابط الاجتماع لهذه الحلقة بعد',
+    MeetingLinkAvailability.invalid => 'رابط الاجتماع المحفوظ غير صالح',
+  },
+  MeetingLinkDenied() => 'لا تملك صلاحية الوصول إلى رابط الاجتماع',
+  MeetingLinkFailed() => 'تعذر التحقق من رابط الاجتماع الآن',
+};

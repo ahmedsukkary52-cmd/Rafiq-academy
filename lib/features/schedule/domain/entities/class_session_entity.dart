@@ -1,7 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-import '../../../../shared/domain/meeting_link_policy.dart';
-
 enum ClassSessionStatus { live, upcoming, ended }
 
 enum ClassSessionType { memorization, review, tajweed, other }
@@ -14,9 +12,10 @@ class ClassSessionEntity extends Equatable {
   final DateTime endAt;
   final String teacherName;
   final ClassSessionStatus status;
-  final String meetingLink;
   final String? topic;
 
+  /// Joinability is not a schedule property: every Join entry point reads
+  /// `halaqaMeetingLinks/{halaqaId}` at tap time through the shared joiner.
   const ClassSessionEntity({
     required this.id,
     required this.title,
@@ -25,12 +24,8 @@ class ClassSessionEntity extends Equatable {
     required this.endAt,
     required this.teacherName,
     required this.status,
-    this.meetingLink = '',
     this.topic,
   });
-
-  /// Same rule as the Join buttons: a valid stored link; no time window.
-  bool get canJoin => joinableMeetingUri(meetingLink) != null;
 
   @override
   List<Object?> get props => [
@@ -41,7 +36,6 @@ class ClassSessionEntity extends Equatable {
     endAt,
     teacherName,
     status,
-    meetingLink,
     topic,
   ];
 }

@@ -25,16 +25,14 @@ class HalaqaScheduleSlot extends Equatable {
 class HalaqaScheduleSource extends Equatable {
   final String halaqaId;
   final String name;
-  final String meetingLink;
   final List<HalaqaScheduleSlot> schedule;
 
   const HalaqaScheduleSource({
     required this.halaqaId,
     required this.name,
-    required this.meetingLink,
     required this.schedule,
   });
 
   @override
-  List<Object?> get props => [halaqaId, name, meetingLink, schedule];
+  List<Object?> get props => [halaqaId, name, schedule];
 }

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
-import '../../../../shared/domain/meeting_link_policy.dart';
+import '../../../../shared/domain/halaqa_meeting_link.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/halaqa_meeting_link_builder.dart';
 import '../../../../shared/widgets/meeting_link_dialog.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../admin/domain/entities/admin_operations_entities.dart';
@@ -23,8 +24,13 @@ import '../widgets/supervisor_loading_skeletons.dart';
 
 class SupervisorHalaqaDetailPage extends StatefulWidget {
   final String halaqaId;
+  final bool allowMeetingLinkAdd;
 
-  const SupervisorHalaqaDetailPage({super.key, required this.halaqaId});
+  const SupervisorHalaqaDetailPage({
+    super.key,
+    required this.halaqaId,
+    this.allowMeetingLinkAdd = kSupervisorMeetingLinkAddEnabled,
+  });
 
   @override
   State<SupervisorHalaqaDetailPage> createState() =>
@@ -39,6 +45,7 @@ class _SupervisorHalaqaDetailPageState
   String _query = '';
   bool _showStudents = false;
   bool _savingLink = false;
+  Object _linkRevision = Object();
 
   /// Supervisors may only add a link while none is stored (B14); the
   /// callable enforces this and the halaqa scope.
@@ -46,7 +53,7 @@ class _SupervisorHalaqaDetailPageState
     if (_savingLink) return;
     final result = await showMeetingLinkDialog(
       context,
-      currentLink: halaqa.meetingLink,
+      currentLink: '',
       canClear: false,
     );
     if (result == null || result.clear || !mounted) return;
@@ -63,6 +70,7 @@ class _SupervisorHalaqaDetailPageState
       (f) => AppSnackBar.showError(context, 'لم يُحفظ الرابط: ${f.message}'),
       (change) {
         AppSnackBar.showSuccess(context, meetingLinkChangeMessage(change));
+        setState(() => _linkRevision = Object());
         final auth = context.read<AuthBloc>().state;
         if (auth is AuthAuthenticated) {
           context.read<SupervisorBloc>().add(
@@ -178,10 +186,16 @@ class _SupervisorHalaqaDetailPageState
                 ],
               ),
               const SizedBox(height: 16),
-              _SupervisorMeetingLinkCard(
-                link: halaqa.meetingLink.trim(),
-                saving: _savingLink,
-                onAdd: () => _addMeetingLink(halaqa),
+              HalaqaMeetingLinkBuilder(
+                halaqaId: halaqa.id,
+                reloadToken: _linkRevision,
+                builder: (context, view, reload) => _SupervisorMeetingLinkCard(
+                  view: view,
+                  allowAdd: widget.allowMeetingLinkAdd,
+                  saving: _savingLink,
+                  onAdd: () => _addMeetingLink(halaqa),
+                  onRetry: reload,
+                ),
               ),
               if (_showStudents) ...[
                 const SizedBox(height: 20),
@@ -249,27 +263,57 @@ class _SupervisorHalaqaDetailPageState
 }
 
 class _SupervisorMeetingLinkCard extends StatelessWidget {
-  final String link;
+  final MeetingLinkView view;
+  final bool allowAdd;
   final bool saving;
   final VoidCallback onAdd;
+  final VoidCallback onRetry;
 
   const _SupervisorMeetingLinkCard({
-    required this.link,
+    required this.view,
+    required this.allowAdd,
     required this.saving,
     required this.onAdd,
+    required this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    final valid = joinableMeetingUri(link) != null;
-    final (title, note) = link.isEmpty
-        ? (
-            'لم يُضبط رابط الاجتماع بعد',
-            'أضف رابط الاجتماع ليتمكن الطلاب من الانضمام.',
-          )
-        : valid
-        ? ('رابط الاجتماع مضبوط', 'تعديل الرابط أو حذفه متاح للمسؤول.')
-        : ('رابط الاجتماع المحفوظ غير صالح', 'تواصل مع المسؤول لتحديث الرابط.');
+    final view = this.view;
+    final loaded = view is MeetingLinkLoaded ? view : null;
+    final link = loaded?.joinableLink;
+    final canAdd =
+        allowAdd && loaded?.availability == MeetingLinkAvailability.missing;
+    final (title, note) = switch (view) {
+      MeetingLinkLoading() => (
+        'جارٍ التحقق من رابط الاجتماع…',
+        'يُقرأ الرابط من مصدره المعتمد.',
+      ),
+      MeetingLinkDenied() => (
+        'لا تملك صلاحية عرض رابط الاجتماع',
+        'تواصل مع المسؤول للتحقق من إسناد الحلقة إليك.',
+      ),
+      MeetingLinkFailed() => (
+        'تعذر تحميل رابط الاجتماع',
+        'تحقق من الاتصال ثم أعد المحاولة.',
+      ),
+      MeetingLinkLoaded(:final availability) => switch (availability) {
+        MeetingLinkAvailability.missing => (
+          'لم يُضبط رابط الاجتماع بعد',
+          allowAdd
+              ? 'أضف رابط الاجتماع ليتمكن الطلاب من الانضمام.'
+              : 'إضافة الرابط متاحة للمسؤول حاليًا؛ تواصل معه لضبطه.',
+        ),
+        MeetingLinkAvailability.joinable => (
+          'رابط الاجتماع مضبوط',
+          'تعديل الرابط أو حذفه متاح للمسؤول.',
+        ),
+        MeetingLinkAvailability.invalid => (
+          'رابط الاجتماع المحفوظ غير صالح',
+          'تواصل مع المسؤول لتحديث الرابط.',
+        ),
+      },
+    };
     return AppCard(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -279,9 +323,7 @@ class _SupervisorMeetingLinkCard extends StatelessWidget {
             children: [
               Icon(
                 Icons.videocam_outlined,
-                color: link.isNotEmpty && valid
-                    ? AppColors.primary
-                    : AppColors.error,
+                color: link != null ? AppColors.primary : AppColors.error,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -294,7 +336,7 @@ class _SupervisorMeetingLinkCard extends StatelessWidget {
               ),
             ],
           ),
-          if (link.isNotEmpty && valid) ...[
+          if (link != null) ...[
             const SizedBox(height: 6),
             Text(
               link,
@@ -308,7 +350,7 @@ class _SupervisorMeetingLinkCard extends StatelessWidget {
             note,
             style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
           ),
-          if (link.isEmpty) ...[
+          if (canAdd) ...[
             const SizedBox(height: 8),
             AppButton(
               key: const Key('supervisorAddMeetingLink'),
@@ -316,6 +358,15 @@ class _SupervisorMeetingLinkCard extends StatelessWidget {
               height: 40,
               isLoading: saving,
               onPressed: saving ? null : onAdd,
+            ),
+          ],
+          if (view is MeetingLinkFailed) ...[
+            const SizedBox(height: 8),
+            AppButton(
+              key: const Key('supervisorMeetingLinkRetry'),
+              label: 'إعادة المحاولة',
+              height: 40,
+              onPressed: onRetry,
             ),
           ],
         ],

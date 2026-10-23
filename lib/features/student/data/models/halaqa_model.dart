@@ -11,7 +11,6 @@ class HalaqaModel extends HalaqaEntity {
     required super.supervisorId,
     required super.studentIds,
     required super.schedule,
-    required super.meetingLink,
     required super.status,
   });
 
@@ -28,7 +27,6 @@ class HalaqaModel extends HalaqaEntity {
       supervisorId: data['supervisorId'] ?? '',
       studentIds: List<String>.from(data['studentIds'] ?? []),
       schedule: scheduleList,
-      meetingLink: data['meetingLink'] ?? '',
       status: data['status'] ?? 'active',
     );
   }

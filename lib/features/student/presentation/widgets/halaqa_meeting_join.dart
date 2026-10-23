@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../shared/domain/halaqa_meeting_link.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../domain/services/halaqa_meeting_joiner.dart';
-import '../../domain/usecases/get_student_halaqa_usecase.dart';
-import '../../domain/usecases/watch_latest_assignment_usecase.dart';
 
 /// Opens [uri] outside the app. `launchUrl` reports a missing handler as
 /// false, so no `canLaunchUrl` pre-check (and no Android `<queries>` entry)
@@ -19,12 +18,7 @@ HalaqaMeetingJoiner? _sharedJoiner;
 /// cannot start overlapping launches.
 HalaqaMeetingJoiner get sharedHalaqaMeetingJoiner =>
     _sharedJoiner ??= HalaqaMeetingJoiner(
-      loadLink: (halaqaId) async {
-        final result = await sl<GetStudentHalaqaUseCase>()(
-          HalaqaIdParams(halaqaId),
-        );
-        return result.map((halaqa) => halaqa.meetingLink);
-      },
+      loadLink: (halaqaId) => sl<GetHalaqaMeetingLinkUseCase>()(halaqaId),
       open: openMeetingUriExternally,
     );
 

@@ -24,7 +24,6 @@ HalaqaEntity _halaqa({List<String> studentIds = const ['s1']}) {
     schedule: const [
       HalaqaScheduleEntity(day: 'monday', startTime: '09:00', endTime: '10:00'),
     ],
-    meetingLink: '',
     status: 'active',
   );
 }

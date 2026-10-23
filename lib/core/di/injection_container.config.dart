@@ -471,11 +471,15 @@ import 'package:rafiq_academy/features/teacher/domain/usecases/upsert_teacher_ev
     as _i1064;
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart'
     as _i933;
+import 'package:rafiq_academy/shared/data/halaqa_meeting_link_firestore.dart'
+    as _i9302;
 import 'package:rafiq_academy/shared/domain/academy_event_observer_resolver.dart'
     as _i937;
 import 'package:rafiq_academy/shared/domain/academy_event_sink.dart' as _i273;
 import 'package:rafiq_academy/shared/domain/attendance_service.dart' as _i295;
 import 'package:rafiq_academy/shared/domain/evaluation_service.dart' as _i81;
+import 'package:rafiq_academy/shared/domain/halaqa_meeting_link.dart'
+    as _i9301;
 
 extension GetItInjectableX on _i174.GetIt {
   // initializes the registration of main-scope dependencies inside of GetIt
@@ -675,6 +679,16 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i756.ScheduleRemoteDatasource>(
       () => _i1027.ScheduleRemoteDatasourceImpl(gh<_i974.FirebaseFirestore>()),
+    );
+    gh.lazySingleton<_i9301.HalaqaMeetingLinkRepository>(
+      () => _i9302.FirestoreHalaqaMeetingLinkRepository(
+        gh<_i974.FirebaseFirestore>(),
+      ),
+    );
+    gh.lazySingleton<_i9301.GetHalaqaMeetingLinkUseCase>(
+      () => _i9301.GetHalaqaMeetingLinkUseCase(
+        gh<_i9301.HalaqaMeetingLinkRepository>(),
+      ),
     );
     gh.lazySingleton<_i1901.ClientVersionSource>(
       () => _i1901.FirestoreClientVersionSource(gh<_i974.FirebaseFirestore>()),

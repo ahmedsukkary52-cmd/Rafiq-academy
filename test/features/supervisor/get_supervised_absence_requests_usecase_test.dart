@@ -17,7 +17,6 @@ HalaqaEntity _halaqa(String id) => HalaqaEntity(
   supervisorId: 'sup1',
   studentIds: const ['s1'],
   schedule: const [],
-  meetingLink: '',
   status: 'active',
 );
 

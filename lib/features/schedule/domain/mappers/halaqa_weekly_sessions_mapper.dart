@@ -73,7 +73,6 @@ class HalaqaWeeklySessionsMapper {
           endAt: endAt,
           teacherName: '',
           status: _statusFor(clock, startAt, endAt),
-          meetingLink: source.meetingLink,
         ),
       );
     }
@@ -131,9 +130,6 @@ class HalaqaWeeklySessionsMapper {
           endAt: endAt,
           teacherName: existing.teacherName,
           status: _statusFor(clock, startAt, endAt),
-          meetingLink: existing.meetingLink.isNotEmpty
-              ? existing.meetingLink
-              : session.meetingLink,
           topic: existing.topic,
         );
       }
@@ -168,7 +164,6 @@ class HalaqaWeeklySessionsMapper {
       endAt: session.endAt,
       teacherName: session.teacherName,
       status: _statusFor(clock, session.startAt, session.endAt),
-      meetingLink: session.meetingLink,
       topic: session.topic,
     );
   }

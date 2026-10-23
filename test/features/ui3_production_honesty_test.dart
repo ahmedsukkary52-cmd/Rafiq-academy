@@ -211,7 +211,6 @@ void main() {
                 supervisorId: 'sup1',
                 studentIds: const [],
                 schedule: const [],
-                meetingLink: '',
                 status: 'active',
               ),
             ],

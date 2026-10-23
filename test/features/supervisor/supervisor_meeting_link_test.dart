@@ -18,7 +18,10 @@ import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_b
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_event.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_state.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/pages/supervisor_halaqa_detail_page.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_meeting_link.dart';
 import 'package:rafiq_academy/shared/theme/app_theme.dart';
+
+import '../../support/fake_halaqa_meeting_link_repository.dart';
 
 // Only `uid` is read; a Fake keeps the test independent of UserEntity's
 // constructor fields.
@@ -85,28 +88,29 @@ class _FakeOpsRepo extends Fake implements AdminOperationsRepository {
   }
 }
 
-HalaqaEntity _halaqa(String link) => HalaqaEntity(
+const _halaqa = HalaqaEntity(
   id: 'h1',
   name: 'حلقة الفجر',
   teacherId: 't1',
   supervisorId: 'sup1',
-  studentIds: const ['s1'],
-  schedule: const [],
-  meetingLink: link,
+  studentIds: ['s1'],
+  schedule: [],
   status: 'active',
 );
 
 Future<_FakeSupervisorBloc> _pump(
   WidgetTester tester, {
-  required String link,
+  required FakeHalaqaMeetingLinkRepository links,
   required _FakeOpsRepo repo,
+  bool allowAdd = kSupervisorMeetingLinkAddEnabled,
 }) async {
   await sl.reset();
   sl.registerFactory<SetHalaqaMeetingLinkUseCase>(
     () => SetHalaqaMeetingLinkUseCase(repo),
   );
+  registerFakeMeetingLinks(links);
   final bloc = _FakeSupervisorBloc(
-    SupervisorState.initial().copyWith(halaqat: [_halaqa(link)]),
+    SupervisorState.initial().copyWith(halaqat: const [_halaqa]),
   );
   await tester.pumpWidget(
     MultiBlocProvider(
@@ -116,7 +120,10 @@ Future<_FakeSupervisorBloc> _pump(
       ],
       child: MaterialApp(
         theme: AppTheme.theme,
-        home: const SupervisorHalaqaDetailPage(halaqaId: 'h1'),
+        home: SupervisorHalaqaDetailPage(
+          halaqaId: 'h1',
+          allowMeetingLinkAdd: allowAdd,
+        ),
       ),
     ),
   );
@@ -127,12 +134,61 @@ Future<_FakeSupervisorBloc> _pump(
 void main() {
   tearDown(() => sl.reset());
 
-  group('B14 supervisor meeting link (add-only)', () {
-    testWidgets('adds a link when none is set and reloads the halaqat', (
+  group('B14 supervisor meeting link before the legacy strip', () {
+    test('supervisor add is gated off by default', () {
+      expect(kSupervisorMeetingLinkAddEnabled, isFalse);
+    });
+
+    testWidgets(
+      'a missing canonical doc (a legacy value may exist) offers no add',
+      (tester) async {
+        final repo = _FakeOpsRepo();
+        final links = FakeHalaqaMeetingLinkRepository();
+        await _pump(tester, links: links, repo: repo);
+        expect(links.reads, ['h1']);
+        expect(find.text('لم يُضبط رابط الاجتماع بعد'), findsOneWidget);
+        expect(
+          find.text('إضافة الرابط متاحة للمسؤول حاليًا؛ تواصل معه لضبطه.'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
+        expect(repo.calls, isEmpty);
+      },
+    );
+
+    testWidgets('valid, invalid, denied and failed states never offer add', (
+      tester,
+    ) async {
+      final cases = <FakeHalaqaMeetingLinkRepository>[
+        FakeHalaqaMeetingLinkRepository({'h1': 'https://meet.example.com/a'}),
+        FakeHalaqaMeetingLinkRepository({'h1': ''}),
+        FakeHalaqaMeetingLinkRepository({'h1': 'http://meet.example.com/x'}),
+        FakeHalaqaMeetingLinkRepository()
+          ..failure = const MeetingLinkAccessDeniedFailure(),
+        FakeHalaqaMeetingLinkRepository()..failure = const NetworkFailure(),
+      ];
+      for (final links in cases) {
+        await tester.pumpWidget(const SizedBox());
+        await _pump(tester, links: links, repo: _FakeOpsRepo(), allowAdd: true);
+        expect(links.reads, ['h1']);
+        expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
+      }
+    });
+  });
+
+  group('B14 supervisor meeting link (add-only, gate on)', () {
+    testWidgets('adds a link when no document exists and re-reads it', (
       tester,
     ) async {
       final repo = _FakeOpsRepo();
-      final bloc = await _pump(tester, link: '', repo: repo);
+      final links = FakeHalaqaMeetingLinkRepository();
+      final bloc = await _pump(
+        tester,
+        links: links,
+        repo: repo,
+        allowAdd: true,
+      );
+      expect(links.reads, ['h1']);
       expect(find.text('لم يُضبط رابط الاجتماع بعد'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('supervisorAddMeetingLink')));
@@ -142,29 +198,93 @@ void main() {
         find.byKey(const Key('meetingLinkField')),
         'https://meet.example.com/new',
       );
+      links.links['h1'] = 'https://meet.example.com/new';
       await tester.tap(find.byKey(const Key('meetingLinkSave')));
       await tester.pumpAndSettle();
 
       expect(repo.calls, ['h1:https://meet.example.com/new:false']);
       expect(find.text('تم حفظ رابط الاجتماع'), findsOneWidget);
       expect(bloc.events.whereType<LoadSupervisedHalaqatEvent>(), hasLength(1));
+      expect(links.reads, ['h1', 'h1']);
+      expect(find.text('رابط الاجتماع مضبوط'), findsOneWidget);
+      expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
     });
 
     testWidgets('an existing link is read-only for the supervisor', (
       tester,
     ) async {
       final repo = _FakeOpsRepo();
-      await _pump(tester, link: 'https://meet.example.com/a', repo: repo);
+      await _pump(
+        tester,
+        links: FakeHalaqaMeetingLinkRepository({
+          'h1': 'https://meet.example.com/a',
+        }),
+        repo: repo,
+      );
       expect(find.text('رابط الاجتماع مضبوط'), findsOneWidget);
+      expect(find.text('https://meet.example.com/a'), findsOneWidget);
       expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
       expect(repo.calls, isEmpty);
+    });
+
+    testWidgets('an invalid stored link is never shown and cannot be added', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        links: FakeHalaqaMeetingLinkRepository({
+          'h1': 'http://meet.example.com/bad',
+        }),
+        repo: _FakeOpsRepo(),
+      );
+      expect(find.text('رابط الاجتماع المحفوظ غير صالح'), findsOneWidget);
+      expect(find.text('http://meet.example.com/bad'), findsNothing);
+      expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
+    });
+
+    testWidgets('permission denied shows its own message, no add', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        links: FakeHalaqaMeetingLinkRepository()
+          ..failure = const MeetingLinkAccessDeniedFailure(),
+        repo: _FakeOpsRepo(),
+      );
+      expect(find.text('لا تملك صلاحية عرض رابط الاجتماع'), findsOneWidget);
+      expect(find.text('تعذر تحميل رابط الاجتماع'), findsNothing);
+      expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
+      expect(find.byKey(const Key('supervisorMeetingLinkRetry')), findsNothing);
+    });
+
+    testWidgets('a load failure offers retry and never offers add', (
+      tester,
+    ) async {
+      final links = FakeHalaqaMeetingLinkRepository()
+        ..failure = const NetworkFailure();
+      await _pump(tester, links: links, repo: _FakeOpsRepo());
+      expect(find.text('تعذر تحميل رابط الاجتماع'), findsOneWidget);
+      expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
+
+      links.failure = null;
+      await tester.tap(find.byKey(const Key('supervisorMeetingLinkRetry')));
+      await tester.pumpAndSettle();
+      expect(links.reads, ['h1', 'h1']);
+      expect(find.text('لم يُضبط رابط الاجتماع بعد'), findsOneWidget);
+      expect(find.byKey(const Key('supervisorAddMeetingLink')), findsNothing);
     });
 
     testWidgets('a server refusal is shown and nothing reloads', (
       tester,
     ) async {
       final repo = _FakeOpsRepo()..failure = const ServerFailure('غير مصرح');
-      final bloc = await _pump(tester, link: '', repo: repo);
+      final links = FakeHalaqaMeetingLinkRepository();
+      final bloc = await _pump(
+        tester,
+        links: links,
+        repo: repo,
+        allowAdd: true,
+      );
       await tester.tap(find.byKey(const Key('supervisorAddMeetingLink')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -175,6 +295,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('لم يُحفظ الرابط: غير مصرح'), findsOneWidget);
       expect(bloc.events, isEmpty);
+      expect(links.reads, ['h1']);
     });
   });
 }

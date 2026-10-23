@@ -17,12 +17,10 @@ void main() {
     required String id,
     required String name,
     List<HalaqaScheduleSlotModel> schedule = const [],
-    String meetingLink = '',
   }) {
     return HalaqaScheduleSourceModel(
       halaqaId: id,
       name: name,
-      meetingLink: meetingLink,
       schedule: schedule,
     );
   }
@@ -65,7 +63,6 @@ void main() {
         source(
           id: 'h1',
           name: 'حلقة أ',
-          meetingLink: 'https://meet.example/a',
           schedule: [slot(day: todayLabel, start: '16:00', end: '17:00')],
         ),
       ], now: now);
@@ -76,7 +73,6 @@ void main() {
       expect(days.single.session.title, 'حلقة أ');
       expect(days.single.session.startAt, DateTime(2026, 7, 22, 16, 0));
       expect(days.single.session.endAt, DateTime(2026, 7, 22, 17, 0));
-      expect(days.single.session.meetingLink, 'https://meet.example/a');
       expect(days.single.session.status, ClassSessionStatus.upcoming);
     });
 

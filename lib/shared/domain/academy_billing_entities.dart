@@ -4,19 +4,28 @@ import 'academy_payment_settings_contract.dart';
 
 class PaymentPublicSettingsEntity extends Equatable {
   final String vodafoneCashDestination;
+  final String instapayDestination;
   final DateTime? updatedAt;
   final String? updatedBy;
 
   const PaymentPublicSettingsEntity({
     this.vodafoneCashDestination = '',
+    this.instapayDestination = '',
     this.updatedAt,
     this.updatedBy,
   });
 
-  bool get hasDestination => vodafoneCashDestination.trim().isNotEmpty;
+  bool get hasVodafoneCash => vodafoneCashDestination.trim().isNotEmpty;
+  bool get hasInstapay => instapayDestination.trim().isNotEmpty;
+  bool get hasDestination => hasVodafoneCash || hasInstapay;
 
   @override
-  List<Object?> get props => [vodafoneCashDestination, updatedAt, updatedBy];
+  List<Object?> get props => [
+    vodafoneCashDestination,
+    instapayDestination,
+    updatedAt,
+    updatedBy,
+  ];
 }
 
 class PricingDefaultsEntity extends Equatable {

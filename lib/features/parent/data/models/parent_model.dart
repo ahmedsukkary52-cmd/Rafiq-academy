@@ -17,10 +17,10 @@ class PaymentModel extends PaymentEntity {
     required super.status,
     super.method,
     super.proofStoragePath,
-    super.proofDownloadUrl,
     super.proofSubmittedAt,
     super.proofSubmittedBy,
     super.proofFileName,
+    super.proofCycleId,
     super.reviewStatus,
     super.reviewedBy,
     super.reviewedAt,
@@ -56,13 +56,14 @@ class PaymentModel extends PaymentEntity {
       method: data['method'] as String?,
       proofStoragePath:
           data[ParentPaymentProofContract.proofStoragePathField] as String?,
-      proofDownloadUrl:
-          data[ParentPaymentProofContract.proofDownloadUrlField] as String?,
       proofSubmittedAt: submitted is Timestamp ? submitted.toDate() : null,
       proofSubmittedBy:
           data[ParentPaymentProofContract.proofSubmittedByField] as String?,
       proofFileName:
           data[ParentPaymentProofContract.proofFileNameField] as String?,
+      proofCycleId: _proofCycleId(
+        data[ParentPaymentProofContract.proofCycleIdField],
+      ),
       reviewStatus:
           data[ParentPaymentProofContract.reviewStatusField] as String?,
       reviewedBy: data[ParentPaymentProofContract.reviewedByField] as String?,
@@ -84,6 +85,11 @@ class PaymentModel extends PaymentEntity {
       currency: data[PricingRulesContract.paymentCurrencyField] as String?,
     );
   }
+
+  static String? _proofCycleId(Object? raw) =>
+      raw is String && ParentPaymentProofContract.isProofCycleId(raw)
+      ? raw
+      : null;
 
   static PaymentStatus _statusFromString(String v) => switch (v) {
     'paid' => PaymentStatus.paid,

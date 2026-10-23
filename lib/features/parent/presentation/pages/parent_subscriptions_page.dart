@@ -2,9 +2,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -17,6 +18,8 @@ import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
 import '../parent_display.dart';
 import '../widgets/parent_loading_skeletons.dart';
+import '../widgets/parent_payment_methods_panel.dart';
+import '../widgets/payment_amount_breakdown.dart';
 import '../widgets/parent_payment_access_banner.dart';
 import '../widgets/parent_subpage_scaffold.dart';
 import '../parent_home_nav.dart';
@@ -68,12 +71,9 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
           top: Radius.circular(AppSizes.radiusXL),
         ),
       ),
-      builder: (ctx) => _ExternalPaySheet(
-        payment: payment,
-        vodafoneCashDestination: context
-            .read<ParentBloc>()
-            .state
-            .vodafoneCashDestination,
+      builder: (ctx) => BlocProvider.value(
+        value: context.read<ParentBloc>(),
+        child: _ExternalPaySheet(payment: payment),
       ),
     );
     if (proceed != true || !mounted) return;
@@ -86,7 +86,9 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      allowedExtensions: UploadFilePolicy.extensionsOf(
+        ParentPaymentProofContract.formats,
+      ),
       withData: false,
     );
     if (!mounted) return;
@@ -145,7 +147,12 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                       payment.studentId,
                     ),
                   ),
-                  subtitle: Text(parentMoneyLabel(payment.amount)),
+                  subtitle: Text(
+                    payment.hasPartialConfirmation
+                        ? 'المتبقي ${parentMoneyLabel(payment.outstandingAmount)}'
+                              ' من ${parentMoneyLabel(payment.amount)}'
+                        : parentMoneyLabel(payment.amount),
+                  ),
                   onTap: () => Navigator.pop(ctx, payment),
                 ),
             ],
@@ -225,9 +232,14 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
     ];
     final visible = filteredLists[_filter];
     final total = state.payments.fold<double>(0, (s, p) => s + p.amount);
-    final paid = state.payments
-        .where((p) => p.status == PaymentStatus.paid)
-        .fold<double>(0, (s, p) => s + p.amount);
+    final paid = state.payments.fold<double>(
+      0,
+      (s, p) =>
+          s +
+          (p.status == PaymentStatus.paid
+              ? p.amount
+              : p.confirmedPartialAmount),
+    );
     final remaining = (total - paid) < 0 ? 0.0 : (total - paid);
     final progress = total <= 0 ? 0.0 : (paid / total).clamp(0.0, 1.0);
     final childrenCaption = parentPaymentsChildrenCaption(
@@ -356,42 +368,29 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
 
 class _ExternalPaySheet extends StatelessWidget {
   final PaymentEntity payment;
-  final String vodafoneCashDestination;
 
-  const _ExternalPaySheet({
-    required this.payment,
-    required this.vodafoneCashDestination,
-  });
-
-  Future<void> _openDestination() async {
-    final dest = vodafoneCashDestination.trim();
-    if (dest.isEmpty) return;
-    final tel = dest.startsWith('tel:') ? dest : 'tel:$dest';
-    final uri = Uri.tryParse(tel);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+  const _ExternalPaySheet({required this.payment});
 
   @override
   Widget build(BuildContext context) {
-    final amount = parentMoneyLabel(payment.amount);
-    final hasDestination = vodafoneCashDestination.trim().isNotEmpty;
+    final outstanding = payment.outstandingAmount;
+    final amount = parentMoneyLabel(outstanding);
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'الدفع عبر فودافون كاش',
+              'الدفع عبر فودافون كاش أو إنستاباي',
               style: AppTextStyles.headlineMedium.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '١) ادفع المبلغ خارج التطبيق.\n'
+              '١) ادفع المبلغ خارج التطبيق بإحدى الطريقتين المعتمدتين أدناه.\n'
               '٢) التقط لقطة شاشة لإثبات الدفع.\n'
               '٣) ارفع الصورة هنا للمراجعة (صور فقط حتى ١٠ ميجا).\n'
               'رفع الإيصال لا يعني اعتماد الدفع تلقائياً — الإدارة تعتمد بعد المراجعة.',
@@ -407,47 +406,56 @@ class _ExternalPaySheet extends StatelessWidget {
                 color: AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(AppSizes.radiusM),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'المبلغ: $amount',
-                      style: AppTextStyles.titleLarge.copyWith(
-                        fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          payment.hasPartialConfirmation
+                              ? 'المتبقي للدفع: $amount'
+                              : 'المبلغ: $amount',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
+                      IconButton(
+                        tooltip: 'نسخ المبلغ',
+                        onPressed: () {
+                          Clipboard.setData(
+                            ClipboardData(text: formatMoneyAmount(outstanding)),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('تم نسخ المبلغ')),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 20),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: 'نسخ المبلغ',
-                    onPressed: () {
-                      Clipboard.setData(
-                        ClipboardData(text: payment.amount.toStringAsFixed(0)),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('تم نسخ المبلغ')),
-                      );
-                    },
-                    icon: const Icon(Icons.copy_rounded, size: 20),
-                  ),
+                  if (payment.hasPartialConfirmation)
+                    PaymentAmountBreakdown(payment: payment),
                 ],
               ),
             ),
-            if (hasDestination) ...[
-              const SizedBox(height: 12),
-              SelectableText(
-                'رقم فودافون كاش: ${vodafoneCashDestination.trim()}',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            BlocBuilder<ParentBloc, ParentState>(
+              buildWhen: (p, c) =>
+                  p.paymentDestinationsStatus != c.paymentDestinationsStatus ||
+                  p.vodafoneCashDestination != c.vodafoneCashDestination ||
+                  p.instapayDestination != c.instapayDestination,
+              builder: (context, state) => ParentPaymentMethodsPanel(
+                status: state.paymentDestinationsStatus,
+                vodafoneCashDestination: state.vodafoneCashDestination,
+                instapayDestination: state.instapayDestination,
+                onRetry: () => context.read<ParentBloc>().add(
+                  const LoadPaymentDestinationsEvent(),
                 ),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _openDestination,
-                icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                label: const Text('فتح طريقة الدفع الخارجية'),
-              ),
-            ],
-            const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.upload_file_outlined, size: 18),
@@ -739,7 +747,6 @@ class _PaymentCard extends StatelessWidget {
         ? 'قيد المراجعة'
         : null;
     final reviewNotes = payment.reviewNotes?.trim() ?? '';
-    final remaining = payment.remainingAmount;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -888,16 +895,6 @@ class _PaymentCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (isPartial && remaining != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'المتبقي: ${parentMoneyLabel(remaining)}',
-                        style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
                     if (reviewNotes.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
@@ -911,6 +908,10 @@ class _PaymentCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ],
+            if (payment.hasPartialConfirmation) ...[
+              const SizedBox(height: 10),
+              PaymentAmountBreakdown(payment: payment),
             ],
             if (!isPaid) ...[
               const SizedBox(height: 12),
@@ -952,10 +953,10 @@ class _PaymentCard extends StatelessWidget {
           : 'رُفض الإيصال ${formatDateDmy(payment.reviewedAt!)}';
     }
     if (review == ParentPaymentProofContract.partial) {
-      final confirmed = payment.amountPaidConfirmed;
-      return confirmed == null
-          ? 'اعتُمد سداد جزئي بعد المراجعة'
-          : 'اعتُمد ${parentMoneyLabel(confirmed)} بعد المراجعة';
+      return payment.hasPartialConfirmation
+          ? 'اعتُمد ${parentMoneyLabel(payment.confirmedPartialAmount)} '
+                'بعد المراجعة'
+          : 'اعتُمد سداد جزئي بعد المراجعة';
     }
     if (payment.hasProofAwaitingReview) {
       return payment.proofSubmittedAt == null

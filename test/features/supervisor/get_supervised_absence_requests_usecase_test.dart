@@ -8,6 +8,7 @@ import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review
 import 'package:rafiq_academy/features/supervisor/domain/entities/supervisor_report_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart';
+import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 
 HalaqaEntity _halaqa(String id) => HalaqaEntity(
@@ -89,7 +90,7 @@ class _FakeSupervisorRepository implements SupervisorRepository {
   }) => throw UnimplementedError();
 
   @override
-  Future<Either<Failure, Unit>> reviewPaymentProof(
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof(
     PaymentReviewParams params,
   ) => throw UnimplementedError();
 }

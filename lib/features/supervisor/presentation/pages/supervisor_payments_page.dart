@@ -3,12 +3,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/payment_review_amount_panel.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../parent/domain/parent_payment_proof.dart';
+import '../../../parent/presentation/widgets/payment_proof_image.dart';
 import '../../domain/entities/payment_review_params.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../bloc/supervisor_bloc.dart';
@@ -18,6 +21,8 @@ import '../widgets/supervisor_loading_skeletons.dart';
 import '../widgets/supervisor_subpage_scaffold.dart';
 
 enum _PaymentFilter { all, awaiting, reviewed }
+
+String _money(double v) => '${formatMoneyAmount(v)} ر.س';
 
 /// Supervisor payment submissions — review external-pay proofs.
 class SupervisorPaymentsPage extends StatefulWidget {
@@ -99,8 +104,6 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
     };
   }
 
-  String _money(double v) => '${v.toStringAsFixed(0)} ر.س';
-
   String _period(DateTime d) =>
       '${d.year}/${d.month.toString().padLeft(2, '0')}';
 
@@ -160,7 +163,10 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
               _resolveNames(ids);
             }
             if (state.reviewPaymentStatus == SubmissionStatus.success) {
-              AppSnackBar.showSuccess(context, 'تم حفظ نتيجة المراجعة');
+              AppSnackBar.showSuccess(
+                context,
+                state.reviewPaymentMessage ?? 'تم حفظ نتيجة المراجعة',
+              );
               context.read<SupervisorBloc>().add(
                 const ResetReviewPaymentEvent(),
               );
@@ -427,6 +433,14 @@ class _KpiChip extends StatelessWidget {
   }
 }
 
+@visibleForTesting
+Widget supervisorPaymentReviewPageForTest(PaymentEntity payment) =>
+    _PaymentReviewPage(
+      payment: payment,
+      studentName: payment.studentId,
+      parentName: payment.parentId,
+    );
+
 class _PaymentReviewPage extends StatefulWidget {
   final PaymentEntity payment;
   final String studentName;
@@ -444,49 +458,112 @@ class _PaymentReviewPage extends StatefulWidget {
 
 class _PaymentReviewPageState extends State<_PaymentReviewPage> {
   final _notesCtrl = TextEditingController();
-  final _paidCtrl = TextEditingController();
-  final _remainingCtrl = TextEditingController();
+  final _draft = PaymentAmountDraft();
   PaymentReviewDecision _decision = PaymentReviewDecision.approved;
+
+  /// Restored from an earlier submission whose outcome is unknown.
+  bool _restored = false;
+
+  /// Storage path whose image is currently displayed; null while loading or
+  /// after a failure.
+  String? _loadedProofPath;
+
+  String get _proofPath => widget.payment.proofStoragePath?.trim() ?? '';
+
+  /// A review requires the image of the current proof to be on screen.
+  bool get _proofLoaded =>
+      _proofPath.isNotEmpty && _loadedProofPath == _proofPath;
+
+  void _onProofLoadedChanged(bool loaded) {
+    setState(() => _loadedProofPath = loaded ? _proofPath : null);
+  }
 
   @override
   void initState() {
     super.initState();
-    _paidCtrl.text = widget.payment.amount.toStringAsFixed(0);
-    _remainingCtrl.text = '0';
-    _notesCtrl.text = widget.payment.reviewNotes ?? '';
+    // A pending proof starts a new review cycle; its kept reviewNotes belong
+    // to the previous proof and must not be re-saved by default.
+    final pending =
+        widget.payment.reviewStatus?.trim() ==
+        ParentPaymentProofContract.pendingReview;
+    _notesCtrl.text = pending ? '' : widget.payment.reviewNotes ?? '';
+
+    final unresolved = context
+        .read<SupervisorBloc>()
+        .state
+        .reviewPaymentUnresolved[widget.payment.id];
+    if (_reviewable &&
+        unresolved != null &&
+        unresolved.targetsProof(
+          fileName: widget.payment.proofFileName,
+          proofCycleId: widget.payment.proofCycleId,
+        )) {
+      _restore(unresolved);
+    }
+  }
+
+  /// Same content ⇒ the bloc re-sends it with the same requestId.
+  void _restore(PaymentReviewCommand command) {
+    _restored = true;
+    _decision = PaymentReviewDecision.values.firstWhere(
+      (d) => d.wire == command.decision,
+    );
+    _notesCtrl.text = command.notes;
+    final mode = command.amountMode;
+    final amount = command.amountMinorUnits;
+    if (mode != null) _draft.mode = mode;
+    if (amount != null) _draft.input.text = formatMinorUnits(amount);
   }
 
   @override
   void dispose() {
     _notesCtrl.dispose();
-    _paidCtrl.dispose();
-    _remainingCtrl.dispose();
+    _draft.dispose();
     super.dispose();
+  }
+
+  PaymentAmountSnapshot get _snapshot => PaymentAmountSnapshot.fromAmounts(
+    invoiceAmount: widget.payment.amount,
+    amountPaidConfirmed: widget.payment.amountPaidConfirmed,
+  );
+
+  /// Only a pending proof with its file name can be reviewed (proof-bound).
+  bool get _reviewable {
+    final p = widget.payment;
+    return p.status != PaymentStatus.paid &&
+        p.reviewStatus?.trim() == ParentPaymentProofContract.pendingReview &&
+        isValidExpectedProofFileName(p.proofFileName);
   }
 
   void _submit() {
     final auth = context.read<AuthBloc>().state;
-    if (auth is! AuthAuthenticated) return;
-
-    final paid = double.tryParse(_paidCtrl.text.trim());
-    final remaining = double.tryParse(_remainingCtrl.text.trim());
-    if (_decision == PaymentReviewDecision.partial &&
-        (remaining == null || remaining < 0)) {
-      AppSnackBar.showInfo(context, 'أدخل المبلغ المتبقي');
+    if (auth is! AuthAuthenticated || !_reviewable || !_proofLoaded) return;
+    final bloc = context.read<SupervisorBloc>();
+    if (bloc.state.reviewPaymentStatus == SubmissionStatus.submitting) {
+      AppSnackBar.showInfo(context, kPaymentReviewBusyMessage);
       return;
     }
 
-    context.read<SupervisorBloc>().add(
+    final partial = _decision == PaymentReviewDecision.partial;
+    final snapshot = _snapshot;
+    final error = partial ? _draft.check(snapshot).error : snapshot.error;
+    if (error != null) {
+      AppSnackBar.showInfo(context, error);
+      return;
+    }
+
+    bloc.add(
       ReviewPaymentProofEvent(
-        PaymentReviewParams(
-          supervisorId: auth.user.uid,
+        supervisorId: auth.user.uid,
+        snapshot: snapshot,
+        command: PaymentReviewCommand(
           paymentId: widget.payment.id,
-          decision: _decision,
-          notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-          amountPaidConfirmed: paid,
-          remainingAmount: _decision == PaymentReviewDecision.partial
-              ? remaining
-              : (_decision == PaymentReviewDecision.approved ? 0 : null),
+          decision: _decision.wire,
+          notes: _notesCtrl.text,
+          amountMode: partial ? _draft.mode : null,
+          amountMinorUnits: partial ? _draft.inputMinorUnits : null,
+          expectedProofFileName: widget.payment.proofFileName ?? '',
+          expectedProofCycleId: widget.payment.proofCycleId,
         ),
       ),
     );
@@ -495,22 +572,36 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
   @override
   Widget build(BuildContext context) {
     final p = widget.payment;
-    final proofUrl = p.proofDownloadUrl?.trim();
+    final proofPath = _proofPath;
+    final reviewable = _reviewable;
+    final proofLoaded = _proofLoaded;
 
     return BlocListener<SupervisorBloc, SupervisorState>(
-      listenWhen: (a, b) => a.reviewPaymentStatus != b.reviewPaymentStatus,
+      // Only outcomes of this payment's review concern this screen.
+      listenWhen: (a, b) =>
+          b.reviewPaymentId == p.id &&
+          a.reviewStatusFor(p.id) != b.reviewStatusFor(p.id),
       listener: (context, state) {
-        if (state.reviewPaymentStatus == SubmissionStatus.success) {
+        final error = state.reviewPaymentError;
+        // Reviewed, or this screen's proof is stale: the list reloads behind.
+        if (state.reviewPaymentStatus == SubmissionStatus.success ||
+            (state.reviewPaymentStatus == SubmissionStatus.error &&
+                (isPaymentProofChangedMessage(error) ||
+                    error == kPaymentNoLongerPendingNotice))) {
           Navigator.of(context).maybePop();
         }
       },
       child: SupervisorSubpageScaffold(
         title: 'مراجعة إثبات الدفع',
         body: BlocBuilder<SupervisorBloc, SupervisorState>(
-          buildWhen: (a, b) => a.reviewPaymentStatus != b.reviewPaymentStatus,
+          buildWhen: (a, b) =>
+              a.reviewPaymentStatus != b.reviewPaymentStatus ||
+              a.reviewPaymentId != b.reviewPaymentId,
           builder: (context, state) {
-            final busy =
+            final submitting =
                 state.reviewPaymentStatus == SubmissionStatus.submitting;
+            final busy = submitting && state.reviewPaymentId == p.id;
+            final otherBusy = submitting && state.reviewPaymentId != p.id;
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
@@ -522,7 +613,7 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                       _InfoRow(label: 'ولي الأمر', value: widget.parentName),
                       _InfoRow(
                         label: 'المبلغ المطلوب',
-                        value: '${p.amount.toStringAsFixed(0)} ر.س',
+                        value: _money(p.amount),
                       ),
                       _InfoRow(
                         label: 'الفترة',
@@ -553,22 +644,17 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (proofUrl == null || proofUrl.isEmpty)
+                if (proofPath.isEmpty)
                   const AppCard(child: Text('لا توجد صورة إثبات مرفقة'))
                 else
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: AspectRatio(
-                      aspectRatio: 3 / 4,
-                      child: Image.network(
-                        proofUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: AppColors.surfaceGrey,
-                          alignment: Alignment.center,
-                          child: const Text('تعذر عرض الصورة'),
-                        ),
-                      ),
+                    child: PaymentProofImage(
+                      parentId: p.parentId,
+                      paymentId: p.id,
+                      storagePath: proofPath,
+                      height: 360,
+                      onLoadedChanged: _onProofLoadedChanged,
                     ),
                   ),
                 const SizedBox(height: 16),
@@ -579,58 +665,93 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final d in PaymentReviewDecision.values)
-                      ChoiceChip(
-                        label: Text(switch (d) {
-                          PaymentReviewDecision.approved => 'قبول',
-                          PaymentReviewDecision.rejected => 'رفض',
-                          PaymentReviewDecision.partial => 'جزئي',
-                        }),
-                        selected: _decision == d,
-                        onSelected: busy
-                            ? null
-                            : (_) => setState(() => _decision = d),
+                if (!reviewable)
+                  AppCard(
+                    child: Text(
+                      'لا يوجد إيصال بانتظار المراجعة لهذه الدفعة',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
                       ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _paidCtrl,
-                  enabled: !busy,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'المبلغ المدفوع المؤكد',
+                    ),
+                  )
+                else ...[
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final d in PaymentReviewDecision.values)
+                        ChoiceChip(
+                          label: Text(switch (d) {
+                            PaymentReviewDecision.approved => 'قبول',
+                            PaymentReviewDecision.rejected => 'رفض',
+                            PaymentReviewDecision.partial => 'جزئي',
+                          }),
+                          selected: _decision == d,
+                          onSelected: busy
+                              ? null
+                              : (_) => setState(() => _decision = d),
+                        ),
+                    ],
                   ),
-                ),
-                if (_decision == PaymentReviewDecision.partial) ...[
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _remainingCtrl,
-                    enabled: !busy,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'المبلغ المتبقي',
+                  AppCard(
+                    child: PaymentReviewAmountPanel(
+                      snapshot: _snapshot,
+                      decision: _decision.wire,
+                      draft: _draft,
+                      currency: 'ر.س',
+                      enabled: !busy,
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _notesCtrl,
-                  enabled: !busy,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'ملاحظات المراجعة',
-                    alignLabelWithHint: true,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _notesCtrl,
+                    enabled: !busy,
+                    maxLines: 3,
+                    maxLength: kPaymentReviewNotesMaxLength,
+                    decoration: const InputDecoration(
+                      labelText: 'ملاحظات المراجعة',
+                      alignLabelWithHint: true,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: busy ? null : _submit,
-                  child: Text(busy ? 'جاري الحفظ…' : 'حفظ نتيجة المراجعة'),
-                ),
+                  if (_restored && !busy) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'لم يتأكد حفظ المراجعة السابقة لهذه الدفعة — البيانات '
+                      'المعروضة هي نفس الطلب السابق، أعد الإرسال دون تعديلها '
+                      'لاسترداد نتيجته.',
+                      key: const ValueKey('payment-review-restored'),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ],
+                  if (otherBusy) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      kPaymentReviewBusyMessage,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  if (!proofLoaded) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      kPaymentProofNotLoadedMessage,
+                      key: const ValueKey('payment-review-proof-not-loaded'),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: busy || otherBusy || !proofLoaded
+                        ? null
+                        : _submit,
+                    child: Text(busy ? 'جاري الحفظ…' : 'حفظ نتيجة المراجعة'),
+                  ),
+                ],
               ],
             );
           },

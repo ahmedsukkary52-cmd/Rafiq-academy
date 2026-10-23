@@ -20,21 +20,45 @@ final class LoadPendingProofsEvent extends PaymentReviewEvent {
   List<Object?> get props => [reviewerUid, isAdmin];
 }
 
+/// [amountMode] / [amountMinorUnits] are read for `partial` only; approval
+/// always confirms the full invoice server-side.
 final class SubmitPaymentReviewEvent extends PaymentReviewEvent {
   final PaymentReviewItem item;
   final PaymentReviewDecision decision;
   final String? notes;
-  final double? amountPaidConfirmed;
+  final PaymentAmountMode? amountMode;
+  final int? amountMinorUnits;
 
   const SubmitPaymentReviewEvent({
     required this.item,
     required this.decision,
     this.notes,
-    this.amountPaidConfirmed,
+    this.amountMode,
+    this.amountMinorUnits,
   });
 
+  /// Re-sends the item's unresolved command unchanged (same `requestId`).
+  factory SubmitPaymentReviewEvent.retry(
+    PaymentReviewItem item,
+    PaymentReviewCommand command,
+  ) => SubmitPaymentReviewEvent(
+    item: item,
+    decision: PaymentReviewDecision.values.firstWhere(
+      (d) => d.wire == command.decision,
+    ),
+    notes: command.notes,
+    amountMode: command.amountMode,
+    amountMinorUnits: command.amountMinorUnits,
+  );
+
   @override
-  List<Object?> get props => [item, decision, notes, amountPaidConfirmed];
+  List<Object?> get props => [
+    item,
+    decision,
+    notes,
+    amountMode,
+    amountMinorUnits,
+  ];
 }
 
 final class ClearPaymentReviewMessageEvent extends PaymentReviewEvent {

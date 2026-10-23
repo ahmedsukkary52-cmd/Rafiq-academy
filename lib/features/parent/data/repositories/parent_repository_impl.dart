@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
@@ -183,10 +185,32 @@ class ParentRepositoryImpl implements ParentRepository {
           message.contains('غير صالح') ||
           message.contains('غير موجود') ||
           message.contains('فارغ') ||
-          message.contains('أكبر من')) {
+          message.contains('أكبر من') ||
+          message.contains('غير مدعوم') ||
+          message.contains('لا يطابق')) {
         return Left(ValidationFailure(message));
       }
       return Left(ServerFailure(message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Uint8List>> downloadPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String storagePath,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.downloadPaymentProof(
+          parentId: parentId,
+          paymentId: paymentId,
+          storagePath: storagePath,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     }
   }
 

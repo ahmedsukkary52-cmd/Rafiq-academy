@@ -49,6 +49,12 @@ class AdminManagementTab extends StatelessWidget {
           route: AppRoutes.adminAccess,
           wired: true,
         ),
+        const _HubTile(
+          icon: Icons.account_balance_wallet_outlined,
+          label: 'وسائل الدفع',
+          route: AppRoutes.adminPaymentDestinations,
+          wired: true,
+        ),
       ],
     ),
     _HubSection(

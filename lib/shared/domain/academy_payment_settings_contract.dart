@@ -11,6 +11,9 @@ class AcademyPaymentSettingsContract {
 
   // paymentPublic
   static const String vodafoneCashDestinationField = 'vodafoneCashDestination';
+
+  /// Independent of [vodafoneCashDestinationField]; never derived from it.
+  static const String instapayDestinationField = 'instapayDestination';
   static const String updatedAtField = 'updatedAt';
   static const String updatedByField = 'updatedBy';
 

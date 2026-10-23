@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/admin_communication_settings_contract.dart';
+import '../../../../shared/data/payment_public_settings_mapper.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/academy_payment_settings_contract.dart';
 import '../../../../shared/domain/pricing_rules_contract.dart';
@@ -26,6 +27,7 @@ import '../../../awards/data/award_grant_errors.dart';
 import '../../../awards/domain/award_submission_id.dart';
 import '../admin_private_email_reader.dart';
 import '../communication_settings_errors.dart';
+import '../payment_destination_errors.dart';
 import 'admin_remote_datasource.dart';
 
 @LazySingleton(as: AdminRemoteDatasource)
@@ -431,41 +433,46 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.paymentPublicDocId)
           .get();
-      final data = doc.data() ?? const <String, dynamic>{};
-      final updated = data[AcademyPaymentSettingsContract.updatedAtField];
-      return PaymentPublicSettingsEntity(
-        vodafoneCashDestination:
-            (data[AcademyPaymentSettingsContract.vodafoneCashDestinationField]
-                    as String?)
-                ?.trim() ??
-            '',
-        updatedAt: updated is Timestamp ? updated.toDate() : null,
-        updatedBy:
-            data[AcademyPaymentSettingsContract.updatedByField] as String?,
+      return paymentPublicSettingsFromData(doc.data());
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        paymentDestinationsErrorMessage(e.code, save: false),
       );
-    } catch (e) {
-      throw ServerException(e.toString());
+    } catch (_) {
+      throw const ServerException(kPaymentDestinationsLoadFailedMessage);
     }
   }
 
   @override
   Future<void> updatePaymentPublicSettings({
-    required String vodafoneCashDestination,
+    String? vodafoneCashDestination,
+    String? instapayDestination,
   }) async {
+    if (vodafoneCashDestination == null && instapayDestination == null) {
+      return;
+    }
     try {
       final uid = FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid;
       await firestore
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.paymentPublicDocId)
           .set({
-            AcademyPaymentSettingsContract.vodafoneCashDestinationField:
-                vodafoneCashDestination.trim(),
+            if (vodafoneCashDestination != null)
+              AcademyPaymentSettingsContract.vodafoneCashDestinationField:
+                  vodafoneCashDestination.trim(),
+            if (instapayDestination != null)
+              AcademyPaymentSettingsContract.instapayDestinationField:
+                  instapayDestination.trim(),
             AcademyPaymentSettingsContract.updatedAtField:
                 FieldValue.serverTimestamp(),
             AcademyPaymentSettingsContract.updatedByField: uid,
           }, SetOptions(merge: true));
-    } catch (e) {
-      throw ServerException(e.toString());
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        paymentDestinationsErrorMessage(e.code, save: true),
+      );
+    } catch (_) {
+      throw const ServerException(kPaymentDestinationsSaveFailedMessage);
     }
   }
 

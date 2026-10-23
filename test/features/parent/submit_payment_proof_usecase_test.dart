@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
@@ -15,6 +17,10 @@ class _FakeParentRepository implements ParentRepository {
   String? proofPaymentId;
   String? proofPath;
   Either<Failure, Unit> proofResult = const Right(unit);
+  final List<String> downloadedPaths = [];
+  Either<Failure, Uint8List> downloadResult = Right(
+    Uint8List.fromList(const [1, 2, 3]),
+  );
 
   @override
   Future<Either<Failure, Unit>> submitPaymentProof({
@@ -26,6 +32,16 @@ class _FakeParentRepository implements ParentRepository {
     proofPaymentId = paymentId;
     proofPath = localFilePath;
     return proofResult;
+  }
+
+  @override
+  Future<Either<Failure, Uint8List>> downloadPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String storagePath,
+  }) async {
+    downloadedPaths.add(storagePath);
+    return downloadResult;
   }
 
   @override
@@ -136,6 +152,77 @@ void main() {
       expect(repo.proofParentId, 'p1');
       expect(repo.proofPaymentId, 'pay1');
       expect(repo.proofPath, '/tmp/shot.png');
+    });
+  });
+
+  group('DownloadPaymentProofUseCase', () {
+    test('loads only the trusted path of this parent + payment', () async {
+      final repo = _FakeParentRepository();
+      final useCase = DownloadPaymentProofUseCase(repo);
+
+      final result = await useCase(
+        const DownloadPaymentProofParams(
+          parentId: 'p1',
+          paymentId: 'pay1',
+          storagePath: 'payment_proofs/p1/pay1/1760000000000.png',
+        ),
+      );
+
+      expect(result.isRight(), isTrue);
+      expect(repo.downloadedPaths, [
+        'payment_proofs/p1/pay1/1760000000000.png',
+      ]);
+    });
+
+    test(
+      'fails closed without touching Storage for untrusted metadata',
+      () async {
+        final repo = _FakeParentRepository();
+        final useCase = DownloadPaymentProofUseCase(repo);
+
+        for (final path in const [
+          '',
+          'https://evil.example/proof.jpg',
+          'https://firebasestorage.googleapis.com/v0/b/b/o/x?alt=media&token=t',
+          'payment_proofs/p2/pay1/1.jpg',
+          'payment_proofs/p1/pay2/1.jpg',
+          'payment_proofs/p1/pay1',
+          'payment_proofs/p1/pay1/sub/1.jpg',
+          'payment_proofs/p1/pay1/1.gif',
+          'payment_proofs/p1/pay1/1',
+          'posts/p1/pay1/1.jpg',
+        ]) {
+          final result = await useCase(
+            DownloadPaymentProofParams(
+              parentId: 'p1',
+              paymentId: 'pay1',
+              storagePath: path,
+            ),
+          );
+          expect(
+            result.fold((f) => f, (_) => null),
+            isA<ValidationFailure>(),
+            reason: path,
+          );
+        }
+        expect(repo.downloadedPaths, isEmpty);
+      },
+    );
+
+    test('surfaces repository failures (e.g. permission denied)', () async {
+      final repo = _FakeParentRepository()
+        ..downloadResult = const Left(ServerFailure('denied'));
+      final useCase = DownloadPaymentProofUseCase(repo);
+
+      final result = await useCase(
+        const DownloadPaymentProofParams(
+          parentId: 'p1',
+          paymentId: 'pay1',
+          storagePath: 'payment_proofs/p1/pay1/1.jpg',
+        ),
+      );
+
+      expect(result.fold((f) => f, (_) => null), isA<ServerFailure>());
     });
   });
 

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/constants/app_constants.dart';
@@ -15,6 +18,7 @@ import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usec
 import 'package:rafiq_academy/features/admin/presentation/bloc/admin_operations_bloc.dart';
 import 'package:rafiq_academy/features/admin/presentation/bloc/payment_review_bloc.dart';
 import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 
 class _FakeOpsRepo implements AdminOperationsRepository {
   final calls = <String>[];
@@ -118,16 +122,39 @@ class _FakeOpsRepo implements AdminOperationsRepository {
     return Right(pending);
   }
 
+  final reviews = <(PaymentReviewCommand, String)>[];
+  Completer<void>? reviewGate;
+  bool replayed = false;
+
   @override
-  Future<Either<Failure, Unit>> reviewPaymentProof({
-    required String paymentId,
-    required PaymentReviewDecision decision,
-    String? notes,
-    double? amountPaidConfirmed,
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof({
+    required PaymentReviewCommand command,
+    required String requestId,
   }) async {
-    calls.add('review:$paymentId:${decision.wire}:$amountPaidConfirmed');
+    reviews.add((command, requestId));
+    calls.add(
+      'review:${command.paymentId}:${command.decision}:'
+      '${command.amountMode?.wire}:${command.amountMinorUnits}',
+    );
+    await reviewGate?.future;
     if (reviewFailure != null) return Left(reviewFailure!);
-    return const Right(unit);
+    return Right(
+      PaymentReviewResult(
+        paymentId: command.paymentId,
+        reviewStatus: command.decision,
+        replayed: replayed,
+      ),
+    );
+  }
+}
+
+class _ErrorRecorder extends BlocObserver {
+  final errors = <Object>[];
+
+  @override
+  void onError(BlocBase<dynamic> bloc, Object error, StackTrace stackTrace) {
+    errors.add(error);
+    super.onError(bloc, error, stackTrace);
   }
 }
 
@@ -140,7 +167,6 @@ class _FakeAdminRepo implements AdminRepository {
     required String password,
     required String name,
     required String role,
-    String? phone,
     bool isActive = true,
   }) async {
     calls.add('provision:$email:$role');
@@ -216,22 +242,6 @@ void main() {
       expect(isValidClockTime('24:00'), isFalse);
     });
 
-    test('partial amount must be strictly between 0 and the invoice', () {
-      expect(validatePartialAmount(invoiceAmount: 100, confirmed: 40), isNull);
-      expect(
-        validatePartialAmount(invoiceAmount: 100, confirmed: 100),
-        isNotNull,
-      );
-      expect(
-        validatePartialAmount(invoiceAmount: 100, confirmed: 0),
-        isNotNull,
-      );
-      expect(
-        validatePartialAmount(invoiceAmount: 100, confirmed: null),
-        isNotNull,
-      );
-    });
-
     test('halaqa request ids match the callable idempotency pattern', () {
       final id = newHalaqaRequestId();
       expect(RegExp(r'^[A-Za-z0-9_-]{8,64}$').hasMatch(id), isTrue);
@@ -268,32 +278,75 @@ void main() {
       expect(ops.calls, isEmpty);
     });
 
-    test('non-partial review never forwards a confirmed amount', () async {
-      final ops = _FakeOpsRepo();
-      await ReviewPaymentProofUseCase(ops)(
-        const ReviewPaymentProofParams(
-          paymentId: 'p1',
-          decision: PaymentReviewDecision.approve,
-          invoiceAmount: 100,
-          amountPaidConfirmed: 30,
-        ),
-      );
-      expect(ops.calls.single, 'review:p1:approve:null');
-    });
+    const snapshot = PaymentAmountSnapshot(invoice: 10000, previous: 4000);
+    const requestId = 'req_0123456789abcdef';
 
-    test('invalid partial review does not reach the callable', () async {
+    test('an approval carrying an amount is refused locally', () async {
       final ops = _FakeOpsRepo();
       final result = await ReviewPaymentProofUseCase(ops)(
-        const ReviewPaymentProofParams(
-          paymentId: 'p1',
-          decision: PaymentReviewDecision.partial,
-          invoiceAmount: 100,
-          amountPaidConfirmed: 150,
+        ReviewPaymentProofParams(
+          command: PaymentReviewCommand(
+            paymentId: 'p1',
+            decision: PaymentReviewWire.approve,
+            amountMode: PaymentAmountMode.receipt,
+            amountMinorUnits: 3000,
+            expectedProofFileName: '1.jpg',
+          ),
+          requestId: requestId,
+          snapshot: snapshot,
         ),
       );
       expect(result.isLeft(), isTrue);
       expect(ops.calls, isEmpty);
     });
+
+    test('invalid partial review does not reach the callable', () async {
+      final ops = _FakeOpsRepo();
+      for (final (mode, amount) in [
+        (PaymentAmountMode.receipt, 6000),
+        (PaymentAmountMode.receipt, 0),
+        (PaymentAmountMode.cumulative, 4000),
+        (PaymentAmountMode.cumulative, 10001),
+      ]) {
+        final result = await ReviewPaymentProofUseCase(ops)(
+          ReviewPaymentProofParams(
+            command: PaymentReviewCommand(
+              paymentId: 'p1',
+              decision: PaymentReviewWire.partial,
+              amountMode: mode,
+              amountMinorUnits: amount,
+              expectedProofFileName: '1.jpg',
+            ),
+            requestId: requestId,
+            snapshot: snapshot,
+          ),
+        );
+        expect(result.isLeft(), isTrue, reason: '$mode $amount');
+      }
+      expect(ops.calls, isEmpty);
+    });
+
+    test(
+      'a missing proof name or bad requestId never reaches the callable',
+      () async {
+        final ops = _FakeOpsRepo();
+        for (final (proof, id) in [('', requestId), ('1.jpg', 'short')]) {
+          final result = await ReviewPaymentProofUseCase(ops)(
+            ReviewPaymentProofParams(
+              command: PaymentReviewCommand(
+                paymentId: 'p1',
+                decision: PaymentReviewWire.reject,
+                expectedProofFileName: proof,
+              ),
+              requestId: id,
+              snapshot: snapshot,
+            ),
+          );
+          expect(result.isLeft(), isTrue);
+        }
+        expect(ops.calls, isEmpty);
+      },
+    );
   });
 
   group('paymentReviewItemFromMap', () {
@@ -307,7 +360,7 @@ void main() {
         'dueDate': Timestamp.fromDate(DateTime(2026, 10, 5)),
         'status': 'pending',
         'reviewStatus': 'pending_review',
-        'proofDownloadUrl': 'https://example.test/p.jpg',
+        'proofStoragePath': 'payment_proofs/par1/pay1/1760000000000.jpg',
         'proofSubmittedAt': Timestamp.fromDate(DateTime(2026, 10, 3)),
       });
       expect(item.paymentId, 'pay1');
@@ -315,13 +368,57 @@ void main() {
       expect(item.dueDate, DateTime(2026, 10, 5));
       expect(item.hasProofImage, isTrue);
       expect(item.reviewStatus, 'pending_review');
+      expect(item.amountPaidConfirmed, isNull);
+      expect(item.amountSnapshot, const PaymentAmountSnapshot(invoice: 25000));
     });
 
-    test('missing proof url yields no image', () {
+    test('maps the previously confirmed cumulative total', () {
+      final item = paymentReviewItemFromMap('pay5', {
+        'amount': 200,
+        'amountPaidConfirmed': 60,
+        'proofFileName': '1790000000000.jpg',
+      });
+      expect(item.amountPaidConfirmed, 60);
+      expect(item.amountSnapshot.remaining, 14000);
+      expect(item.proofFileName, '1790000000000.jpg');
+      expect(item.withStudentName('x').amountPaidConfirmed, 60);
+    });
+
+    test('missing proof path yields no image', () {
       final item = paymentReviewItemFromMap('pay2', {'amount': 10});
       expect(item.hasProofImage, isFalse);
+      expect(item.hasProofMetadata, isFalse);
       expect(item.parentId, '');
     });
+
+    test('a legacy download URL alone is never treated as a proof image', () {
+      final item = paymentReviewItemFromMap('pay3', {
+        'parentId': 'par1',
+        'proofDownloadUrl': 'https://evil.example/p.jpg',
+      });
+      expect(item.hasProofImage, isFalse);
+      expect(item.hasProofMetadata, isFalse);
+    });
+
+    test(
+      'a path for another parent or payment is metadata but not trusted',
+      () {
+        for (final path in [
+          'payment_proofs/other/pay4/1.jpg',
+          'payment_proofs/par1/other/1.jpg',
+          'https://evil.example/payment_proofs/par1/pay4/1.jpg',
+          'payment_proofs/par1/pay4/../x.jpg',
+          'payment_proofs/par1/pay4/1.gif',
+        ]) {
+          final item = paymentReviewItemFromMap('pay4', {
+            'parentId': 'par1',
+            'proofStoragePath': path,
+          });
+          expect(item.hasProofMetadata, isTrue, reason: path);
+          expect(item.hasProofImage, isFalse, reason: path);
+        }
+      },
+    );
   });
 
   group('AdminOperationsBloc', () {
@@ -548,7 +645,131 @@ void main() {
       parentId: 'par1',
       studentId: 's1',
       amount: 100,
+      proofFileName: '1790000000000.jpg',
     );
+
+    PaymentReviewBloc newBloc(_FakeOpsRepo ops) => PaymentReviewBloc(
+      listPending: ListPendingPaymentProofsUseCase(ops),
+      reviewProof: ReviewPaymentProofUseCase(ops),
+    );
+
+    SubmitPaymentReviewEvent partial(int amount, {String? notes}) =>
+        SubmitPaymentReviewEvent(
+          item: item,
+          decision: PaymentReviewDecision.partial,
+          notes: notes,
+          amountMode: PaymentAmountMode.receipt,
+          amountMinorUnits: amount,
+        );
+
+    test(
+      'partial sends the receipt mode bound to the reviewed proof',
+      () async {
+        final ops = _FakeOpsRepo()..pending = [item];
+        final bloc = newBloc(ops);
+        bloc.add(
+          const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true),
+        );
+        await _settle();
+        bloc.add(partial(4000, notes: ' دفعة أولى '));
+        await _settle();
+        final (command, requestId) = ops.reviews.single;
+        expect(command.decision, 'partial');
+        expect(command.amountMode, PaymentAmountMode.receipt);
+        expect(command.amountMinorUnits, 4000);
+        expect(command.notes, 'دفعة أولى');
+        expect(command.expectedProofFileName, '1790000000000.jpg');
+        expect(kPaymentReviewRequestIdPattern.hasMatch(requestId), isTrue);
+        await bloc.close();
+      },
+    );
+
+    test('approval ignores any amount typed by the reviewer', () async {
+      final ops = _FakeOpsRepo()..pending = [item];
+      final bloc = newBloc(ops);
+      bloc.add(
+        const SubmitPaymentReviewEvent(
+          item: item,
+          decision: PaymentReviewDecision.approve,
+          amountMode: PaymentAmountMode.cumulative,
+          amountMinorUnits: 3000,
+        ),
+      );
+      await _settle();
+      expect(ops.calls.single, 'review:p1:approve:null:null');
+      await bloc.close();
+    });
+
+    test('a retry after a network error reuses the requestId', () async {
+      final ops = _FakeOpsRepo()
+        ..pending = [item]
+        ..reviewFailure = const NetworkFailure();
+      final bloc = newBloc(ops);
+      bloc.add(partial(4000));
+      await _settle();
+      bloc.add(partial(4000));
+      await _settle();
+      expect(ops.reviews[1].$2, ops.reviews[0].$2);
+
+      bloc.add(partial(4500));
+      await _settle();
+      expect(ops.reviews[2].$2, isNot(ops.reviews[0].$2));
+
+      ops.reviewFailure = null;
+      bloc.add(partial(4500));
+      await _settle();
+      expect(ops.reviews[3].$2, ops.reviews[2].$2);
+      expect(bloc.state.submissionStatus, SubmissionStatus.success);
+      await bloc.close();
+    });
+
+    test('a new decision after success gets a new requestId', () async {
+      final ops = _FakeOpsRepo()..pending = [item];
+      final bloc = newBloc(ops);
+      bloc.add(partial(4000));
+      await _settle();
+      bloc.add(partial(4000));
+      await _settle();
+      expect(ops.reviews[1].$2, isNot(ops.reviews[0].$2));
+      await bloc.close();
+    });
+
+    test('a changed proof reloads the list and never resends', () async {
+      final ops = _FakeOpsRepo()
+        ..pending = [item]
+        ..reviewFailure = const ServerFailure(kPaymentProofChangedMessage);
+      final bloc = newBloc(ops);
+      bloc.add(const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true));
+      await _settle();
+      ops.calls.clear();
+      bloc.add(partial(4000));
+      await _settle();
+      expect(ops.calls, ['review:p1:partial:receipt:4000', 'pending:a1:true']);
+      expect(ops.reviews, hasLength(1));
+      expect(bloc.state.status, SectionStatus.loaded);
+      await bloc.close();
+    });
+
+    test('concurrent submissions are dropped while one is in flight', () async {
+      final ops = _FakeOpsRepo()
+        ..pending = [item]
+        ..reviewGate = Completer<void>();
+      final bloc = newBloc(ops);
+      bloc
+        ..add(partial(4000))
+        ..add(partial(4000))
+        ..add(
+          const SubmitPaymentReviewEvent(
+            item: item,
+            decision: PaymentReviewDecision.reject,
+          ),
+        );
+      await _settle();
+      ops.reviewGate!.complete();
+      await _settle();
+      expect(ops.reviews, hasLength(1));
+      await bloc.close();
+    });
 
     test('loads pending proofs for a supervisor scope', () async {
       final ops = _FakeOpsRepo()..pending = [item];
@@ -574,15 +795,9 @@ void main() {
       );
       bloc.add(const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true));
       await _settle();
-      bloc.add(
-        const SubmitPaymentReviewEvent(
-          item: item,
-          decision: PaymentReviewDecision.partial,
-          amountPaidConfirmed: 40,
-        ),
-      );
+      bloc.add(partial(4000));
       await _settle();
-      expect(ops.calls.last, 'review:p1:partial:40.0');
+      expect(ops.calls.last, 'review:p1:partial:receipt:4000');
       expect(bloc.state.items, isEmpty);
       expect(bloc.state.submissionStatus, SubmissionStatus.success);
       await bloc.close();
@@ -609,6 +824,288 @@ void main() {
       expect(bloc.state.submissionStatus, SubmissionStatus.error);
       expect(bloc.state.message, 'تمت مراجعة الإيصال مسبقاً');
       await bloc.close();
+    });
+
+    Future<PaymentReviewBloc> loaded(_FakeOpsRepo ops) async {
+      final bloc = newBloc(ops);
+      bloc.add(const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true));
+      await _settle();
+      ops.calls.clear();
+      return bloc;
+    }
+
+    test('closing the page mid-review never adds to the closed bloc', () async {
+      final recorder = _ErrorRecorder();
+      final previous = Bloc.observer;
+      Bloc.observer = recorder;
+      addTearDown(() => Bloc.observer = previous);
+      final ops = _FakeOpsRepo()
+        ..pending = [item]
+        ..reviewGate = Completer<void>()
+        ..reviewFailure = const ServerFailure(kPaymentProofChangedMessage);
+      final bloc = await loaded(ops);
+      bloc.add(partial(4000));
+      await _settle();
+      final closing = bloc.close();
+      ops.reviewGate!.complete();
+      await closing;
+      await _settle();
+      expect(recorder.errors, isEmpty);
+      expect(ops.calls, ['review:p1:partial:receipt:4000']);
+    });
+
+    for (final message in kPaymentNoLongerPendingMessages) {
+      test('"$message" settles, reloads and never resends', () async {
+        final ops = _FakeOpsRepo()
+          ..pending = [item]
+          ..reviewFailure = ServerFailure(message);
+        final bloc = await loaded(ops);
+        bloc.add(partial(4000));
+        await _settle();
+        expect(ops.calls, [
+          'review:p1:partial:receipt:4000',
+          'pending:a1:true',
+        ]);
+        expect(bloc.state.message, kPaymentNoLongerPendingNotice);
+        expect(bloc.state.unresolved, isEmpty);
+
+        // The reload shows the server truth; a new attempt is a new request.
+        ops.reviewFailure = null;
+        bloc.add(partial(4000));
+        await _settle();
+        expect(ops.reviews, hasLength(2));
+        expect(ops.reviews[1].$2, isNot(ops.reviews[0].$2));
+        await bloc.close();
+      });
+    }
+
+    test('other preconditions are not mistaken for "already reviewed"', () {
+      for (final message in [
+        'الدفعة خارج نطاق إشرافك',
+        'مبلغ الفاتورة غير صالح',
+        kPaymentProofChangedMessage,
+      ]) {
+        expect(isPaymentNoLongerPendingMessage(message), isFalse);
+      }
+      expect(
+        paymentReviewFailureKind(const ServerFailure('deadline-exceeded')),
+        PaymentReviewFailureKind.unresolved,
+      );
+    });
+
+    test(
+      'a replayed result reloads instead of removing the current row',
+      () async {
+        final ops = _FakeOpsRepo()
+          ..pending = [item]
+          ..replayed = true;
+        final bloc = await loaded(ops);
+        bloc.add(partial(4000));
+        await _settle();
+        expect(ops.calls, [
+          'review:p1:partial:receipt:4000',
+          'pending:a1:true',
+        ]);
+        expect(bloc.state.message, kPaymentReviewReplayedMessage);
+        await bloc.close();
+      },
+    );
+
+    test('an old result never removes a newer proof of the payment', () async {
+      final ops = _FakeOpsRepo()
+        ..pending = [item]
+        ..reviewGate = Completer<void>();
+      final bloc = await loaded(ops);
+      bloc.add(partial(4000));
+      await _settle();
+      const newer = PaymentReviewItem(
+        paymentId: 'p1',
+        parentId: 'par1',
+        studentId: 's1',
+        amount: 100,
+        proofFileName: '1790000009999.jpg',
+      );
+      ops.pending = [newer];
+      bloc.add(const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true));
+      await _settle();
+      ops.reviewGate!.complete();
+      await _settle();
+      expect(bloc.state.submissionStatus, SubmissionStatus.success);
+      expect(bloc.state.items, [newer]);
+      await bloc.close();
+    });
+
+    test(
+      'an unresolved decision is kept and retried verbatim with its id',
+      () async {
+        final ops = _FakeOpsRepo()
+          ..pending = [item]
+          ..reviewFailure = const ServerFailure('deadline-exceeded');
+        final bloc = await loaded(ops);
+        bloc.add(partial(4000, notes: 'دفعة أولى'));
+        await _settle();
+        final kept = bloc.state.unresolvedFor(item)!;
+        expect(kept.amountMinorUnits, 4000);
+        expect(kept.notes, 'دفعة أولى');
+
+        ops.reviewFailure = null;
+        bloc.add(SubmitPaymentReviewEvent.retry(item, kept));
+        await _settle();
+        expect(ops.reviews[1].$1, ops.reviews[0].$1);
+        expect(ops.reviews[1].$2, ops.reviews[0].$2);
+        expect(bloc.state.unresolved, isEmpty);
+        await bloc.close();
+      },
+    );
+
+    test('a changed command never reuses the unresolved id', () async {
+      final ops = _FakeOpsRepo()
+        ..pending = [item]
+        ..reviewFailure = const NetworkFailure();
+      final bloc = await loaded(ops);
+      bloc.add(partial(4000));
+      await _settle();
+      bloc.add(partial(4000, notes: 'تعديل'));
+      await _settle();
+      bloc.add(
+        const SubmitPaymentReviewEvent(
+          item: item,
+          decision: PaymentReviewDecision.reject,
+        ),
+      );
+      await _settle();
+      final ids = ops.reviews.map((r) => r.$2).toSet();
+      expect(ids, hasLength(3));
+      expect(bloc.state.unresolvedFor(item)!.decision, 'reject');
+      await bloc.close();
+    });
+
+    test(
+      'a reload with a newer proof drops the stale unresolved decision',
+      () async {
+        final ops = _FakeOpsRepo()
+          ..pending = [item]
+          ..reviewFailure = const NetworkFailure();
+        final bloc = await loaded(ops);
+        bloc.add(partial(4000));
+        await _settle();
+        expect(bloc.state.unresolved, isNotEmpty);
+        ops.pending = [
+          const PaymentReviewItem(
+            paymentId: 'p1',
+            parentId: 'par1',
+            studentId: 's1',
+            amount: 100,
+            proofFileName: '1790000009999.jpg',
+          ),
+        ];
+        bloc.add(
+          const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true),
+        );
+        await _settle();
+        expect(bloc.state.unresolved, isEmpty);
+        await bloc.close();
+      },
+    );
+
+    group('proof cycle', () {
+      const cycleA = 'pc_AAAAAAAAAAAAAAAAAAAAAAAA';
+      const cycleB = 'pc_BBBBBBBBBBBBBBBBBBBBBBBB';
+      const onA = PaymentReviewItem(
+        paymentId: 'p1',
+        parentId: 'par1',
+        studentId: 's1',
+        amount: 100,
+        proofFileName: '1790000000000.jpg',
+        proofCycleId: cycleA,
+      );
+      // Same file name, newer server cycle.
+      const onB = PaymentReviewItem(
+        paymentId: 'p1',
+        parentId: 'par1',
+        studentId: 's1',
+        amount: 100,
+        proofFileName: '1790000000000.jpg',
+        proofCycleId: cycleB,
+      );
+
+      SubmitPaymentReviewEvent partialOn(PaymentReviewItem i) =>
+          SubmitPaymentReviewEvent(
+            item: i,
+            decision: PaymentReviewDecision.partial,
+            amountMode: PaymentAmountMode.receipt,
+            amountMinorUnits: 4000,
+          );
+
+      test('the command carries the reviewed cycle', () async {
+        final ops = _FakeOpsRepo()..pending = [onA];
+        final bloc = await loaded(ops);
+        bloc.add(partialOn(onA));
+        await _settle();
+        expect(ops.reviews.single.$1.expectedProofCycleId, cycleA);
+        await bloc.close();
+      });
+
+      test('a result for cycle A never removes cycle B', () async {
+        final ops = _FakeOpsRepo()
+          ..pending = [onA]
+          ..reviewGate = Completer<void>();
+        final bloc = await loaded(ops);
+        bloc.add(partialOn(onA));
+        await _settle();
+        ops.pending = [onB];
+        bloc.add(
+          const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true),
+        );
+        await _settle();
+        ops.reviewGate!.complete();
+        await _settle();
+        expect(bloc.state.items, [onB]);
+        await bloc.close();
+      });
+
+      test(
+        'an unresolved decision on A is dropped once B is pending',
+        () async {
+          final ops = _FakeOpsRepo()
+            ..pending = [onA]
+            ..reviewFailure = const NetworkFailure();
+          final bloc = await loaded(ops);
+          bloc.add(partialOn(onA));
+          await _settle();
+          expect(bloc.state.unresolvedFor(onA), isNotNull);
+          expect(bloc.state.unresolvedFor(onB), isNull);
+
+          ops.pending = [onB];
+          bloc.add(
+            const LoadPendingProofsEvent(reviewerUid: 'a1', isAdmin: true),
+          );
+          await _settle();
+          expect(bloc.state.unresolved, isEmpty);
+
+          ops.reviewFailure = null;
+          bloc.add(partialOn(onB));
+          await _settle();
+          expect(ops.reviews[1].$2, isNot(ops.reviews[0].$2));
+          expect(ops.reviews[1].$1.expectedProofCycleId, cycleB);
+          await bloc.close();
+        },
+      );
+
+      test('a stale-cycle reply settles, reloads and never resends', () async {
+        final ops = _FakeOpsRepo()
+          ..pending = [onA]
+          ..reviewFailure = const ServerFailure(
+            kPaymentProofCycleRequiredMessage,
+          );
+        final bloc = await loaded(ops);
+        bloc.add(partialOn(onA));
+        await _settle();
+        expect(bloc.state.unresolved, isEmpty);
+        expect(ops.calls.last, 'pending:a1:true');
+        expect(ops.reviews, hasLength(1));
+        await bloc.close();
+      });
     });
   });
 }

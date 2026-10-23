@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../entities/admin_operations_entities.dart';
 
@@ -57,10 +58,9 @@ abstract class AdminOperationsRepository {
     required bool isAdmin,
   });
 
-  Future<Either<Failure, Unit>> reviewPaymentProof({
-    required String paymentId,
-    required PaymentReviewDecision decision,
-    String? notes,
-    double? amountPaidConfirmed,
+  /// [requestId] is stable for a retried identical [command].
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof({
+    required PaymentReviewCommand command,
+    required String requestId,
   });
 }

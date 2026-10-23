@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/exception.dart';
@@ -125,6 +127,13 @@ class _FakeParentRepository implements ParentRepository {
     required String parentId,
     required String paymentId,
     required String localFilePath,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, Uint8List>> downloadPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String storagePath,
   }) => throw UnimplementedError();
 
   @override

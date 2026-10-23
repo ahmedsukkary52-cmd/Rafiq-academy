@@ -1,15 +1,22 @@
+import '../../../shared/domain/payment_review_amounts.dart';
 import '../../../shared/domain/storage_paths_contract.dart';
+import '../../../shared/domain/upload_file_policy.dart';
 import 'entities/parent_entities.dart';
 
 /// Parent payment-proof + Supervisor review contract (external pay + screenshot).
 ///
 /// Same collection: `payments/{paymentId}` — **no new collection**.
 ///
-/// Parent after screenshot upload:
-/// - `proofStoragePath`, `proofDownloadUrl`, `proofSubmittedAt`,
-///   `proofSubmittedBy`, `proofFileName`
+/// Parent uploads the screenshot (Storage, create-only), then calls the
+/// [submitCallable]; the server verifies the object and writes:
+/// - `proofStoragePath`, `proofSubmittedAt`, `proofSubmittedBy`,
+///   `proofFileName`, and a fresh server-issued `proofCycleId`
+/// - `proofDownloadUrl` is legacy: cleared on resubmit, never read
 /// - `method` → [externalMethod]
 /// - `reviewStatus` → [pendingReview] (does **not** mean paid)
+///
+/// Clients never write `payments/{id}` (firestore.rules). A review is bound
+/// to the `proofCycleId` the reviewer saw.
 ///
 /// Supervisor review (scoped to assigned-halaqa students):
 /// - `reviewStatus` → approved | rejected | partial
@@ -26,6 +33,15 @@ class ParentPaymentProofContract {
   static const String proofSubmittedAtField = 'proofSubmittedAt';
   static const String proofSubmittedByField = 'proofSubmittedBy';
   static const String proofFileNameField = 'proofFileName';
+  static const String proofCycleIdField = 'proofCycleId';
+
+  /// Server-authoritative submission callable (europe-west1).
+  static const String submitCallable = 'submitPaymentProof';
+
+  static final RegExp _cycleId = RegExp(r'^pc_[A-Za-z0-9_-]{16,64}$');
+
+  /// Shape of a server-issued proof cycle; anything else is treated as none.
+  static bool isProofCycleId(String? raw) => _cycleId.hasMatch(raw ?? '');
 
   static const String reviewStatusField = 'reviewStatus';
   static const String reviewedByField = 'reviewedBy';
@@ -56,12 +72,76 @@ class ParentPaymentProofContract {
   }
 
   /// Max proof size (matches Parent UI copy: ١٠ ميجا).
-  static const int maxBytes = 10 * 1024 * 1024;
+  static const int maxBytes = UploadFilePolicy.imageMaxBytes;
+
+  /// JPEG / PNG / WebP screenshots (the Parent picker's formats).
+  static const List<UploadFormat> formats = UploadFilePolicy.imageFormats;
+
+  static final RegExp _fileName = RegExp(
+    r'^[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|webp)$',
+  );
+
+  /// `{timestamp}.{ext}` — same shape firestore.rules and storage.rules accept.
+  static String proofFileName(UploadFormat format, {DateTime? now}) =>
+      '${(now ?? DateTime.now()).millisecondsSinceEpoch}.${format.extension}';
+
+  /// True only for `payment_proofs/{parentId}/{paymentId}/{name}.{img}` of
+  /// this exact parent and payment. Anything else is never loaded.
+  static bool isTrustedStoragePath(
+    String? path, {
+    required String parentId,
+    required String paymentId,
+  }) {
+    final p = path?.trim() ?? '';
+    final parent = parentId.trim();
+    final payment = paymentId.trim();
+    if (p.isEmpty || parent.isEmpty || payment.isEmpty) return false;
+    final parts = p.split('/');
+    return parts.length == 4 &&
+        parts[0] == StoragePathsContract.paymentProofsPrefix &&
+        parts[1] == parent &&
+        parts[2] == payment &&
+        _fileName.hasMatch(parts[3]);
+  }
 
   /// Legacy empty constant — Vodafone destination is loaded from
   /// `academySettings/paymentPublic` (C3). Do not hard-code a number here.
   @Deprecated('Use academySettings/paymentPublic via Parent datasource')
   static const String transferDestination = '';
+}
+
+/// Uploaded proofs whose [ParentPaymentProofContract.submitCallable] outcome
+/// is unknown (lost response / network). Retrying the same local file reuses
+/// the uploaded name, so the server replays the cycle it already opened
+/// instead of a second upload opening another one. Stored objects cannot be
+/// overwritten, so the name is never re-uploaded.
+class UnconfirmedProofUploads {
+  final Map<String, ({String localFilePath, String fileName})> _byPayment = {};
+
+  /// Callable errors that settle the attempt: the server answered, so the
+  /// same upload is never retried.
+  static const Set<String> definitiveCodes = {
+    'invalid-argument',
+    'failed-precondition',
+    'permission-denied',
+    'not-found',
+    'unauthenticated',
+    'already-exists',
+    'out-of-range',
+  };
+
+  String? reusableFileName(String paymentId, String localFilePath) {
+    final entry = _byPayment[paymentId];
+    return entry != null && entry.localFilePath == localFilePath
+        ? entry.fileName
+        : null;
+  }
+
+  void remember(String paymentId, String localFilePath, String fileName) {
+    _byPayment[paymentId] = (localFilePath: localFilePath, fileName: fileName);
+  }
+
+  void settle(String paymentId) => _byPayment.remove(paymentId);
 }
 
 extension PaymentProofStatusX on PaymentEntity {
@@ -84,5 +164,29 @@ extension PaymentProofStatusX on PaymentEntity {
     return review == ParentPaymentProofContract.approved ||
         review == ParentPaymentProofContract.rejected ||
         review == ParentPaymentProofContract.partial;
+  }
+
+  PaymentAmountSnapshot get _amountSnapshot =>
+      PaymentAmountSnapshot.fromAmounts(
+        invoiceAmount: amount,
+        amountPaidConfirmed: amountPaidConfirmed,
+      );
+
+  /// Cumulative total confirmed by partial reviews on an unpaid invoice. It
+  /// survives a later proof upload or rejection (the server never resets it).
+  bool get hasPartialConfirmation {
+    if (status == PaymentStatus.paid) return false;
+    final snapshot = _amountSnapshot;
+    return snapshot.isValid && snapshot.previous > 0;
+  }
+
+  double get confirmedPartialAmount =>
+      hasPartialConfirmation ? minorUnitsToMoney(_amountSnapshot.previous) : 0;
+
+  /// What the Parent still owes: invoice − confirmed total (0 once paid).
+  double get outstandingAmount {
+    if (status == PaymentStatus.paid) return 0;
+    final snapshot = _amountSnapshot;
+    return snapshot.isValid ? minorUnitsToMoney(snapshot.remaining) : amount;
   }
 }

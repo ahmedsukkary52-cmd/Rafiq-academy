@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../entities/payment_review_params.dart';
 import '../repositories/parent_repository.dart';
@@ -40,13 +41,20 @@ class GetSupervisedPaymentsUseCase
 }
 
 @lazySingleton
-class ReviewPaymentProofUseCase extends UseCase<Unit, PaymentReviewParams> {
+class ReviewPaymentProofUseCase
+    extends UseCase<PaymentReviewResult, PaymentReviewParams> {
   final SupervisorRepository repository;
 
   ReviewPaymentProofUseCase(this.repository);
 
   @override
-  Future<Either<Failure, Unit>> call(PaymentReviewParams params) {
+  Future<Either<Failure, PaymentReviewResult>> call(
+    PaymentReviewParams params,
+  ) {
+    final error = !kPaymentReviewRequestIdPattern.hasMatch(params.requestId)
+        ? 'بيانات المراجعة غير صالحة'
+        : validatePaymentReviewCommand(params.command, params.snapshot);
+    if (error != null) return Future.value(Left(ValidationFailure(error)));
     return repository.reviewPaymentProof(params);
   }
 }

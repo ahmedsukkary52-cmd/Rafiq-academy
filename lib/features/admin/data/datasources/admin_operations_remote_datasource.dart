@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/domain/parent_payment_proof.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
@@ -49,11 +50,9 @@ abstract class AdminOperationsRemoteDatasource {
     required bool isAdmin,
   });
 
-  Future<void> reviewPaymentProof({
-    required String paymentId,
-    required PaymentReviewDecision decision,
-    String? notes,
-    double? amountPaidConfirmed,
+  Future<PaymentReviewResult> reviewPaymentProof({
+    required PaymentReviewCommand command,
+    required String requestId,
   });
 }
 
@@ -65,8 +64,9 @@ PaymentReviewItem paymentReviewItemFromMap(
   DateTime? asDate(Object? raw) =>
       raw is Timestamp ? raw.toDate() : (raw is DateTime ? raw : null);
   String text(Object? raw) => raw is String ? raw.trim() : '';
-  final url = text(data[ParentPaymentProofContract.proofDownloadUrlField]);
+  final path = text(data[ParentPaymentProofContract.proofStoragePathField]);
   final fileName = text(data[ParentPaymentProofContract.proofFileNameField]);
+  final cycle = text(data[ParentPaymentProofContract.proofCycleIdField]);
   return PaymentReviewItem(
     paymentId: id,
     parentId: text(data['parentId']),
@@ -77,10 +77,16 @@ PaymentReviewItem paymentReviewItemFromMap(
     dueDate: asDate(data['dueDate']),
     status: text(data['status']),
     reviewStatus: text(data[ParentPaymentProofContract.reviewStatusField]),
-    proofDownloadUrl: url.isEmpty ? null : url,
+    proofStoragePath: path.isEmpty ? null : path,
     proofFileName: fileName.isEmpty ? null : fileName,
     proofSubmittedAt: asDate(
       data[ParentPaymentProofContract.proofSubmittedAtField],
     ),
+    proofCycleId: ParentPaymentProofContract.isProofCycleId(cycle)
+        ? cycle
+        : null,
+    amountPaidConfirmed:
+        (data[ParentPaymentProofContract.amountPaidConfirmedField] as num?)
+            ?.toDouble(),
   );
 }

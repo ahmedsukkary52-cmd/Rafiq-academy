@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/read_models/supervisor_day_board.dart';
@@ -46,6 +47,15 @@ class SupervisorState extends Equatable {
   final SubmissionStatus reviewPaymentStatus;
   final String? reviewPaymentError;
 
+  /// Payment the current [reviewPaymentStatus] belongs to; a screen showing
+  /// another payment must ignore it.
+  final String? reviewPaymentId;
+  final String? reviewPaymentMessage;
+
+  /// Decisions whose outcome is still unknown, by payment: a retry re-sends
+  /// exactly this command with its `requestId`.
+  final Map<String, PaymentReviewCommand> reviewPaymentUnresolved;
+
   const SupervisorState({
     this.halaqatStatus = SectionStatus.initial,
     this.halaqat = const [],
@@ -71,6 +81,9 @@ class SupervisorState extends Equatable {
     this.paymentsError,
     this.reviewPaymentStatus = SubmissionStatus.idle,
     this.reviewPaymentError,
+    this.reviewPaymentId,
+    this.reviewPaymentMessage,
+    this.reviewPaymentUnresolved = const {},
   });
 
   factory SupervisorState.initial() => const SupervisorState();
@@ -100,6 +113,9 @@ class SupervisorState extends Equatable {
     Object? paymentsError = _unset,
     SubmissionStatus? reviewPaymentStatus,
     Object? reviewPaymentError = _unset,
+    Object? reviewPaymentId = _unset,
+    Object? reviewPaymentMessage = _unset,
+    Map<String, PaymentReviewCommand>? reviewPaymentUnresolved,
   }) {
     return SupervisorState(
       halaqatStatus: halaqatStatus ?? this.halaqatStatus,
@@ -150,8 +166,22 @@ class SupervisorState extends Equatable {
       reviewPaymentError: identical(reviewPaymentError, _unset)
           ? this.reviewPaymentError
           : reviewPaymentError as String?,
+      reviewPaymentId: identical(reviewPaymentId, _unset)
+          ? this.reviewPaymentId
+          : reviewPaymentId as String?,
+      reviewPaymentMessage: identical(reviewPaymentMessage, _unset)
+          ? this.reviewPaymentMessage
+          : reviewPaymentMessage as String?,
+      reviewPaymentUnresolved:
+          reviewPaymentUnresolved ?? this.reviewPaymentUnresolved,
     );
   }
+
+  /// The review status as seen by a screen showing [paymentId].
+  SubmissionStatus reviewStatusFor(String paymentId) =>
+      reviewPaymentId == paymentId
+      ? reviewPaymentStatus
+      : SubmissionStatus.idle;
 
   @override
   List<Object?> get props => [
@@ -179,5 +209,8 @@ class SupervisorState extends Equatable {
     paymentsError,
     reviewPaymentStatus,
     reviewPaymentError,
+    reviewPaymentId,
+    reviewPaymentMessage,
+    reviewPaymentUnresolved,
   ];
 }

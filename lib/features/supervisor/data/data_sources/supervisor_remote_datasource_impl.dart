@@ -7,7 +7,8 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
-import '../../../../shared/data/achievements_firestore_contract.dart';
+import '../../../../shared/data/payment_review_callable.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../awards/data/award_grant_errors.dart';
 import '../../../awards/domain/award_submission_id.dart';
@@ -271,28 +272,21 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
     }
   }
 
-  /// The reviewPaymentProof callable derives status, paidAt and
-  /// remainingAmount and enforces supervised-halaqa scope server-side.
+  /// The reviewPaymentProof callable derives status, paidAt and the
+  /// cumulative amounts and enforces supervised-halaqa scope server-side.
   @override
-  Future<void> reviewPaymentProof(PaymentReviewParams params) async {
-    final paymentId = params.paymentId.trim();
-    if (paymentId.isEmpty) {
+  Future<PaymentReviewResult> reviewPaymentProof(
+    PaymentReviewParams params,
+  ) async {
+    if (params.paymentId.isEmpty) {
       throw const ServerException('بيانات المراجعة غير صالحة');
     }
-    final notes = params.notes?.trim();
     try {
       final callable = functions.httpsCallable('reviewPaymentProof');
-      await callable.call(<String, dynamic>{
-        'paymentId': paymentId,
-        'decision': switch (params.decision) {
-          PaymentReviewDecision.approved => 'approve',
-          PaymentReviewDecision.rejected => 'reject',
-          PaymentReviewDecision.partial => 'partial',
-        },
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
-        if (params.amountPaidConfirmed != null)
-          'amountPaidConfirmed': params.amountPaidConfirmed,
-      });
+      final response = await callable.call(
+        reviewPaymentProofPayload(params.command, requestId: params.requestId),
+      );
+      return reviewPaymentProofResult(response.data, params.command);
     } on FirebaseFunctionsException catch (e) {
       throw ServerException(e.message ?? e.code);
     } catch (e) {

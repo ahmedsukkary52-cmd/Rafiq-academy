@@ -22,11 +22,15 @@ class PaymentEntity extends Equatable {
   final String? method;
 
   /// Screenshot proof on Storage (Parent upload). Not confirmation of payment.
+  /// Read through Storage Rules; a legacy `proofDownloadUrl` is never used.
   final String? proofStoragePath;
-  final String? proofDownloadUrl;
   final DateTime? proofSubmittedAt;
   final String? proofSubmittedBy;
   final String? proofFileName;
+
+  /// Server-issued identity of the current proof submission (null on
+  /// payments submitted before proof submission moved server-side).
+  final String? proofCycleId;
 
   /// Supervisor / Admin review fields (see [ParentPaymentProofContract]).
   final String? reviewStatus;
@@ -53,10 +57,10 @@ class PaymentEntity extends Equatable {
     required this.status,
     this.method,
     this.proofStoragePath,
-    this.proofDownloadUrl,
     this.proofSubmittedAt,
     this.proofSubmittedBy,
     this.proofFileName,
+    this.proofCycleId,
     this.reviewStatus,
     this.reviewedBy,
     this.reviewedAt,
@@ -81,10 +85,10 @@ class PaymentEntity extends Equatable {
     status,
     method,
     proofStoragePath,
-    proofDownloadUrl,
     proofSubmittedAt,
     proofSubmittedBy,
     proofFileName,
+    proofCycleId,
     reviewStatus,
     reviewedBy,
     reviewedAt,

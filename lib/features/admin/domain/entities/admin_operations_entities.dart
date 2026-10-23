@@ -2,6 +2,9 @@ import 'dart:math';
 
 import 'package:equatable/equatable.dart';
 
+import '../../../../shared/domain/payment_review_amounts.dart';
+import '../../../parent/domain/parent_payment_proof.dart';
+
 /// Idempotency key for adminCreateHalaqa (`^[A-Za-z0-9_-]{8,64}$`): one key
 /// per create form, so a retried submit converges on the same Halaqa.
 String newHalaqaRequestId([Random? random]) {
@@ -17,20 +20,18 @@ class AdminDirectoryUser extends Equatable {
   final String name;
   final String role;
   final bool isActive;
-  final String email;
 
   const AdminDirectoryUser({
     required this.uid,
     required this.name,
     required this.role,
     this.isActive = true,
-    this.email = '',
   });
 
   String get displayName => name.trim().isEmpty ? uid : name.trim();
 
   @override
-  List<Object?> get props => [uid, name, role, isActive, email];
+  List<Object?> get props => [uid, name, role, isActive];
 }
 
 /// Weekly slot intent for adminCreateHalaqa / adminAddHalaqaSlot.
@@ -122,9 +123,15 @@ class PaymentReviewItem extends Equatable {
   final DateTime? dueDate;
   final String status;
   final String reviewStatus;
-  final String? proofDownloadUrl;
+  final String? proofStoragePath;
   final String? proofFileName;
   final DateTime? proofSubmittedAt;
+
+  /// Server-issued proof cycle (null on legacy payments); reviews bind to it.
+  final String? proofCycleId;
+
+  /// Cumulative total confirmed by earlier partial reviews (null = none).
+  final double? amountPaidConfirmed;
 
   const PaymentReviewItem({
     required this.paymentId,
@@ -137,12 +144,27 @@ class PaymentReviewItem extends Equatable {
     this.dueDate,
     this.status = '',
     this.reviewStatus = '',
-    this.proofDownloadUrl,
+    this.proofStoragePath,
     this.proofFileName,
     this.proofSubmittedAt,
+    this.proofCycleId,
+    this.amountPaidConfirmed,
   });
 
-  bool get hasProofImage => (proofDownloadUrl?.trim() ?? '').isNotEmpty;
+  PaymentAmountSnapshot get amountSnapshot => PaymentAmountSnapshot.fromAmounts(
+    invoiceAmount: amount,
+    amountPaidConfirmed: amountPaidConfirmed,
+  );
+
+  /// Proof metadata present at all (valid or not).
+  bool get hasProofMetadata => (proofStoragePath?.trim() ?? '').isNotEmpty;
+
+  /// Only this payment's own proof object is ever loaded.
+  bool get hasProofImage => ParentPaymentProofContract.isTrustedStoragePath(
+    proofStoragePath,
+    parentId: parentId,
+    paymentId: paymentId,
+  );
 
   PaymentReviewItem withStudentName(String name) => PaymentReviewItem(
     paymentId: paymentId,
@@ -155,9 +177,11 @@ class PaymentReviewItem extends Equatable {
     dueDate: dueDate,
     status: status,
     reviewStatus: reviewStatus,
-    proofDownloadUrl: proofDownloadUrl,
+    proofStoragePath: proofStoragePath,
     proofFileName: proofFileName,
     proofSubmittedAt: proofSubmittedAt,
+    proofCycleId: proofCycleId,
+    amountPaidConfirmed: amountPaidConfirmed,
   );
 
   @override
@@ -172,25 +196,12 @@ class PaymentReviewItem extends Equatable {
     dueDate,
     status,
     reviewStatus,
-    proofDownloadUrl,
+    proofStoragePath,
     proofFileName,
     proofSubmittedAt,
+    proofCycleId,
+    amountPaidConfirmed,
   ];
-}
-
-/// Client-side pre-check mirroring the server rule for a partial amount
-/// (0 < confirmed < invoice amount). The callable remains authoritative.
-String? validatePartialAmount({
-  required double invoiceAmount,
-  required double? confirmed,
-}) {
-  if (confirmed == null || !confirmed.isFinite) {
-    return 'أدخل المبلغ المؤكد';
-  }
-  if (confirmed <= 0 || confirmed >= invoiceAmount) {
-    return 'المبلغ يجب أن يكون أكبر من صفر وأقل من قيمة الفاتورة';
-  }
-  return null;
 }
 
 /// HH:mm validator shared by the slot form (server re-validates).

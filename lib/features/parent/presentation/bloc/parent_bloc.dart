@@ -1,3 +1,4 @@
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
@@ -52,11 +53,15 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<SelectChildEvent>(_onSelectChild);
     on<LoadWeeklyReportEvent>(_onLoadWeeklyReport);
     on<LoadPaymentsEvent>(_onLoadPayments);
+    on<LoadPaymentDestinationsEvent>(_onLoadPaymentDestinations);
     on<LoadAbsenceRequestsEvent>(_onLoadAbsenceRequests);
     on<LoadStudentHalaqatEvent>(_onLoadStudentHalaqat);
     on<SubmitAbsenceRequestEvent>(_onSubmitAbsenceRequest);
     on<ResetAbsenceSubmissionEvent>(_onResetAbsenceSubmission);
-    on<SubmitPaymentProofEvent>(_onSubmitPaymentProof);
+    on<SubmitPaymentProofEvent>(
+      _onSubmitPaymentProof,
+      transformer: droppable(),
+    );
     on<ResetPaymentProofEvent>(_onResetPaymentProof);
     on<ClearParentSessionEvent>(_onClearSession);
   }
@@ -251,10 +256,12 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     final publicResult = await getPaymentPublicSettings(const NoParams());
     final accessResult = await getPaymentAccess(ParentIdParams(event.parentId));
 
-    final destination = publicResult.fold(
-      (_) => '',
-      (s) => s.vodafoneCashDestination,
-    );
+    final settings = publicResult.fold((_) => null, (s) => s);
+    final destinationsStatus = settings == null
+        ? SectionStatus.error
+        : SectionStatus.loaded;
+    final vodafoneCash = settings?.vodafoneCashDestination ?? '';
+    final instapay = settings?.instapayDestination ?? '';
     final access = accessResult.fold((_) => null, (a) => a);
 
     result.fold(
@@ -262,7 +269,9 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
         state.copyWith(
           paymentsStatus: SectionStatus.error,
           paymentsError: failure.message,
-          vodafoneCashDestination: destination,
+          vodafoneCashDestination: vodafoneCash,
+          instapayDestination: instapay,
+          paymentDestinationsStatus: destinationsStatus,
           paymentAccess: access,
         ),
       ),
@@ -284,11 +293,37 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
               children: hydrated,
               payments: payments,
             ),
-            vodafoneCashDestination: destination,
+            vodafoneCashDestination: vodafoneCash,
+            instapayDestination: instapay,
+            paymentDestinationsStatus: destinationsStatus,
             paymentAccess: access,
           ),
         );
       },
+    );
+  }
+
+  Future<void> _onLoadPaymentDestinations(
+    LoadPaymentDestinationsEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    emit(state.copyWith(paymentDestinationsStatus: SectionStatus.loading));
+    final result = await getPaymentPublicSettings(const NoParams());
+    result.fold(
+      (_) => emit(
+        state.copyWith(
+          vodafoneCashDestination: '',
+          instapayDestination: '',
+          paymentDestinationsStatus: SectionStatus.error,
+        ),
+      ),
+      (s) => emit(
+        state.copyWith(
+          vodafoneCashDestination: s.vodafoneCashDestination,
+          instapayDestination: s.instapayDestination,
+          paymentDestinationsStatus: SectionStatus.loaded,
+        ),
+      ),
     );
   }
 

@@ -77,8 +77,11 @@ abstract class AdminRemoteDatasource {
 
   /// C3 / WA-4 — Admin RW academySettings/paymentPublic.
   Future<PaymentPublicSettingsEntity> getPaymentPublicSettings();
+
+  /// Writes only the provided fields; an omitted method is left untouched.
   Future<void> updatePaymentPublicSettings({
-    required String vodafoneCashDestination,
+    String? vodafoneCashDestination,
+    String? instapayDestination,
   });
 
   /// C3 / WA-4 — Admin-only pricingDefaults.

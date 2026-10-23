@@ -4,6 +4,8 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/data/payment_review_callable.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/domain/parent_payment_proof.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
@@ -60,7 +62,6 @@ class AdminOperationsRemoteDatasourceImpl
           name: (d['name'] as String?)?.trim() ?? '',
           role: (d['role'] as String?) ?? role,
           isActive: d['isActive'] != false,
-          email: (d['email'] as String?)?.trim() ?? '',
         );
       }).toList()..sort((a, b) => a.displayName.compareTo(b.displayName));
       return users;
@@ -241,18 +242,14 @@ class AdminOperationsRemoteDatasourceImpl
   }
 
   @override
-  Future<void> reviewPaymentProof({
-    required String paymentId,
-    required PaymentReviewDecision decision,
-    String? notes,
-    double? amountPaidConfirmed,
+  Future<PaymentReviewResult> reviewPaymentProof({
+    required PaymentReviewCommand command,
+    required String requestId,
   }) async {
-    await _call('reviewPaymentProof', {
-      'paymentId': paymentId,
-      'decision': decision.wire,
-      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-      if (amountPaidConfirmed != null)
-        'amountPaidConfirmed': amountPaidConfirmed,
-    });
+    final data = await _call(
+      'reviewPaymentProof',
+      reviewPaymentProofPayload(command, requestId: requestId),
+    );
+    return reviewPaymentProofResult(data, command);
   }
 }

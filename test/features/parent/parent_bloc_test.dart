@@ -24,6 +24,8 @@ import 'package:rafiq_academy/features/parent/presentation/bloc/parent_state.dar
 import 'package:rafiq_academy/shared/domain/academy_billing_entities.dart';
 import 'package:rafiq_academy/shared/domain/payment_access_entity.dart';
 
+import '../../helpers/payment_destination_placeholders.dart';
+
 typedef _E<T> = Either<Failure, T>;
 
 class _Script<P, R> {
@@ -97,7 +99,10 @@ class _Payments extends Fake implements GetPaymentsUseCase {
 class _PublicSettings extends Fake implements GetPaymentPublicSettingsUseCase {
   final s = _Script<NoParams, _E<PaymentPublicSettingsEntity>>(
     (_) => const Right(
-      PaymentPublicSettingsEntity(vodafoneCashDestination: '01000000000'),
+      PaymentPublicSettingsEntity(
+        vodafoneCashDestination: kDevPlaceholderVodafoneCash,
+        instapayDestination: kDevPlaceholderInstapayAddress,
+      ),
     ),
   );
   @override
@@ -176,7 +181,8 @@ class _Harness {
   );
 }
 
-Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 10));
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 10));
 
 void main() {
   late _Harness h;
@@ -275,11 +281,27 @@ void main() {
       await _settle();
 
       expect(h.bloc.state.paymentsStatus, SectionStatus.loaded);
-      expect(h.bloc.state.vodafoneCashDestination, '01000000000');
+      expect(h.bloc.state.vodafoneCashDestination, kDevPlaceholderVodafoneCash);
+      expect(h.bloc.state.instapayDestination, kDevPlaceholderInstapayAddress);
+      expect(h.bloc.state.paymentDestinationsStatus, SectionStatus.loaded);
       expect(h.bloc.state.paymentAccess!.status, 'ok');
     });
 
-    test('missing settings degrade to an empty destination', () async {
+    test('destinations are independent: one set, the other unset', () async {
+      h.publicSettings.s.respond = (_) => const Right(
+        PaymentPublicSettingsEntity(
+          instapayDestination: kDevPlaceholderInstapayLink,
+        ),
+      );
+      h.bloc.add(const LoadPaymentsEvent('p1'));
+      await _settle();
+
+      expect(h.bloc.state.vodafoneCashDestination, '');
+      expect(h.bloc.state.instapayDestination, kDevPlaceholderInstapayLink);
+      expect(h.bloc.state.paymentDestinationsStatus, SectionStatus.loaded);
+    });
+
+    test('settings read failure is reported, not shown as unset', () async {
       h.publicSettings.s.respond = (_) => const Left(ServerFailure('x'));
       h.access.s.respond = (_) => const Left(ServerFailure('x'));
       h.bloc.add(const LoadPaymentsEvent('p1'));
@@ -287,7 +309,30 @@ void main() {
 
       expect(h.bloc.state.paymentsStatus, SectionStatus.loaded);
       expect(h.bloc.state.vodafoneCashDestination, '');
+      expect(h.bloc.state.instapayDestination, '');
+      expect(h.bloc.state.paymentDestinationsStatus, SectionStatus.error);
       expect(h.bloc.state.paymentAccess, isNull);
+    });
+
+    test('retry reloads only the destinations', () async {
+      h.publicSettings.s.respond = (_) => const Left(ServerFailure('x'));
+      h.bloc.add(const LoadPaymentsEvent('p1'));
+      await _settle();
+      expect(h.bloc.state.paymentDestinationsStatus, SectionStatus.error);
+      final paymentCalls = h.payments.s.params.length;
+
+      h.publicSettings.s.respond = (_) => const Right(
+        PaymentPublicSettingsEntity(
+          vodafoneCashDestination: kDevPlaceholderVodafoneCash,
+        ),
+      );
+      h.bloc.add(const LoadPaymentDestinationsEvent());
+      await _settle();
+
+      expect(h.bloc.state.paymentDestinationsStatus, SectionStatus.loaded);
+      expect(h.bloc.state.vodafoneCashDestination, kDevPlaceholderVodafoneCash);
+      expect(h.bloc.state.instapayDestination, '');
+      expect(h.payments.s.params.length, paymentCalls);
     });
 
     test('proof upload success reloads payments', () async {
@@ -303,6 +348,26 @@ void main() {
       expect(h.submitProof.s.params.single.paymentId, 'inv_c1_2026-09');
       expect(h.bloc.state.paymentProofStatus, SubmissionStatus.success);
       expect(h.payments.s.params, hasLength(1));
+    });
+
+    test('a repeated submit while one is in flight is dropped', () async {
+      final gate = Completer<void>();
+      h.submitProof.s.gates[0] = gate;
+      const event = SubmitPaymentProofEvent(
+        parentId: 'p1',
+        paymentId: 'inv_c1_2026-09',
+        localFilePath: '/tmp/proof.jpg',
+      );
+      h.bloc
+        ..add(event)
+        ..add(event);
+      await _settle();
+      expect(h.submitProof.s.params, hasLength(1));
+
+      gate.complete();
+      await _settle();
+      expect(h.submitProof.s.params, hasLength(1));
+      expect(h.bloc.state.paymentProofStatus, SubmissionStatus.success);
     });
 
     test('proof upload failure keeps the payment id for retry', () async {
@@ -354,9 +419,13 @@ void main() {
           ? const Right([ParentHalaqaOption(id: 'h1', name: 'أ')])
           : const Right([]);
 
-      h.bloc.add(const LoadStudentHalaqatEvent(parentId: 'p1', studentId: 'c1'));
+      h.bloc.add(
+        const LoadStudentHalaqatEvent(parentId: 'p1', studentId: 'c1'),
+      );
       await _settle();
-      h.bloc.add(const LoadStudentHalaqatEvent(parentId: 'p1', studentId: 'c2'));
+      h.bloc.add(
+        const LoadStudentHalaqatEvent(parentId: 'p1', studentId: 'c2'),
+      );
       await _settle();
       h.studentHalaqat.s.gates[0]!.complete();
       await _settle();

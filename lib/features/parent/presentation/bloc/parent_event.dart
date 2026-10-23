@@ -52,6 +52,11 @@ class LoadPaymentsEvent extends ParentEvent {
   List<Object?> get props => [parentId];
 }
 
+/// إعادة تحميل وسائل الدفع المعتمدة فقط (academySettings/paymentPublic)
+class LoadPaymentDestinationsEvent extends ParentEvent {
+  const LoadPaymentDestinationsEvent();
+}
+
 /// تحميل طلبات الاستئذان الخاصة بولي الأمر (W7 Slice 1)
 class LoadAbsenceRequestsEvent extends ParentEvent {
   final String parentId;

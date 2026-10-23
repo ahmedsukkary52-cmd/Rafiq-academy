@@ -7,9 +7,12 @@ import 'package:rafiq_academy/features/homework/data/datasources/homework_remote
 import 'package:rafiq_academy/features/student/data/models/recitation_record_model.dart';
 import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource_impl.dart';
+import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart'
+    as supervisor;
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
+import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 
 import '../support/fake_callables.dart';
 
@@ -21,8 +24,9 @@ void main() {
 
   setUp(() => functions = FakeFunctions());
 
-  Matcher serverError(String message) =>
-      throwsA(isA<ServerException>().having((e) => e.message, 'message', message));
+  Matcher serverError(String message) => throwsA(
+    isA<ServerException>().having((e) => e.message, 'message', message),
+  );
 
   group('teacher attendance (recordSessionAttendance)', () {
     late TeacherRemoteDatasourceImpl ds;
@@ -179,7 +183,10 @@ void main() {
     test('server rejection is surfaced', () async {
       functions.handlers['completeHomework'] = (_) =>
           throw FakeFunctionsError('failed-precondition', 'لم تكتمل المهام');
-      await expectLater(ds.completeHomework('hw1'), serverError('لم تكتمل المهام'));
+      await expectLater(
+        ds.completeHomework('hw1'),
+        serverError('لم تكتمل المهام'),
+      );
     });
   });
 
@@ -202,6 +209,93 @@ void main() {
       await expectLater(
         ds.registerNewStudent(halaqaId: 'h2', studentId: 's9'),
         serverError('خارج نطاق إشرافك'),
+      );
+    });
+  });
+
+  group('supervisor payment review (reviewPaymentProof)', () {
+    late SupervisorRemoteDatasourceImpl ds;
+
+    setUp(() {
+      ds = SupervisorRemoteDatasourceImpl(
+        firestore: UnusedFirestore(),
+        functions: functions,
+      );
+      functions.handlers['reviewPaymentProof'] = (_) => null;
+    });
+
+    supervisor.PaymentReviewParams params(PaymentReviewCommand command) =>
+        supervisor.PaymentReviewParams(
+          supervisorId: 'sup1',
+          command: command,
+          requestId: 'req_0123456789abcdef',
+          snapshot: const PaymentAmountSnapshot(invoice: 20000, previous: 6000),
+        );
+
+    test('partial receipt uses the current contract only', () async {
+      await ds.reviewPaymentProof(
+        params(
+          PaymentReviewCommand(
+            paymentId: ' inv1 ',
+            decision: supervisor.PaymentReviewDecision.partial.wire,
+            notes: ' جزء ',
+            amountMode: PaymentAmountMode.receipt,
+            amountMinorUnits: 5000,
+            expectedProofFileName: '1790000000000.jpg',
+          ),
+        ),
+      );
+      expect(functions.payloadOf('reviewPaymentProof'), {
+        'paymentId': 'inv1',
+        'decision': 'partial',
+        'notes': 'جزء',
+        'requestId': 'req_0123456789abcdef',
+        'expectedProofFileName': '1790000000000.jpg',
+        'amountMode': 'receipt',
+        'amountValue': 50.0,
+      });
+    });
+
+    test('approval sends no amount and no remainingAmount', () async {
+      await ds.reviewPaymentProof(
+        params(
+          PaymentReviewCommand(
+            paymentId: 'inv1',
+            decision: supervisor.PaymentReviewDecision.approved.wire,
+            expectedProofFileName: '1790000000000.jpg',
+          ),
+        ),
+      );
+      final payload = functions.payloadOf('reviewPaymentProof') as Map;
+      expect(
+        payload.keys,
+        unorderedEquals([
+          'paymentId',
+          'decision',
+          'requestId',
+          'expectedProofFileName',
+        ]),
+      );
+      expect(payload['decision'], 'approve');
+    });
+
+    test('a changed proof surfaces the server message verbatim', () async {
+      functions.handlers['reviewPaymentProof'] = (_) =>
+          throw FakeFunctionsError(
+            'failed-precondition',
+            kPaymentProofChangedMessage,
+          );
+      await expectLater(
+        ds.reviewPaymentProof(
+          params(
+            PaymentReviewCommand(
+              paymentId: 'inv1',
+              decision: supervisor.PaymentReviewDecision.rejected.wire,
+              expectedProofFileName: '1790000000000.jpg',
+            ),
+          ),
+        ),
+        serverError(kPaymentProofChangedMessage),
       );
     });
   });
@@ -250,10 +344,14 @@ void main() {
     });
 
     test('invoice generation forwards only provided fields', () async {
-      functions.handlers['adminGenerateInvoice'] =
-          (_) => {'paymentId': 'inv_s1_2026-10'};
+      functions.handlers['adminGenerateInvoice'] = (_) => {
+        'paymentId': 'inv_s1_2026-10',
+      };
 
-      final id = await ds.generateInvoice(studentId: ' s1 ', periodKey: '2026-10');
+      final id = await ds.generateInvoice(
+        studentId: ' s1 ',
+        periodKey: '2026-10',
+      );
 
       expect(id, 'inv_s1_2026-10');
       expect(functions.payloadOf('adminGenerateInvoice'), {
@@ -266,7 +364,9 @@ void main() {
       functions.handlers['adminReinstatePaymentAccess'] = (_) => null;
 
       await ds.reinstatePaymentAccess(parentId: 'p1', reason: '  ');
-      expect(functions.payloadOf('adminReinstatePaymentAccess'), {'parentId': 'p1'});
+      expect(functions.payloadOf('adminReinstatePaymentAccess'), {
+        'parentId': 'p1',
+      });
 
       await ds.reinstatePaymentAccess(parentId: 'p1', reason: ' تم السداد ');
       expect(functions.payloadOf('adminReinstatePaymentAccess'), {
@@ -320,19 +420,67 @@ void main() {
       );
     });
 
-    test('review decision omits blank notes', () async {
+    test('review decision omits blank notes and never sends amounts', () async {
       functions.handlers['reviewPaymentProof'] = (_) => null;
 
       await ds.reviewPaymentProof(
-        paymentId: 'inv1',
-        decision: PaymentReviewDecision.reject,
-        notes: ' ',
+        command: PaymentReviewCommand(
+          paymentId: 'inv1',
+          decision: PaymentReviewWire.reject,
+          notes: ' ',
+          expectedProofFileName: '1790000000000.jpg',
+        ),
+        requestId: 'req_0123456789abcdef',
       );
 
       expect(functions.payloadOf('reviewPaymentProof'), {
         'paymentId': 'inv1',
         'decision': 'reject',
+        'requestId': 'req_0123456789abcdef',
+        'expectedProofFileName': '1790000000000.jpg',
       });
+    });
+
+    test(
+      'partial review sends mode + value, never amountPaidConfirmed',
+      () async {
+        functions.handlers['reviewPaymentProof'] = (_) => null;
+
+        await ds.reviewPaymentProof(
+          command: PaymentReviewCommand(
+            paymentId: 'inv1',
+            decision: PaymentReviewWire.partial,
+            amountMode: PaymentAmountMode.cumulative,
+            amountMinorUnits: 15050,
+            expectedProofFileName: '1790000000000.jpg',
+          ),
+          requestId: 'req_0123456789abcdef',
+        );
+
+        final payload = functions.payloadOf('reviewPaymentProof') as Map;
+        expect(payload['amountMode'], 'cumulative');
+        expect(payload['amountValue'], 150.5);
+        expect(payload.containsKey('amountPaidConfirmed'), isFalse);
+      },
+    );
+
+    test('a changed proof surfaces the server message verbatim', () async {
+      functions.handlers['reviewPaymentProof'] = (_) =>
+          throw FakeFunctionsError(
+            'failed-precondition',
+            kPaymentProofChangedMessage,
+          );
+      await expectLater(
+        ds.reviewPaymentProof(
+          command: PaymentReviewCommand(
+            paymentId: 'inv1',
+            decision: PaymentReviewWire.approve,
+            expectedProofFileName: '1790000000000.jpg',
+          ),
+          requestId: 'req_0123456789abcdef',
+        ),
+        serverError(kPaymentProofChangedMessage),
+      );
     });
 
     test('server denial is surfaced', () async {

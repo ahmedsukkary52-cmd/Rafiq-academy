@@ -73,6 +73,7 @@ void main() {
       AppRoutes.studentContent,
       AppRoutes.admin,
       AppRoutes.supervisor,
+      AppRoutes.adminPaymentDestinations,
       AppRoutes.updateRequired,
       AppRoutes.teacherChat.replaceFirst(':conversationId', 'c1'),
       AppRoutes.teacherStudentProfile('s1'),

@@ -36,8 +36,13 @@ class ParentState extends Equatable {
   final List<PaymentEntity> payments;
   final String? paymentsError;
 
-  /// C3 — from academySettings/paymentPublic (never hard-coded).
+  /// C3 — from academySettings/paymentPublic (never hard-coded). The two
+  /// destinations are configured independently.
   final String vodafoneCashDestination;
+  final String instapayDestination;
+
+  /// Load state of the destinations above; `error` means unknown, not unset.
+  final SectionStatus paymentDestinationsStatus;
 
   /// C2 — own paymentAccess read model (null if absent).
   final PaymentAccessEntity? paymentAccess;
@@ -79,6 +84,8 @@ class ParentState extends Equatable {
     this.payments = const [],
     this.paymentsError,
     this.vodafoneCashDestination = '',
+    this.instapayDestination = '',
+    this.paymentDestinationsStatus = SectionStatus.initial,
     this.paymentAccess,
     this.absenceRequestsStatus = SectionStatus.initial,
     this.absenceRequests = const [],
@@ -125,6 +132,8 @@ class ParentState extends Equatable {
     List<PaymentEntity>? payments,
     Object? paymentsError = _unset,
     String? vodafoneCashDestination,
+    String? instapayDestination,
+    SectionStatus? paymentDestinationsStatus,
     Object? paymentAccess = _unset,
     SectionStatus? absenceRequestsStatus,
     List<AbsenceRequestEntity>? absenceRequests,
@@ -168,6 +177,9 @@ class ParentState extends Equatable {
           : paymentsError as String?,
       vodafoneCashDestination:
           vodafoneCashDestination ?? this.vodafoneCashDestination,
+      instapayDestination: instapayDestination ?? this.instapayDestination,
+      paymentDestinationsStatus:
+          paymentDestinationsStatus ?? this.paymentDestinationsStatus,
       paymentAccess: identical(paymentAccess, _unset)
           ? this.paymentAccess
           : paymentAccess as PaymentAccessEntity?,
@@ -221,6 +233,8 @@ class ParentState extends Equatable {
     payments,
     paymentsError,
     vodafoneCashDestination,
+    instapayDestination,
+    paymentDestinationsStatus,
     paymentAccess,
     absenceRequestsStatus,
     absenceRequests,

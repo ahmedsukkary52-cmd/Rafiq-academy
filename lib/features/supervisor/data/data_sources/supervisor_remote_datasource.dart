@@ -1,4 +1,5 @@
 import '../../../../shared/data/absence_request_model.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/data/models/parent_model.dart';
 import '../../../student/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
@@ -47,5 +48,5 @@ abstract class SupervisorRemoteDatasource {
     required List<String> studentIds,
   });
 
-  Future<void> reviewPaymentProof(PaymentReviewParams params);
+  Future<PaymentReviewResult> reviewPaymentProof(PaymentReviewParams params);
 }

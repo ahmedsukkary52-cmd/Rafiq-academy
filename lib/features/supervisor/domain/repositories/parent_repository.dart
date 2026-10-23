@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../entities/achievement_issue_entity.dart';
@@ -54,7 +55,9 @@ abstract class SupervisorRepository {
     required List<String> studentIds,
   });
 
-  Future<Either<Failure, Unit>> reviewPaymentProof(PaymentReviewParams params);
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof(
+    PaymentReviewParams params,
+  );
 }
 
 class SupervisorIdParams extends Equatable {

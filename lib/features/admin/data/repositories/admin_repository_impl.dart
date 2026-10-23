@@ -197,12 +197,14 @@ class AdminRepositoryImpl implements AdminRepository {
 
   @override
   Future<Either<Failure, Unit>> updatePaymentPublicSettings({
-    required String vodafoneCashDestination,
+    String? vodafoneCashDestination,
+    String? instapayDestination,
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.updatePaymentPublicSettings(
         vodafoneCashDestination: vodafoneCashDestination,
+        instapayDestination: instapayDestination,
       );
       return const Right(unit);
     } on ServerException catch (e) {

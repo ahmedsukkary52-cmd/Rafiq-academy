@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/meeting_link_policy.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../entities/admin_operations_entities.dart';
 import '../repositories/admin_operations_repository.dart';
@@ -286,52 +287,39 @@ class ListPendingPaymentProofsUseCase
 }
 
 class ReviewPaymentProofParams extends Equatable {
-  final String paymentId;
-  final PaymentReviewDecision decision;
-  final double invoiceAmount;
-  final String? notes;
-  final double? amountPaidConfirmed;
+  final PaymentReviewCommand command;
+  final String requestId;
+
+  /// Invoice + previously confirmed total the reviewer saw.
+  final PaymentAmountSnapshot snapshot;
 
   const ReviewPaymentProofParams({
-    required this.paymentId,
-    required this.decision,
-    required this.invoiceAmount,
-    this.notes,
-    this.amountPaidConfirmed,
+    required this.command,
+    required this.requestId,
+    required this.snapshot,
   });
 
   @override
-  List<Object?> get props => [
-    paymentId,
-    decision,
-    invoiceAmount,
-    notes,
-    amountPaidConfirmed,
-  ];
+  List<Object?> get props => [command, requestId, snapshot];
 }
 
 @lazySingleton
 class ReviewPaymentProofUseCase
-    extends UseCase<Unit, ReviewPaymentProofParams> {
+    extends UseCase<PaymentReviewResult, ReviewPaymentProofParams> {
   final AdminOperationsRepository repository;
   ReviewPaymentProofUseCase(this.repository);
 
   @override
-  Future<Either<Failure, Unit>> call(ReviewPaymentProofParams params) {
-    if (params.decision == PaymentReviewDecision.partial) {
-      final error = validatePartialAmount(
-        invoiceAmount: params.invoiceAmount,
-        confirmed: params.amountPaidConfirmed,
-      );
-      if (error != null) return Future.value(Left(ValidationFailure(error)));
-    }
+  Future<Either<Failure, PaymentReviewResult>> call(
+    ReviewPaymentProofParams params,
+  ) {
+    final error = !kPaymentReviewRequestIdPattern.hasMatch(params.requestId)
+        ? 'بيانات المراجعة غير صالحة'
+        : validatePaymentReviewCommand(params.command, params.snapshot);
+    if (error != null) return Future.value(Left(ValidationFailure(error)));
     return repository.reviewPaymentProof(
-      paymentId: params.paymentId,
-      decision: params.decision,
-      notes: params.notes,
-      amountPaidConfirmed: params.decision == PaymentReviewDecision.partial
-          ? params.amountPaidConfirmed
-          : null,
+      command: params.command,
+      requestId: params.requestId,
     );
   }
 }

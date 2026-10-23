@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
+import '../../../../shared/domain/academy_payment_destinations.dart';
 import '../repositories/admin_repository.dart';
 
 @lazySingleton
@@ -18,11 +19,13 @@ class GetAdminPaymentPublicSettingsUseCase
       repository.getPaymentPublicSettings();
 }
 
+/// Updates one payment method's destination. An empty [value] clears it.
 class UpdatePaymentPublicParams extends Equatable {
-  final String vodafoneCashDestination;
-  const UpdatePaymentPublicParams({required this.vodafoneCashDestination});
+  final AcademyPaymentMethod method;
+  final String value;
+  const UpdatePaymentPublicParams({required this.method, required this.value});
   @override
-  List<Object?> get props => [vodafoneCashDestination];
+  List<Object?> get props => [method, value];
 }
 
 @lazySingleton
@@ -32,10 +35,24 @@ class UpdatePaymentPublicSettingsUseCase
   UpdatePaymentPublicSettingsUseCase(this.repository);
 
   @override
-  Future<Either<Failure, Unit>> call(UpdatePaymentPublicParams params) =>
-      repository.updatePaymentPublicSettings(
-        vodafoneCashDestination: params.vodafoneCashDestination,
-      );
+  Future<Either<Failure, Unit>> call(UpdatePaymentPublicParams params) async {
+    final error = AcademyPaymentDestinations.validate(
+      params.method,
+      params.value,
+      allowEmpty: true,
+    );
+    if (error != null) return Left(ValidationFailure(error));
+    final value = params.value.trim().isEmpty
+        ? ''
+        : AcademyPaymentDestinations.normalize(params.method, params.value);
+    return switch (params.method) {
+      AcademyPaymentMethod.vodafoneCash =>
+        repository.updatePaymentPublicSettings(vodafoneCashDestination: value),
+      AcademyPaymentMethod.instapay => repository.updatePaymentPublicSettings(
+        instapayDestination: value,
+      ),
+    };
+  }
 }
 
 @lazySingleton

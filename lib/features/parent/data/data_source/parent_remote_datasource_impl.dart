@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -9,11 +10,13 @@ import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_dat
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/absence_request_firestore_reads.dart';
+import '../../../../shared/data/payment_public_settings_mapper.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/academy_payment_settings_contract.dart';
 import '../../../../shared/domain/payment_access_contract.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
 import '../../../../shared/domain/student_at_risk_policy.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../analytics/domain/analytics_recitation_honesty.dart';
 import '../../../student/data/models/achievement_model.dart';
@@ -29,8 +32,9 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
   final FirebaseFunctions functions;
+  final UnconfirmedProofUploads _unconfirmedUploads = UnconfirmedProofUploads();
 
-  const ParentRemoteDatasourceImpl({
+  ParentRemoteDatasourceImpl({
     required this.firestore,
     required this.storage,
     required this.functions,
@@ -198,18 +202,7 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
           .collection(FirestoreCollections.academySettings)
           .doc(AcademyPaymentSettingsContract.paymentPublicDocId)
           .get();
-      final data = doc.data() ?? const <String, dynamic>{};
-      final updated = data[AcademyPaymentSettingsContract.updatedAtField];
-      return PaymentPublicSettingsEntity(
-        vodafoneCashDestination:
-            (data[AcademyPaymentSettingsContract.vodafoneCashDestinationField]
-                    as String?)
-                ?.trim() ??
-            '',
-        updatedAt: updated is Timestamp ? updated.toDate() : null,
-        updatedBy:
-            data[AcademyPaymentSettingsContract.updatedByField] as String?,
-      );
+      return paymentPublicSettingsFromData(doc.data());
     } catch (e) {
       throw ServerException(e.toString());
     }
@@ -354,6 +347,14 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     if (length >= ParentPaymentProofContract.maxBytes) {
       throw const ServerException('حجم الإيصال أكبر من ١٠ ميجا');
     }
+    final check = await UploadFilePolicy.checkFile(
+      file,
+      formats: ParentPaymentProofContract.formats,
+    );
+    final format = check.format;
+    if (format == null) {
+      throw ServerException(check.error ?? 'صيغة الإيصال غير مدعومة');
+    }
 
     try {
       final paymentRef = firestore
@@ -372,43 +373,73 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
         throw const ServerException('تم سداد هذه الدفعة بالفعل');
       }
 
-      final ext = path.contains('.')
-          ? path.split('.').last.toLowerCase()
-          : 'jpg';
-      final safeExt = RegExp(r'^[a-z0-9]{1,8}$').hasMatch(ext) ? ext : 'jpg';
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$safeExt';
-      final storagePath = ParentPaymentProofContract.storagePath(
-        parentId: pid,
-        paymentId: payId,
-        fileName: fileName,
-      );
-      final ref = storage.ref(storagePath);
-      await ref.putFile(file);
-      final downloadUrl = await ref.getDownloadURL();
+      var fileName = _unconfirmedUploads.reusableFileName(payId, path);
+      if (fileName == null) {
+        fileName = ParentPaymentProofContract.proofFileName(format);
+        await storage
+            .ref(
+              ParentPaymentProofContract.storagePath(
+                parentId: pid,
+                paymentId: payId,
+                fileName: fileName,
+              ),
+            )
+            .putFile(file, SettableMetadata(contentType: format.contentType));
+        _unconfirmedUploads.remember(payId, path, fileName);
+      }
 
-      await paymentRef.update({
-        ParentPaymentProofContract.proofStoragePathField: storagePath,
-        ParentPaymentProofContract.proofDownloadUrlField: downloadUrl,
-        ParentPaymentProofContract.proofSubmittedAtField:
-            FieldValue.serverTimestamp(),
-        ParentPaymentProofContract.proofSubmittedByField: pid,
-        ParentPaymentProofContract.proofFileNameField: fileName,
-        'method': ParentPaymentProofContract.externalMethod,
-        ParentPaymentProofContract.reviewStatusField:
-            ParentPaymentProofContract.pendingReview,
-        // Clear prior supervisor outcome so resubmit awaits a fresh review.
-        ParentPaymentProofContract.reviewedByField: FieldValue.delete(),
-        ParentPaymentProofContract.reviewedAtField: FieldValue.delete(),
-        ParentPaymentProofContract.reviewNotesField: FieldValue.delete(),
-        ParentPaymentProofContract.amountPaidConfirmedField:
-            FieldValue.delete(),
-        ParentPaymentProofContract.remainingAmountField: FieldValue.delete(),
-        // Parent never sets status/paidAt or supervisor review outcome fields.
-      });
+      // Only the server makes the upload the current proof (new cycle);
+      // pending is shown after it confirms and the payment is re-read.
+      final response = await functions
+          .httpsCallable(ParentPaymentProofContract.submitCallable)
+          .call(<String, dynamic>{'paymentId': payId, 'fileName': fileName});
+      _unconfirmedUploads.settle(payId);
+      final data = response.data;
+      final cycle = data is Map ? data['proofCycleId'] : null;
+      if (!ParentPaymentProofContract.isProofCycleId(
+        cycle is String ? cycle : null,
+      )) {
+        throw const ServerException('تعذر تأكيد إرسال الإيصال، حدّث الصفحة');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (UnconfirmedProofUploads.definitiveCodes.contains(e.code)) {
+        _unconfirmedUploads.settle(payId);
+      }
+      throw ServerException(e.message ?? e.code);
     } on ServerException {
       rethrow;
     } catch (e) {
       throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<Uint8List> downloadPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String storagePath,
+  }) async {
+    if (!ParentPaymentProofContract.isTrustedStoragePath(
+      storagePath,
+      parentId: parentId,
+      paymentId: paymentId,
+    )) {
+      throw const ServerException('بيانات صورة الإيصال غير صالحة');
+    }
+    try {
+      final bytes = await storage
+          .ref(storagePath.trim())
+          .getData(ParentPaymentProofContract.maxBytes);
+      if (bytes == null || bytes.isEmpty) {
+        throw const ServerException('صورة الإيصال غير موجودة');
+      }
+      return bytes;
+    } on FirebaseException catch (e) {
+      throw ServerException(switch (e.code) {
+        'object-not-found' => 'صورة الإيصال غير موجودة',
+        'unauthorized' => 'لا تملك صلاحية عرض هذا الإيصال',
+        _ => 'تعذر تحميل صورة الإيصال',
+      });
     }
   }
 

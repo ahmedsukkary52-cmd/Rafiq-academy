@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import '../../domain/usecases/admin_operations_usecases.dart';
 
@@ -16,6 +17,7 @@ part 'payment_review_state.dart';
 class PaymentReviewBloc extends Bloc<PaymentReviewEvent, PaymentReviewState> {
   final ListPendingPaymentProofsUseCase listPending;
   final ReviewPaymentProofUseCase reviewProof;
+  final PaymentReviewRequestIds _requestIds = PaymentReviewRequestIds();
 
   PaymentReviewBloc({required this.listPending, required this.reviewProof})
     : super(const PaymentReviewState()) {
@@ -44,8 +46,46 @@ class PaymentReviewBloc extends Bloc<PaymentReviewEvent, PaymentReviewState> {
     result.fold(
       (f) =>
           emit(state.copyWith(status: SectionStatus.error, error: f.message)),
-      (items) =>
-          emit(state.copyWith(status: SectionStatus.loaded, items: items)),
+      (items) {
+        // An unresolved decision survives only while its proof is pending.
+        final pendingProofs = {for (final item in items) item.paymentId: item};
+        _requestIds.retainWhere((c) {
+          final item = pendingProofs[c.paymentId];
+          return item != null &&
+              c.targetsProof(
+                fileName: item.proofFileName,
+                proofCycleId: item.proofCycleId,
+              );
+        });
+        emit(
+          state.copyWith(
+            status: SectionStatus.loaded,
+            items: items,
+            unresolved: _requestIds.openCommands,
+          ),
+        );
+      },
+    );
+  }
+
+  /// Set as soon as [close] starts: bloc's event sink closes before
+  /// [isClosed] turns true, so [isClosed] alone cannot guard [add].
+  bool _closing = false;
+
+  @override
+  Future<void> close() {
+    _closing = true;
+    return super.close();
+  }
+
+  void _reload() {
+    // The page may have closed while the review was in flight.
+    if (_closing || isClosed) return;
+    add(
+      LoadPendingProofsEvent(
+        reviewerUid: state.reviewerUid,
+        isAdmin: state.isAdmin,
+      ),
     );
   }
 
@@ -53,7 +93,18 @@ class PaymentReviewBloc extends Bloc<PaymentReviewEvent, PaymentReviewState> {
     SubmitPaymentReviewEvent event,
     Emitter<PaymentReviewState> emit,
   ) async {
-    final paymentId = event.item.paymentId;
+    final item = event.item;
+    final paymentId = item.paymentId;
+    final partial = event.decision == PaymentReviewDecision.partial;
+    final command = PaymentReviewCommand(
+      paymentId: paymentId,
+      decision: event.decision.wire,
+      notes: event.notes,
+      amountMode: partial ? event.amountMode : null,
+      amountMinorUnits: partial ? event.amountMinorUnits : null,
+      expectedProofFileName: item.proofFileName ?? '',
+      expectedProofCycleId: item.proofCycleId,
+    );
     emit(
       state.copyWith(
         submissionStatus: SubmissionStatus.submitting,
@@ -63,29 +114,65 @@ class PaymentReviewBloc extends Bloc<PaymentReviewEvent, PaymentReviewState> {
     );
     final result = await reviewProof(
       ReviewPaymentProofParams(
-        paymentId: paymentId,
-        decision: event.decision,
-        invoiceAmount: event.item.amount,
-        notes: event.notes,
-        amountPaidConfirmed: event.amountPaidConfirmed,
+        command: command,
+        requestId: _requestIds.idFor(command),
+        snapshot: item.amountSnapshot,
       ),
     );
     result.fold(
-      (f) => emit(
-        state.copyWith(
-          submissionStatus: SubmissionStatus.error,
-          message: f.message,
-        ),
-      ),
-      // A reviewed proof leaves the pending list; a reload reflects any
-      // concurrent review (the server is authoritative).
-      (_) => emit(
-        state.copyWith(
-          submissionStatus: SubmissionStatus.success,
-          message: 'تم تسجيل قرار المراجعة: ${event.decision.label}',
-          items: state.items.where((i) => i.paymentId != paymentId).toList(),
-        ),
-      ),
+      (f) {
+        final kind = paymentReviewFailureKind(f);
+        if (kind != PaymentReviewFailureKind.unresolved) {
+          _requestIds.settle(paymentId);
+        }
+        emit(
+          state.copyWith(
+            submissionStatus: SubmissionStatus.error,
+            message: kind == PaymentReviewFailureKind.noLongerPending
+                ? kPaymentNoLongerPendingNotice
+                : f.message,
+            unresolved: _requestIds.openCommands,
+          ),
+        );
+        // Never re-sent automatically; the reload shows the current proof.
+        if (kind == PaymentReviewFailureKind.proofChanged ||
+            kind == PaymentReviewFailureKind.noLongerPending) {
+          _reload();
+        }
+      },
+      (reviewed) {
+        _requestIds.settle(paymentId);
+        if (reviewed.replayed) {
+          // A stored earlier result: the row may already show a newer proof.
+          emit(
+            state.copyWith(
+              submissionStatus: SubmissionStatus.success,
+              message: kPaymentReviewReplayedMessage,
+              unresolved: _requestIds.openCommands,
+            ),
+          );
+          _reload();
+          return;
+        }
+        // Only the reviewed cycle leaves the list, never a newer proof.
+        emit(
+          state.copyWith(
+            submissionStatus: SubmissionStatus.success,
+            message: 'تم تسجيل قرار المراجعة: ${event.decision.label}',
+            items: state.items
+                .where(
+                  (i) =>
+                      i.paymentId != paymentId ||
+                      !command.targetsProof(
+                        fileName: i.proofFileName,
+                        proofCycleId: i.proofCycleId,
+                      ),
+                )
+                .toList(),
+            unresolved: _requestIds.openCommands,
+          ),
+        );
+      },
     );
   }
 

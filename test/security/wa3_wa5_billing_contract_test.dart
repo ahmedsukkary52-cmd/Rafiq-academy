@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/shared/domain/academy_payment_settings_contract.dart';
 import 'package:rafiq_academy/shared/domain/payment_access_contract.dart';
@@ -36,6 +38,28 @@ void main() {
         AcademyPaymentSettingsContract.vodafoneCashDestinationField,
         'vodafoneCashDestination',
       );
+      expect(
+        AcademyPaymentSettingsContract.instapayDestinationField,
+        'instapayDestination',
+      );
+    });
+
+    test('paymentPublic rules allow exactly the two independent '
+        'destination fields plus audit fields', () {
+      final rules = File('firestore.rules').readAsStringSync();
+      final block = RegExp(
+        r"match /academySettings/\{docId\} \{[\s\S]*?hasOnly\(\[([\s\S]*?)\]\)",
+      ).firstMatch(rules);
+      expect(block, isNotNull);
+      final fields = RegExp(
+        r"'(\w+)'",
+      ).allMatches(block!.group(1)!).map((m) => m.group(1)).toSet();
+      expect(fields, {
+        AcademyPaymentSettingsContract.vodafoneCashDestinationField,
+        AcademyPaymentSettingsContract.instapayDestinationField,
+        AcademyPaymentSettingsContract.updatedAtField,
+        AcademyPaymentSettingsContract.updatedByField,
+      });
     });
   });
 

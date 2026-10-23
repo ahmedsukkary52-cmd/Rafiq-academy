@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../shared/domain/payment_review_amounts.dart';
 import '../../../shared/domain/student_at_risk_policy.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/utils/attendance_policy.dart';
@@ -137,8 +138,10 @@ const _arabicMonths = [
   'ديسمبر',
 ];
 
+/// Whole amounts stay whole; partial confirmations keep their piasters.
 String parentMoneyLabel(double amount) {
-  return '${parentEasternDigits('${amount.round()}')} جنيه';
+  final text = formatMoneyAmount(amount).replaceAll('.', '٫');
+  return '${parentEasternDigits(text)} جنيه';
 }
 
 String parentPaymentPeriodLabel(DateTime date) {

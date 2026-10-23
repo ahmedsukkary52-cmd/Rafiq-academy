@@ -14,6 +14,7 @@ import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_s
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_day_readiness.dart';
+import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 
 final _monday = DateTime(2024, 6, 3, 9, 0);
 final _mondayDue = DateTime(2024, 6, 3, 23, 59, 59);
@@ -198,7 +199,7 @@ class _FakeSupervisorRepository implements SupervisorRepository {
   }) => throw UnimplementedError();
 
   @override
-  Future<Either<Failure, Unit>> reviewPaymentProof(
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof(
     PaymentReviewParams params,
   ) => throw UnimplementedError();
 }

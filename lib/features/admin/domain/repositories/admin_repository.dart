@@ -83,7 +83,8 @@ abstract class AdminRepository {
   getPaymentPublicSettings();
 
   Future<Either<Failure, Unit>> updatePaymentPublicSettings({
-    required String vodafoneCashDestination,
+    String? vodafoneCashDestination,
+    String? instapayDestination,
   });
 
   Future<Either<Failure, PricingDefaultsEntity>> getPricingDefaults();

@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import '../../domain/repositories/admin_operations_repository.dart';
@@ -120,18 +121,13 @@ class AdminOperationsRepositoryImpl implements AdminOperationsRepository {
   );
 
   @override
-  Future<Either<Failure, Unit>> reviewPaymentProof({
-    required String paymentId,
-    required PaymentReviewDecision decision,
-    String? notes,
-    double? amountPaidConfirmed,
-  }) => _run(() async {
-    await remoteDatasource.reviewPaymentProof(
-      paymentId: paymentId,
-      decision: decision,
-      notes: notes,
-      amountPaidConfirmed: amountPaidConfirmed,
-    );
-    return unit;
-  });
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof({
+    required PaymentReviewCommand command,
+    required String requestId,
+  }) => _run(
+    () => remoteDatasource.reviewPaymentProof(
+      command: command,
+      requestId: requestId,
+    ),
+  );
 }

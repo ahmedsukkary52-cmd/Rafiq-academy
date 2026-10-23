@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../student/data/models/achievement_model.dart';
 import '../../domain/parent_household.dart';
 import '../models/parent_model.dart';
@@ -45,6 +47,14 @@ abstract class ParentRemoteDatasource {
     required String parentId,
     required String paymentId,
     required String localFilePath,
+  });
+
+  /// Proof bytes read through Storage Rules; only a path inside
+  /// `payment_proofs/{parentId}/{paymentId}/` is ever requested.
+  Future<Uint8List> downloadPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String storagePath,
   });
 
   Future<ParentHousehold> getHousehold({

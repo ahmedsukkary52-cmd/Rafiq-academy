@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
@@ -167,13 +168,12 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> reviewPaymentProof(
+  Future<Either<Failure, PaymentReviewResult>> reviewPaymentProof(
     PaymentReviewParams params,
   ) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      await remoteDatasource.reviewPaymentProof(params);
-      return const Right(unit);
+      return Right(await remoteDatasource.reviewPaymentProof(params));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

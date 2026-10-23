@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 
@@ -63,6 +65,13 @@ abstract class ParentRepository {
     required String parentId,
     required String paymentId,
     required String localFilePath,
+  });
+
+  /// Proof image for Parent / Admin / scoped Supervisor review.
+  Future<Either<Failure, Uint8List>> downloadPaymentProof({
+    required String parentId,
+    required String paymentId,
+    required String storagePath,
   });
 
   Future<Either<Failure, ParentHousehold>> getHousehold({

@@ -18,6 +18,7 @@ import '../../features/admin/presentation/pages/admin_membership_page.dart';
 import '../../features/admin/presentation/pages/admin_misc_pages.dart';
 import '../../features/admin/presentation/pages/admin_oversight_pages.dart';
 import '../../features/admin/presentation/pages/admin_parent_links_page.dart';
+import '../../features/admin/presentation/pages/admin_payment_destinations_page.dart';
 import '../../features/admin/presentation/pages/admin_registration_requests_page.dart';
 import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/admin/presentation/pages/payment_review_page.dart';
@@ -181,6 +182,9 @@ class AppRoutes {
   static const String adminInternalNotes = '/admin/internal-notes';
   static const String adminCommunicationSettings =
       '/admin/communication-settings';
+
+  /// Academy payment destinations (Vodafone Cash, InstaPay) shown to parents.
+  static const String adminPaymentDestinations = '/admin/payment-destinations';
 
   /// Legacy entry point; redirects to [adminHalaqat] (schedule required, D8).
   static const String adminCreateHalaqa = '/admin/create-halaqa';
@@ -644,6 +648,10 @@ class AppRouter {
           GoRoute(
             path: 'communication-settings',
             builder: (_, __) => const AdminCommunicationSettingsPage(),
+          ),
+          GoRoute(
+            path: 'payment-destinations',
+            builder: (_, __) => const AdminPaymentDestinationsRoute(),
           ),
           GoRoute(
             path: 'create-halaqa',

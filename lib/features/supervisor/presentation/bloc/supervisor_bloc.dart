@@ -1,8 +1,14 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart' show Either;
 import 'package:injectable/injectable.dart';
 
+import '../../../../core/error/failure.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/payment_review_amounts.dart';
+import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../parent/domain/parent_payment_proof.dart';
+import '../../domain/entities/payment_review_params.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../../domain/usecases/admit_student_to_halaqa_usecase.dart';
 import '../../domain/usecases/get_supervised_absence_requests_usecase.dart';
@@ -30,6 +36,21 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
   final RegisterNewStudentUseCase registerNewStudent;
 
   String? _supervisorId;
+  final PaymentReviewRequestIds _reviewRequestIds = PaymentReviewRequestIds();
+
+  /// Bumped on every session clear; in-flight results of an older session
+  /// are dropped.
+  int _session = 0;
+
+  /// Set as soon as [close] starts: bloc's event sink closes before
+  /// [isClosed] turns true, so [isClosed] alone cannot guard [add].
+  bool _closing = false;
+
+  @override
+  Future<void> close() {
+    _closing = true;
+    return super.close();
+  }
 
   SupervisorBloc({
     required this.getSupervisedHalaqat,
@@ -66,7 +87,9 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     ClearSupervisorSessionEvent event,
     Emitter<SupervisorState> emit,
   ) {
+    _session++;
     _supervisorId = null;
+    _reviewRequestIds.clear();
     emit(SupervisorState.initial());
   }
 
@@ -368,13 +391,30 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
           paymentsError: failure.message,
         ),
       ),
-      (payments) => emit(
-        state.copyWith(
-          paymentsStatus: SectionStatus.loaded,
-          payments: payments,
-          paymentsError: null,
-        ),
-      ),
+      (payments) {
+        // A loaded payment now showing another proof cycle (or no longer
+        // pending) invalidates its unresolved decision.
+        final loaded = {for (final p in payments) p.id: p};
+        _reviewRequestIds.retainWhere((c) {
+          final p = loaded[c.paymentId];
+          if (p == null) return true;
+          return p.status != PaymentStatus.paid &&
+              p.reviewStatus?.trim() ==
+                  ParentPaymentProofContract.pendingReview &&
+              c.targetsProof(
+                fileName: p.proofFileName,
+                proofCycleId: p.proofCycleId,
+              );
+        });
+        emit(
+          state.copyWith(
+            paymentsStatus: SectionStatus.loaded,
+            payments: payments,
+            paymentsError: null,
+            reviewPaymentUnresolved: _reviewRequestIds.openCommands,
+          ),
+        );
+      },
     );
   }
 
@@ -382,31 +422,98 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     ReviewPaymentProofEvent event,
     Emitter<SupervisorState> emit,
   ) async {
+    // Droppable semantics (screens block and explain a second review); the
+    // check and the `submitting` emit both run before the first await.
+    if (state.reviewPaymentStatus == SubmissionStatus.submitting) return;
+    final session = _session;
+    final command = event.command;
+    final paymentId = command.paymentId;
     emit(
       state.copyWith(
         reviewPaymentStatus: SubmissionStatus.submitting,
+        reviewPaymentId: paymentId,
         reviewPaymentError: null,
+        reviewPaymentMessage: null,
       ),
     );
-    final result = await reviewPaymentProof(event.params);
-    await result.fold(
-      (failure) async => emit(
-        state.copyWith(
-          reviewPaymentStatus: SubmissionStatus.error,
-          reviewPaymentError: failure.message,
+
+    // A result that arrives after the session was cleared (or the bloc
+    // closed) belongs to nobody on screen now.
+    bool stale() => session != _session || _closing || isClosed;
+
+    final Either<Failure, PaymentReviewResult> result;
+    try {
+      result = await reviewPaymentProof(
+        PaymentReviewParams(
+          supervisorId: event.supervisorId,
+          command: command,
+          requestId: _reviewRequestIds.idFor(command),
+          snapshot: event.snapshot,
         ),
-      ),
-      (_) async {
-        emit(state.copyWith(reviewPaymentStatus: SubmissionStatus.success));
-        final studentIds = {
-          for (final h in state.halaqat) ...h.studentIds,
-        }.toList();
-        add(
-          LoadSupervisedPaymentsEvent(
-            supervisorId: event.params.supervisorId,
-            studentIds: studentIds,
+      );
+    } catch (error, stackTrace) {
+      // Outcome unknown: keep the command (same requestId on retry), release
+      // the busy state, and report the error instead of swallowing it.
+      if (!stale()) {
+        emit(
+          state.copyWith(
+            reviewPaymentStatus: SubmissionStatus.error,
+            reviewPaymentError: 'تعذر التأكد من حفظ المراجعة — أعد المحاولة',
+            reviewPaymentUnresolved: _reviewRequestIds.openCommands,
           ),
         );
+      }
+      addError(error, stackTrace);
+      return;
+    }
+    if (stale()) return;
+
+    void reloadPayments() {
+      if (_closing || isClosed) return;
+      final studentIds = {
+        for (final h in state.halaqat) ...h.studentIds,
+      }.toList();
+      add(
+        LoadSupervisedPaymentsEvent(
+          supervisorId: event.supervisorId,
+          studentIds: studentIds,
+        ),
+      );
+    }
+
+    result.fold(
+      (failure) {
+        final kind = paymentReviewFailureKind(failure);
+        if (kind != PaymentReviewFailureKind.unresolved) {
+          _reviewRequestIds.settle(paymentId);
+        }
+        emit(
+          state.copyWith(
+            reviewPaymentStatus: SubmissionStatus.error,
+            reviewPaymentError: kind == PaymentReviewFailureKind.noLongerPending
+                ? kPaymentNoLongerPendingNotice
+                : failure.message,
+            reviewPaymentUnresolved: _reviewRequestIds.openCommands,
+          ),
+        );
+        // Never re-sent automatically; the reload shows the current proof.
+        if (kind == PaymentReviewFailureKind.proofChanged ||
+            kind == PaymentReviewFailureKind.noLongerPending) {
+          reloadPayments();
+        }
+      },
+      (reviewed) {
+        _reviewRequestIds.settle(paymentId);
+        emit(
+          state.copyWith(
+            reviewPaymentStatus: SubmissionStatus.success,
+            reviewPaymentMessage: reviewed.replayed
+                ? kPaymentReviewReplayedMessage
+                : 'تم حفظ نتيجة المراجعة',
+            reviewPaymentUnresolved: _reviewRequestIds.openCommands,
+          ),
+        );
+        reloadPayments();
       },
     );
   }
@@ -415,10 +522,14 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     ResetReviewPaymentEvent event,
     Emitter<SupervisorState> emit,
   ) {
+    // Never releases an in-flight review's busy state.
+    if (state.reviewPaymentStatus == SubmissionStatus.submitting) return;
     emit(
       state.copyWith(
         reviewPaymentStatus: SubmissionStatus.idle,
         reviewPaymentError: null,
+        reviewPaymentId: null,
+        reviewPaymentMessage: null,
       ),
     );
   }

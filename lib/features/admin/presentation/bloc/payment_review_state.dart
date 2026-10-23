@@ -10,6 +10,10 @@ class PaymentReviewState extends Equatable {
   final String? activePaymentId;
   final String? message;
 
+  /// Decisions whose outcome is still unknown (timeout / network), by
+  /// payment: a retry re-sends exactly this command with its `requestId`.
+  final Map<String, PaymentReviewCommand> unresolved;
+
   const PaymentReviewState({
     this.status = SectionStatus.initial,
     this.error,
@@ -19,6 +23,7 @@ class PaymentReviewState extends Equatable {
     this.submissionStatus = SubmissionStatus.idle,
     this.activePaymentId,
     this.message,
+    this.unresolved = const {},
   });
 
   PaymentReviewState copyWith({
@@ -31,6 +36,7 @@ class PaymentReviewState extends Equatable {
     String? activePaymentId,
     String? message,
     bool clearMessage = false,
+    Map<String, PaymentReviewCommand>? unresolved,
   }) {
     return PaymentReviewState(
       status: status ?? this.status,
@@ -41,7 +47,21 @@ class PaymentReviewState extends Equatable {
       submissionStatus: submissionStatus ?? this.submissionStatus,
       activePaymentId: activePaymentId ?? this.activePaymentId,
       message: clearMessage ? null : (message ?? this.message),
+      unresolved: unresolved ?? this.unresolved,
     );
+  }
+
+  /// The unresolved command for [item], only while it is still bound to the
+  /// proof the item shows now.
+  PaymentReviewCommand? unresolvedFor(PaymentReviewItem item) {
+    final command = unresolved[item.paymentId];
+    if (command == null) return null;
+    return command.targetsProof(
+          fileName: item.proofFileName,
+          proofCycleId: item.proofCycleId,
+        )
+        ? command
+        : null;
   }
 
   @override
@@ -54,5 +74,6 @@ class PaymentReviewState extends Equatable {
     submissionStatus,
     activePaymentId,
     message,
+    unresolved,
   ];
 }

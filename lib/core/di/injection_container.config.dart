@@ -85,6 +85,8 @@ import 'package:rafiq_academy/features/admin/presentation/bloc/admin_bloc.dart'
     as _i409;
 import 'package:rafiq_academy/features/admin/presentation/bloc/admin_operations_bloc.dart'
     as _i195;
+import 'package:rafiq_academy/features/admin/presentation/bloc/admin_payment_destinations_bloc.dart'
+    as _i805;
 import 'package:rafiq_academy/features/admin/presentation/bloc/payment_review_bloc.dart'
     as _i866;
 import 'package:rafiq_academy/features/app_update/data/client_version_repository_impl.dart'
@@ -1224,6 +1226,12 @@ extension GetItInjectableX on _i174.GetIt {
         networkInfo: gh<_i696.NetworkInfo>(),
       ),
     );
+    gh.factory<_i805.AdminPaymentDestinationsBloc>(
+      () => _i805.AdminPaymentDestinationsBloc(
+        getSettings: gh<_i606.GetAdminPaymentPublicSettingsUseCase>(),
+        updateSettings: gh<_i606.UpdatePaymentPublicSettingsUseCase>(),
+      ),
+    );
     gh.factory<_i81.GetLatestHomeworkUseCase>(
       () => _i81.GetLatestHomeworkUseCase(gh<_i951.HomeworkRepository>()),
     );
@@ -1384,6 +1392,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i347.SubmitPaymentProofUseCase>(
       () => _i347.SubmitPaymentProofUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i347.DownloadPaymentProofUseCase>(
+      () => _i347.DownloadPaymentProofUseCase(gh<_i493.ParentRepository>()),
     );
     gh.lazySingleton<_i937.AcademyEventObserverResolver>(
       () => _i890.DefaultAcademyEventObserverResolver(

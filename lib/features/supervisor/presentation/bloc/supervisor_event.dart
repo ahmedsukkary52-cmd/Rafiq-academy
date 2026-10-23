@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
-import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
 
 abstract class SupervisorEvent extends Equatable {
@@ -144,13 +144,20 @@ class LoadSupervisedPaymentsEvent extends SupervisorEvent {
   List<Object?> get props => [supervisorId, studentIds];
 }
 
+/// The bloc assigns the `requestId`: the same [command] retried keeps it.
 class ReviewPaymentProofEvent extends SupervisorEvent {
-  final PaymentReviewParams params;
+  final String supervisorId;
+  final PaymentReviewCommand command;
+  final PaymentAmountSnapshot snapshot;
 
-  const ReviewPaymentProofEvent(this.params);
+  const ReviewPaymentProofEvent({
+    required this.supervisorId,
+    required this.command,
+    required this.snapshot,
+  });
 
   @override
-  List<Object?> get props => [params];
+  List<Object?> get props => [supervisorId, command, snapshot];
 }
 
 class ResetReviewPaymentEvent extends SupervisorEvent {

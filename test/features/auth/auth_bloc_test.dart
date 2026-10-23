@@ -20,7 +20,6 @@ final _student = UserEntity(
   uid: 'stu1',
   name: 'طالب',
   role: 'student',
-  phone: '',
   isActive: true,
   createdAt: DateTime(2026),
 );

@@ -23,7 +23,6 @@ class _FakeAdminRepository implements AdminRepository {
     required String password,
     required String name,
     required String role,
-    String? phone,
     bool isActive = true,
   }) async {
     provisionCalled = true;

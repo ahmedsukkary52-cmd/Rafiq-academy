@@ -5,6 +5,7 @@ import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
@@ -101,6 +102,8 @@ class ParentRepositoryImpl implements ParentRepository {
   Future<Either<Failure, Unit>> submitAbsenceRequest(
     AbsenceRequestEntity request,
   ) async {
+    final violation = contactInfoViolation(request.reason);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.submitAbsenceRequest(

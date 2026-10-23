@@ -57,7 +57,6 @@ UserEntity _teacherUser() => UserEntity(
   uid: 't1',
   name: 'محمد',
   role: 'teacher',
-  phone: '0500000000',
   email: 't@example.com',
   isActive: true,
   createdAt: DateTime(2026, 1, 1),

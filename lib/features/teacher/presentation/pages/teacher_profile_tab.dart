@@ -29,11 +29,8 @@ class TeacherProfileTab extends StatelessWidget {
     final displayName = user?.name.trim().isNotEmpty == true
         ? 'أ. ${user!.name.trim()}'
         : 'المعلم';
-    final phone = user?.phone.trim() ?? '';
     final email = user?.email?.trim() ?? '';
-    final contact = phone.isNotEmpty
-        ? phone
-        : (email.isNotEmpty ? email : null);
+    final contact = email.isNotEmpty ? email : null;
 
     return Directionality(
       textDirection: TextDirection.rtl,

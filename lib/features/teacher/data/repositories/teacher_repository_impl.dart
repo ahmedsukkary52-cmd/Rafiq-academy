@@ -7,6 +7,7 @@ import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/academy_event_publication.dart';
 import '../../../../shared/domain/academy_event_sink.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../../student/data/models/recitation_record_model.dart';
 import '../../../parent/domain/entities/parent_entities.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
@@ -242,6 +243,10 @@ class TeacherRepositoryImpl implements TeacherRepository {
     required DateTime dueDate,
     required String teacherId,
   }) async {
+    final violation =
+        contactInfoViolation(newMemorizationRange) ??
+        contactInfoViolation(reviewRange);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
 
     final List<AcademyEvent> events;

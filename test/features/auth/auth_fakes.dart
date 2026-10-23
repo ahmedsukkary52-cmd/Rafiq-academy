@@ -10,7 +10,10 @@ class FakeUser extends Fake implements User {
   @override
   final String uid;
 
-  FakeUser(this.uid);
+  @override
+  final String? email;
+
+  FakeUser(this.uid, {this.email});
 }
 
 class FakeCredential extends Fake implements UserCredential {
@@ -67,7 +70,7 @@ class FakeFirebaseAuth extends Fake implements FirebaseAuth {
     if (passwords[uid] != password) {
       throw FirebaseAuthException(code: 'wrong-password');
     }
-    _current = FakeUser(uid);
+    _current = FakeUser(uid, email: email);
     _authState.add(_current);
     return FakeCredential(_current);
   }

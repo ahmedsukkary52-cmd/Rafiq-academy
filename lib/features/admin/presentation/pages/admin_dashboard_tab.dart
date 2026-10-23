@@ -367,7 +367,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
     final letter = r.name.isNotEmpty ? r.name.characters.first : 'ط';
     return AdminPendingRequestTile(
       title: r.name,
-      subtitle: r.phone ?? r.email ?? 'طالب جديد',
+      subtitle: r.email ?? 'طالب جديد',
       badgeLabel: 'جديد',
       badgeColor: AppColors.primary,
       badgeBg: AppColors.primaryLight,

@@ -6,7 +6,6 @@ class StudentProfileEntity extends Equatable {
   final String uid;
   final String name;
   final String? profileImageUrl;
-  final String? phone;
   final String? halaqaId;
   final String halaqaName; // denormalized - ظهر في التصميم "حلقة المتقدمين"
 
@@ -57,7 +56,6 @@ class StudentProfileEntity extends Equatable {
     required this.uid,
     required this.name,
     this.profileImageUrl,
-    this.phone,
     this.halaqaId,
     this.halaqaName = '',
     this.lifecycle = StudentLifecycle.active,
@@ -90,7 +88,6 @@ class StudentProfileEntity extends Equatable {
       uid: uid,
       name: name,
       profileImageUrl: profileImageUrl,
-      phone: phone,
       halaqaId: halaqaId,
       halaqaName: halaqaName,
       lifecycle: lifecycle,
@@ -116,7 +113,6 @@ class StudentProfileEntity extends Equatable {
     uid,
     name,
     profileImageUrl,
-    phone,
     halaqaId,
     halaqaName,
     lifecycle,

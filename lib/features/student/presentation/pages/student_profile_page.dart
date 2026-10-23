@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../auth/presentation/bloc/auth_bloc.dart';
-import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../awards/presentation/bloc/awards_bloc.dart';
 import '../../../awards/presentation/bloc/awards_event.dart';
 import '../../../awards/presentation/bloc/awards_state.dart';
@@ -278,16 +275,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         .clamp(0.0, 100.0)
         .toDouble();
     final joinDate = _formatJoinMonthYear(profile.createdAt);
-    final phone = nonEmptyTrimmed(profile.phone);
-    final authState = context.read<AuthBloc>().state;
-    final viewerIsAdmin =
-        authState is AuthAuthenticated && authState.user.role == AppRoles.admin;
-    // D16 — phone is Admin-only; never show on teacher/supervisor student profile.
-    final phoneDisplay = !viewerIsAdmin
-        ? '—'
-        : phone == null
-        ? 'غير متوفر'
-        : teacherHomeEasternDigits(phone);
     final guardianValue = !_hasLinkedGuardian
         ? 'غير مرتبط'
         : (_guardianName ?? 'ولي الأمر');
@@ -364,7 +351,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                             _InfoCard(
                               name: displayName,
                               guardian: guardianValue,
-                              phone: phoneDisplay,
                               planName: planName,
                               joinDate: joinDate == null
                                   ? 'غير متوفر'
@@ -702,14 +688,12 @@ class _ProfileCtaButton extends StatelessWidget {
 class _InfoCard extends StatelessWidget {
   final String name;
   final String guardian;
-  final String phone;
   final String planName;
   final String joinDate;
 
   const _InfoCard({
     required this.name,
     required this.guardian,
-    required this.phone,
     required this.planName,
     required this.joinDate,
   });
@@ -735,8 +719,6 @@ class _InfoCard extends StatelessWidget {
           _InfoRow(label: 'الاسم الكامل', value: name),
           const SizedBox(height: 12),
           _InfoRow(label: 'ولي الأمر', value: guardian),
-          const SizedBox(height: 12),
-          _InfoRow(label: 'رقم الهاتف', value: phone),
           const SizedBox(height: 12),
           _InfoRow(label: 'الخطة الحالية', value: planName),
           const SizedBox(height: 12),

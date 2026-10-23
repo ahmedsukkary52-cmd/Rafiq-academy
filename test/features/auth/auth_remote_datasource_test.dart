@@ -200,6 +200,48 @@ void main() {
     });
   });
 
+  group('own email comes from Firebase Auth', () {
+    test('profile without users.email still shows the Auth email', () async {
+      final user = await ds.loginWithEmail(
+        email: 'student@x.test',
+        password: 'secret1',
+      );
+      expect(user.email, 'student@x.test');
+    });
+
+    test('Auth email wins over a legacy users.email', () async {
+      firestore.docs['users/stu1'] = {
+        ...profile('student', isActive: true),
+        'email': 'stale@x.test',
+      };
+      final user = await ds.loginWithEmail(
+        email: 'student@x.test',
+        password: 'secret1',
+      );
+      expect(user.email, 'student@x.test');
+    });
+
+    test('transition: legacy users.email is kept when Auth has none', () async {
+      firestore.docs['users/stu1'] = {
+        ...profile('student', isActive: true),
+        'email': 'legacy-only@x.test',
+      };
+      auth = FakeFirebaseAuth(current: FakeUser('stu1'));
+      ds = AuthRemoteDatasourceImpl(firebaseAuth: auth, firestore: firestore);
+      final user = await ds.getCurrentUser();
+      expect(user?.email, 'legacy-only@x.test');
+    });
+
+    test('restored session uses the Auth email', () async {
+      auth = FakeFirebaseAuth(
+        current: FakeUser('stu1', email: 'restored@x.test'),
+      );
+      ds = AuthRemoteDatasourceImpl(firebaseAuth: auth, firestore: firestore);
+      final user = await ds.getCurrentUser();
+      expect(user?.email, 'restored@x.test');
+    });
+  });
+
   group('password reset', () {
     test('sends the Firebase reset email in Arabic', () async {
       await ds.sendPasswordResetEmail(email: 'student@x.test');

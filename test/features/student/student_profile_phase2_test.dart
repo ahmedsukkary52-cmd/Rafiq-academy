@@ -49,31 +49,13 @@ void main() {
           'totalVersesMemorized': 80,
         },
       );
-      // D16 — phone is Admin/self via userPrivate only; public users.phone must not leak.
-      expect(model.phone, isNull);
+      // A legacy users.phone is never carried into the app.
+      expect(model.props, isNot(contains('0501234567')));
       expect(model.name, 'أحمد');
       expect(model.streakDays, 12);
       expect(model.totalVersesMemorized, 80);
       expect(model.level, 3);
     });
-
-    test(
-      'D16: ignores blank users.phone the same as populated users.phone',
-      () {
-        final model = StudentProfileModel.fromMaps(
-          uid: 's1',
-          user: {'name': 'أحمد', 'phone': '  '},
-          profile: {
-            'currentPlanName': '',
-            'overallProgressPercent': 0,
-            'totalStars': 0,
-            'badges': const <String>[],
-          },
-        );
-        expect(model.phone, isNull);
-        expect(model.name, 'أحمد');
-      },
-    );
 
     test('prefers profile createdAt then users.createdAt', () {
       final fromProfile = StudentProfileModel.fromMaps(

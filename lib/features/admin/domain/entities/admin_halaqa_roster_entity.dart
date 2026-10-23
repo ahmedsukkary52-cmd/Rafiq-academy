@@ -3,20 +3,18 @@ import 'package:equatable/equatable.dart';
 class AdminRosterStudentEntity extends Equatable {
   final String uid;
   final String name;
-  final String? phone;
   final String? profileImageUrl;
   final bool isActive;
 
   const AdminRosterStudentEntity({
     required this.uid,
     required this.name,
-    this.phone,
     this.profileImageUrl,
     required this.isActive,
   });
 
   @override
-  List<Object?> get props => [uid, name, phone, profileImageUrl, isActive];
+  List<Object?> get props => [uid, name, profileImageUrl, isActive];
 }
 
 class AdminHalaqaRosterEntity extends Equatable {

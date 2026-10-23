@@ -14,7 +14,7 @@
 /// `--teacher-password=<password>` entrypoint args are accepted too.
 ///
 /// Optional overrides:
-///   --teacher-name=...  --teacher-phone=...  --meeting-link=...
+///   --teacher-name=...  --meeting-link=...
 ///
 /// Idempotent: fixed document IDs under `seed_*` so re-runs overwrite the same docs.
 library;
@@ -51,7 +51,6 @@ const _notificationId = 'seed_notif_teacher';
 const _student1Name = 'أحمد محمد';
 const _student2Name = 'عمر خالد';
 const _defaultTeacherName = 'المعلم التجريبي';
-const _defaultTeacherPhone = '0500000001';
 const _defaultMeetingLink = 'https://meet.google.com/seed-teacher-halaqa';
 
 Future<void> main(List<String> rawArgs) async {
@@ -118,18 +117,12 @@ Future<_SeedResult> _seedTeacherFlow(
   final now = DateTime.now();
   final dayStart = DateTime(now.year, now.month, now.day);
   final teacherName = args.teacherName;
-  final teacherPhone = args.teacherPhone;
-  final teacherEmail = args.teacherEmail.isNotEmpty
-      ? args.teacherEmail
-      : args.teacherEmailField;
 
-  // 1) Teacher users/{teacherUid}
+  // 1) Teacher users/{teacherUid} (email stays in Firebase Auth only)
   final teacherUser = UserModel(
     uid: teacherUid,
     name: teacherName,
     role: AppRoles.teacher,
-    phone: teacherPhone,
-    email: teacherEmail.isEmpty ? null : teacherEmail,
     isActive: true,
     createdAt: now,
   );
@@ -143,7 +136,6 @@ Future<_SeedResult> _seedTeacherFlow(
     uid: _student1Id,
     name: _student1Name,
     role: AppRoles.student,
-    phone: '0500000002',
     isActive: true,
     createdAt: now,
   );
@@ -151,7 +143,6 @@ Future<_SeedResult> _seedTeacherFlow(
     uid: _student2Id,
     name: _student2Name,
     role: AppRoles.student,
-    phone: '0500000003',
     isActive: true,
     createdAt: now,
   );
@@ -374,7 +365,6 @@ class _SeedArgs {
   final String teacherEmail;
   final String teacherPassword;
   final String teacherName;
-  final String teacherPhone;
   final String teacherEmailField;
   final String meetingLink;
 
@@ -383,7 +373,6 @@ class _SeedArgs {
     required this.teacherEmail,
     required this.teacherPassword,
     required this.teacherName,
-    required this.teacherPhone,
     required this.teacherEmailField,
     required this.meetingLink,
   });
@@ -402,7 +391,6 @@ class _SeedArgs {
             'SEED_TEACHER_PASSWORD',
           ),
           'SEED_TEACHER_NAME': String.fromEnvironment('SEED_TEACHER_NAME'),
-          'SEED_TEACHER_PHONE': String.fromEnvironment('SEED_TEACHER_PHONE'),
           'SEED_MEETING_LINK': String.fromEnvironment('SEED_MEETING_LINK'),
         };
         final v = defines[envKey];
@@ -420,11 +408,6 @@ class _SeedArgs {
         'teacher-name',
         envKey: 'SEED_TEACHER_NAME',
         fallback: _defaultTeacherName,
-      ),
-      teacherPhone: opt(
-        'teacher-phone',
-        envKey: 'SEED_TEACHER_PHONE',
-        fallback: _defaultTeacherPhone,
       ),
       teacherEmailField: email,
       meetingLink: opt(

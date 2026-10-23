@@ -8,7 +8,6 @@ class StudentProfileModel extends StudentProfileEntity {
     required super.uid,
     required super.name,
     super.profileImageUrl,
-    super.phone,
     super.halaqaId,
     super.halaqaName,
     super.lifecycle,
@@ -51,8 +50,6 @@ class StudentProfileModel extends StudentProfileEntity {
       uid: uid,
       name: user['name'] ?? '',
       profileImageUrl: user['profileImageUrl'] as String?,
-      // D16 — never hydrate phone from users; resolve via userPrivate when allowed.
-      phone: null,
       halaqaId: profile['halaqaId'] as String?,
       halaqaName: _readNonEmptyString(profile['halaqaName']) ?? halaqaName,
       // C14 / WA-15 — absent lifecycle reads as active (no migration needed).

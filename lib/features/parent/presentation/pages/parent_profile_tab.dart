@@ -29,12 +29,7 @@ class ParentProfileTab extends StatelessWidget {
     final name = user?.name.trim().isNotEmpty == true
         ? user!.name.trim()
         : 'ولي الأمر';
-    final phone = user?.phone.trim() ?? '';
-    final email = user?.email?.trim() ?? '';
-    final contact = [
-      if (email.isNotEmpty) email,
-      if (phone.isNotEmpty) phone,
-    ].join(' — ');
+    final contact = user?.email?.trim() ?? '';
 
     return Directionality(
       textDirection: TextDirection.rtl,

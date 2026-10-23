@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../domain/entities/content_file_entity.dart';
 import '../../domain/repositories/content_library_repository.dart';
 import '../datasources/content_library_remote_datasource.dart';
@@ -48,6 +49,11 @@ class ContentLibraryRepositoryImpl implements ContentLibraryRepository {
     required String uploaderName,
     String? halaqaId,
   }) async* {
+    final violation = contactInfoViolation(title);
+    if (violation != null) {
+      yield Left(ValidationFailure(violation));
+      return;
+    }
     if (!await networkInfo.isConnected) {
       yield const Left(NetworkFailure());
       return;

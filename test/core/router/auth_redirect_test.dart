@@ -7,7 +7,6 @@ UserEntity _user(String role) => UserEntity(
   uid: 'u1',
   name: 'x',
   role: role,
-  phone: '',
   isActive: true,
   createdAt: DateTime(2026),
 );

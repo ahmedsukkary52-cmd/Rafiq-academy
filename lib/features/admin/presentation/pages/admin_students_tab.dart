@@ -58,9 +58,7 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
           final students = h.students
               .where(
                 (s) =>
-                    s.name.toLowerCase().contains(q) ||
-                    (s.phone ?? '').contains(q) ||
-                    s.uid.contains(q),
+                    s.name.toLowerCase().contains(q) || s.uid.contains(q),
               )
               .toList();
           if (students.isEmpty && !h.name.toLowerCase().contains(q)) {
@@ -349,23 +347,11 @@ class _StudentRow extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      student.name,
-                      style: AppTextStyles.titleMedium.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (student.phone != null && student.phone!.isNotEmpty)
-                      Text(
-                        student.phone!,
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  student.name,
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               AdminStatusBadge(

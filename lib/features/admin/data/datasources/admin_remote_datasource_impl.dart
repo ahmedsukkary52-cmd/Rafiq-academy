@@ -22,6 +22,7 @@ import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
 import '../../domain/entities/teacher_management_entity.dart';
+import '../admin_private_email_reader.dart';
 import 'admin_remote_datasource.dart';
 
 @LazySingleton(as: AdminRemoteDatasource)
@@ -33,6 +34,8 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
     required this.firestore,
     required this.functions,
   });
+
+  AdminPrivateEmailReader get emailReader => AdminPrivateEmailReader(firestore);
 
   @override
   Future<AcademyStatsEntity> getAcademyStats() async {
@@ -678,7 +681,6 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
           return AdminRosterStudentEntity(
             uid: sid,
             name: u['name'] as String? ?? sid,
-            phone: u['phone'] as String?,
             profileImageUrl: u['profileImageUrl'] as String?,
             isActive: u['isActive'] as bool? ?? true,
           );
@@ -726,12 +728,15 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
 
         final userData = userDoc.data();
         final createdRaw = userData['createdAt'] ?? profileData['createdAt'];
+        final privateEmail = await emailReader.emailOf(userDoc.id);
         pending.add(
           RegistrationRequestEntity(
             studentId: userDoc.id,
             name: userData['name'] as String? ?? userDoc.id,
-            phone: userData['phone'] as String?,
-            email: userData['email'] as String?,
+            email: AdminPrivateEmailReader.preferPrivate(
+              privateEmail,
+              userData['email'],
+            ),
             profileImageUrl: userData['profileImageUrl'] as String?,
             registeredAt: createdRaw is Timestamp ? createdRaw.toDate() : null,
           ),

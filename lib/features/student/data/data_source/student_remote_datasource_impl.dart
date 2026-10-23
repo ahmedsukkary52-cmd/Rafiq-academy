@@ -44,56 +44,14 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
         throw const ServerException('لم يتم العثور على بيانات الطالب');
       }
 
-      final base = StudentProfileModel.fromFirestore(
+      return StudentProfileModel.fromFirestore(
         userDoc: userDoc,
         profileDoc: profileDoc,
-      );
-
-      // D16: phone only from userPrivate when Rules allow (self or Admin).
-      final phone = await _tryReadPrivatePhone(uid);
-      if (phone == null) return base;
-      return StudentProfileModel(
-        uid: base.uid,
-        name: base.name,
-        profileImageUrl: base.profileImageUrl,
-        phone: phone,
-        halaqaId: base.halaqaId,
-        halaqaName: base.halaqaName,
-        currentPlanName: base.currentPlanName,
-        overallProgressPercent: base.overallProgressPercent,
-        totalVersesMemorized: base.totalVersesMemorized,
-        completedJuz: base.completedJuz,
-        completedSurahs: base.completedSurahs,
-        points: base.points,
-        streakDays: base.streakDays,
-        level: base.level,
-        totalStars: base.totalStars,
-        badges: base.badges,
-        coins: base.coins,
-        avatarId: base.avatarId,
-        unlockedAvatarIds: base.unlockedAvatarIds,
-        createdAt: base.createdAt,
       );
     } on ServerException {
       rethrow;
     } catch (e) {
       throw ServerException(e.toString());
-    }
-  }
-
-  Future<String?> _tryReadPrivatePhone(String uid) async {
-    try {
-      final snap = await firestore
-          .collection(FirestoreCollections.userPrivate)
-          .doc(uid)
-          .get();
-      final raw = snap.data()?['phone'];
-      if (raw is! String) return null;
-      final phone = raw.trim();
-      return phone.isEmpty ? null : phone;
-    } catch (_) {
-      // Teacher/Supervisor/Parent denied by Rules — expected.
-      return null;
     }
   }
 

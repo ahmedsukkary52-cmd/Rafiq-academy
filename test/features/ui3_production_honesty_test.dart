@@ -195,7 +195,6 @@ void main() {
               uid: 't1',
               name: 'محمد',
               role: 'teacher',
-              phone: '0500000000',
               isActive: true,
               createdAt: DateTime(2026, 1, 1),
             ),

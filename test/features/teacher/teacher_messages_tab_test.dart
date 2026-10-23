@@ -38,7 +38,6 @@ class _AuthBloc extends Fake implements AuthBloc {
       uid: 't1',
       name: 'المعلم',
       role: AppRoles.teacher,
-      phone: '',
       isActive: true,
       createdAt: DateTime(2026),
     ),

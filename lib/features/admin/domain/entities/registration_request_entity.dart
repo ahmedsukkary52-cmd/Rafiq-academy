@@ -4,7 +4,6 @@ import 'package:equatable/equatable.dart';
 class RegistrationRequestEntity extends Equatable {
   final String studentId;
   final String name;
-  final String? phone;
   final String? email;
   final String? profileImageUrl;
   final DateTime? registeredAt;
@@ -12,7 +11,6 @@ class RegistrationRequestEntity extends Equatable {
   const RegistrationRequestEntity({
     required this.studentId,
     required this.name,
-    this.phone,
     this.email,
     this.profileImageUrl,
     this.registeredAt,
@@ -22,7 +20,6 @@ class RegistrationRequestEntity extends Equatable {
   List<Object?> get props => [
     studentId,
     name,
-    phone,
     email,
     profileImageUrl,
     registeredAt,

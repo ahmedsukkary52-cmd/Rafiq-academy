@@ -162,34 +162,8 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
         reason: AuthErrorReason.disabled,
       );
     }
-
-    // D16: prefer userPrivate phone (self); fall back to legacy users.phone.
-    final privatePhone = await _readOwnPrivatePhone(uid);
-    if (privatePhone == null || privatePhone.isEmpty) return user;
-    return UserModel(
-      uid: user.uid,
-      name: user.name,
-      role: user.role,
-      phone: privatePhone,
-      email: user.email,
-      profileImageUrl: user.profileImageUrl,
-      isActive: user.isActive,
-      createdAt: user.createdAt,
-    );
-  }
-
-  Future<String?> _readOwnPrivatePhone(String uid) async {
-    try {
-      final snap = await firestore
-          .collection(FirestoreCollections.userPrivate)
-          .doc(uid)
-          .get()
-          .timeout(_firestoreTimeout);
-      final raw = snap.data()?['phone'];
-      return raw is String ? raw.trim() : null;
-    } catch (_) {
-      return null;
-    }
+    final authUser = firebaseAuth.currentUser;
+    return user.withAuthEmail(authUser?.uid == uid ? authUser?.email : null);
   }
 
   Future<void> _signOutQuietly() async {

@@ -1,4 +1,4 @@
-﻿/// Demo Academy permanent development dataset — called from [seed_firestore.dart].
+/// Demo Academy permanent development dataset — called from [seed_firestore.dart].
 ///
 /// Idempotent: fixed document IDs under `demo_*` / stable Auth emails.
 /// Safe to re-run; overwrites the same docs.
@@ -145,26 +145,109 @@ const demoAccountsCatalog = <DemoAccount>[
     name: 'حسن العمري',
   ),
   // Students 01–20
-  DemoAccount(email: 'student01@rafiq.demo', role: AppRoles.student, name: 'أحمد محمد', note: 'متفوق'),
-  DemoAccount(email: 'student02@rafiq.demo', role: AppRoles.student, name: 'سارة علي', note: 'متأخرة في الواجب'),
-  DemoAccount(email: 'student03@rafiq.demo', role: AppRoles.student, name: 'عمر خالد'),
-  DemoAccount(email: 'student04@rafiq.demo', role: AppRoles.student, name: 'نورة فهد'),
-  DemoAccount(email: 'student05@rafiq.demo', role: AppRoles.student, name: 'يوسف سعد'),
-  DemoAccount(email: 'student06@rafiq.demo', role: AppRoles.student, name: 'لينا ماجد'),
-  DemoAccount(email: 'student07@rafiq.demo', role: AppRoles.student, name: 'كريم ناصر'),
-  DemoAccount(email: 'student08@rafiq.demo', role: AppRoles.student, name: 'هدى بدر'),
-  DemoAccount(email: 'student09@rafiq.demo', role: AppRoles.student, name: 'فيصل تركي', note: 'ملتحق حديثاً'),
-  DemoAccount(email: 'student10@rafiq.demo', role: AppRoles.student, name: 'دانة وليد'),
-  DemoAccount(email: 'student11@rafiq.demo', role: AppRoles.student, name: 'راكان سلمان'),
-  DemoAccount(email: 'student12@rafiq.demo', role: AppRoles.student, name: 'جود إبراهيم'),
-  DemoAccount(email: 'student13@rafiq.demo', role: AppRoles.student, name: 'تميم عادل'),
-  DemoAccount(email: 'student14@rafiq.demo', role: AppRoles.student, name: 'ميساء حمد'),
-  DemoAccount(email: 'student15@rafiq.demo', role: AppRoles.student, name: 'زياد طارق'),
-  DemoAccount(email: 'student16@rafiq.demo', role: AppRoles.student, name: 'غادة سامر'),
-  DemoAccount(email: 'student17@rafiq.demo', role: AppRoles.student, name: 'باسل أنور'),
-  DemoAccount(email: 'student18@rafiq.demo', role: AppRoles.student, name: 'شهد فواز'),
-  DemoAccount(email: 'student19@rafiq.demo', role: AppRoles.student, name: 'أنس جابر'),
-  DemoAccount(email: 'student20@rafiq.demo', role: AppRoles.student, name: 'ريما صالح'),
+  DemoAccount(
+    email: 'student01@rafiq.demo',
+    role: AppRoles.student,
+    name: 'أحمد محمد',
+    note: 'متفوق',
+  ),
+  DemoAccount(
+    email: 'student02@rafiq.demo',
+    role: AppRoles.student,
+    name: 'سارة علي',
+    note: 'متأخرة في الواجب',
+  ),
+  DemoAccount(
+    email: 'student03@rafiq.demo',
+    role: AppRoles.student,
+    name: 'عمر خالد',
+  ),
+  DemoAccount(
+    email: 'student04@rafiq.demo',
+    role: AppRoles.student,
+    name: 'نورة فهد',
+  ),
+  DemoAccount(
+    email: 'student05@rafiq.demo',
+    role: AppRoles.student,
+    name: 'يوسف سعد',
+  ),
+  DemoAccount(
+    email: 'student06@rafiq.demo',
+    role: AppRoles.student,
+    name: 'لينا ماجد',
+  ),
+  DemoAccount(
+    email: 'student07@rafiq.demo',
+    role: AppRoles.student,
+    name: 'كريم ناصر',
+  ),
+  DemoAccount(
+    email: 'student08@rafiq.demo',
+    role: AppRoles.student,
+    name: 'هدى بدر',
+  ),
+  DemoAccount(
+    email: 'student09@rafiq.demo',
+    role: AppRoles.student,
+    name: 'فيصل تركي',
+    note: 'ملتحق حديثاً',
+  ),
+  DemoAccount(
+    email: 'student10@rafiq.demo',
+    role: AppRoles.student,
+    name: 'دانة وليد',
+  ),
+  DemoAccount(
+    email: 'student11@rafiq.demo',
+    role: AppRoles.student,
+    name: 'راكان سلمان',
+  ),
+  DemoAccount(
+    email: 'student12@rafiq.demo',
+    role: AppRoles.student,
+    name: 'جود إبراهيم',
+  ),
+  DemoAccount(
+    email: 'student13@rafiq.demo',
+    role: AppRoles.student,
+    name: 'تميم عادل',
+  ),
+  DemoAccount(
+    email: 'student14@rafiq.demo',
+    role: AppRoles.student,
+    name: 'ميساء حمد',
+  ),
+  DemoAccount(
+    email: 'student15@rafiq.demo',
+    role: AppRoles.student,
+    name: 'زياد طارق',
+  ),
+  DemoAccount(
+    email: 'student16@rafiq.demo',
+    role: AppRoles.student,
+    name: 'غادة سامر',
+  ),
+  DemoAccount(
+    email: 'student17@rafiq.demo',
+    role: AppRoles.student,
+    name: 'باسل أنور',
+  ),
+  DemoAccount(
+    email: 'student18@rafiq.demo',
+    role: AppRoles.student,
+    name: 'شهد فواز',
+  ),
+  DemoAccount(
+    email: 'student19@rafiq.demo',
+    role: AppRoles.student,
+    name: 'أنس جابر',
+  ),
+  DemoAccount(
+    email: 'student20@rafiq.demo',
+    role: AppRoles.student,
+    name: 'ريما صالح',
+  ),
 ];
 
 /// Legacy emails still created (compat with older docs / habits).
@@ -180,7 +263,11 @@ Future<Map<String, User>> ensureAllDemoAuthUsers(
 }) async {
   final out = <String, User>{};
   for (final a in demoAccountsCatalog) {
-    out[a.email] = await ensureAuthUser(auth, email: a.email, password: password);
+    out[a.email] = await ensureAuthUser(
+      auth,
+      email: a.email,
+      password: password,
+    );
   }
   // Legacy aliases (same password) for older tooling.
   for (final email in legacyCompatEmails) {
@@ -231,7 +318,9 @@ void printDemoCredentials(String password) {
     if (a.note.isNotEmpty) stdout.writeln('${''.padRight(12)}→ ${a.note}');
   }
   stdout.writeln('────────────────────────────────────────────────────');
-  stdout.writeln('halaqat: $demoHalaqaMorningId | $demoHalaqaAfternoonId | $demoHalaqaEveningId');
+  stdout.writeln(
+    'halaqat: $demoHalaqaMorningId | $demoHalaqaAfternoonId | $demoHalaqaEveningId',
+  );
   stdout.writeln('academy: $demoAcademyId');
   stdout.writeln('Teacher Home login: teacher@rafiq.demo');
   stdout.writeln('════════════════════════════════════════════════════');
@@ -258,11 +347,14 @@ Future<void> seedDemoAcademyDataset(
   final t3 = uid('teacher3@rafiq.demo');
 
   final studentEmails = [
-    for (var i = 1; i <= 20; i++) 'student${i.toString().padLeft(2, '0')}@rafiq.demo',
+    for (var i = 1; i <= 20; i++)
+      'student${i.toString().padLeft(2, '0')}@rafiq.demo',
   ];
   final studentUids = [for (final e in studentEmails) uid(e)];
   final studentNames = {
-    for (final a in demoAccountsCatalog.where((a) => a.role == AppRoles.student))
+    for (final a in demoAccountsCatalog.where(
+      (a) => a.role == AppRoles.student,
+    ))
       a.email: a.name,
   };
 
@@ -298,7 +390,9 @@ Future<void> seedDemoAcademyDataset(
     'name': 'أكاديمية رفيق للتحفيظ',
     'city': 'الرياض',
     'currentSemester': 'الفصل الدراسي الثاني 1447',
-    'semesterStart': Timestamp.fromDate(dayStart.subtract(const Duration(days: 60))),
+    'semesterStart': Timestamp.fromDate(
+      dayStart.subtract(const Duration(days: 60)),
+    ),
     'semesterEnd': Timestamp.fromDate(dayStart.add(const Duration(days: 60))),
     'timezone': 'Asia/Riyadh',
     'settings': {
@@ -312,18 +406,19 @@ Future<void> seedDemoAcademyDataset(
   stdout.writeln('Seeding users + profiles…');
   for (final a in demoAccountsCatalog) {
     final u = users[a.email]!;
-    await db.collection(FirestoreCollections.users).doc(u.uid).set(
-      UserModel(
-        uid: u.uid,
-        name: a.name,
-        role: a.role,
-        phone: _phoneFor(a.email),
-        email: a.email,
-        isActive: true,
-        createdAt: now,
-      ).toFirestore(),
-      SetOptions(merge: true),
-    );
+    await db
+        .collection(FirestoreCollections.users)
+        .doc(u.uid)
+        .set(
+          UserModel(
+            uid: u.uid,
+            name: a.name,
+            role: a.role,
+            isActive: true,
+            createdAt: now,
+          ).toFirestore(),
+          SetOptions(merge: true),
+        );
   }
 
   await db.collection(FirestoreCollections.teacherProfiles).doc(t1).set({
@@ -343,9 +438,10 @@ Future<void> seedDemoAcademyDataset(
   }, SetOptions(merge: true));
 
   for (final entry in parentChildren.entries) {
-    await db.collection(FirestoreCollections.parentProfiles).doc(uid(entry.key)).set({
-      'childrenIds': entry.value,
-    }, SetOptions(merge: true));
+    await db
+        .collection(FirestoreCollections.parentProfiles)
+        .doc(uid(entry.key))
+        .set({'childrenIds': entry.value}, SetOptions(merge: true));
   }
 
   stdout.writeln('Seeding halaqat…');
@@ -359,8 +455,16 @@ Future<void> seedDemoAcademyDataset(
     studentIds: morningStudents,
     schedule: [
       HalaqaScheduleModel(day: todayAr, startTime: '06:30', endTime: '08:00'),
-      const HalaqaScheduleModel(day: 'الأربعاء', startTime: '06:30', endTime: '08:00'),
-      const HalaqaScheduleModel(day: 'السبت', startTime: '06:30', endTime: '08:00'),
+      const HalaqaScheduleModel(
+        day: 'الأربعاء',
+        startTime: '06:30',
+        endTime: '08:00',
+      ),
+      const HalaqaScheduleModel(
+        day: 'السبت',
+        startTime: '06:30',
+        endTime: '08:00',
+      ),
     ],
   );
   await _putHalaqa(
@@ -372,8 +476,16 @@ Future<void> seedDemoAcademyDataset(
     studentIds: afternoonStudents,
     schedule: [
       HalaqaScheduleModel(day: todayAr, startTime: '16:00', endTime: '17:30'),
-      const HalaqaScheduleModel(day: 'الاثنين', startTime: '16:00', endTime: '17:30'),
-      const HalaqaScheduleModel(day: 'الخميس', startTime: '16:00', endTime: '17:30'),
+      const HalaqaScheduleModel(
+        day: 'الاثنين',
+        startTime: '16:00',
+        endTime: '17:30',
+      ),
+      const HalaqaScheduleModel(
+        day: 'الخميس',
+        startTime: '16:00',
+        endTime: '17:30',
+      ),
     ],
   );
   await _putHalaqa(
@@ -385,8 +497,16 @@ Future<void> seedDemoAcademyDataset(
     studentIds: eveningStudents,
     schedule: [
       HalaqaScheduleModel(day: todayAr, startTime: '19:30', endTime: '21:00'),
-      const HalaqaScheduleModel(day: 'الثلاثاء', startTime: '19:30', endTime: '21:00'),
-      const HalaqaScheduleModel(day: 'الجمعة', startTime: '19:30', endTime: '21:00'),
+      const HalaqaScheduleModel(
+        day: 'الثلاثاء',
+        startTime: '19:30',
+        endTime: '21:00',
+      ),
+      const HalaqaScheduleModel(
+        day: 'الجمعة',
+        startTime: '19:30',
+        endTime: '21:00',
+      ),
     ],
   );
 
@@ -419,13 +539,20 @@ Future<void> seedDemoAcademyDataset(
       'completedSurahs': index == 0 ? 12 : index % 4,
       'badges': badges,
       'createdAt': Timestamp.fromDate(
-        index == 8 ? now.subtract(const Duration(days: 5)) : now.subtract(Duration(days: 90 - index)),
+        index == 8
+            ? now.subtract(const Duration(days: 5))
+            : now.subtract(Duration(days: 90 - index)),
       ),
     }, SetOptions(merge: true));
   }
 
   for (var i = 0; i < 8; i++) {
-    await profile(i, demoHalaqaMorningId, 'حلقة الفجر', badges: i == 0 ? ['متفوق'] : const []);
+    await profile(
+      i,
+      demoHalaqaMorningId,
+      'حلقة الفجر',
+      badges: i == 0 ? ['متفوق'] : const [],
+    );
   }
   for (var i = 8; i < 14; i++) {
     await profile(i, demoHalaqaAfternoonId, 'حلقة العصر');
@@ -599,17 +726,24 @@ Future<void> seedDemoAcademyDataset(
   );
 
   // Touch legacy docs so older IDs still resolve for W1–W8 smoke paths.
-  await db.collection(FirestoreCollections.halaqat).doc('seed_demo_halaqa').set({
-    'name': 'حلقة التحفيظ التجريبية (legacy)',
-    'teacherId': t1,
-    'supervisorId': sup1,
-    'studentIds': [studentUids[0], studentUids[1]],
-    'schedule': [
-      HalaqaScheduleModel(day: todayAr, startTime: '16:00', endTime: '18:00').toMap(),
-    ],
-    'meetingLink': 'https://meet.google.com/seed-demo-halaqa',
-    'status': 'active',
-  }, SetOptions(merge: true));
+  await db.collection(FirestoreCollections.halaqat).doc('seed_demo_halaqa').set(
+    {
+      'name': 'حلقة التحفيظ التجريبية (legacy)',
+      'teacherId': t1,
+      'supervisorId': sup1,
+      'studentIds': [studentUids[0], studentUids[1]],
+      'schedule': [
+        HalaqaScheduleModel(
+          day: todayAr,
+          startTime: '16:00',
+          endTime: '18:00',
+        ).toMap(),
+      ],
+      'meetingLink': 'https://meet.google.com/seed-demo-halaqa',
+      'status': 'active',
+    },
+    SetOptions(merge: true),
+  );
 }
 
 Future<void> _putHalaqa(
@@ -778,7 +912,12 @@ Future<void> _putAssignment(
     if (completedAt != null) 'completedAt': Timestamp.fromDate(completedAt),
     if (submitted)
       'tasks': (homework['tasks'] as List)
-          .map((t) => {...Map<String, dynamic>.from(t as Map), 'isCompleted': true})
+          .map(
+            (t) => {
+              ...Map<String, dynamic>.from(t as Map),
+              'isCompleted': true,
+            },
+          )
           .toList(),
   });
 }
@@ -937,20 +1076,26 @@ Future<void> _seedNotificationsAndAnnouncements(
     body: 'تُعقد اجتماعات أولياء الأمور يوم الخميس بعد صلاة المغرب.',
     targetRole: AppRoles.teacher,
   );
-  await db.collection(FirestoreCollections.notifications).doc('demo_announce_old').set({
-    ...olderAnnouncement,
-    'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 3))),
-  });
+  await db
+      .collection(FirestoreCollections.notifications)
+      .doc('demo_announce_old')
+      .set({
+        ...olderAnnouncement,
+        'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 3))),
+      });
 
   final newestAnnouncement = AdminOpsBroadcast.notificationFields(
     title: 'إعلان إداري',
     body: 'تذكير: موعد رفع التقييمات الشهرية غداً قبل الساعة 12 ظهراً',
     targetRole: AppRoles.teacher,
   );
-  await db.collection(FirestoreCollections.notifications).doc('demo_announce_new').set({
-    ...newestAnnouncement,
-    'createdAt': Timestamp.fromDate(now.subtract(const Duration(hours: 1))),
-  });
+  await db
+      .collection(FirestoreCollections.notifications)
+      .doc('demo_announce_new')
+      .set({
+        ...newestAnnouncement,
+        'createdAt': Timestamp.fromDate(now.subtract(const Duration(hours: 1))),
+      });
 
   // Also broadcast to all roles (unread badge noise)
   final allAnnounce = AdminOpsBroadcast.notificationFields(
@@ -958,10 +1103,13 @@ Future<void> _seedNotificationsAndAnnouncements(
     body: 'يُرجى تحديث بيانات التواصل قبل نهاية الأسبوع.',
     targetRole: 'all',
   );
-  await db.collection(FirestoreCollections.notifications).doc('demo_announce_all').set({
-    ...allAnnounce,
-    'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 1))),
-  });
+  await db
+      .collection(FirestoreCollections.notifications)
+      .doc('demo_announce_all')
+      .set({
+        ...allAnnounce,
+        'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 1))),
+      });
 
   await putNotif(
     id: 'demo_notif_teacher_assign',
@@ -1095,8 +1243,3 @@ String _arabicWeekday(int weekday) => switch (weekday) {
   DateTime.saturday => 'السبت',
   _ => 'الأحد',
 };
-
-String _phoneFor(String email) {
-  final hash = email.hashCode.abs() % 100000000;
-  return '05${hash.toString().padLeft(8, '0')}';
-}

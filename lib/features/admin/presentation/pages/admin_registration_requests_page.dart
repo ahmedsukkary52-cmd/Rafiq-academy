@@ -299,7 +299,7 @@ class _RequestCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        request.phone ?? request.email ?? request.studentId,
+                        request.email ?? request.studentId,
                         style: AppTextStyles.labelSmall,
                       ),
                     ],

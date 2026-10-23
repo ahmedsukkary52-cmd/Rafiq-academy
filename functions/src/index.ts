@@ -48,6 +48,7 @@ export {
 
 // PH-02 — backend authority (server-owned transitions; clients send intent).
 export { reviewPaymentProof } from "./billing/paymentReview";
+export { submitPaymentProof } from "./billing/paymentProofSubmission";
 export {
   recordSessionAttendance,
   upsertSessionEvaluation,

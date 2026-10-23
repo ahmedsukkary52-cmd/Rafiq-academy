@@ -131,6 +131,16 @@ export const AUDIT_METADATA_ALLOWLIST = new Set([
   "previousReviewStatus",
   "newReviewStatus",
   "decision",
+  // Payment review amounts: `amount` is the invoice; the rest are cumulative
+  // confirmed totals except `receiptAmount` (this review's increment).
+  "amountMode",
+  "receiptAmount",
+  "previousAmountPaidConfirmed",
+  "amountPaidConfirmed",
+  "remainingAmount",
+  "requestId",
+  // Server-issued payment proof cycle the review was bound to.
+  "proofCycleId",
   "sessionId",
   "date",
   "fromHalaqaId",

@@ -20,6 +20,7 @@
     "test:billing:emulator": "node --test --test-concurrency=1 test/admin_billing_callable.emulator.test.mjs",
     "test:chat:emulator": "node --test --test-concurrency=1 test/chat_message_callable.emulator.test.mjs",
     "test:meeting-link:emulator": "node --test --test-concurrency=1 test/meeting_link.emulator.test.mjs",
+    "test:proof-cycle:emulator": "npm run build && node --test --test-concurrency=1 test/payment_proof_cycle.emulator.test.mjs",
     "test:unit": "node --test test/wa1_provision_gate.test.mjs",
     "test:wa13": "node --test test/wa13_fcm_send_chain.test.mjs",
     "test:wa14": "node --test test/wa14_student_search.test.mjs",

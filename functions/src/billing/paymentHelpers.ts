@@ -2,6 +2,8 @@
  * Pure helpers for WA-3/WA-5 payment + invoice (unit-testable).
  */
 
+import { cairoLocalDateTimeToUtc } from "./cairoTime";
+
 export const PAYMENT_ACCESS_STATUSES = [
   "ok",
   "reminded",
@@ -29,6 +31,17 @@ export function periodKeyForDate(date: Date): string {
 
 export function invoiceDocId(studentId: string, periodKey: string): string {
   return `inv_${studentId.trim()}_${periodKey.trim()}`;
+}
+
+/**
+ * Default invoice due date: the last calendar day of the billing month at
+ * 12:00 Africa/Cairo. Noon never falls in a DST gap or repeated hour, so the
+ * Cairo calendar day is the last day in standard and summer time alike.
+ */
+export function defaultInvoiceDueDate(periodKey: string): Date {
+  const [y, m] = periodKey.split("-").map((x) => Number(x));
+  const lastDayYmd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  return cairoLocalDateTimeToUtc(lastDayYmd, 12, 0);
 }
 
 export type PricingRuleLike = {

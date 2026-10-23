@@ -3,9 +3,11 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
 import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
+import { contactInfoViolation } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
 import { assertCallerIsAdmin } from "./assertAdmin";
 import {
+  defaultInvoiceDueDate,
   invoiceDocId,
   isValidPaymentAccessStatus,
   periodKeyForDate,
@@ -132,7 +134,7 @@ async function ensurePaymentAccessOk(
   });
 }
 
-function dueDateFromInput(iso: string | undefined, periodKey: string): Date {
+export function dueDateFromInput(iso: string | undefined, periodKey: string): Date {
   if (iso) {
     const parsed = new Date(iso);
     if (Number.isNaN(parsed.getTime())) {
@@ -140,8 +142,7 @@ function dueDateFromInput(iso: string | undefined, periodKey: string): Date {
     }
     return parsed;
   }
-  const [y, m] = periodKey.split("-").map((x) => Number(x));
-  return new Date(Date.UTC(y, m, 0, 21, 0, 0));
+  return defaultInvoiceDueDate(periodKey);
 }
 
 /**
@@ -305,6 +306,10 @@ export const adminReinstatePaymentAccess = onCall(
       typeof (request.data as ReinstateRequest)?.reason === "string"
         ? (request.data as ReinstateRequest).reason!.trim()
         : "admin_reinstate";
+    const reasonViolation = contactInfoViolation(reason);
+    if (reasonViolation) {
+      throw new HttpsError("invalid-argument", reasonViolation);
+    }
 
     const db = admin.firestore();
     const ref = db.collection("paymentAccess").doc(parentId);

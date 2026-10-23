@@ -12,6 +12,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { FieldPath } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { assertCallerIsAdmin } from "../admin/assertAdmin";
@@ -228,7 +229,7 @@ export const adminBackfillStudentLifecycle = onCall(
     let query = db
       .collection(USERS_COLLECTION)
       .where("role", "==", STUDENT_ROLE)
-      .orderBy(admin.firestore.FieldPath.documentId())
+      .orderBy(FieldPath.documentId())
       .limit(pageSize);
     if (cursor !== null) query = query.startAfter(cursor);
 

@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { onRequest } from "firebase-functions/v2/https";
 import { paymobHmacSecret } from "../config";
 import { verifyPaymobHmac } from "./verifyHmac";
@@ -73,7 +74,7 @@ export const paymobWebhook = onRequest(
 
       await paymentRef.update({
         status: "paid",
-        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        paidAt: FieldValue.serverTimestamp(),
         method: "paymob",
       });
 

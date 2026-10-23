@@ -3,6 +3,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 import type { InAppNotification } from "./academyNotifications";
 import { assertSafeDataPayload } from "./evaluationNotification";
@@ -101,7 +102,7 @@ export async function writeInAppNotifications(
         type: n.type,
         readBy: [] as string[],
         hasAudioAlert: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         data: n.data,
       });
     }

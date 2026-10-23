@@ -3,20 +3,25 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
 import '../../domain/entities/posts_entities.dart';
+import '../../domain/post_attachment_policy.dart';
 import '../../domain/post_audience_target.dart';
 import '../bloc/posts_bloc.dart';
 import '../bloc/posts_event.dart';
 import '../bloc/posts_state.dart';
+import '../media/post_attachment_loader.dart';
 
 /// Teacher Home «المنشورات» tab — uses app-scoped [PostsBloc] (do not close it).
 class PostsListPage extends StatefulWidget {
@@ -88,26 +93,39 @@ class _PostsListPageState extends State<PostsListPage> {
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'mp3', 'wav', 'mp4', 'png', 'jpg', 'jpeg'],
+      allowedExtensions: PostAttachmentPolicy.allowedExtensions,
       allowMultiple: true,
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
+    final rejected = <String>[];
     for (final file in result.files) {
       final path = file.path;
       if (path == null) continue;
-      final ext = file.extension?.toLowerCase() ?? '';
-      final AttachmentType? type = switch (ext) {
-        'pdf' => AttachmentType.pdf,
-        'mp3' || 'wav' => AttachmentType.audio,
-        'mp4' => AttachmentType.video,
-        'png' || 'jpg' || 'jpeg' => AttachmentType.image,
-        _ => null,
-      };
-      if (type == null) continue;
+      if (_selectedFiles.length >= PostAttachmentPolicy.maxAttachments) {
+        rejected.add(
+          'الحد الأقصى ${PostAttachmentPolicy.maxAttachments} مرفقات للمنشور',
+        );
+        break;
+      }
+      final check = UploadFilePolicy.check(
+        fileName: file.name,
+        sizeBytes: file.size,
+        formats: PostAttachmentPolicy.formats,
+      );
+      final format = check.format;
+      if (format == null) {
+        rejected.add('${file.name}: ${check.error}');
+        continue;
+      }
       setState(() {
         _selectedFiles.add(File(path));
-        _selectedTypes.add(type);
+        _selectedTypes.add(PostAttachmentPolicy.typeFor(format));
       });
+    }
+    if (rejected.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(rejected.join('\n'))));
     }
   }
 
@@ -519,7 +537,10 @@ class _PostItem extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: post.attachments
-                  .map((attachment) => _AttachmentItem(attachment: attachment))
+                  .map(
+                    (attachment) =>
+                        _AttachmentItem(post: post, attachment: attachment),
+                  )
                   .toList(),
             ),
           ],
@@ -582,10 +603,70 @@ class _PostItem extends StatelessWidget {
   }
 }
 
-class _AttachmentItem extends StatelessWidget {
+class _AttachmentItem extends StatefulWidget {
+  final PostEntity post;
   final PostAttachmentEntity attachment;
 
-  const _AttachmentItem({required this.attachment});
+  const _AttachmentItem({required this.post, required this.attachment});
+
+  @override
+  State<_AttachmentItem> createState() => _AttachmentItemState();
+}
+
+class _AttachmentItemState extends State<_AttachmentItem> {
+  bool _opening = false;
+
+  PostAttachmentEntity get attachment => widget.attachment;
+
+  bool get _isPrivate => PostAttachmentPolicy.isTrustedStoragePath(
+    attachment.storagePath,
+    halaqaId: widget.post.halaqaId ?? '',
+    postId: widget.post.id,
+  );
+
+  /// Legacy URLs were already vetted by the datasource.
+  bool get _isLegacyLink =>
+      attachment.storagePath.isEmpty && attachment.url.isNotEmpty;
+
+  bool get _available => _isPrivate || _isLegacyLink;
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _open() async {
+    if (_opening) return;
+    if (_isLegacyLink) {
+      if (!isAllowedExternalLink(attachment.url)) return;
+      final uri = Uri.parse(attachment.url.trim());
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+    if (!_isPrivate) {
+      _showSnack('المرفق غير متاح');
+      return;
+    }
+    setState(() => _opening = true);
+    final result = await sl<PostAttachmentLoader>().localFile(
+      widget.post,
+      attachment,
+    );
+    if (!mounted) return;
+    setState(() => _opening = false);
+    await result.fold((failure) async => _showSnack(failure.message), (
+      file,
+    ) async {
+      final opened = await OpenFilex.open(file.path);
+      if (opened.type != ResultType.done) {
+        _showSnack('لا يوجد تطبيق على الجهاز لفتح هذا الملف');
+      }
+    });
+  }
 
   Color get _color => switch (attachment.type) {
     AttachmentType.pdf => AppColors.error,
@@ -603,17 +684,13 @@ class _AttachmentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = _available ? _color : AppColors.textHint;
     return InkWell(
-      onTap: () async {
-        final uri = Uri.parse(attachment.url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      },
+      onTap: _open,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: _color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppSizes.radiusM),
         ),
         child: Row(
@@ -621,7 +698,14 @@ class _AttachmentItem extends StatelessWidget {
           children: [
             Text(attachment.fileName, style: AppTextStyles.labelMedium),
             const SizedBox(width: 6),
-            Icon(_icon, color: _color, size: 20),
+            if (_opening)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(_icon, color: color, size: 20),
           ],
         ),
       ),

@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../domain/entities/posts_entities.dart';
 import '../../domain/repositories/posts_repository.dart';
 import '../datasources/posts_remote_datasource.dart';
@@ -67,6 +68,8 @@ class PostsRepositoryImpl implements PostsRepository {
     List<File> attachmentFiles = const [],
     List<AttachmentType> attachmentTypes = const [],
   }) async {
+    final violation = contactInfoViolation(content);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.createPost(
@@ -112,6 +115,8 @@ class PostsRepositoryImpl implements PostsRepository {
     required String authorName,
     required String content,
   }) async {
+    final violation = contactInfoViolation(content);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.addComment(
@@ -145,6 +150,25 @@ class PostsRepositoryImpl implements PostsRepository {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.deletePost(postId);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> downloadAttachment({
+    required PostEntity post,
+    required PostAttachmentEntity attachment,
+    required File target,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      await remoteDatasource.downloadAttachment(
+        post: post,
+        attachment: attachment,
+        target: target,
+      );
       return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

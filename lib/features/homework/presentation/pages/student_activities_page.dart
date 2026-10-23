@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/presentation/halaqa_activities/activity_thread_widgets.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../../../shared/presentation/halaqa_activities/halaqa_activity_ui_models.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
@@ -342,11 +343,22 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
     }
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+      allowedExtensions: UploadFilePolicy.extensionsOf(
+        UploadFilePolicy.imageFormats,
+      ),
       allowMultiple: false,
     );
     final path = result?.files.single.path;
     if (path == null || !mounted) return;
+    final check = UploadFilePolicy.check(
+      fileName: result!.files.single.name,
+      sizeBytes: result.files.single.size,
+      formats: UploadFilePolicy.imageFormats,
+    );
+    if (!check.isOk) {
+      AppSnackBar.showError(context, check.error!);
+      return;
+    }
     setState(() => _pendingImageFile = File(path));
   }
 

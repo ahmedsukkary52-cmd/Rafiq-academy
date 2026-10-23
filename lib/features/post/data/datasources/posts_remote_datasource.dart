@@ -34,4 +34,12 @@ abstract class PostsRemoteDatasource {
   Future<void> togglePin({required String postId, required bool isPinned});
 
   Future<void> deletePost(String postId);
+
+  /// Writes an attachment stored under this post's own Storage folder to
+  /// [target], read through Storage Rules (no download URL).
+  Future<void> downloadAttachment({
+    required PostEntity post,
+    required PostAttachmentEntity attachment,
+    required File target,
+  });
 }

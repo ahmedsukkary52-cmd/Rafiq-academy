@@ -159,6 +159,26 @@ class DeletePostUseCase extends UseCase<Unit, PostIdParams> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// DownloadPostAttachmentUseCase
+// ══════════════════════════════════════════════════════════════════════════════
+
+@lazySingleton
+class DownloadPostAttachmentUseCase
+    extends UseCase<Unit, DownloadPostAttachmentParams> {
+  final PostsRepository repository;
+
+  DownloadPostAttachmentUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, Unit>> call(DownloadPostAttachmentParams params) =>
+      repository.downloadAttachment(
+        post: params.post,
+        attachment: params.attachment,
+        target: params.target,
+      );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Params
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -239,6 +259,21 @@ class AddCommentParams extends Equatable {
 
   @override
   List<Object?> get props => [postId, authorId, authorName, content];
+}
+
+class DownloadPostAttachmentParams extends Equatable {
+  final PostEntity post;
+  final PostAttachmentEntity attachment;
+  final File target;
+
+  const DownloadPostAttachmentParams({
+    required this.post,
+    required this.attachment,
+    required this.target,
+  });
+
+  @override
+  List<Object?> get props => [post.id, attachment, target.path];
 }
 
 class TogglePinParams extends Equatable {

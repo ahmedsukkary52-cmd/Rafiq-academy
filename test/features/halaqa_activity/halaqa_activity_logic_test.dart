@@ -17,10 +17,12 @@ import 'package:rafiq_academy/shared/domain/assignment_policy.dart';
 import 'package:rafiq_academy/shared/presentation/halaqa_activities/halaqa_activity_ui_models.dart';
 
 class _FakeHalaqaActivityRepository implements HalaqaActivityRepository {
-  Either<Failure, AcademyEventPublication> publishResult =
-      const Right(AcademyEventPublication.none());
-  Either<Failure, List<HalaqaActivityEntity>> listResult =
-      const Right(<HalaqaActivityEntity>[]);
+  Either<Failure, AcademyEventPublication> publishResult = const Right(
+    AcademyEventPublication.none(),
+  );
+  Either<Failure, List<HalaqaActivityEntity>> listResult = const Right(
+    <HalaqaActivityEntity>[],
+  );
   Either<Failure, HalaqaActivityEntity>? getResult;
   Either<Failure, HalaqaActivityResponseEntity>? submitResult;
 
@@ -181,7 +183,10 @@ void main() {
       );
       expect(AssignmentPolicy.isLessonHomeworkData({}), isTrue);
       expect(AssignmentPolicy.isHalaqaActivityData({}), isFalse);
-      expect(AssignmentPolicy.latestScanLimit, greaterThan(AssignmentPolicy.latestLimit));
+      expect(
+        AssignmentPolicy.latestScanLimit,
+        greaterThan(AssignmentPolicy.latestLimit),
+      );
     });
   });
 
@@ -214,33 +219,35 @@ void main() {
       expect(repo.lastPublish, isNull);
     });
 
-    test('publishes whole-halaqa activity with optional deadline and types',
-        () async {
-      final repo = _FakeHalaqaActivityRepository();
-      final useCase = PublishHalaqaActivityUseCase(repo);
-      final deadline = DateTime(2026, 8, 20);
+    test(
+      'publishes whole-halaqa activity with optional deadline and types',
+      () async {
+        final repo = _FakeHalaqaActivityRepository();
+        final useCase = PublishHalaqaActivityUseCase(repo);
+        final deadline = DateTime(2026, 8, 20);
 
-      final result = await useCase(
-        PublishHalaqaActivityParams(
-          halaqaId: 'h1',
-          teacherId: 't1',
-          teacherName: 'أ. أحمد',
-          prompt: 'اكتب فقرة عن الصبر',
-          allowedResponseTypes: {
-            HalaqaActivityResponseType.text,
-            HalaqaActivityResponseType.image,
-          },
-          deadline: deadline,
-          alsoShareAsPost: true,
-        ),
-      );
+        final result = await useCase(
+          PublishHalaqaActivityParams(
+            halaqaId: 'h1',
+            teacherId: 't1',
+            teacherName: 'أ. أحمد',
+            prompt: 'اكتب فقرة عن الصبر',
+            allowedResponseTypes: {
+              HalaqaActivityResponseType.text,
+              HalaqaActivityResponseType.image,
+            },
+            deadline: deadline,
+            alsoShareAsPost: true,
+          ),
+        );
 
-      expect(result.isRight(), isTrue);
-      expect(repo.lastPublish!.alsoShareAsPost, isTrue);
-      expect(repo.lastPublish!.deadline, deadline);
-      expect(repo.store.single.halaqaId, 'h1');
-      expect(repo.store.single.kind, AssignmentKind.halaqaActivity);
-    });
+        expect(result.isRight(), isTrue);
+        expect(repo.lastPublish!.alsoShareAsPost, isTrue);
+        expect(repo.lastPublish!.deadline, deadline);
+        expect(repo.store.single.halaqaId, 'h1');
+        expect(repo.store.single.kind, AssignmentKind.halaqaActivity);
+      },
+    );
 
     test('surfaces empty-halaqa / publish guard from repository', () async {
       final repo = _FakeHalaqaActivityRepository()
@@ -316,23 +323,22 @@ void main() {
   });
 
   group('Student load / auth / thread', () {
-    test('getActivity rejects wrong halaqa scope via repository failure',
-        () async {
-      final repo = _FakeHalaqaActivityRepository()
-        ..getResult = const Left(
-          ServerFailure('هذه المهمة خارج نطاق الحلقة'),
+    test(
+      'getActivity rejects wrong halaqa scope via repository failure',
+      () async {
+        final repo = _FakeHalaqaActivityRepository()
+          ..getResult = const Left(
+            ServerFailure('هذه المهمة خارج نطاق الحلقة'),
+          );
+        final result = await GetHalaqaActivityUseCase(repo)(
+          const GetHalaqaActivityParams(halaqaId: 'h2', activityId: 'act_1'),
         );
-      final result = await GetHalaqaActivityUseCase(repo)(
-        const GetHalaqaActivityParams(
-          halaqaId: 'h2',
-          activityId: 'act_1',
-        ),
-      );
-      expect(
-        result,
-        const Left(ServerFailure('هذه المهمة خارج نطاق الحلقة')),
-      );
-    });
+        expect(
+          result,
+          const Left(ServerFailure('هذه المهمة خارج نطاق الحلقة')),
+        );
+      },
+    );
 
     test('submitResponse builds threaded replies for same activity', () async {
       final repo = _FakeHalaqaActivityRepository();
@@ -433,6 +439,48 @@ void main() {
       expect(AppCapabilities.audioUploadsEnabled, isFalse);
     });
 
+    test('publish rejects audio-only while audio uploads are off', () async {
+      final repo = _FakeHalaqaActivityRepository();
+      final result = await PublishHalaqaActivityUseCase(repo)(
+        const PublishHalaqaActivityParams(
+          halaqaId: 'h1',
+          teacherId: 't1',
+          teacherName: 'معلم',
+          prompt: 'سجّل تلاوتك',
+          allowedResponseTypes: {HalaqaActivityResponseType.audio},
+        ),
+      );
+      expect(
+        result,
+        const Left(
+          ValidationFailure('رفع الصوت غير مفعّل حالياً — اختر نصاً أو صورة'),
+        ),
+      );
+      expect(repo.lastPublish, isNull);
+      expect(repo.store, isEmpty);
+    });
+
+    test(
+      'publish rejects mixed selection containing audio while off',
+      () async {
+        final repo = _FakeHalaqaActivityRepository();
+        final result = await PublishHalaqaActivityUseCase(repo)(
+          const PublishHalaqaActivityParams(
+            halaqaId: 'h1',
+            teacherId: 't1',
+            teacherName: 'معلم',
+            prompt: 'شارك رأيك',
+            allowedResponseTypes: {
+              HalaqaActivityResponseType.text,
+              HalaqaActivityResponseType.audio,
+            },
+          ),
+        );
+        expect(result.isLeft(), isTrue);
+        expect(repo.lastPublish, isNull);
+      },
+    );
+
     test('mapper preserves allowed response types', () {
       final entity = HalaqaActivityEntity(
         id: 'a1',
@@ -448,13 +496,10 @@ void main() {
         deadline: DateTime(2026, 8, 10),
       );
       final ui = HalaqaActivityUiMapper.toUi(entity);
-      expect(
-        ui.allowedResponseTypes,
-        {
-          ActivityResponseTypeUi.image,
-          ActivityResponseTypeUi.audio,
-        },
-      );
+      expect(ui.allowedResponseTypes, {
+        ActivityResponseTypeUi.image,
+        ActivityResponseTypeUi.audio,
+      });
       expect(ui.deadline, DateTime(2026, 8, 10));
     });
   });

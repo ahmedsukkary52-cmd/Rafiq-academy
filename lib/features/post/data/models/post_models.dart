@@ -4,7 +4,9 @@ import '../../domain/entities/posts_entities.dart';
 
 class PostAttachmentModel extends PostAttachmentEntity {
   const PostAttachmentModel({
-    required super.url,
+    super.url,
+    super.storagePath,
+    super.contentType,
     required super.type,
     required super.fileName,
     super.fileSizeMb,
@@ -12,17 +14,31 @@ class PostAttachmentModel extends PostAttachmentEntity {
   });
 
   factory PostAttachmentModel.fromMap(Map<String, dynamic> map) {
+    String text(Object? raw) => raw is String ? raw.trim() : '';
     return PostAttachmentModel(
-      url: map['url'] ?? '',
-      type: _typeFromString(map['type'] ?? ''),
-      fileName: map['fileName'] ?? '',
+      url: text(map['url']),
+      storagePath: text(map['storagePath']),
+      contentType: text(map['contentType']),
+      type: _typeFromString(text(map['type'])),
+      fileName: text(map['fileName']),
       fileSizeMb: (map['fileSizeMb'] as num?)?.toDouble(),
       audioDurationSeconds: map['audioDurationSeconds'] as int?,
     );
   }
 
+  PostAttachmentModel withoutLegacyUrl() => PostAttachmentModel(
+    storagePath: storagePath,
+    contentType: contentType,
+    type: type,
+    fileName: fileName,
+    fileSizeMb: fileSizeMb,
+    audioDurationSeconds: audioDurationSeconds,
+  );
+
+  /// New attachments persist the Storage path only — never a download URL.
   Map<String, dynamic> toMap() => {
-    'url': url,
+    'storagePath': storagePath,
+    'contentType': contentType,
     'type': _typeToString(type),
     'fileName': fileName,
     if (fileSizeMb != null) 'fileSizeMb': fileSizeMb,
@@ -99,6 +115,21 @@ class PostModel extends PostEntity {
       commentsCount: (data['commentsCount'] ?? 0) as int,
     );
   }
+
+  PostModel withAttachments(List<PostAttachmentModel> next) => PostModel(
+    id: id,
+    authorId: authorId,
+    authorName: authorName,
+    authorImageUrl: authorImageUrl,
+    content: content,
+    attachments: next,
+    halaqaId: halaqaId,
+    audience: audience,
+    createdAt: createdAt,
+    isPinned: isPinned,
+    likedBy: likedBy,
+    commentsCount: commentsCount,
+  );
 }
 
 class CommentModel extends CommentEntity {

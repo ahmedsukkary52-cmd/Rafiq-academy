@@ -28,14 +28,16 @@ class CalendarEventModel extends CalendarEventEntity {
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
+  /// [creatorUid] is the signed-in Firebase user; firestore.rules reject any
+  /// other value, so the entity's own [createdBy] is never written.
+  Map<String, dynamic> toCreateData({required String creatorUid}) => {
     'title': title,
     'type': _typeToString(type),
     'date': Timestamp.fromDate(date),
     if (description != null) 'description': description,
     if (halaqaId != null) 'halaqaId': halaqaId,
     if (halaqaName != null) 'halaqaName': halaqaName,
-    'createdBy': createdBy,
+    'createdBy': creatorUid,
     'createdAt': FieldValue.serverTimestamp(),
   };
 

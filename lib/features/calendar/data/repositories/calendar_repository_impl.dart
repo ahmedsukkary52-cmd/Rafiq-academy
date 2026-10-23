@@ -4,6 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../domain/entities/calendar_event_entity.dart';
 import '../../domain/repositories/calendar_repository.dart';
 import '../datasources/calendar_remote_datasource.dart';
@@ -36,6 +37,10 @@ class CalendarRepositoryImpl implements CalendarRepository {
 
   @override
   Future<Either<Failure, Unit>> addEvent(CalendarEventEntity event) async {
+    final violation =
+        contactInfoViolation(event.title) ??
+        contactInfoViolation(event.description);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       await remoteDatasource.addEvent(

@@ -10,6 +10,7 @@ import '../../domain/entities/calendar_event_entity.dart';
 import '../bloc/calendar_bloc.dart';
 import '../bloc/calendar_event.dart';
 import '../bloc/calendar_state.dart';
+import '../widgets/add_calendar_event_sheet.dart';
 
 /// Quarantined (H6 / A-H8): teacher calendar route removed from [AppRouter].
 /// Page kept for possible future product; not reachable from live nav.
@@ -24,6 +25,7 @@ class CalendarPage extends StatefulWidget {
 
 class _CalendarPageState extends State<CalendarPage> {
   late final CalendarBloc _bloc;
+  bool _addSheetOpen = false;
 
   @override
   void initState() {
@@ -54,10 +56,13 @@ class _CalendarPageState extends State<CalendarPage> {
             AppSnackBar.showSuccess(context, 'تم إضافة الحدث');
             context.read<CalendarBloc>().add(const ResetAddEventEvent());
           } else if (state.addEventStatus == SubmissionStatus.error) {
-            AppSnackBar.showError(
-              context,
-              state.addEventError ?? 'تعذر إضافة الحدث',
-            );
+            // An open sheet shows the error inline beside the kept inputs.
+            if (!_addSheetOpen) {
+              AppSnackBar.showError(
+                context,
+                state.addEventError ?? 'تعذر إضافة الحدث',
+              );
+            }
             context.read<CalendarBloc>().add(const ResetAddEventEvent());
           }
         },
@@ -250,16 +255,18 @@ class _CalendarPageState extends State<CalendarPage> {
     CalendarEventType.occasion => AppColors.eventOccasion,
   };
 
-  void _showAddEventSheet(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showAddEventSheet(BuildContext context) async {
+    _addSheetOpen = true;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: _bloc,
-        child: _AddEventSheet(halaqaId: widget.halaqaId),
+        child: AddCalendarEventSheet(halaqaId: widget.halaqaId),
       ),
     );
+    _addSheetOpen = false;
   }
 }
 
@@ -367,196 +374,4 @@ class _EventCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _AddEventSheet
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _AddEventSheet extends StatefulWidget {
-  final String? halaqaId;
-
-  const _AddEventSheet({this.halaqaId});
-
-  @override
-  State<_AddEventSheet> createState() => _AddEventSheetState();
-}
-
-class _AddEventSheetState extends State<_AddEventSheet> {
-  final _titleCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  CalendarEventType _type = CalendarEventType.session;
-  DateTime _date = DateTime.now();
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppSizes.radiusXL),
-        ),
-      ),
-      padding: EdgeInsets.only(
-        top: AppSizes.paddingL,
-        left: AppSizes.paddingM,
-        right: AppSizes.paddingM,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSizes.paddingL,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('إضافة حدث جديد', style: AppTextStyles.headlineMedium),
-            const SizedBox(height: 20),
-
-            // اسم الحدث
-            Text('اسم الحدث', style: AppTextStyles.labelLarge),
-            const SizedBox(height: 6),
-            AppTextField(
-              hint: 'مثال: اختبار الحفظ الشهري',
-              controller: _titleCtrl,
-            ),
-
-            const SizedBox(height: 16),
-
-            // نوع الحدث
-            Text('نوع الحدث', style: AppTextStyles.labelLarge),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: CalendarEventType.values.map((t) {
-                final selected = t == _type;
-                final color = _colorForType(t);
-                return GestureDetector(
-                  onTap: () => setState(() => _type = t),
-                  child: Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? color.withOpacity(0.12)
-                          : AppColors.surfaceGrey,
-                      borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                      border: Border.all(
-                        color: selected ? color : Colors.transparent,
-                      ),
-                    ),
-                    child: Text(
-                      t.label,
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: selected ? color : AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 16),
-
-            // التاريخ
-            Text('التاريخ', style: AppTextStyles.labelLarge),
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _date,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2030),
-                );
-                if (picked != null) setState(() => _date = picked);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceGrey,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_outlined,
-                      color: AppColors.textHint,
-                      size: 18,
-                    ),
-                    Text(
-                      '${_date.day}/${_date.month}/${_date.year}',
-                      style: AppTextStyles.bodyLarge,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ملاحظة اختيارية
-            Text('وصف (اختياري)', style: AppTextStyles.labelLarge),
-            const SizedBox(height: 6),
-            AppTextField(hint: 'تفاصيل إضافية...', controller: _descCtrl),
-
-            const SizedBox(height: 24),
-
-            AppButton(
-              label: 'إضافة الحدث',
-              onPressed: () {
-                if (_titleCtrl.text.trim().isEmpty) return;
-                context.read<CalendarBloc>().add(
-                  AddEventEvent(
-                    CalendarEventEntity(
-                      id: '',
-                      title: _titleCtrl.text.trim(),
-                      type: _type,
-                      date: _date,
-                      description: _descCtrl.text.trim().isEmpty
-                          ? null
-                          : _descCtrl.text.trim(),
-                      halaqaId: widget.halaqaId,
-                      createdBy: '',
-                    ),
-                  ),
-                );
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _colorForType(CalendarEventType t) => switch (t) {
-    CalendarEventType.session => AppColors.eventSession,
-    CalendarEventType.exam => AppColors.eventExam,
-    CalendarEventType.holiday => AppColors.eventHoliday,
-    CalendarEventType.occasion => AppColors.eventOccasion,
-  };
 }

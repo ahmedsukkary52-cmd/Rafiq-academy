@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/app_back_button.dart';
@@ -836,9 +837,11 @@ class _AttachmentTile extends StatelessWidget {
         children: [
           IconButton(
             onPressed: () async {
-              final uri = Uri.tryParse(attachment.url);
-              if (uri == null) return;
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!isAllowedExternalLink(attachment.url)) return;
+              await launchUrl(
+                Uri.parse(attachment.url.trim()),
+                mode: LaunchMode.externalApplication,
+              );
             },
             icon: const Icon(
               Icons.download_rounded,

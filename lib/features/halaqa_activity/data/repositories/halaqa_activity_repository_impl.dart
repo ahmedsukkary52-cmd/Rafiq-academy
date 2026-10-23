@@ -9,6 +9,7 @@ import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/academy_event_publication.dart';
 import '../../../../shared/domain/academy_event_sink.dart';
+import '../../../../shared/domain/contact_info_policy.dart';
 import '../../../post/domain/entities/posts_entities.dart';
 import '../../../post/domain/repositories/posts_repository.dart';
 import '../../domain/entities/halaqa_activity_entity.dart';
@@ -65,6 +66,8 @@ class HalaqaActivityRepositoryImpl implements HalaqaActivityRepository {
     DateTime? deadline,
     bool alsoShareAsPost = false,
   }) async {
+    final violation = contactInfoViolation(prompt);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       final result = await remoteDatasource.publishActivity(
@@ -142,6 +145,8 @@ class HalaqaActivityRepositoryImpl implements HalaqaActivityRepository {
     File? imageFile,
     File? audioFile,
   }) async {
+    final violation = contactInfoViolation(text);
+    if (violation != null) return Left(ValidationFailure(violation));
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
       return Right(

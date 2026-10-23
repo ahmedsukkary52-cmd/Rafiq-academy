@@ -50,4 +50,11 @@ abstract class PostsRepository {
 
   /// حذف منشور (صاحبه فقط أو الإدارة)
   Future<Either<Failure, Unit>> deletePost(String postId);
+
+  /// تنزيل مرفق عبر قواعد Storage إلى [target]
+  Future<Either<Failure, Unit>> downloadAttachment({
+    required PostEntity post,
+    required PostAttachmentEntity attachment,
+    required File target,
+  });
 }

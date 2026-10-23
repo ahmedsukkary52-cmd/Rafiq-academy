@@ -7,7 +7,9 @@ import 'package:rafiq_academy/features/post/data/datasources/posts_remote_dataso
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../domain/entities/posts_entities.dart';
+import '../../domain/post_attachment_policy.dart';
 import '../../domain/post_audience_target.dart';
 import '../models/post_models.dart';
 
@@ -33,7 +35,32 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
         .orderBy('createdAt', descending: true)
         .limit(30)
         .snapshots()
-        .map((snap) => snap.docs.map(PostModel.fromFirestore).toList());
+        .map(
+          (snap) => snap.docs
+              .map((doc) => _dropUntrustedUrls(PostModel.fromFirestore(doc)))
+              .toList(),
+        );
+  }
+
+  /// Keeps a legacy `url` only when it is this project's download URL for
+  /// the author's legacy folder; arbitrary links are never surfaced.
+  PostModel _dropUntrustedUrls(PostModel post) {
+    var changed = false;
+    final next = post.attachments.map((a) {
+      final model = a as PostAttachmentModel;
+      if (model.url.isEmpty) return model;
+      final keep =
+          model.storagePath.isEmpty &&
+          PostAttachmentPolicy.isLegacyDownloadUrl(
+            model.url,
+            bucket: storage.bucket,
+            authorId: post.authorId,
+          );
+      if (keep) return model;
+      changed = true;
+      return model.withoutLegacyUrl();
+    }).toList();
+    return changed ? post.withAttachments(next) : post;
   }
 
   @override
@@ -60,46 +87,68 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
     List<File> attachmentFiles = const [],
     List<AttachmentType> attachmentTypes = const [],
   }) async {
+    // audienceTarget = halaqaId دائماً (المنشورات خاصة بالحلقة فقط).
+    final audienceTarget = resolvePostAudienceTarget(
+      audience: audience,
+      halaqaId: halaqaId,
+    );
+    if (audienceTarget == null) {
+      throw const ServerException('يجب تحديد الحلقة قبل نشر منشور خاص بها');
+    }
+    if (attachmentFiles.length > PostAttachmentPolicy.maxAttachments) {
+      throw const ServerException(
+        'الحد الأقصى ${PostAttachmentPolicy.maxAttachments} مرفقات للمنشور',
+      );
+    }
+
+    // Every file is validated before the first upload starts.
+    final checked = <({File file, UploadFormat format, String name})>[];
+    for (final file in attachmentFiles) {
+      final name = file.path.split(RegExp(r'[\\/]')).last;
+      final result = await UploadFilePolicy.checkFile(
+        file,
+        formats: PostAttachmentPolicy.formats,
+      );
+      if (!result.isOk) throw ServerException('$name: ${result.error}');
+      checked.add((file: file, format: result.format!, name: name));
+    }
+
+    // The post id is fixed first: Storage Rules only expose
+    // posts/{halaqaId}/{postId}/… through the live posts/{postId} doc.
+    final postRef = _postsRef.doc();
+    final uploaded = <Reference>[];
     try {
-      // أولاً: رفع المرفقات على Storage لو وجدت
       final attachments = <PostAttachmentModel>[];
-
-      for (int i = 0; i < attachmentFiles.length; i++) {
-        final file = attachmentFiles[i];
-        final type = attachmentTypes[i];
-        final fileName = file.path.split('/').last;
-        final ext = _extensionForType(type);
-
-        final storagePath =
-            'posts/$authorId/${DateTime.now().millisecondsSinceEpoch}_$i.$ext';
-
-        final ref = storage.ref(storagePath);
-        final task = await ref.putFile(file);
-        final url = await task.ref.getDownloadURL();
-
-        final fileSizeMb = file.lengthSync() / (1024 * 1024);
-
+      for (var i = 0; i < checked.length; i++) {
+        final item = checked[i];
+        final path = PostAttachmentPolicy.storagePath(
+          halaqaId: audienceTarget,
+          postId: postRef.id,
+          index: i,
+          format: item.format,
+        );
+        final ref = storage.ref(path);
+        uploaded.add(ref);
+        await ref.putFile(
+          item.file,
+          SettableMetadata(
+            contentType: item.format.contentType,
+            customMetadata: {'uploaderId': authorId},
+          ),
+        );
+        final sizeMb = await item.file.length() / UploadFilePolicy.mb;
         attachments.add(
           PostAttachmentModel(
-            url: url,
-            type: type,
-            fileName: fileName,
-            fileSizeMb: double.parse(fileSizeMb.toStringAsFixed(1)),
+            storagePath: path,
+            contentType: item.format.contentType,
+            type: PostAttachmentPolicy.typeFor(item.format),
+            fileName: item.name,
+            fileSizeMb: double.parse(sizeMb.toStringAsFixed(1)),
           ),
         );
       }
 
-      // ثانياً: حفظ الـ document في Firestore
-      // audienceTarget = halaqaId دائماً (المنشورات خاصة بالحلقة فقط).
-      final audienceTarget = resolvePostAudienceTarget(
-        audience: audience,
-        halaqaId: halaqaId,
-      );
-      if (audienceTarget == null) {
-        throw const ServerException('يجب تحديد الحلقة قبل نشر منشور خاص بها');
-      }
-
-      await _postsRef.add({
+      await postRef.set({
         'authorId': authorId,
         'authorName': authorName,
         'content': content,
@@ -113,7 +162,21 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
         'commentsCount': 0,
       });
     } catch (e) {
+      await _discardUploads(uploaded);
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
+    }
+  }
+
+  /// Best effort: Storage Rules let the uploader delete objects only while
+  /// no posts/{postId} doc exists, so a post that did commit keeps its files.
+  Future<void> _discardUploads(List<Reference> refs) async {
+    for (final ref in refs) {
+      try {
+        await ref.delete();
+      } on Object {
+        // Left for the server-side orphan sweep (see media cleanup notes).
+      }
     }
   }
 
@@ -205,10 +268,28 @@ class PostsRemoteDatasourceImpl implements PostsRemoteDatasource {
     }
   }
 
-  String _extensionForType(AttachmentType type) => switch (type) {
-    AttachmentType.pdf => 'pdf',
-    AttachmentType.audio => 'm4a',
-    AttachmentType.image => 'jpg',
-    AttachmentType.video => 'mp4',
-  };
+  @override
+  Future<void> downloadAttachment({
+    required PostEntity post,
+    required PostAttachmentEntity attachment,
+    required File target,
+  }) async {
+    final path = attachment.storagePath;
+    if (!PostAttachmentPolicy.isTrustedStoragePath(
+      path,
+      halaqaId: post.halaqaId ?? '',
+      postId: post.id,
+    )) {
+      throw const ServerException('المرفق غير متاح');
+    }
+    try {
+      await storage.ref(path).writeToFile(target);
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        e.code == 'unauthorized'
+            ? 'لا تملك صلاحية فتح هذا المرفق'
+            : 'تعذر تحميل المرفق',
+      );
+    }
+  }
 }

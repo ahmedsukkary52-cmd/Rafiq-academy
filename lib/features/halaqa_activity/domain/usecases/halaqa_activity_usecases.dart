@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/academy_event_publication.dart';
@@ -23,11 +24,23 @@ class PublishHalaqaActivityUseCase
   ) {
     final prompt = params.prompt.trim();
     if (prompt.isEmpty) {
-      return Future.value(const Left(ValidationFailure('اكتب نص المهمة أولاً')));
+      return Future.value(
+        const Left(ValidationFailure('اكتب نص المهمة أولاً')),
+      );
     }
     if (params.allowedResponseTypes.isEmpty) {
       return Future.value(
         const Left(ValidationFailure('اختر نوع رد واحد على الأقل')),
+      );
+    }
+    if (!AppCapabilities.audioUploadsEnabled &&
+        params.allowedResponseTypes.contains(
+          HalaqaActivityResponseType.audio,
+        )) {
+      return Future.value(
+        const Left(
+          ValidationFailure('رفع الصوت غير مفعّل حالياً — اختر نصاً أو صورة'),
+        ),
       );
     }
     return repository.publishActivity(
@@ -52,8 +65,7 @@ class ListHalaqaActivitiesUseCase
   @override
   Future<Either<Failure, List<HalaqaActivityEntity>>> call(
     HalaqaActivityHalaqaParams params,
-  ) =>
-      repository.listActivitiesForHalaqa(params.halaqaId);
+  ) => repository.listActivitiesForHalaqa(params.halaqaId);
 }
 
 @lazySingleton
@@ -66,18 +78,20 @@ class GetHalaqaActivityUseCase
   @override
   Future<Either<Failure, HalaqaActivityEntity>> call(
     GetHalaqaActivityParams params,
-  ) =>
-      repository.getActivity(
-        halaqaId: params.halaqaId,
-        activityId: params.activityId,
-        includeThread: params.includeThread,
-      );
+  ) => repository.getActivity(
+    halaqaId: params.halaqaId,
+    activityId: params.activityId,
+    includeThread: params.includeThread,
+  );
 }
 
 @lazySingleton
 class SubmitHalaqaActivityResponseUseCase
     extends
-        UseCase<HalaqaActivityResponseEntity, SubmitHalaqaActivityResponseParams> {
+        UseCase<
+          HalaqaActivityResponseEntity,
+          SubmitHalaqaActivityResponseParams
+        > {
   final HalaqaActivityRepository repository;
 
   SubmitHalaqaActivityResponseUseCase(this.repository);

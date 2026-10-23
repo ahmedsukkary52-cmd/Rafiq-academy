@@ -15,6 +15,7 @@ import '../../features/parent/presentation/bloc/parent_bloc.dart';
 import '../../features/parent/presentation/bloc/parent_event.dart';
 import '../../features/post/presentation/bloc/posts_bloc.dart';
 import '../../features/post/presentation/bloc/posts_event.dart';
+import '../../features/post/presentation/media/post_attachment_loader.dart';
 import '../../features/student/presentation/bloc/student_bloc.dart';
 import '../../features/student/presentation/bloc/student_event.dart';
 import '../../features/supervisor/presentation/bloc/supervisor_bloc.dart';
@@ -40,4 +41,5 @@ void clearSessionProjections(BuildContext context) {
   );
   context.read<PostsBloc>().add(const ClearPostsSessionEvent());
   unawaited(sl<ChatMediaLoader>().clear());
+  unawaited(sl<PostAttachmentLoader>().clear());
 }

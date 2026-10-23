@@ -9,6 +9,8 @@ import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/domain/assignment_kind.dart';
 import '../../../../shared/domain/assignment_policy.dart';
+import '../../../../shared/domain/storage_paths_contract.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../domain/entities/halaqa_activity_entity.dart';
 import 'halaqa_activity_remote_datasource.dart';
 
@@ -247,12 +249,21 @@ class HalaqaActivityRemoteDatasourceImpl
       String? audioLabel;
 
       if (imageFile != null) {
+        final check = await UploadFilePolicy.checkFile(
+          imageFile,
+          formats: UploadFilePolicy.imageFormats,
+        );
+        final format = check.format;
+        if (format == null) {
+          throw ServerException(check.error ?? 'صيغة الصورة غير مدعومة');
+        }
         final uploaded = await _uploadMedia(
           activityId: activityId,
           studentId: studentId,
           file: imageFile,
           folder: 'images',
-          contentType: 'image/jpeg',
+          extension: format.extension,
+          contentType: format.contentType,
         );
         imageUrl = uploaded.url;
         imageLabel = uploaded.name;
@@ -263,6 +274,7 @@ class HalaqaActivityRemoteDatasourceImpl
           studentId: studentId,
           file: audioFile,
           folder: 'audio',
+          extension: 'm4a',
           contentType: 'audio/mp4',
         );
         audioUrl = uploaded.url;
@@ -396,14 +408,19 @@ class HalaqaActivityRemoteDatasourceImpl
     required String studentId,
     required File file,
     required String folder,
+    required String extension,
     required String contentType,
   }) async {
     final fileName = file.uri.pathSegments.isNotEmpty
         ? file.uri.pathSegments.last
         : 'attachment';
-    final path =
-        'halaqa_activities/$activityId/$studentId/$folder/'
-        '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+    // The picked name is display-only; the object name is `{ts}.{ext}`.
+    final path = StoragePathsContract.halaqaActivityMedia(
+      activityId: activityId,
+      studentId: studentId,
+      folder: folder,
+      fileName: '${DateTime.now().millisecondsSinceEpoch}.$extension',
+    );
     final ref = storage.ref(path);
     final task = await ref
         .putFile(file, SettableMetadata(contentType: contentType))

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/presentation/halaqa_activities/halaqa_activity_ui_models.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -226,26 +227,35 @@ class _CreateHalaqaActivitySheetState extends State<CreateHalaqaActivitySheet> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: ActivityResponseTypeUi.values.map((type) {
-                final selected = _selectedTypes.contains(type);
-                final icon = switch (type) {
-                  ActivityResponseTypeUi.text => Icons.notes_rounded,
-                  ActivityResponseTypeUi.image => Icons.image_outlined,
-                  ActivityResponseTypeUi.audio => Icons.mic_none_rounded,
-                };
-                return FilterChip(
-                  selected: selected,
-                  label: Text(type.labelAr),
-                  avatar: Icon(icon, size: 16),
-                  onSelected: (_) => _toggleType(type),
-                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
-                  checkmarkColor: AppColors.primary,
-                  labelStyle: AppTextStyles.labelMedium.copyWith(
-                    color: selected ? AppColors.primary : AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                );
-              }).toList(),
+              children: ActivityResponseTypeUi.values
+                  .where(
+                    (type) =>
+                        AppCapabilities.audioUploadsEnabled ||
+                        type != ActivityResponseTypeUi.audio,
+                  )
+                  .map((type) {
+                    final selected = _selectedTypes.contains(type);
+                    final icon = switch (type) {
+                      ActivityResponseTypeUi.text => Icons.notes_rounded,
+                      ActivityResponseTypeUi.image => Icons.image_outlined,
+                      ActivityResponseTypeUi.audio => Icons.mic_none_rounded,
+                    };
+                    return FilterChip(
+                      selected: selected,
+                      label: Text(type.labelAr),
+                      avatar: Icon(icon, size: 16),
+                      onSelected: (_) => _toggleType(type),
+                      selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                      checkmarkColor: AppColors.primary,
+                      labelStyle: AppTextStyles.labelMedium.copyWith(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  })
+                  .toList(),
             ),
             if (_typesError != null) ...[
               const SizedBox(height: 6),

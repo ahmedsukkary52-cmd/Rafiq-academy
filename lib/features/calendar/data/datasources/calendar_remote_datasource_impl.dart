@@ -1,10 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../models/calendar_model.dart';
 import 'calendar_remote_datasource.dart';
+
+const String kCalendarSignedOutMessage = 'انتهت الجلسة، سجّل الدخول مرة أخرى';
+const String kCalendarAddEventFailedMessage = 'تعذر إضافة الحدث، حاول مرة أخرى';
+
+/// User-facing text for a failed event create; never the raw exception.
+String calendarAddEventErrorMessage(String code) => switch (code) {
+  'permission-denied' => 'ليس لديك صلاحية لإضافة أحداث لهذا التقويم',
+  'unauthenticated' => kCalendarSignedOutMessage,
+  'unavailable' || 'deadline-exceeded' =>
+    'تعذر الاتصال بالخادم، تحقق من الإنترنت وحاول مرة أخرى',
+  _ => kCalendarAddEventFailedMessage,
+};
 
 @LazySingleton(as: CalendarRemoteDatasource)
 class CalendarRemoteDatasourceImpl implements CalendarRemoteDatasource {
@@ -52,10 +65,17 @@ class CalendarRemoteDatasourceImpl implements CalendarRemoteDatasource {
 
   @override
   Future<void> addEvent(CalendarEventModel event) async {
+    final uid =
+        FirebaseAuth.instanceFor(app: firestore.app).currentUser?.uid ?? '';
+    if (uid.isEmpty) {
+      throw const ServerException(kCalendarSignedOutMessage);
+    }
     try {
-      await _eventsRef.add(event.toFirestore());
-    } catch (e) {
-      throw ServerException(e.toString());
+      await _eventsRef.add(event.toCreateData(creatorUid: uid));
+    } on FirebaseException catch (e) {
+      throw ServerException(calendarAddEventErrorMessage(e.code));
+    } catch (_) {
+      throw const ServerException(kCalendarAddEventFailedMessage);
     }
   }
 

@@ -333,6 +333,8 @@ import 'package:rafiq_academy/features/post/domain/usecases/posts_usecases.dart'
     as _i918;
 import 'package:rafiq_academy/features/post/presentation/bloc/posts_bloc.dart'
     as _i532;
+import 'package:rafiq_academy/features/post/presentation/media/post_attachment_loader.dart'
+    as _i747;
 import 'package:rafiq_academy/features/progress_report/data/datasources/progress_report_remote_datasource.dart'
     as _i102;
 import 'package:rafiq_academy/features/progress_report/data/datasources/progress_report_remote_datasource_impl.dart'
@@ -1000,6 +1002,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i918.DeletePostUseCase>(
       () => _i918.DeletePostUseCase(gh<_i486.PostsRepository>()),
     );
+    gh.lazySingleton<_i918.DownloadPostAttachmentUseCase>(
+      () => _i918.DownloadPostAttachmentUseCase(gh<_i486.PostsRepository>()),
+    );
     gh.lazySingleton<_i356.LoadQuranTextUseCase>(
       () => _i356.LoadQuranTextUseCase(gh<_i878.QuranTextRepository>()),
     );
@@ -1424,6 +1429,10 @@ extension GetItInjectableX on _i174.GetIt {
         conversationId,
         currentUserId,
       ),
+    );
+    gh.lazySingleton<_i747.PostAttachmentLoader>(
+      () =>
+          _i747.PostAttachmentLoader(gh<_i918.DownloadPostAttachmentUseCase>()),
     );
     gh.factory<_i542.ContentLibraryBloc>(
       () => _i542.ContentLibraryBloc(

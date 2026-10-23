@@ -109,10 +109,11 @@ void main() {
     test('posts / content / halaqa activity path helpers', () {
       expect(
         StoragePathsContract.postAttachment(
-          authorId: 't1',
-          fileName: '1.jpg',
+          halaqaId: 'h1',
+          postId: 'p1',
+          fileName: 'att_0.jpg',
         ),
-        'posts/t1/1.jpg',
+        'posts/h1/p1/att_0.jpg',
       );
       expect(
         StoragePathsContract.contentFile(

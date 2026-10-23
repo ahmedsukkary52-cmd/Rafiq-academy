@@ -1,3 +1,4 @@
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
@@ -23,7 +24,7 @@ class CalendarBloc extends Bloc<CalendarEvent, CalendarState> {
   }) : super(CalendarState.initial()) {
     on<LoadMonthEventsEvent>(_onLoadMonthEvents);
     on<SelectDayEvent>(_onSelectDay);
-    on<AddEventEvent>(_onAddEvent);
+    on<AddEventEvent>(_onAddEvent, transformer: droppable());
     on<ResetAddEventEvent>(_onResetAddEvent);
     on<DeleteEventEvent>(_onDeleteEvent);
   }

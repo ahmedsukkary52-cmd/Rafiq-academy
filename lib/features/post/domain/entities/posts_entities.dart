@@ -7,14 +7,22 @@ import 'package:equatable/equatable.dart';
 enum AttachmentType { pdf, audio, image, video }
 
 class PostAttachmentEntity extends Equatable {
+  /// Legacy only: download URL of a pre-hardening `posts/{authorId}/…`
+  /// object. New attachments leave it empty and are read via [storagePath].
   final String url;
+
+  /// `posts/{halaqaId}/{postId}/att_N.ext`, fetched through Storage Rules.
+  final String storagePath;
+  final String contentType;
   final AttachmentType type;
   final String fileName;
   final double? fileSizeMb;
   final int? audioDurationSeconds; // مدة الصوت بالثواني - لعرض "١:٣٤" في الـ UI
 
   const PostAttachmentEntity({
-    required this.url,
+    this.url = '',
+    this.storagePath = '',
+    this.contentType = '',
     required this.type,
     required this.fileName,
     this.fileSizeMb,
@@ -24,6 +32,8 @@ class PostAttachmentEntity extends Equatable {
   @override
   List<Object?> get props => [
     url,
+    storagePath,
+    contentType,
     type,
     fileName,
     fileSizeMb,

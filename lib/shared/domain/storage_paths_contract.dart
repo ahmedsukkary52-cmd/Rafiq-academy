@@ -89,17 +89,21 @@ class StoragePathsContract {
     return '$chatAttachmentsPrefix/$c/$m/$f';
   }
 
-  /// `posts/{authorId}/{fileName}`
+  /// `posts/{halaqaId}/{postId}/{fileName}` — readable only through the live
+  /// `posts/{postId}` doc of that Halaqa. Legacy `posts/{authorId}/{file}`
+  /// objects are no longer written.
   static String postAttachment({
-    required String authorId,
+    required String halaqaId,
+    required String postId,
     required String fileName,
   }) {
-    final a = authorId.trim();
+    final h = halaqaId.trim();
+    final p = postId.trim();
     final f = fileName.trim();
-    if (a.isEmpty || f.isEmpty) {
+    if (h.isEmpty || p.isEmpty || f.isEmpty) {
       throw ArgumentError('post attachment path segments must be non-empty');
     }
-    return '$postsPrefix/$a/$f';
+    return '$postsPrefix/$h/$p/$f';
   }
 
   /// `content/{uploadedBy}/{fileName}`

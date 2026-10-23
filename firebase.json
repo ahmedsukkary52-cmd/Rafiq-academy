@@ -36,7 +36,17 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local",
-        "seed-emulator*.mjs"
+        "firestore-debug.log",
+        "seed-emulator*.mjs",
+        "deploy-functions.mjs",
+        "serve-emulators.mjs",
+        "test",
+        "migrate-*.mjs",
+        "migrate_*.mjs",
+        "migration-*.mjs",
+        "migration_*.mjs",
+        "meeting-link-migration-core.mjs",
+        "*.emulator.test.mjs"
       ]
     }
   ],

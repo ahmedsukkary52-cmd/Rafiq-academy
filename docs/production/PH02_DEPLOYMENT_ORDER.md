@@ -64,11 +64,44 @@ independently enforce a `demo-*` project.
 |------|-----|
 | **B-BILLING / Blaze verified** (operational) | Every PH-02 transition (payment review, attendance, evaluation, membership, homework reward, avatar purchase, staff award, notification fan-out) now runs in Cloud Functions. Client-side notification fan-out was removed, so academy notifications stop until Functions are live. |
 | ~~Evaluation edit contract decided~~ — **resolved** (D7.1) | Teacher edits for 24h from the server-set `recitationRecords.createdAt`; Admin corrects at any time; Supervisor read-only; every create/correction audited. No longer a gate. |
-| **PH-01 deploy gates done** | `adminMigrateUserPhones` must have emptied every `users.phone` before the PH-01/PH-02 rules ship. |
+| **PH-01 deploy gates done** | The approved contact-field cleanup (step 1.1) must have removed the legacy contact keys before the PH-01/PH-02 rules ship. Until then, legacy documents keep those keys. Not yet run on any real project. |
 
-## 1. Data migrations (Admin callables, run once, idempotent)
+## 1. Data migrations (run once, idempotent; 1 is a local script, 2–3 are Admin callables)
 
-1. `adminMigrateUserPhones` (PH-01) — confirm zero remaining `users.phone`.
+1. **Contact-field cleanup (PH-01)** — `functions/scripts/migrate-contact-fields.mjs`.
+   It replaces the retired `adminMigrateUserPhones` callable, which no longer
+   exists in source or in the deploy archive.
+   - **Where it runs:** a local Admin SDK script run from `functions/`. It is
+     not a deployed callable and is excluded from the Functions deploy archive.
+   - **Credentials:** a real project needs Admin credentials for that project.
+     If `GOOGLE_APPLICATION_CREDENTIALS` is set, its `project_id` must match
+     `--project`.
+   - **What it does:** removes only the top-level keys `phone`, `phoneNumber`,
+     `mobile`, `whatsapp`, `parentPhone`, `guardianPhone` from `users`,
+     `userPrivate`, `parentProfiles`, `studentProfiles`, `teacherProfiles`,
+     `supervisorProfiles` and `studentSearch`. These are the same keys as
+     `contactInfoPolicy.ts` and `contactFieldKeys()` in `firestore.rules`.
+   - **What it leaves alone:** every other field. Nested contact keys, other
+     phone-like key names and the old `migratedFromUsers` marker are counted
+     for review only. It never deletes documents or Auth users.
+   - **Usage:** dry run by default:
+     `node scripts/migrate-contact-fields.mjs --project <project-id>`.
+     Apply only with the exact token:
+     `... --apply --confirm contact-field-cleanup:<project-id>`.
+   - **Safety checks:**
+     - `--project` must be in the allowlist (`migrate-guards.mjs`);
+     - project environment variables and the credential file must match it;
+     - emulator variables are refused for real projects;
+     - `demo-*` projects need a loopback emulator;
+     - each update is conditional on the document's last update time;
+     - output is counts and capped UID-shaped ids only.
+   - **Approval:** running it against any real project needs explicit
+     approval. It has not been run against any real project. Run the dry run
+     first and review its report before `--apply`. Afterwards, a repeat dry
+     run should report zero fields to remove.
+   - **Related step:** the read-only contact-data audit
+     (`migrate-audit-contact-data.mjs`) currently refuses every live project.
+     A live audit needs a reviewed change to that gate first.
 2. `adminMigrateHalaqaSlotIds` (WA-7) — every `schedule[]` slot carries a
    stable `slotId`. `recordSessionAttendance` fails closed on slots without it.
 3. `adminBackfillStudentSearch`, `adminBackfillStudentLifecycle` (WA-14/15)

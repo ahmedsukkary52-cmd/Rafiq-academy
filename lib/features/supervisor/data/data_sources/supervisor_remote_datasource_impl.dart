@@ -9,6 +9,8 @@ import '../../../../shared/data/absence_request_firestore_reads.dart';
 import '../../../../shared/data/absence_request_model.dart';
 import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/utils/firestore_in_query.dart';
+import '../../../awards/data/award_grant_errors.dart';
+import '../../../awards/domain/award_submission_id.dart';
 import '../../../parent/data/models/parent_model.dart';
 import '../../../parent/domain/parent_payment_proof.dart';
 import '../../../student/data/models/halaqa_model.dart';
@@ -41,20 +43,27 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
 
   @override
   Future<void> issueAchievement(AchievementIssueEntity data) async {
+    if (!AwardSubmissionId.isValid(data.achievementId)) {
+      throw const ServerException(kAwardGrantFailedMessage);
+    }
+    var requestSent = false;
     try {
-      await firestore
-          .collection(FirestoreCollections.achievements)
-          .add(
-            AchievementsFirestoreContract.supervisorIssueFields(
-              studentId: data.studentId,
-              type: data.type,
-              title: data.title,
-              issuedBy: data.issuedBy,
-              halaqaId: data.halaqaId,
-            ),
-          );
-    } catch (e) {
-      throw ServerException(e.toString());
+      // The server writes the record; replaying the same id is a no-op.
+      final callable = functions.httpsCallable('issueAchievement');
+      requestSent = true;
+      await callable.call(<String, dynamic>{
+        'achievementId': data.achievementId,
+        'studentId': data.studentId,
+        'halaqaId': data.halaqaId,
+        'type': data.type,
+        'title': data.title,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(awardGrantErrorMessage(e.code, e.message));
+    } catch (_) {
+      throw ServerException(
+        awardGrantUnexpectedErrorMessage(requestSent: requestSent),
+      );
     }
   }
 

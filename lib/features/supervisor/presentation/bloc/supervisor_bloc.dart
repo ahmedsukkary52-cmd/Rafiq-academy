@@ -1,3 +1,4 @@
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
@@ -45,7 +46,7 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
     on<LoadSupervisedHalaqatEvent>(_onLoadHalaqat);
     on<LoadSupervisorDayBoardEvent>(_onLoadDayBoard);
     on<LoadSupervisedAbsenceRequestsEvent>(_onLoadAbsenceRequests);
-    on<IssueAchievementEvent>(_onIssueAchievement);
+    on<IssueAchievementEvent>(_onIssueAchievement, transformer: droppable());
     on<ResetIssueAchievementEvent>(_onResetIssueAchievement);
     on<SubmitSupervisorReportEvent>(_onSubmitReport);
     on<ResetSubmitReportEvent>(_onResetSubmitReport);

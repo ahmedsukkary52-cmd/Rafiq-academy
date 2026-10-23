@@ -7,6 +7,8 @@ import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/contact_info_policy.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
+import '../../../student/domain/entities/achievement_entity.dart';
+import '../../../student/domain/merge_student_achievements.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/repositories/parent_repositories.dart';
@@ -221,6 +223,19 @@ class ParentRepositoryImpl implements ParentRepository {
           endExclusive: endExclusive,
         ),
       );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<AchievementEntity>>> getChildAchievements(
+    String studentId,
+  ) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      final items = await remoteDatasource.getChildAchievements(studentId);
+      return Right(mergeStudentAchievements(items, const []));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

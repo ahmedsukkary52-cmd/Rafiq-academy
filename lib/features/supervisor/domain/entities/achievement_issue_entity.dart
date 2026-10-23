@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 
 class AchievementIssueEntity extends Equatable {
+  /// `issueAchievement` operation id; reused by retries of the same submission.
+  final String achievementId;
   final String studentId;
   final String type;
   final String title;
@@ -10,6 +12,7 @@ class AchievementIssueEntity extends Equatable {
   final String halaqaId;
 
   const AchievementIssueEntity({
+    required this.achievementId,
     required this.studentId,
     required this.type,
     required this.title,
@@ -18,5 +21,12 @@ class AchievementIssueEntity extends Equatable {
   });
 
   @override
-  List<Object?> get props => [studentId, type, title, issuedBy, halaqaId];
+  List<Object?> get props => [
+    achievementId,
+    studentId,
+    type,
+    title,
+    issuedBy,
+    halaqaId,
+  ];
 }

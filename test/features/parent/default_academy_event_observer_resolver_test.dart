@@ -6,6 +6,7 @@ import 'package:rafiq_academy/features/parent/data/observers/default_academy_eve
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/parent/domain/parent_household.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
+import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
 import 'package:rafiq_academy/shared/domain/academy_billing_entities.dart';
 import 'package:rafiq_academy/shared/domain/academy_event.dart';
 import 'package:rafiq_academy/shared/domain/payment_access_entity.dart';
@@ -137,4 +138,9 @@ class _FakeParentRepository implements ParentRepository {
     required DateTime start,
     required DateTime endExclusive,
   }) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, List<AchievementEntity>>> getChildAchievements(
+    String studentId,
+  ) => throw UnimplementedError();
 }

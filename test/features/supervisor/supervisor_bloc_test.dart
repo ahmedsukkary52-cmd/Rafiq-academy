@@ -47,6 +47,7 @@ const _halaqa = HalaqaEntity(
 );
 
 const _achievement = AchievementIssueEntity(
+  achievementId: 'achSubmission01',
   studentId: 's1',
   type: 'excellence',
   title: 'تميز',

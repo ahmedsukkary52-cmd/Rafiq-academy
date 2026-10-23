@@ -1,3 +1,4 @@
+import '../../../student/data/models/achievement_model.dart';
 import '../../domain/parent_household.dart';
 import '../models/parent_model.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
@@ -56,4 +57,8 @@ abstract class ParentRemoteDatasource {
     required DateTime start,
     required DateTime endExclusive,
   });
+
+  /// Achievements of one linked child via the `getParentAchievements`
+  /// callable (parent list queries on `achievements` are denied by Rules).
+  Future<List<AchievementModel>> getChildAchievements(String studentId);
 }

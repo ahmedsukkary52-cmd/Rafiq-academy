@@ -3,15 +3,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../awards/data/award_grant_errors.dart';
+import '../../../awards/domain/award_submission_id.dart';
+import '../../../awards/domain/unresolved_award_store.dart';
+import '../../../awards/presentation/widgets/unresolved_award_panel.dart';
 import '../../../chat/domain/entities/chat_entities.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
+import '../../data/admin_grant_reward_payload_codec.dart';
 import '../../domain/admin_grant_reward_params.dart';
 import '../../domain/entities/communication_settings_entity.dart';
 import '../admin_format.dart';
@@ -157,6 +163,13 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
   }
 }
 
+const _recipientsUnavailableMessage =
+    'تعذر تحديد مستلمي الجائزة من قائمة الحلقات. يجري تحديث القائمة؛ '
+    'أعد المحاولة بعد قليل.';
+
+const _chooseStudentHalaqaMessage =
+    'الطالب مسجل في أكثر من حلقة. اختر الحلقة التي تُمنح فيها الجائزة.';
+
 class AdminRewardsPage extends StatefulWidget {
   const AdminRewardsPage({super.key});
 
@@ -168,12 +181,28 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
   AdminRewardTargetKind _target = AdminRewardTargetKind.student;
   String _rewardType = 'star';
   String? _selectedTargetId;
+  String? _selectedStudentHalaqaId;
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  late final AwardSubmissionId<AdminGrantRewardParams> _submissionId;
 
   @override
   void initState() {
     super.initState();
+    final auth = context.read<AuthBloc>().state;
+    final grantor = auth is AuthAuthenticated ? auth.user.uid : '';
+    _submissionId = AwardSubmissionId.durable(
+      scope: AwardOperationScope(
+        operation: AwardOperationScope.grantAward,
+        form: 'admin',
+        uid: grantor,
+      ),
+      store: sl<UnresolvedAwardStore>(),
+      codec: const AdminGrantRewardPayloadCodec(),
+    );
+    _submissionId.restore().then((_) {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bloc = context.read<AdminBloc>();
       bloc.add(const LoadAdminDirectoryEvent());
@@ -196,33 +225,100 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
           .map((h) => (id: h.id, label: h.name))
           .toList();
     }
-    return state.studentRoster
-        .expand((h) => h.students)
-        .map((s) => (id: s.uid, label: s.name))
-        .toList();
+    final seen = <String>{};
+    return [
+      for (final s in state.studentRoster.expand((h) => h.students))
+        if (seen.add(s.uid)) (id: s.uid, label: s.name),
+    ];
   }
 
-  void _grant(BuildContext context, String actorId) {
+  /// The selected student's halaqat; a choice is required when there are
+  /// several.
+  List<({String id, String label})> _studentHalaqaOptions(AdminState state) {
+    final studentId = _selectedTargetId;
+    if (_target != AdminRewardTargetKind.student || studentId == null) {
+      return const [];
+    }
+    return [
+      for (final h in halaqatOfStudent(state.studentRoster, studentId))
+        (id: h.id, label: h.name),
+    ];
+  }
+
+  Future<void> _grant(BuildContext context, String actorId) async {
     final title = _titleCtrl.text.trim();
     final targetId = _selectedTargetId?.trim() ?? '';
     if (title.isEmpty || targetId.isEmpty) {
       AppSnackBar.showError(context, 'أكمل الحقول المطلوبة');
       return;
     }
-    context.read<AdminBloc>().add(
-      GrantAdminRewardEvent(
-        params: AdminGrantRewardParams(
-          targetKind: _target,
-          targetId: targetId,
-          type: _rewardType,
-          title: title,
-          description: _descCtrl.text.trim().isEmpty
-              ? null
-              : _descCtrl.text.trim(),
-          grantedBy: actorId,
-        ),
+    final description = _descCtrl.text.trim();
+    final target = _target;
+    final rewardType = _rewardType;
+    final bloc = context.read<AdminBloc>();
+    final studentHalaqaId = _selectedStudentHalaqaId;
+    if (bloc.state.rosterStatus == SectionStatus.loaded &&
+        studentHalaqaId == null &&
+        _studentHalaqaOptions(bloc.state).length > 1) {
+      AppSnackBar.showError(context, _chooseStudentHalaqaMessage);
+      return;
+    }
+    final resolved = bloc.state.rosterStatus == SectionStatus.loaded
+        ? resolveAdminRewardRecipients(
+            roster: bloc.state.studentRoster,
+            kind: target,
+            targetId: targetId,
+            studentHalaqaId: target == AdminRewardTargetKind.student
+                ? studentHalaqaId
+                : null,
+          )
+        : null;
+    if (resolved == null) {
+      AppSnackBar.showError(context, _recipientsUnavailableMessage);
+      bloc.add(const LoadStudentRosterEvent());
+      return;
+    }
+    final preparing = _submissionId.prepare(
+      [
+        target,
+        targetId,
+        rewardType,
+        title,
+        description,
+        resolved.halaqaId,
+        '|',
+        ...resolved.recipientStudentIds,
+      ],
+      (awardId) => AdminGrantRewardParams(
+        awardId: awardId,
+        targetKind: target,
+        targetId: targetId,
+        type: rewardType,
+        title: title,
+        description: description.isEmpty ? null : description,
+        grantedBy: actorId,
+        halaqaId: resolved.halaqaId,
+        halaqaName: resolved.halaqaName,
+        studentName: resolved.studentName,
+        recipientStudentIds: resolved.recipientStudentIds,
       ),
     );
+    setState(() {});
+    final prepared = await preparing;
+    final params = prepared.payload;
+    if (params != null) bloc.add(GrantAdminRewardEvent(params: params));
+    if (!mounted) return;
+    setState(() {});
+    if (prepared.status == AwardPrepareStatus.localSaveFailed) {
+      AppSnackBar.showError(this.context, kAwardLocalSaveFailedMessage);
+    }
+  }
+
+  Future<void> _abandonUnresolved() async {
+    await _submissionId.abandon();
+    if (!mounted) return;
+    setState(() {});
+    context.read<AdminBloc>().add(const LoadStudentRosterEvent());
   }
 
   @override
@@ -231,108 +327,196 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
       listenWhen: (p, c) => p.grantRewardStatus != c.grantRewardStatus,
       listener: (context, state) {
         if (state.grantRewardStatus == SubmissionStatus.success) {
+          _submissionId.complete();
           AppSnackBar.showSuccess(context, 'تم منح الجائزة');
-          context.read<AdminBloc>().add(const ResetGrantRewardEvent());
+          context.read<AdminBloc>()
+            ..add(const ResetGrantRewardEvent())
+            ..add(const LoadStudentRosterEvent());
           _titleCtrl.clear();
           _descCtrl.clear();
         } else if (state.grantRewardStatus == SubmissionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.grantRewardError ?? 'تعذر المنح',
-          );
+          final message = state.grantRewardError ?? 'تعذر المنح';
+          if (isAwardGrantUnconfirmed(message)) {
+            _submissionId.markUnresolved();
+            setState(() {});
+            FocusScope.of(context).unfocus();
+          } else {
+            _submissionId.confirmedFailure();
+          }
+          AppSnackBar.showError(context, message);
           context.read<AdminBloc>().add(const ResetGrantRewardEvent());
         }
       },
       builder: (context, state) {
+        final pinned = _submissionId.unresolved?.payload;
+        final problem = _submissionId.recoveryProblem;
+        final locked = _submissionId.blocksNewSubmission;
+        final submitting =
+            state.grantRewardStatus == SubmissionStatus.submitting;
         return AdminFeatureShell(
           title: 'مركز التحفيز والمكافآت',
           subtitle: 'منح لطالب أو حلقة',
           sections: [
-            SegmentedButton<AdminRewardTargetKind>(
-              segments: const [
-                ButtonSegment(
-                  value: AdminRewardTargetKind.student,
-                  label: Text('طالب'),
-                ),
-                ButtonSegment(
-                  value: AdminRewardTargetKind.halaqa,
-                  label: Text('حلقة'),
-                ),
-              ],
-              selected: {_target},
-              onSelectionChanged: (s) => setState(() {
-                _target = s.first;
-                _selectedTargetId = null;
-              }),
-            ),
-            const SizedBox(height: 12),
-            AdminSectionHeader(title: 'نوع الجائزة'),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children:
-                  [
-                    ('star', 'نجمة'),
-                    ('badge', 'شارة'),
-                    ('certificate', 'شهادة'),
-                  ].map((entry) {
-                    return AdminFilterChip(
-                      label: entry.$2,
-                      selected: _rewardType == entry.$1,
-                      onTap: () => setState(() => _rewardType = entry.$1),
-                    );
-                  }).toList(),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _selectedTargetId,
-              decoration: InputDecoration(
-                labelText: _target == AdminRewardTargetKind.student
-                    ? 'اختر الطالب'
-                    : 'اختر الحلقة',
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusL),
-                ),
+            if (pinned != null || problem != null) ...[
+              UnresolvedAwardPanel(
+                summary: pinned?.title ?? kAwardRecordUnreadableSummary,
+                blockedReason: awardRecoveryNotice(problem),
+                enabled: !submitting,
+                onAbandon: _abandonUnresolved,
               ),
-              items: _targetOptions(state)
-                  .map(
-                    (o) => DropdownMenuItem(value: o.id, child: Text(o.label)),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedTargetId = v),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _titleCtrl,
-              decoration: InputDecoration(
-                labelText: 'عنوان الجائزة',
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusL),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              decoration: InputDecoration(
-                labelText: 'السبب',
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusL),
+              const SizedBox(height: 12),
+            ],
+            IgnorePointer(
+              ignoring: locked,
+              child: Opacity(
+                opacity: locked ? 0.5 : 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<AdminRewardTargetKind>(
+                      segments: const [
+                        ButtonSegment(
+                          value: AdminRewardTargetKind.student,
+                          label: Text('طالب'),
+                        ),
+                        ButtonSegment(
+                          value: AdminRewardTargetKind.halaqa,
+                          label: Text('حلقة'),
+                        ),
+                      ],
+                      selected: {_target},
+                      onSelectionChanged: (s) => setState(() {
+                        _target = s.first;
+                        _selectedTargetId = null;
+                        _selectedStudentHalaqaId = null;
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    AdminSectionHeader(title: 'نوع الجائزة'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children:
+                          [
+                            ('star', 'نجمة'),
+                            ('badge', 'شارة'),
+                            ('certificate', 'شهادة'),
+                          ].map((entry) {
+                            return AdminFilterChip(
+                              label: entry.$2,
+                              selected: _rewardType == entry.$1,
+                              onTap: () =>
+                                  setState(() => _rewardType = entry.$1),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedTargetId,
+                      decoration: InputDecoration(
+                        labelText: _target == AdminRewardTargetKind.student
+                            ? 'اختر الطالب'
+                            : 'اختر الحلقة',
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                        ),
+                      ),
+                      items: _targetOptions(state)
+                          .map(
+                            (o) => DropdownMenuItem(
+                              value: o.id,
+                              child: Text(o.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() {
+                        _selectedTargetId = v;
+                        _selectedStudentHalaqaId = null;
+                      }),
+                    ),
+                    if (_studentHalaqaOptions(state) case final halaqat
+                        when halaqat.length > 1) ...[
+                      const SizedBox(height: 12),
+                      KeyedSubtree(
+                        key: ValueKey(_selectedTargetId),
+                        child: DropdownButtonFormField<String>(
+                          key: const Key('admin-reward-student-halaqa'),
+                          initialValue:
+                              halaqat.any(
+                                (h) => h.id == _selectedStudentHalaqaId,
+                              )
+                              ? _selectedStudentHalaqaId
+                              : null,
+                          decoration: InputDecoration(
+                            labelText:
+                                'الطالب مسجل في أكثر من حلقة: اختر الحلقة',
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusL,
+                              ),
+                            ),
+                          ),
+                          items: [
+                            for (final h in halaqat)
+                              DropdownMenuItem(
+                                value: h.id,
+                                child: Text(h.label),
+                              ),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _selectedStudentHalaqaId = v),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _titleCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'عنوان الجائزة',
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _descCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'السبب',
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
             AppButton(
-              label: state.grantRewardStatus == SubmissionStatus.submitting
+              key: const Key('admin-reward-grant'),
+              label: submitting
                   ? 'جاري المنح…'
+                  : pinned != null
+                  ? kAwardGrantRetrySameLabel
                   : 'منح الجائزة',
-              onPressed: state.grantRewardStatus == SubmissionStatus.submitting
+              onPressed: submitting
+                  ? null
+                  : pinned != null
+                  ? (_submissionId.canRetry
+                        ? () => context.read<AdminBloc>().add(
+                            GrantAdminRewardEvent(params: pinned),
+                          )
+                        : null)
+                  : locked
                   ? null
                   : () {
                       final auth = context.read<AuthBloc>().state;
@@ -359,80 +543,121 @@ class _AdminCommunicationSettingsPageState
     extends State<AdminCommunicationSettingsPage> {
   CommunicationSettingsEntity? _draft;
 
+  /// The bloc is a singleton: settings from an earlier visit must not be
+  /// editable (or savable) until this visit's own load has finished.
+  bool _awaitingLoad = true;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdminBloc>().add(const LoadCommunicationSettingsEvent());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  void _load() {
+    setState(() {
+      _awaitingLoad = true;
+      _draft = null;
     });
+    context.read<AdminBloc>().add(const LoadCommunicationSettingsEvent());
+  }
+
+  void _onStateChanged(BuildContext context, AdminState state) {
+    final load = state.communicationSettingsStatus;
+    if (_awaitingLoad &&
+        (load == SectionStatus.loaded || load == SectionStatus.error)) {
+      setState(() => _awaitingLoad = false);
+    }
+    final save = state.saveCommunicationSettingsStatus;
+    if (save == SubmissionStatus.success) {
+      setState(() => _draft = null);
+      AppSnackBar.showSuccess(context, 'تم حفظ الإعدادات');
+      context.read<AdminBloc>().add(const ResetCommunicationSettingsEvent());
+    } else if (save == SubmissionStatus.error) {
+      AppSnackBar.showError(
+        context,
+        state.saveCommunicationSettingsError ?? 'تعذر الحفظ',
+      );
+      context.read<AdminBloc>().add(const ResetCommunicationSettingsEvent());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<AdminBloc, AdminState>(
       listenWhen: (p, c) =>
+          p.communicationSettingsStatus != c.communicationSettingsStatus ||
           p.saveCommunicationSettingsStatus !=
-          c.saveCommunicationSettingsStatus,
-      listener: (context, state) {
-        if (state.saveCommunicationSettingsStatus == SubmissionStatus.success) {
-          AppSnackBar.showSuccess(context, 'تم حفظ الإعدادات');
-          context.read<AdminBloc>().add(
-            const ResetCommunicationSettingsEvent(),
-          );
-        } else if (state.saveCommunicationSettingsStatus ==
-            SubmissionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.saveCommunicationSettingsError ?? 'تعذر الحفظ',
-          );
-          context.read<AdminBloc>().add(
-            const ResetCommunicationSettingsEvent(),
+              c.saveCommunicationSettingsStatus,
+      listener: _onStateChanged,
+      builder: (context, state) {
+        final load = state.communicationSettingsStatus;
+        if (load == SectionStatus.error && !_awaitingLoad) {
+          return AdminSubpageScaffold(
+            title: 'إعدادات التواصل',
+            body: AppErrorWidget(
+              key: const Key('communication-settings-load-error'),
+              message:
+                  state.communicationSettingsError ??
+                  'تعذر تحميل إعدادات التواصل',
+              onRetry: _load,
+            ),
           );
         }
-      },
-      builder: (context, state) {
-        final settings = _draft ?? state.communicationSettings;
-        if (state.communicationSettingsStatus == SectionStatus.loading &&
-            settings == null) {
+        final loaded = state.communicationSettings;
+        if (_awaitingLoad || load != SectionStatus.loaded || loaded == null) {
           return const AdminSubpageScaffold(
             title: 'إعدادات التواصل',
             body: const AdminSettingsTogglesSkeleton(),
           );
         }
-        final s = settings ?? CommunicationSettingsEntity.defaults();
+        final s = _draft ?? loaded;
+        final saving =
+            state.saveCommunicationSettingsStatus ==
+            SubmissionStatus.submitting;
         return AdminFeatureShell(
           title: 'إعدادات التواصل',
           sections: [
             AppCard(
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: const Text('رد تلقائي خارج أوقات العمل'),
-                    value: s.autoReplyOutsideHours,
-                    onChanged: (v) => setState(
-                      () => _draft = CommunicationSettingsEntity(
-                        autoReplyOutsideHours: v,
-                        broadcastsNeedApproval: s.broadcastsNeedApproval,
-                        maxFileSizeMb: s.maxFileSizeMb,
-                        allowedFileTypes: s.allowedFileTypes,
-                        conversationRetentionDays: s.conversationRetentionDays,
-                      ),
+              // ListTiles paint ink on the nearest Material, not on the card.
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('رد تلقائي خارج أوقات العمل'),
+                      value: s.autoReplyOutsideHours,
+                      onChanged: saving
+                          ? null
+                          : (v) => setState(
+                              () => _draft = CommunicationSettingsEntity(
+                                autoReplyOutsideHours: v,
+                                broadcastsNeedApproval:
+                                    s.broadcastsNeedApproval,
+                                maxFileSizeMb: s.maxFileSizeMb,
+                                allowedFileTypes: s.allowedFileTypes,
+                                conversationRetentionDays:
+                                    s.conversationRetentionDays,
+                              ),
+                            ),
                     ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('تحتاج البثوث موافقة المدير'),
-                    value: s.broadcastsNeedApproval,
-                    onChanged: (v) => setState(
-                      () => _draft = CommunicationSettingsEntity(
-                        autoReplyOutsideHours: s.autoReplyOutsideHours,
-                        broadcastsNeedApproval: v,
-                        maxFileSizeMb: s.maxFileSizeMb,
-                        allowedFileTypes: s.allowedFileTypes,
-                        conversationRetentionDays: s.conversationRetentionDays,
-                      ),
+                    SwitchListTile(
+                      title: const Text('تحتاج البثوث موافقة المدير'),
+                      value: s.broadcastsNeedApproval,
+                      onChanged: saving
+                          ? null
+                          : (v) => setState(
+                              () => _draft = CommunicationSettingsEntity(
+                                autoReplyOutsideHours: s.autoReplyOutsideHours,
+                                broadcastsNeedApproval: v,
+                                maxFileSizeMb: s.maxFileSizeMb,
+                                allowedFileTypes: s.allowedFileTypes,
+                                conversationRetentionDays:
+                                    s.conversationRetentionDays,
+                              ),
+                            ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -455,7 +680,9 @@ class _AdminCommunicationSettingsPageState
             ),
             const SizedBox(height: 16),
             AppButton(
+              key: const Key('communication-settings-save'),
               label: 'حفظ',
+              isLoading: saving,
               onPressed: () {
                 context.read<AdminBloc>().add(
                   SaveCommunicationSettingsEvent(settings: s),

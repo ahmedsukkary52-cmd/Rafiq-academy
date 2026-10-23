@@ -73,8 +73,8 @@ void main() {
         halaqaId: 'h2',
       );
 
-      // Mirrors recordOnlyAchievementOk() in firestore.rules: credited,
-      // multi-recipient awards go through the grantAward callable only.
+      // Mirrors the record-only doc written by the issueAchievement callable;
+      // credited, multi-recipient awards go through grantAward only.
       expect(fields.keys.toSet(), <String>{
         'studentId',
         'type',

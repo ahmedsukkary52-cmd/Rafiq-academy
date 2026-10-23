@@ -6,8 +6,8 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../student/domain/entities/achievement_entity.dart';
-import '../../../student/domain/usecases/get_achievements_usecase.dart';
 import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../domain/usecases/get_child_achievements_usecase.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_child_access.dart';
 import '../parent_display.dart';
@@ -65,7 +65,7 @@ class _ParentAchievementsPageState extends State<ParentAchievementsPage> {
       _loading = true;
       _error = null;
     });
-    final result = await sl<GetAchievementsUseCase>()(
+    final result = await sl<GetChildAchievementsUseCase>()(
       StudentUidParams(studentId),
     );
     if (!mounted) return;

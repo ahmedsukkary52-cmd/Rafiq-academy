@@ -4,6 +4,7 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
+import '../../../student/domain/entities/achievement_entity.dart';
 import '../entities/parent_entities.dart';
 import '../parent_household.dart';
 
@@ -74,6 +75,11 @@ abstract class ParentRepository {
     required DateTime start,
     required DateTime endExclusive,
   });
+
+  /// Achievements of one linked child, served by the parent-scoped callable.
+  Future<Either<Failure, List<AchievementEntity>>> getChildAchievements(
+    String studentId,
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

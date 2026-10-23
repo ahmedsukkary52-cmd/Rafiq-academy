@@ -153,8 +153,12 @@ import 'package:rafiq_academy/features/awards/data/repositories/awards_repositor
     as _i662;
 import 'package:rafiq_academy/features/awards/data/services/certificate_pdf_generator.dart'
     as _i649;
+import 'package:rafiq_academy/features/awards/data/shared_preferences_unresolved_award_store.dart'
+    as _i167;
 import 'package:rafiq_academy/features/awards/domain/repositories/awards_repository.dart'
     as _i888;
+import 'package:rafiq_academy/features/awards/domain/unresolved_award_store.dart'
+    as _i966;
 import 'package:rafiq_academy/features/awards/domain/usecases/awards_usecases.dart'
     as _i186;
 import 'package:rafiq_academy/features/awards/presentation/bloc/awards_bloc.dart'
@@ -301,6 +305,8 @@ import 'package:rafiq_academy/features/parent/domain/usecases/get_absence_reques
     as _i1044;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_attendance_marks_usecase.dart'
     as _i785;
+import 'package:rafiq_academy/features/parent/domain/usecases/get_child_achievements_usecase.dart'
+    as _i457;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_children_ids_usecase.dart'
     as _i379;
 import 'package:rafiq_academy/features/parent/domain/usecases/get_halaqat_for_student_usecase.dart'
@@ -527,6 +533,9 @@ extension GetItInjectableX on _i174.GetIt {
         mp3QuranCatalog: gh<_i638.Mp3QuranCatalogService>(),
       ),
     );
+    gh.lazySingleton<_i966.UnresolvedAwardStore>(
+      () => _i167.SharedPreferencesUnresolvedAwardStore(),
+    );
     gh.lazySingleton<_i174.AudioLibraryRepository>(
       () => _i4.AudioLibraryRepositoryImpl(
         remoteDatasource: gh<_i1052.AudioLibraryRemoteDatasource>(),
@@ -657,6 +666,13 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i333.ReviewScheduleRemoteDatasource>(),
       ),
     );
+    gh.lazySingleton<_i892.ParentRemoteDatasource>(
+      () => _i430.ParentRemoteDatasourceImpl(
+        firestore: gh<_i974.FirebaseFirestore>(),
+        storage: gh<_i457.FirebaseStorage>(),
+        functions: gh<_i809.FirebaseFunctions>(),
+      ),
+    );
     gh.lazySingleton<_i283.ContentLibraryRepository>(
       () => _i669.ContentLibraryRepositoryImpl(
         remoteDatasource: gh<_i37.ContentLibraryRemoteDatasource>(),
@@ -705,12 +721,6 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i523.AdminOperationsRepositoryImpl(
         remoteDatasource: gh<_i449.AdminOperationsRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
-      ),
-    );
-    gh.lazySingleton<_i892.ParentRemoteDatasource>(
-      () => _i430.ParentRemoteDatasourceImpl(
-        firestore: gh<_i974.FirebaseFirestore>(),
-        storage: gh<_i457.FirebaseStorage>(),
       ),
     );
     gh.factory<_i173.GetReviewMonthUseCase>(
@@ -1344,6 +1354,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i785.GetAttendanceMarksUseCase>(
       () => _i785.GetAttendanceMarksUseCase(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i457.GetChildAchievementsUseCase>(
+      () => _i457.GetChildAchievementsUseCase(gh<_i493.ParentRepository>()),
     );
     gh.lazySingleton<_i379.GetChildrenIdsUseCase>(
       () => _i379.GetChildrenIdsUseCase(gh<_i493.ParentRepository>()),

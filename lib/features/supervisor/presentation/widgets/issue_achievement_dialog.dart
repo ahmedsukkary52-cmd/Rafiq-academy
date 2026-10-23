@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../awards/domain/award_submission_id.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
@@ -36,6 +37,7 @@ class IssueAchievementDialog extends StatefulWidget {
 class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
   final _titleCtrl = TextEditingController();
   final _manualStudentCtrl = TextEditingController();
+  final _submission = AwardSubmissionId();
   String? _studentId;
   late String _type;
   Map<String, String> _studentNames = const {};
@@ -86,6 +88,12 @@ class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
 
     widget.onSubmit(
       AchievementIssueEntity(
+        achievementId: _submission.idFor([
+          studentId,
+          widget.halaqaId,
+          _type,
+          title,
+        ]),
         studentId: studentId,
         type: _type,
         title: title,
@@ -97,7 +105,14 @@ class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SupervisorBloc, SupervisorState>(
+    return BlocConsumer<SupervisorBloc, SupervisorState>(
+      listenWhen: (prev, curr) =>
+          prev.issueAchievementStatus != curr.issueAchievementStatus,
+      listener: (context, state) {
+        if (state.issueAchievementStatus == SubmissionStatus.success) {
+          _submission.complete();
+        }
+      },
       buildWhen: (prev, curr) =>
           prev.issueAchievementStatus != curr.issueAchievementStatus,
       builder: (context, state) {

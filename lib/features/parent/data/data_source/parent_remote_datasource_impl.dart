@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart';
@@ -15,20 +16,24 @@ import '../../../../shared/domain/payment_access_entity.dart';
 import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../analytics/domain/analytics_recitation_honesty.dart';
+import '../../../student/data/models/achievement_model.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_payment_proof.dart';
 import '../../domain/services/parent_recipient_resolver.dart';
 import '../models/parent_model.dart';
+import '../parent_achievements_response.dart';
 
 @LazySingleton(as: ParentRemoteDatasource)
 class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
+  final FirebaseFunctions functions;
 
   const ParentRemoteDatasourceImpl({
     required this.firestore,
     required this.storage,
+    required this.functions,
   });
 
   @override
@@ -688,6 +693,20 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
       }
     }
     return byId.values.toList();
+  }
+
+  @override
+  Future<List<AchievementModel>> getChildAchievements(String studentId) async {
+    try {
+      final response = await functions
+          .httpsCallable('getParentAchievements')
+          .call(<String, dynamic>{'studentId': studentId});
+      return parseParentAchievementsResponse(response.data);
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(parentAchievementsErrorMessage(e.code, e.message));
+    } catch (_) {
+      throw const ServerException(kParentAchievementsLoadFailedMessage);
+    }
   }
 
   Future<List<ParentStaffContact>> _loadAdmins() async {

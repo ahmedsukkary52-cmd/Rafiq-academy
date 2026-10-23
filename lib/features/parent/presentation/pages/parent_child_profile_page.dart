@@ -16,12 +16,12 @@ import '../../../student/domain/entities/achievement_entity.dart';
 import '../../../student/domain/entities/recitation_record_entity.dart';
 import '../../../student/domain/entities/student_profile_entity.dart';
 import '../../../student/domain/student_profile_latest_evaluation.dart';
-import '../../../student/domain/usecases/get_achievements_usecase.dart';
 import '../../../student/domain/usecases/get_recitation_records_usecase.dart';
 import '../../../student/domain/usecases/get_student_profile_usecase.dart';
 import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_performance.dart';
+import '../../domain/usecases/get_child_achievements_usecase.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_child_access.dart';
 import '../parent_destinations.dart';
@@ -50,6 +50,8 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
   StudentProfileLatestEvaluation? _latest;
   double? _performance;
   List<AchievementEntity> _achievements = const [];
+  bool _achievementsLoading = false;
+  String? _achievementsError;
   List<RecitationRecordEntity> _reviewedRecitations = const [];
   bool _startingChat = false;
 
@@ -72,6 +74,8 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
         _latest = null;
         _performance = null;
         _achievements = const [];
+        _achievementsLoading = false;
+        _achievementsError = null;
         _reviewedRecitations = const [];
       });
       return;
@@ -80,11 +84,12 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
     setState(() {
       _loading = true;
       _error = null;
+      _achievementsError = null;
     });
     final uid = StudentUidParams(widget.studentId);
     final profileResult = await sl<GetStudentProfileUseCase>()(uid);
     final recitationsResult = await sl<GetRecitationRecordsUseCase>()(uid);
-    final achievementsResult = await sl<GetAchievementsUseCase>()(uid);
+    final achievementsResult = await sl<GetChildAchievementsUseCase>()(uid);
     if (!mounted) return;
 
     profileResult.fold(
@@ -108,10 +113,42 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
           _achievements = achievementsResult.getOrElse(
             (_) => const <AchievementEntity>[],
           );
+          _achievementsError = achievementsResult.fold(
+            (f) => f.message,
+            (_) => null,
+          );
           _reviewedRecitations = reviewed;
         });
       },
     );
+  }
+
+  Future<void> _reloadAchievements() async {
+    final parentState = context.read<ParentBloc>().state;
+    if (!ParentChildAccess.owns(
+      state: parentState,
+      studentId: widget.studentId,
+    )) {
+      setState(() {
+        _achievements = const [];
+        _achievementsLoading = false;
+        _achievementsError = ParentChildAccess.deniedMessage;
+      });
+      return;
+    }
+    setState(() {
+      _achievementsLoading = true;
+      _achievementsError = null;
+    });
+    final result = await sl<GetChildAchievementsUseCase>()(
+      StudentUidParams(widget.studentId),
+    );
+    if (!mounted) return;
+    setState(() {
+      _achievementsLoading = false;
+      _achievements = result.getOrElse((_) => const <AchievementEntity>[]);
+      _achievementsError = result.fold((f) => f.message, (_) => null);
+    });
   }
 
   Future<void> _startTeacherChat(ParentChildSnapshot? snapshot) async {
@@ -353,6 +390,9 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
                           const SizedBox(height: 18),
                           _ActivitiesSection(
                             items: activities,
+                            achievementsLoading: _achievementsLoading,
+                            achievementsError: _achievementsError,
+                            onRetryAchievements: _reloadAchievements,
                             onSeeAll: () => ParentDestinations.achievements(
                               context,
                               studentId: widget.studentId,
@@ -1013,9 +1053,18 @@ class _NoteBlock extends StatelessWidget {
 
 class _ActivitiesSection extends StatelessWidget {
   final List<_ActivityItem> items;
+  final bool achievementsLoading;
+  final String? achievementsError;
+  final VoidCallback onRetryAchievements;
   final VoidCallback onSeeAll;
 
-  const _ActivitiesSection({required this.items, required this.onSeeAll});
+  const _ActivitiesSection({
+    required this.items,
+    required this.achievementsLoading,
+    required this.achievementsError,
+    required this.onRetryAchievements,
+    required this.onSeeAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1044,7 +1093,40 @@ class _ActivitiesSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        if (items.isEmpty)
+        if (achievementsLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: LinearProgressIndicator(minHeight: 3),
+          )
+        else if (achievementsError != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusL),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  achievementsError!,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.error,
+                  ),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: onRetryAchievements,
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (items.isEmpty && achievementsError == null && !achievementsLoading)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1059,7 +1141,7 @@ class _ActivitiesSection extends StatelessWidget {
               ),
             ),
           )
-        else
+        else if (items.isNotEmpty)
           Container(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
             decoration: BoxDecoration(

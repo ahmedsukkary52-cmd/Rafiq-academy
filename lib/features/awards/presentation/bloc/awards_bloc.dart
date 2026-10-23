@@ -1,3 +1,4 @@
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
@@ -21,7 +22,7 @@ class AwardsBloc extends Bloc<AwardsEvent, AwardsState> {
     required this.generateCertificatePdf,
   }) : super(AwardsState.initial()) {
     on<LoadAwardsDashboardEvent>(_onLoadDashboard);
-    on<GrantAwardEvent>(_onGrantAward);
+    on<GrantAwardEvent>(_onGrantAward, transformer: droppable());
     on<ResetGrantAwardEvent>(_onResetGrantAward);
     on<GenerateCertificateEvent>(_onGenerateCertificate);
     on<ResetCertificateEvent>(_onResetCertificate);
@@ -94,22 +95,22 @@ class AwardsBloc extends Bloc<AwardsEvent, AwardsState> {
 
     final result = await grantAward(event.award);
 
-    result.fold(
-      (failure) => emit(
+    final failure = result.getLeft().toNullable();
+    if (failure != null) {
+      emit(
         state.copyWith(
           grantStatus: SubmissionStatus.error,
           grantError: failure.message,
         ),
-      ),
-      (_) async {
-        emit(state.copyWith(grantStatus: SubmissionStatus.success));
-        final scope = state.dashboardHalaqaId ?? event.award.halaqaId;
-        await Future.wait([
-          _loadStats(scope, emit),
-          _loadGrantedAwards(scope, emit),
-        ]);
-      },
-    );
+      );
+      return;
+    }
+    emit(state.copyWith(grantStatus: SubmissionStatus.success));
+    final scope = state.dashboardHalaqaId ?? event.award.halaqaId;
+    await Future.wait([
+      _loadStats(scope, emit),
+      _loadGrantedAwards(scope, emit),
+    ]);
   }
 
   void _onResetGrantAward(

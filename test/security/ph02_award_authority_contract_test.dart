@@ -38,7 +38,7 @@ class _IdOnlyDoc extends Fake
 
 GrantedAwardModel _award({List<String> recipients = const ['s1', 's2']}) =>
     GrantedAwardModel(
-      id: '',
+      id: 'awardSubmission01',
       studentId: '',
       studentName: 'أحمد',
       type: AwardType.performanceStars,
@@ -72,7 +72,7 @@ void main() {
 
     expect(functions.calledNames, ['grantAward']);
     final payload = functions.payloadOf('grantAward') as Map;
-    expect(payload['awardId'], 'generatedAwardId');
+    expect(payload['awardId'], 'awardSubmission01');
     expect(payload['type'], 'performance_stars');
     expect(payload['recipientStudentIds'], ['s1', 's2']);
     expect(payload['halaqaIds'], ['h1']);
@@ -92,7 +92,7 @@ void main() {
     ]) {
       expect(payload.containsKey(key), isFalse, reason: key);
     }
-    expect(firestore.collections, ['achievements']);
+    expect(firestore.collections, isEmpty);
   });
 
   test('no recipients is rejected before the server', () async {

@@ -22,7 +22,10 @@ import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/registration_request_entity.dart';
 import '../../domain/entities/teacher_activity_entity.dart';
 import '../../domain/entities/teacher_management_entity.dart';
+import '../../../awards/data/award_grant_errors.dart';
+import '../../../awards/domain/award_submission_id.dart';
 import '../admin_private_email_reader.dart';
+import '../communication_settings_errors.dart';
 import 'admin_remote_datasource.dart';
 
 @LazySingleton(as: AdminRemoteDatasource)
@@ -865,9 +868,11 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   @override
   Future<CommunicationSettingsEntity> getCommunicationSettings() async {
     try {
+      // Server only: a cached (or cached-missing) doc would let a later save
+      // write stale values or defaults over the real settings.
       final doc = await firestore
           .doc(AdminCommunicationSettingsContract.docPath)
-          .get();
+          .get(const GetOptions(source: Source.server));
       if (!doc.exists) return CommunicationSettingsEntity.defaults();
 
       final data = doc.data() ?? AdminCommunicationSettingsContract.defaults();
@@ -896,8 +901,12 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
                 ?.toInt() ??
             365,
       );
-    } catch (e) {
-      throw ServerException(e.toString());
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        communicationSettingsErrorMessage(e.code, save: false),
+      );
+    } catch (_) {
+      throw const ServerException(kCommunicationSettingsLoadFailedMessage);
     }
   }
 
@@ -920,8 +929,12 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         AdminCommunicationSettingsContract.updatedAtField:
             FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    } catch (e) {
-      throw ServerException(e.toString());
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        communicationSettingsErrorMessage(e.code, save: true),
+      );
+    } catch (_) {
+      throw const ServerException(kCommunicationSettingsSaveFailedMessage);
     }
   }
 
@@ -934,47 +947,24 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
 
   @override
   Future<void> grantReward(AdminGrantRewardParams params) async {
+    var requestSent = false;
     try {
-      final targetId = params.targetId.trim();
-      String halaqaId;
-      List<String> recipients;
-      if (params.targetKind == AdminRewardTargetKind.student) {
-        halaqaId = params.halaqaId?.trim() ?? '';
-        if (halaqaId.isEmpty) {
-          final rosters = await firestore
-              .collection(FirestoreCollections.halaqat)
-              .where('studentIds', arrayContains: targetId)
-              .limit(1)
-              .get();
-          if (rosters.docs.isEmpty) {
-            throw const ServerException('الطالب غير مسجل في أي حلقة');
-          }
-          halaqaId = rosters.docs.first.id;
-        }
-        recipients = [targetId];
-      } else {
-        final halaqaDoc = await firestore
-            .collection(FirestoreCollections.halaqat)
-            .doc(targetId)
-            .get();
-        if (!halaqaDoc.exists) {
-          throw const ServerException('الحلقة غير موجودة');
-        }
-        recipients = List<String>.from(
-          halaqaDoc.data()?['studentIds'] ?? const <String>[],
-        );
-        if (recipients.isEmpty) {
-          throw const ServerException('لا يوجد طلاب في هذه الحلقة');
-        }
-        halaqaId = targetId;
+      if (!AwardSubmissionId.isValid(params.awardId)) {
+        throw const ServerException(kAwardGrantFailedMessage);
+      }
+      // Sent exactly as pinned: re-reading the roster here would change the
+      // request behind an operation id the server may already have committed.
+      final halaqaId = params.halaqaId?.trim() ?? '';
+      final recipients = params.recipientStudentIds;
+      if (halaqaId.isEmpty || recipients.isEmpty) {
+        throw const ServerException(kAwardGrantFailedMessage);
       }
 
       final type = params.type.trim();
-      await functions.httpsCallable('grantAward').call(<String, dynamic>{
-        'awardId': firestore
-            .collection(FirestoreCollections.achievements)
-            .doc()
-            .id,
+      final callable = functions.httpsCallable('grantAward');
+      requestSent = true;
+      await callable.call(<String, dynamic>{
+        'awardId': params.awardId,
         'type': _rewardTypeKeys[type] ?? type,
         'title': params.title.trim(),
         'description': params.description?.trim() ?? '',
@@ -984,10 +974,12 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         'recipientStudentIds': recipients,
       });
     } on FirebaseFunctionsException catch (e) {
-      throw ServerException(e.message ?? e.code);
+      throw ServerException(awardGrantErrorMessage(e.code, e.message));
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(e.toString());
+      throw ServerException(
+        awardGrantUnexpectedErrorMessage(requestSent: requestSent),
+      );
     }
   }
 

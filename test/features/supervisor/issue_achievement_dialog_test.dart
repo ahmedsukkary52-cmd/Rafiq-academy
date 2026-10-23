@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rafiq_academy/features/awards/domain/award_submission_id.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/admit_student_to_halaqa_usecase.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervised_absence_requests_usecase.dart';
@@ -55,7 +58,9 @@ Future<List<AchievementIssueEntity>> _pump(
 }) async {
   final submitted = <AchievementIssueEntity>[];
   final bloc = _bloc();
-  addTearDown(bloc.close);
+  // Awaiting close() of a bloc with a droppable() handler never completes
+  // under the widget tester's fake async.
+  addTearDown(() => unawaited(bloc.close()));
   await tester.pumpWidget(
     MaterialApp(
       home: Directionality(
@@ -146,5 +151,6 @@ void main() {
     expect(submitted.single.studentId, 'uid_a');
     expect(submitted.single.halaqaId, 'h1');
     expect(submitted.single.issuedBy, 'sup1');
+    expect(AwardSubmissionId.isValid(submitted.single.achievementId), isTrue);
   });
 }

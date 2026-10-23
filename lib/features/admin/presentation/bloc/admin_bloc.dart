@@ -1,3 +1,4 @@
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
@@ -112,9 +113,12 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<UpdateComplaintEvent>(_onUpdateComplaint);
     on<ResetUpdateComplaintEvent>(_onResetUpdateComplaint);
     on<LoadCommunicationSettingsEvent>(_onLoadCommunicationSettings);
-    on<SaveCommunicationSettingsEvent>(_onSaveCommunicationSettings);
+    on<SaveCommunicationSettingsEvent>(
+      _onSaveCommunicationSettings,
+      transformer: droppable(),
+    );
     on<ResetCommunicationSettingsEvent>(_onResetCommunicationSettings);
-    on<GrantAdminRewardEvent>(_onGrantReward);
+    on<GrantAdminRewardEvent>(_onGrantReward, transformer: droppable());
     on<ResetGrantRewardEvent>(_onResetGrantReward);
     on<EnsureAdminInternalChatEvent>(_onEnsureAdminInternalChat);
     on<ClearAdminSessionEvent>(_onClearSession);

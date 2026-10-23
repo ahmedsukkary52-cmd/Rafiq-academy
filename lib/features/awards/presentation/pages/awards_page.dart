@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -13,11 +14,16 @@ import '../../../teacher/domain/repositories/teacher_repository.dart';
 import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
 import '../../../teacher/presentation/bloc/teacher_bloc.dart';
 import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
+import '../../data/award_grant_errors.dart';
+import '../../data/granted_award_payload_codec.dart';
 import '../../domain/award_recipient_selection.dart';
+import '../../domain/award_submission_id.dart';
 import '../../domain/entities/award_entities.dart';
+import '../../domain/unresolved_award_store.dart';
 import '../bloc/awards_bloc.dart';
 import '../bloc/awards_event.dart';
 import '../bloc/awards_state.dart';
+import '../widgets/unresolved_award_panel.dart';
 
 class AwardsPage extends StatefulWidget {
   final String halaqaId;
@@ -558,10 +564,26 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
   final _rosterErrors = <String, String>{};
   String? _imagePath;
   String? _imageName;
+  late final AwardSubmissionId<GrantedAwardEntity> _submissionId;
+  String? _grantError;
 
   @override
   void initState() {
     super.initState();
+    final auth = context.read<AuthBloc>().state;
+    final grantor = auth is AuthAuthenticated ? auth.user.uid : '';
+    _submissionId = AwardSubmissionId.durable(
+      scope: AwardOperationScope(
+        operation: AwardOperationScope.grantAward,
+        form: 'teacher',
+        uid: grantor,
+      ),
+      store: sl<UnresolvedAwardStore>(),
+      codec: const GrantedAwardPayloadCodec(),
+    );
+    _submissionId.restore().then((_) {
+      if (mounted) setState(() {});
+    });
     final preset = widget.preset;
     _type = preset?.formCategory ?? AwardType.attendance;
     if (preset != null) {
@@ -592,6 +614,12 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
   }
 
   void _onFieldsChanged() => setState(() {});
+
+  Future<void> _abandonUnresolved() async {
+    await _submissionId.abandon();
+    if (!mounted) return;
+    setState(() => _grantError = null);
+  }
 
   void _seedKnownRoster() {
     final teacherState = context.read<TeacherBloc>().state;
@@ -657,14 +685,26 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
 
   Future<void> _pickImage() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: FileType.custom,
+      allowedExtensions: UploadFilePolicy.extensionsOf(
+        UploadFilePolicy.imageFormats,
+      ),
       allowMultiple: false,
     );
     final path = result?.files.single.path;
-    if (path == null) return;
+    if (path == null || !mounted) return;
+    final check = UploadFilePolicy.check(
+      fileName: result!.files.single.name,
+      sizeBytes: result.files.single.size,
+      formats: UploadFilePolicy.imageFormats,
+    );
+    if (!check.isOk) {
+      AppSnackBar.showError(context, check.error!);
+      return;
+    }
     setState(() {
       _imagePath = path;
-      _imageName = result!.files.single.name;
+      _imageName = result.files.single.name;
     });
   }
 
@@ -718,213 +758,242 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
     final showGlobalSelectAll =
         groups.length > 1 &&
         groups.any((group) => group.students.isNotEmpty);
+    final pinned = _submissionId.unresolved?.payload;
+    final problem = _submissionId.recoveryProblem;
+    final locked = _submissionId.blocksNewSubmission;
+    final grantInFlight = context.select(
+      (AwardsBloc b) => b.state.grantStatus == SubmissionStatus.submitting,
+    );
 
     return _BottomSheet(
       title: 'جائزة جديدة',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('اسم الجائزة', style: AppTextStyles.labelLarge),
-          const SizedBox(height: 6),
-          AppTextField(hint: 'مثال: حضور مثالي', controller: _titleCtrl),
-          const SizedBox(height: 16),
-          Text('الوصف / السبب', style: AppTextStyles.labelLarge),
-          const SizedBox(height: 6),
-          AppTextField(
-            hint: 'مثال: للالتزام بالحضور طوال الشهر',
-            controller: _descriptionCtrl,
-          ),
-          const SizedBox(height: 16),
-          Text('نوع الجائزة', style: AppTextStyles.labelLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: AwardTypeInfo.formTypes.map((type) {
-              final selected = type == _type;
-              return ChoiceChip(
-                label: Text(type.title),
-                selected: selected,
-                onSelected: (_) => setState(() => _type = type),
-                selectedColor: AppColors.primaryLight,
-                labelStyle: AppTextStyles.labelMedium.copyWith(
-                  color: selected ? AppColors.primary : AppColors.textSecondary,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          Text('صورة الجائزة', style: AppTextStyles.labelLarge),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: _pickImage,
-            icon: const Icon(Icons.image_outlined),
-            label: Text(
-              _imageName == null || _imageName!.isEmpty
-                  ? 'اختيار صورة'
-                  : _imageName!,
+          if (pinned != null || problem != null) ...[
+            UnresolvedAwardPanel(
+              summary: pinned == null
+                  ? kAwardRecordUnreadableSummary
+                  : '${pinned.displayTitle} — '
+                        '${pinned.honoredStudentIds.length} طالب',
+              blockedReason: awardRecoveryNotice(problem),
+              enabled: !grantInFlight,
+              onAbandon: _abandonUnresolved,
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Text('الحلقات المستفيدة', style: AppTextStyles.labelLarge),
-              const Spacer(),
-              Text(
-                'المحدد: ${_selection.selectedHalaqaCount}',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          if (teacherHalaqat.isEmpty)
-            Text(
-              'لا توجد حلقات محمّلة',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            )
-          else ...[
-            CheckboxListTile(
-              value: allHalaqatSelected,
-              onChanged: (_) {
-                setState(() {
-                  _selection = _selection.toggleSelectAllHalaqat(
-                    allHalaqaIds: allHalaqaIds,
-                    rosters: _rosters,
-                  );
-                });
-                _ensureSelectedRosters();
-              },
-              title: const Text('اختيار الكل'),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-            ),
-            ...teacherHalaqat.map(
-              (halaqa) => CheckboxListTile(
-                value: _selection.selectedHalaqaIds.contains(halaqa.id),
-                onChanged: (_) {
-                  setState(() {
-                    _selection = _selection.toggleHalaqa(
-                      halaqa.id,
-                      allHalaqaIds: allHalaqaIds,
-                      rosters: _rosters,
-                    );
-                  });
-                  _ensureSelectedRosters();
-                },
-                title: Text(halaqa.name),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
-          if (_selection.hasHalaqa) ...[
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Text('الطلاب المستفيدون', style: AppTextStyles.labelLarge),
-                const Spacer(),
-                Text(
-                  'المحدد: ${_selection.selectedStudentCount}',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (showGlobalSelectAll)
-              CheckboxListTile(
-                value: _selection.isGlobalAllSelected(_rosters),
-                onChanged: (_) {
-                  setState(() {
-                    _selection = _selection.toggleSelectAllStudents(_rosters);
-                  });
-                },
-                title: const Text('اختيار كل الطلاب'),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ...groups.map((group) {
-              final loading = _loadingHalaqat.contains(group.halaqaId);
-              final error = _rosterErrors[group.halaqaId];
-              return Column(
+          ],
+          IgnorePointer(
+            ignoring: locked,
+            child: Opacity(
+              opacity: locked ? 0.5 : 1,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 4),
-                    child: Text(
-                      group.halaqaName,
-                      style: AppTextStyles.labelLarge,
+                  Text('اسم الجائزة', style: AppTextStyles.labelLarge),
+                  const SizedBox(height: 6),
+                  AppTextField(hint: 'مثال: حضور مثالي', controller: _titleCtrl),
+                  const SizedBox(height: 16),
+                  Text('الوصف / السبب', style: AppTextStyles.labelLarge),
+                  const SizedBox(height: 6),
+                  AppTextField(
+                    hint: 'مثال: للالتزام بالحضور طوال الشهر',
+                    controller: _descriptionCtrl,
+                  ),
+                  const SizedBox(height: 16),
+                  Text('نوع الجائزة', style: AppTextStyles.labelLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: AwardTypeInfo.formTypes.map((type) {
+                      final selected = type == _type;
+                      return ChoiceChip(
+                        label: Text(type.title),
+                        selected: selected,
+                        onSelected: (_) => setState(() => _type = type),
+                        selectedColor: AppColors.primaryLight,
+                        labelStyle: AppTextStyles.labelMedium.copyWith(
+                          color: selected ? AppColors.primary : AppColors.textSecondary,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('صورة الجائزة', style: AppTextStyles.labelLarge),
+                  const SizedBox(height: 6),
+                  OutlinedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.image_outlined),
+                    label: Text(
+                      _imageName == null || _imageName!.isEmpty
+                          ? 'اختيار صورة'
+                          : _imageName!,
                     ),
                   ),
-                  if (loading)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('الحلقات المستفيدة', style: AppTextStyles.labelLarge),
+                      const Spacer(),
+                      Text(
+                        'المحدد: ${_selection.selectedHalaqaCount}',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                    )
-                  else if (error != null)
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (teacherHalaqat.isEmpty)
                     Text(
-                      error,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.error,
-                      ),
-                    )
-                  else if (group.students.isEmpty)
-                    Text(
-                      'لا يوجد طلاب في هذه الحلقة',
+                      'لا توجد حلقات محمّلة',
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     )
                   else ...[
                     CheckboxListTile(
-                      value: _selection.isHalaqaFullySelected(
-                        group.halaqaId,
-                        _rosters,
-                      ),
+                      value: allHalaqatSelected,
                       onChanged: (_) {
                         setState(() {
-                          _selection = _selection.toggleSelectAllInHalaqa(
-                            group.halaqaId,
-                            _rosters,
+                          _selection = _selection.toggleSelectAllHalaqat(
+                            allHalaqaIds: allHalaqaIds,
+                            rosters: _rosters,
                           );
                         });
+                        _ensureSelectedRosters();
                       },
-                      title: const Text('اختيار كل طلاب الحلقة'),
+                      title: const Text('اختيار الكل'),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    ...group.students.map(
-                      (student) => CheckboxListTile(
-                        value: _selection.selectedStudentIds.contains(
-                          student.uid,
-                        ),
+                    ...teacherHalaqat.map(
+                      (halaqa) => CheckboxListTile(
+                        value: _selection.selectedHalaqaIds.contains(halaqa.id),
                         onChanged: (_) {
                           setState(() {
-                            _selection = _selection.toggleStudent(student.uid);
+                            _selection = _selection.toggleHalaqa(
+                              halaqa.id,
+                              allHalaqaIds: allHalaqaIds,
+                              rosters: _rosters,
+                            );
                           });
+                          _ensureSelectedRosters();
                         },
-                        title: Text(student.name),
+                        title: Text(halaqa.name),
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
                   ],
+                  if (_selection.hasHalaqa) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Text('الطلاب المستفيدون', style: AppTextStyles.labelLarge),
+                        const Spacer(),
+                        Text(
+                          'المحدد: ${_selection.selectedStudentCount}',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    if (showGlobalSelectAll)
+                      CheckboxListTile(
+                        value: _selection.isGlobalAllSelected(_rosters),
+                        onChanged: (_) {
+                          setState(() {
+                            _selection = _selection.toggleSelectAllStudents(_rosters);
+                          });
+                        },
+                        title: const Text('اختيار كل الطلاب'),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ...groups.map((group) {
+                      final loading = _loadingHalaqat.contains(group.halaqaId);
+                      final error = _rosterErrors[group.halaqaId];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Text(
+                              group.halaqaName,
+                              style: AppTextStyles.labelLarge,
+                            ),
+                          ),
+                          if (loading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            )
+                          else if (error != null)
+                            Text(
+                              error,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.error,
+                              ),
+                            )
+                          else if (group.students.isEmpty)
+                            Text(
+                              'لا يوجد طلاب في هذه الحلقة',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            )
+                          else ...[
+                            CheckboxListTile(
+                              value: _selection.isHalaqaFullySelected(
+                                group.halaqaId,
+                                _rosters,
+                              ),
+                              onChanged: (_) {
+                                setState(() {
+                                  _selection = _selection.toggleSelectAllInHalaqa(
+                                    group.halaqaId,
+                                    _rosters,
+                                  );
+                                });
+                              },
+                              title: const Text('اختيار كل طلاب الحلقة'),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            ...group.students.map(
+                              (student) => CheckboxListTile(
+                                value: _selection.selectedStudentIds.contains(
+                                  student.uid,
+                                ),
+                                onChanged: (_) {
+                                  setState(() {
+                                    _selection = _selection.toggleStudent(student.uid);
+                                  });
+                                },
+                                title: Text(student.name),
+                                controlAffinity: ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    }),
+                  ],
                 ],
-              );
-            }),
-          ],
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
           Text(
             'الحلقات: ${_selection.selectedHalaqaCount}',
@@ -934,8 +1003,33 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
             'الطلاب: ${recipients.length}',
             style: AppTextStyles.bodyMedium,
           ),
+          if (_grantError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _grantError!,
+              key: const Key('create-award-error'),
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+            ),
+          ],
           const SizedBox(height: 20),
-          BlocBuilder<AwardsBloc, AwardsState>(
+          BlocConsumer<AwardsBloc, AwardsState>(
+            listenWhen: (previous, current) =>
+                previous.grantStatus != current.grantStatus,
+            listener: (context, state) {
+              if (state.grantStatus == SubmissionStatus.success) {
+                _submissionId.complete();
+                Navigator.of(context).pop();
+              } else if (state.grantStatus == SubmissionStatus.error) {
+                final message = state.grantError ?? 'تعذر منح الجائزة';
+                if (isAwardGrantUnconfirmed(message)) {
+                  _submissionId.markUnresolved();
+                  FocusScope.of(context).unfocus();
+                } else {
+                  _submissionId.confirmedFailure();
+                }
+                setState(() => _grantError = message);
+              }
+            },
             buildWhen: (previous, current) =>
                 previous.grantStatus != current.grantStatus,
             builder: (context, state) {
@@ -946,43 +1040,79 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
                 hasStudent: recipients.isNotEmpty,
                 title: _titleCtrl.text,
               );
+              if (pinned != null) {
+                return AppButton(
+                  key: const Key('create-award-submit'),
+                  label: kAwardGrantRetrySameLabel,
+                  isLoading: submitting,
+                  onPressed: submitting || !_submissionId.canRetry
+                      ? null
+                      : () {
+                          setState(() => _grantError = null);
+                          context.read<AwardsBloc>().add(
+                            GrantAwardEvent(pinned),
+                          );
+                        },
+                );
+              }
               return AppButton(
+                key: const Key('create-award-submit'),
                 label: 'منح الجائزة',
                 isLoading: submitting,
-                onPressed: !canSubmit || submitting
+                onPressed: !canSubmit || submitting || locked
                     ? null
-                    : () {
+                    : () async {
                         final title = _titleCtrl.text.trim();
                         final selected = recipients;
                         if (selected.isEmpty) return;
                         final first = selected.first;
-                        context.read<AwardsBloc>().add(
-                          GrantAwardEvent(
-                            GrantedAwardEntity(
-                              id: '',
+                        final description = _descriptionCtrl.text.trim();
+                        final recipientIds = selected
+                            .map((s) => s.uid)
+                            .toList();
+                        final bloc = context.read<AwardsBloc>();
+                        final imagePath = _imagePath;
+                        final grantedAt = DateTime.now();
+                        final preparing = _submissionId.prepare([
+                          _type,
+                          title,
+                          description,
+                          imagePath,
+                          primaryHalaqaId,
+                          ...selectedHalaqaIds,
+                          '|',
+                          ...recipientIds,
+                        ], (awardId) => GrantedAwardEntity(
+                          id: awardId,
                               studentId: first.uid,
                               studentName: first.name,
                               studentImageUrl: first.imageUrl,
                               type: _type,
                               title: title,
-                              description: _descriptionCtrl.text.trim().isEmpty
+                              description: description.isEmpty
                                   ? null
-                                  : _descriptionCtrl.text.trim(),
-                              localImagePath: _imagePath,
+                                  : description,
+                              localImagePath: imagePath,
                               grantedBy: uid,
                               halaqaId: primaryHalaqaId,
                               halaqaName: halaqaName,
                               halaqaIds: selectedHalaqaIds,
                               halaqaNames: selectedHalaqaNames,
-                              grantedAt: DateTime.now(),
-                              recipientStudentIds: selected
-                                  .map((s) => s.uid)
-                                  .toList(),
+                              grantedAt: grantedAt,
+                              recipientStudentIds: recipientIds,
                               recipientCount: selected.length,
-                            ),
-                          ),
-                        );
-                        Navigator.pop(context);
+                        ));
+                        setState(() => _grantError = null);
+                        final prepared = await preparing;
+                        final award = prepared.payload;
+                        if (award != null) bloc.add(GrantAwardEvent(award));
+                        if (!mounted) return;
+                        setState(() {
+                          if (prepared.status ==
+                              AwardPrepareStatus.localSaveFailed) {
+                            _grantError = kAwardLocalSaveFailedMessage;
+                          }
+                        });
                       },
               );
             },

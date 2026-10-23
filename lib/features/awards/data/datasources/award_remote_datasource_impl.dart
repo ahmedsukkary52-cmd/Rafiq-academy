@@ -8,7 +8,10 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/achievements_firestore_contract.dart';
+import '../../../../shared/domain/upload_file_policy.dart';
+import '../../domain/award_submission_id.dart';
 import '../../domain/entities/award_entities.dart';
+import '../award_grant_errors.dart';
 import '../award_image_storage_path.dart';
 import '../models/granted_award_model.dart';
 import 'award_remote_datasource.dart';
@@ -73,10 +76,14 @@ class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
 
   @override
   Future<void> grantAward(GrantedAwardModel award) async {
+    var requestSent = false;
     try {
       final recipientIds = award.honoredStudentIds.toList();
       if (recipientIds.isEmpty) {
         throw const ServerException('يجب اختيار طالب واحد على الأقل');
+      }
+      if (!AwardSubmissionId.isValid(award.id)) {
+        throw const ServerException(kAwardGrantFailedMessage);
       }
 
       var imageUrl = award.imageUrl;
@@ -84,21 +91,32 @@ class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
       final localPath = award.localImagePath?.trim();
       if (localPath != null && localPath.isNotEmpty) {
         final file = File(localPath);
-        final ext = localPath.split('.').last;
+        final check = await UploadFilePolicy.checkFile(
+          file,
+          formats: awardImageFormats,
+        );
+        final format = check.format;
+        if (format == null) {
+          throw ServerException(check.error ?? 'صيغة الصورة غير مدعومة');
+        }
         imageStoragePath = awardImageStoragePath(
           teacherId: award.grantedBy,
-          extension: ext,
+          extension: format.extension,
         );
         final ref = storage.ref(imageStoragePath);
-        await ref.putFile(file);
+        await ref.putFile(
+          file,
+          SettableMetadata(contentType: format.contentType),
+        );
         imageUrl = await ref.getDownloadURL();
       }
 
       // The server writes the award and credits stars atomically; the
-      // pre-generated id makes a replayed call a no-op.
+      // caller's per-submission id makes a replayed call a no-op.
       final callable = functions.httpsCallable('grantAward');
+      requestSent = true;
       await callable.call(<String, dynamic>{
-        'awardId': _awardsRef.doc().id,
+        'awardId': award.id,
         'type': award.type.firestoreKey,
         'title': award.displayTitle,
         'description': award.description?.trim() ?? '',
@@ -111,10 +129,12 @@ class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
         'imageStoragePath': imageStoragePath ?? '',
       });
     } on FirebaseFunctionsException catch (e) {
-      throw ServerException(e.message ?? e.code);
+      throw ServerException(awardGrantErrorMessage(e.code, e.message));
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(e.toString());
+      throw ServerException(
+        awardGrantUnexpectedErrorMessage(requestSent: requestSent),
+      );
     }
   }
 }

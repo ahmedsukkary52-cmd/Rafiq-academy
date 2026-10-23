@@ -7,10 +7,15 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../awards/data/award_grant_errors.dart';
+import '../../../awards/domain/award_submission_id.dart';
+import '../../../awards/domain/unresolved_award_store.dart';
+import '../../../awards/presentation/widgets/unresolved_award_panel.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
 import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
 import '../../../teacher/domain/repositories/teacher_repository.dart';
 import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
+import '../../data/achievement_issue_payload_codec.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
@@ -40,6 +45,7 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
   String? _halaqaId;
   String _type = kSupervisorAwardTypeExamples.first;
   final _titleCtrl = TextEditingController();
+  late final AwardSubmissionId<AchievementIssueEntity> _submission;
   bool _loadingRoster = false;
   String? _rosterError;
   List<SupervisorStudentRow> _roster = const [];
@@ -48,6 +54,20 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
   @override
   void initState() {
     super.initState();
+    final auth = context.read<AuthBloc>().state;
+    final issuer = auth is AuthAuthenticated ? auth.user.uid : '';
+    _submission = AwardSubmissionId.durable(
+      scope: AwardOperationScope(
+        operation: AwardOperationScope.issueAchievement,
+        form: 'staff',
+        uid: issuer,
+      ),
+      store: sl<UnresolvedAwardStore>(),
+      codec: const AchievementIssuePayloadCodec(),
+    );
+    _submission.restore().then((_) {
+      if (mounted) setState(() {});
+    });
     _studentId = _trimOrNull(widget.preselectedStudentId);
     _halaqaId = _trimOrNull(widget.preselectedHalaqaId);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadRoster());
@@ -129,7 +149,7 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
     return halaqat.map((h) => h.id).toList();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) {
       AppSnackBar.showInfo(context, 'يجب تسجيل الدخول أولاً');
@@ -150,18 +170,38 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
       setState(() => _formError = 'أدخل عنوان الإنجاز');
       return;
     }
-    setState(() => _formError = null);
-    context.read<SupervisorBloc>().add(
-      IssueAchievementEvent(
-        AchievementIssueEntity(
-          studentId: studentId,
-          type: _type,
-          title: title,
-          issuedBy: auth.user.uid,
-          halaqaId: halaqaId,
-        ),
+    final type = _type;
+    final bloc = context.read<SupervisorBloc>();
+    final preparing = _submission.prepare(
+      [studentId, halaqaId, type, title],
+      (achievementId) => AchievementIssueEntity(
+        achievementId: achievementId,
+        studentId: studentId,
+        type: type,
+        title: title,
+        issuedBy: auth.user.uid,
+        halaqaId: halaqaId,
       ),
     );
+    setState(() => _formError = null);
+    final prepared = await preparing;
+    final entity = prepared.payload;
+    if (entity != null) bloc.add(IssueAchievementEvent(entity));
+    if (!mounted) return;
+    setState(() {
+      if (prepared.status == AwardPrepareStatus.localSaveFailed) {
+        _formError = kAwardLocalSaveFailedMessage;
+      }
+    });
+  }
+
+  void _retryPinned(AchievementIssueEntity pinned) {
+    context.read<SupervisorBloc>().add(IssueAchievementEvent(pinned));
+  }
+
+  Future<void> _abandonUnresolved() async {
+    await _submission.abandon();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -171,15 +211,21 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
           p.issueAchievementStatus != c.issueAchievementStatus,
       listener: (context, state) {
         if (state.issueAchievementStatus == SubmissionStatus.success) {
+          _submission.complete();
           context.read<SupervisorBloc>().add(
             const ResetIssueAchievementEvent(),
           );
           Navigator.of(context).maybePop();
         } else if (state.issueAchievementStatus == SubmissionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.issueAchievementError ?? 'تعذر منح الإنجاز',
-          );
+          final message = state.issueAchievementError ?? 'تعذر منح الإنجاز';
+          if (isAwardGrantUnconfirmed(message)) {
+            _submission.markUnresolved();
+            setState(() {});
+            FocusScope.of(context).unfocus();
+          } else {
+            _submission.confirmedFailure();
+          }
+          AppSnackBar.showError(context, message);
           context.read<SupervisorBloc>().add(
             const ResetIssueAchievementEvent(),
           );
@@ -207,82 +253,120 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
               );
             }
 
+            final pinned = _submission.unresolved?.payload;
+            final problem = _submission.recoveryProblem;
+            final locked = _submission.blocksNewSubmission;
+
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                DropdownButtonFormField<String>(
-                  value: _studentId != null && _rowFor(_studentId) != null
-                      ? _studentId
-                      : null,
-                  decoration: const InputDecoration(labelText: 'الطالب'),
-                  items: [
-                    for (final r in _roster)
-                      DropdownMenuItem(
-                        value: r.studentId,
-                        child: Text(
-                          r.displayName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: _roster.isEmpty
-                      ? null
-                      : (v) => setState(() {
-                          _studentId = v;
-                          _formError = null;
-                          _syncHalaqaForStudent();
-                        }),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _halaqaId != null && halaqaIds.contains(_halaqaId)
-                      ? _halaqaId
-                      : null,
-                  decoration: const InputDecoration(labelText: 'الحلقة'),
-                  items: [
-                    for (final id in halaqaIds)
-                      DropdownMenuItem(
-                        value: id,
-                        child: Text(
-                          _halaqaName(id, halaqat),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: halaqaIds.isEmpty
-                      ? null
-                      : (v) => setState(() {
-                          _halaqaId = v;
-                          _formError = null;
-                        }),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'النوع',
-                  style: AppTextStyles.labelLarge.copyWith(
-                    fontWeight: FontWeight.w700,
+                if (pinned != null || problem != null) ...[
+                  UnresolvedAwardPanel(
+                    summary: pinned == null
+                        ? kAwardRecordUnreadableSummary
+                        : '${pinned.title} — '
+                              '${_rowFor(pinned.studentId)?.displayName ?? pinned.studentId}',
+                    blockedReason: awardRecoveryNotice(problem),
+                    enabled: !submitting,
+                    onAbandon: _abandonUnresolved,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final o in kSupervisorAwardTypeOptions)
-                      ChoiceChip(
-                        label: Text(o.label),
-                        selected: _type == o.key,
-                        onSelected: (_) => setState(() => _type = o.key),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _titleCtrl,
-                  decoration: const InputDecoration(labelText: 'عنوان الإنجاز'),
-                  onChanged: (_) {
-                    if (_formError != null) setState(() => _formError = null);
-                  },
+                  const SizedBox(height: 16),
+                ],
+                IgnorePointer(
+                  ignoring: locked,
+                  child: Opacity(
+                    opacity: locked ? 0.5 : 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value:
+                              _studentId != null && _rowFor(_studentId) != null
+                              ? _studentId
+                              : null,
+                          decoration: const InputDecoration(
+                            labelText: 'الطالب',
+                          ),
+                          items: [
+                            for (final r in _roster)
+                              DropdownMenuItem(
+                                value: r.studentId,
+                                child: Text(
+                                  r.displayName,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: _roster.isEmpty
+                              ? null
+                              : (v) => setState(() {
+                                  _studentId = v;
+                                  _formError = null;
+                                  _syncHalaqaForStudent();
+                                }),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value:
+                              _halaqaId != null && halaqaIds.contains(_halaqaId)
+                              ? _halaqaId
+                              : null,
+                          decoration: const InputDecoration(
+                            labelText: 'الحلقة',
+                          ),
+                          items: [
+                            for (final id in halaqaIds)
+                              DropdownMenuItem(
+                                value: id,
+                                child: Text(
+                                  _halaqaName(id, halaqat),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: halaqaIds.isEmpty
+                              ? null
+                              : (v) => setState(() {
+                                  _halaqaId = v;
+                                  _formError = null;
+                                }),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'النوع',
+                          style: AppTextStyles.labelLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final o in kSupervisorAwardTypeOptions)
+                              ChoiceChip(
+                                label: Text(o.label),
+                                selected: _type == o.key,
+                                onSelected: (_) =>
+                                    setState(() => _type = o.key),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _titleCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'عنوان الإنجاز',
+                          ),
+                          onChanged: (_) {
+                            if (_formError != null) {
+                              setState(() => _formError = null);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 if (_formError != null) ...[
                   const SizedBox(height: 12),
@@ -295,8 +379,23 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
                 ],
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: submitting ? null : _submit,
-                  child: submitting ? const Text('جاري…') : const Text('منح'),
+                  key: const Key('supervisor-award-submit'),
+                  onPressed: submitting
+                      ? null
+                      : pinned != null
+                      ? (_submission.canRetry
+                            ? () => _retryPinned(pinned)
+                            : null)
+                      : locked
+                      ? null
+                      : _submit,
+                  child: Text(
+                    submitting
+                        ? 'جاري…'
+                        : pinned != null
+                        ? kAwardGrantRetrySameLabel
+                        : 'منح',
+                  ),
                 ),
               ],
             );

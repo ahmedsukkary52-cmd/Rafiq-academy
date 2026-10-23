@@ -39,6 +39,42 @@ class AchievementModel extends AchievementEntity {
     );
   }
 
+  /// One entry of the `getParentAchievements` callable response (already
+  /// projected server-side; `dateMillis` is epoch milliseconds).
+  factory AchievementModel.fromParentCallable(Map<String, dynamic> data) {
+    final millis = data['dateMillis'];
+    final resolvable = <String, dynamic>{
+      ...data,
+      AchievementsFirestoreContract.dateField: millis is num
+          ? DateTime.fromMillisecondsSinceEpoch(millis.toInt())
+          : null,
+    };
+    final recipients = AchievementsFirestoreContract.resolveRecipientStudentIds(
+      resolvable,
+    );
+    final studentId =
+        (data[AchievementsFirestoreContract.studentIdField] as String?)
+            ?.trim() ??
+        '';
+    final imageUrl =
+        (data[AchievementsFirestoreContract.imageUrlField] as String?)?.trim();
+    return AchievementModel(
+      id: (data['id'] as String?)?.trim() ?? '',
+      studentId: studentId.isNotEmpty
+          ? studentId
+          : (recipients.isNotEmpty ? recipients.first : ''),
+      type: typeFromFirestoreKey(
+        (data[AchievementsFirestoreContract.typeField] as String?) ?? '',
+      ),
+      title: AchievementsFirestoreContract.resolveTitle(resolvable),
+      description: AchievementsFirestoreContract.resolveDescription(resolvable),
+      imageUrl: (imageUrl == null || imageUrl.isEmpty) ? null : imageUrl,
+      issuedBy: AchievementsFirestoreContract.resolveActor(resolvable),
+      date: AchievementsFirestoreContract.resolveDate(resolvable),
+      recipientStudentIds: recipients,
+    );
+  }
+
   /// Legacy supervisor-shaped map (unused as a live writer after H7 dual-write).
   Map<String, dynamic> toFirestore() => {
     AchievementsFirestoreContract.studentIdField: studentId,

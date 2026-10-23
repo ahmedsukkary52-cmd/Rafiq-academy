@@ -35,6 +35,7 @@ export { sendChatMessage } from "./chat/chatMessageFunctions";
 export {
   notifyParentsOnEvaluation,
 } from "./notifications/evaluationNotificationFunctions";
+export { reconcileFcmTokenOwnership } from "./notifications/fcmTokenOwnership";
 export {
   adminBackfillStudentSearch,
   projectStudentSearchOnHalaqaWrite,

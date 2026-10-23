@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import {
@@ -28,6 +29,7 @@ import {
   SendOutcome,
   summarizeSendOutcomes,
 } from "./fcmTokenContract";
+import { filterOwnedTokens } from "./fcmTokenOwnership";
 import { pushGateBlockedMessage, resolvePushSendMode } from "./pushGate";
 
 const FEATURE = "notifyParentsOnEvaluation";
@@ -187,7 +189,7 @@ async function deliverToParent(params: {
         type: notification.type,
         readBy: [] as string[],
         hasAudioAlert: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         data: notification.data,
       });
     }
@@ -203,8 +205,8 @@ async function deliverToParent(params: {
         attempts: attempt.attempt,
         createdAt: existingDelivery.exists
           ? existingDelivery.data()?.createdAt
-          : admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          : FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
@@ -217,16 +219,19 @@ async function deliverToParent(params: {
   // A redelivered event never re-pushes a device that already received it.
   const alreadySent = new Set(claim.sentDeviceIds);
   const devices = await loadDeviceTokens(db, parentId);
-  const sendable = selectSendableTokens(devices).filter(
-    (t) => !alreadySent.has(t.deviceId),
+  const owned = await filterOwnedTokens(
+    db,
+    parentId,
+    selectSendableTokens(devices),
   );
+  const sendable = owned.filter((t) => !alreadySent.has(t.deviceId));
   if (sendable.length === 0) {
     await deliveryRef.set(
       {
         status: alreadySent.size > 0 ? "sent" : "no_tokens",
         successCount: 0,
         failureCount: 0,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
@@ -263,7 +268,7 @@ async function deliverToParent(params: {
       disabledDeviceIds: summary.invalidDeviceIds,
       sentDeviceIds: [...new Set([...alreadySent, ...delivered])],
       errorCodes: summary.errorCodes,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
@@ -341,7 +346,7 @@ async function disableDevices(params: {
       {
         disabled: true,
         disabledReason: "unregistered_token",
-        disabledAt: admin.firestore.FieldValue.serverTimestamp(),
+        disabledAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );

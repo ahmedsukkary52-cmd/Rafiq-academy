@@ -63,6 +63,7 @@ const PINNED = {
     projectStudentSearchOnHalaqaWrite: firestoreEvent(WRITTEN, "halaqat/{halaqaId}"),
     projectStudentSearchOnProfileWrite: firestoreEvent(WRITTEN, "studentProfiles/{studentId}"),
     projectStudentSearchOnUserWrite: firestoreEvent(WRITTEN, "users/{uid}"),
+    reconcileFcmTokenOwnership: firestoreEvent(WRITTEN, "fcmTokens/{uid}/devices/{deviceId}"),
     syncHalaqaGroupOnWrite: firestoreEvent(WRITTEN, "halaqat/{halaqaId}"),
   },
   /** Time-based only; never fired by a write. */

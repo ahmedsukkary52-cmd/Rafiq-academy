@@ -59,7 +59,8 @@ export {
   adminTransferStudent,
 } from "./halaqa/membershipFunctions";
 export { completeHomework, purchaseAvatar } from "./economy/economyFunctions";
-export { grantAward } from "./awards/awardFunctions";
+export { grantAward, issueAchievement } from "./awards/awardFunctions";
+export { getParentAchievements } from "./awards/parentAchievementFunctions";
 
 // P0 completion — Admin operational workflows (server-authoritative).
 export { adminLinkParentChild } from "./relationships/parentLinkFunctions";

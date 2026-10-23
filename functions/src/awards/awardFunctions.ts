@@ -9,7 +9,8 @@
  * AWARD_POINTS_PER_RECIPIENT is kept only as the historical value.
  *
  * Awards are append-only (no revoke) — `achievements` update/delete stay
- * denied in rules. Replaying the same `awardId` never credits twice.
+ * denied in rules. Replaying the same `awardId` never credits twice, and a
+ * replay with a different payload is rejected instead of reported as granted.
  */
 
 import * as admin from "firebase-admin";
@@ -23,6 +24,7 @@ import {
   requireText,
   stringList,
 } from "../authority/callerContext";
+import { contactInfoViolation } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
 
 export const AWARD_POINTS_PER_RECIPIENT = 10;
@@ -68,6 +70,33 @@ export function canGrantInHalaqa(
   return false;
 }
 
+/** Credited (grantAward) docs carry a recipient list; record-only ones never do. */
+function isCreditedAward(doc: Record<string, unknown>): boolean {
+  return Array.isArray(doc.recipientStudentIds);
+}
+
+export const AWARD_PAYLOAD_MISMATCH_MESSAGE =
+  "معرّف العملية مستخدم لطلب مختلف. لم تُسجَّل هذه البيانات؛ راجع قائمة الجوائز.";
+
+function sameIdSet(stored: unknown, requested: readonly string[]): boolean {
+  const a = [...new Set(stringList(stored))].sort();
+  const b = [...new Set(requested)].sort();
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/**
+ * A replayed operation id must carry the payload that was committed under
+ * it; otherwise the replay would report success for data never written.
+ * Compared on the stored canonical fields. Display-only fields and the image
+ * are excluded: the client re-uploads the image to a new timestamped path on
+ * every attempt, so its URL and path legitimately differ between retries.
+ */
+function assertSamePayload(matches: boolean): void {
+  if (!matches) {
+    throw new HttpsError("failed-precondition", AWARD_PAYLOAD_MISMATCH_MESSAGE);
+  }
+}
+
 export function awardImagePathOk(path: string, uid: string): boolean {
   return path.startsWith(`awards/${uid}/`) && !path.includes("..");
 }
@@ -98,6 +127,13 @@ export async function grantAwardCore(
   const studentImageUrl = optionalText(data.studentImageUrl, 2000);
   const imageUrl = optionalText(data.imageUrl, 2000);
   const imageStoragePath = optionalText(data.imageStoragePath, 300);
+  const awardTextViolation =
+    contactInfoViolation(title) ??
+    contactInfoViolation(description) ??
+    contactInfoViolation(studentName);
+  if (awardTextViolation) {
+    throw new HttpsError("invalid-argument", awardTextViolation);
+  }
   if (imageStoragePath && !awardImagePathOk(imageStoragePath, uid)) {
     throw new HttpsError("invalid-argument", "مسار صورة الجائزة غير صالح");
   }
@@ -137,9 +173,17 @@ export async function grantAwardCore(
     const existing = await tx.get(awardRef);
     if (existing.exists) {
       const prior = existing.data() ?? {};
-      if (text(prior.grantedBy) !== uid) {
+      if (text(prior.grantedBy) !== uid || !isCreditedAward(prior)) {
         throw new HttpsError("already-exists", "معرّف الجائزة مستخدم");
       }
+      assertSamePayload(
+        text(prior.type) === type &&
+          text(prior.title) === title &&
+          text(prior.description) === description &&
+          text(prior.halaqaId) === primaryHalaqaId &&
+          sameIdSet(prior.halaqaIds, halaqaIds) &&
+          sameIdSet(prior.recipientStudentIds, recipients),
+      );
       return {
         awardId,
         recipientCount: stringList(prior.recipientStudentIds).length,
@@ -202,6 +246,108 @@ export async function grantAwardCore(
     return { awardId, recipientCount: recipients.length, alreadyGranted: false };
   });
 }
+
+/** Mirror of kSupervisorAwardTypeOptions (lib/features/supervisor). */
+export const RECORD_ONLY_TYPE_KEYS: readonly string[] = Object.freeze([
+  "star",
+  "badge",
+  "certificate",
+]);
+
+export type IssueAchievementResult = {
+  achievementId: string;
+  alreadyIssued: boolean;
+};
+
+/**
+ * Record-only achievement (no star credit): one student on the roster of a
+ * halaqa the caller may grant in. Same doc shape the client used to write.
+ * Replaying `achievementId` by the same issuer returns the original record;
+ * an id already used by someone else or by a credited award is rejected.
+ */
+export async function issueAchievementCore(
+  db: admin.firestore.Firestore,
+  callerUid: string | undefined,
+  data: Record<string, unknown>,
+): Promise<IssueAchievementResult> {
+  const uid = requireCallerUid(callerUid);
+  const achievementId = requireText(data.achievementId, "achievementId", 64);
+  if (!AWARD_ID_PATTERN.test(achievementId)) {
+    throw new HttpsError("invalid-argument", "achievementId غير صالح");
+  }
+  const type = requireText(data.type, "type", 64);
+  if (!RECORD_ONLY_TYPE_KEYS.includes(type)) {
+    throw new HttpsError("invalid-argument", "نوع الإنجاز غير صالح");
+  }
+  const title = requireText(data.title, "title", 120);
+  const titleViolation = contactInfoViolation(title);
+  if (titleViolation) {
+    throw new HttpsError("invalid-argument", titleViolation);
+  }
+  const studentId = requireText(data.studentId, "studentId", 128);
+  const halaqaId = requireText(data.halaqaId, "halaqaId", 128);
+
+  const role = await loadCallerRole(db, uid);
+  if (!GRANTOR_ROLES.has(role)) {
+    throw new HttpsError("permission-denied", "منح الإنجازات متاح للمعلم والمشرف والإدارة فقط");
+  }
+
+  const ref = db.collection("achievements").doc(achievementId);
+  const halaqaRef = db.collection("halaqat").doc(halaqaId);
+
+  return db.runTransaction(async (tx) => {
+    const existing = await tx.get(ref);
+    if (existing.exists) {
+      const prior = existing.data() ?? {};
+      if (text(prior.grantedBy) !== uid || isCreditedAward(prior)) {
+        throw new HttpsError("already-exists", "معرّف الإنجاز مستخدم");
+      }
+      assertSamePayload(
+        text(prior.type) === type &&
+          text(prior.title) === title &&
+          text(prior.studentId) === studentId &&
+          text(prior.halaqaId) === halaqaId,
+      );
+      return { achievementId, alreadyIssued: true };
+    }
+
+    const halaqaSnap = await tx.get(halaqaRef);
+    if (!halaqaSnap.exists) throw new HttpsError("not-found", "الحلقة غير موجودة");
+    const halaqa = halaqaSnap.data() ?? {};
+    if (!canGrantInHalaqa(role, uid, halaqa)) {
+      throw new HttpsError("permission-denied", "لا تملك صلاحية منح إنجازات في هذه الحلقة");
+    }
+    if (!stringList(halaqa.studentIds).includes(studentId)) {
+      throw new HttpsError("permission-denied", "الطالب ليس ضمن هذه الحلقة");
+    }
+
+    const now = FieldValue.serverTimestamp();
+    tx.create(ref, {
+      studentId,
+      type,
+      halaqaId,
+      title,
+      note: title,
+      grantedBy: uid,
+      issuedBy: uid,
+      grantedAt: now,
+      date: now,
+    });
+    return { achievementId, alreadyIssued: false };
+  });
+}
+
+export const issueAchievement = onCall(
+  { region: "europe-west1" },
+  async (request) => {
+    assertBackendAllowed("issueAchievement");
+    return issueAchievementCore(
+      admin.firestore(),
+      request.auth?.uid,
+      (request.data ?? {}) as Record<string, unknown>,
+    );
+  },
+);
 
 export const grantAward = onCall(
   { region: "europe-west1" },

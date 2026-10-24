@@ -31,7 +31,7 @@
     "test:wa16": "node --test test/wa16_audit_logs.test.mjs"
   },
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "lib/index.js",
   "dependencies": {

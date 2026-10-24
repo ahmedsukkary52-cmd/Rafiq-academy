@@ -517,7 +517,7 @@ test("docs state the identity evidence and the no-reuse retry procedure", () => 
     "A read it could not do is reported as unknown, never as absent.",
     "The diagnosis never makes the session acceptable for\nseeding.",
     "may create `studentSearch/{id}`",
-    "`engines.node` is `\"20\"`",
+    "`engines.node` is `\"22\"`",
     "runs the Functions emulator on the host's Node instead.",
   ]) {
     assert.ok(docs.includes(phrase), phrase);

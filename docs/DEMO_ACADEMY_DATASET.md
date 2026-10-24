@@ -179,10 +179,10 @@ rather than guessing.
 
 The Firebase CLI, the Functions emulator, the seeder and the unit tests all
 run on the host's Node (currently Node 24). `functions/package.json`
-`engines.node` is `"20"`, and that is the runtime used on deploy. When the
+`engines.node` is `"22"`, and that is the runtime used on deploy. When the
 requested major version is not installed locally, the CLI prints a warning and
 runs the Functions emulator on the host's Node instead. So local runs do not
-prove Node 20 behavior. No `.nvmrc` is provided.
+prove Node 22 behavior. No `.nvmrc` is provided.
 
 ### Deploy exclusion and status
 

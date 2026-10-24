@@ -1608,6 +1608,51 @@ test("PH02 award: separate grants accumulate (awards are repeatable)", async () 
   assert.equal(profile.totalStars, 2);
 });
 
+test("PH02 award: the same awardId with a different payload is rejected, never replayed as success", async () => {
+  await awards.grantAwardCore(db, "teacher1", grant());
+  const changed = [
+    grant({ title: "Edited" }),
+    grant({ type: "achievement" }),
+    grant({ description: "added later" }),
+    grant({ recipientStudentIds: ["student1"] }),
+  ];
+  for (const input of changed) {
+    await expectCode(awards.grantAwardCore(db, "teacher1", input), "failed-precondition");
+  }
+  const award = await data("achievements/award_0001");
+  assert.equal(award.title, "Award");
+  assert.deepEqual(award.recipientStudentIds, ["student1", "student2"]);
+  assert.equal((await data("studentProfiles/student1")).totalStars, 1);
+  assert.equal((await data("studentProfiles/student2")).totalStars, 1);
+});
+
+test("PH02 award: a retry with the same payload replays even with a re-uploaded image or reordered ids", async () => {
+  await awards.grantAwardCore(db, "teacher1", grant({
+    imageStoragePath: "awards/teacher1/1.jpg",
+    imageUrl: "https://example.invalid/1.jpg",
+  }));
+  const replay = await awards.grantAwardCore(db, "teacher1", grant({
+    recipientStudentIds: ["student2", "student1"],
+    imageStoragePath: "awards/teacher1/2.jpg",
+    imageUrl: "https://example.invalid/2.jpg",
+  }));
+  assert.equal(replay.alreadyGranted, true);
+  assert.equal((await data("achievements/award_0001")).imageStoragePath, "awards/teacher1/1.jpg");
+  assert.equal((await data("studentProfiles/student1")).totalStars, 1);
+});
+
+test("PH02 award: after a confirmed grant a new id is a genuinely new award", async () => {
+  const first = await awards.grantAwardCore(db, "teacher1", grant());
+  assert.equal(first.alreadyGranted, false);
+  const second = await awards.grantAwardCore(db, "teacher1", grant({
+    awardId: "award_0002",
+    title: "Edited",
+  }));
+  assert.equal(second.alreadyGranted, false);
+  assert.equal((await data("achievements/award_0002")).title, "Edited");
+  assert.equal((await data("studentProfiles/student1")).totalStars, 2);
+});
+
 test("PH02 award: scoped Supervisor and Admin may grant", async () => {
   await awards.grantAwardCore(db, "sup1", grant({ awardId: "award_sup1" }));
   await awards.grantAwardCore(db, "admin1", grant({ awardId: "award_adm1" }));
@@ -1650,4 +1695,127 @@ test("PH02 award: bad input fails closed", async () => {
     awards.grantAwardCore(db, "teacher1", grant({ halaqaId: "ghost", halaqaIds: ["ghost"] })),
     "not-found",
   );
+});
+
+// ── Record-only achievements (issueAchievement, no credit) ─────────────────
+
+const issue = (overrides = {}) => ({
+  achievementId: "ach_0001",
+  studentId: "student1",
+  halaqaId: "h1",
+  type: "star",
+  title: "Star",
+  ...overrides,
+});
+
+const achievementsOf = async (studentId) =>
+  (await db.collection("achievements").where("studentId", "==", studentId).get()).size;
+
+test("PH02 achievement: record-only issue writes one doc and credits nothing", async () => {
+  const result = await awards.issueAchievementCore(db, "sup1", issue({
+    totalStars: 5,
+    grantedBy: "admin1",
+    recipientStudentIds: ["student1", "student2"],
+  }));
+  assert.deepEqual(result, { achievementId: "ach_0001", alreadyIssued: false });
+  const doc = await data("achievements/ach_0001");
+  assert.deepEqual(Object.keys(doc).sort(), [
+    "date", "grantedAt", "grantedBy", "halaqaId", "issuedBy", "note", "studentId", "title", "type",
+  ]);
+  assert.equal(doc.grantedBy, "sup1");
+  assert.equal(doc.issuedBy, "sup1");
+  assert.equal(doc.title, "Star");
+  assert.equal(doc.note, "Star");
+  assert.equal((await data("studentProfiles/student1")).totalStars, undefined);
+});
+
+test("PH02 achievement: retry after a committed issue replays it (no second record)", async () => {
+  await awards.issueAchievementCore(db, "sup1", issue());
+  // The caller never saw the first response; it retries with the same id.
+  const replay = await awards.issueAchievementCore(db, "sup1", issue());
+  assert.deepEqual(replay, { achievementId: "ach_0001", alreadyIssued: true });
+  await expectCode(awards.issueAchievementCore(db, "teacher1", issue()), "already-exists");
+  assert.equal(await achievementsOf("student1"), 1);
+});
+
+test("PH02 achievement: concurrent replays of one issue create exactly one record", async () => {
+  const results = await Promise.allSettled([
+    awards.issueAchievementCore(db, "sup1", issue()),
+    awards.issueAchievementCore(db, "sup1", issue()),
+    awards.issueAchievementCore(db, "sup1", issue()),
+  ]);
+  const fresh = results.filter((r) => r.status === "fulfilled" && !r.value.alreadyIssued);
+  assert.equal(fresh.length, 1);
+  assert.equal(await achievementsOf("student1"), 1);
+});
+
+test("PH02 achievement: a new operation id is an intentional second record", async () => {
+  await awards.issueAchievementCore(db, "sup1", issue());
+  await awards.issueAchievementCore(db, "sup1", issue({ achievementId: "ach_0002" }));
+  assert.equal(await achievementsOf("student1"), 2);
+  assert.equal((await data("studentProfiles/student1")).totalStars, undefined);
+});
+
+test("PH02 achievement: the same id with a different payload is rejected, never replayed as success", async () => {
+  await awards.issueAchievementCore(db, "sup1", issue());
+  for (const input of [
+    issue({ title: "Edited" }),
+    issue({ type: "badge" }),
+    issue({ studentId: "student2" }),
+  ]) {
+    await expectCode(awards.issueAchievementCore(db, "sup1", input), "failed-precondition");
+  }
+  const doc = await data("achievements/ach_0001");
+  assert.equal(doc.title, "Star");
+  assert.equal(doc.type, "star");
+  assert.equal(await achievementsOf("student1"), 1);
+  assert.equal(await achievementsOf("student2"), 0);
+});
+
+test("PH02 achievement: ids never cross between record-only and credited awards", async () => {
+  await awards.grantAwardCore(db, "teacher1", grant({ awardId: "shared_0001" }));
+  await expectCode(
+    awards.issueAchievementCore(db, "teacher1", issue({ achievementId: "shared_0001" })),
+    "already-exists",
+  );
+  await awards.issueAchievementCore(db, "teacher1", issue({ achievementId: "shared_0002" }));
+  await expectCode(
+    awards.grantAwardCore(db, "teacher1", grant({ awardId: "shared_0002" })),
+    "already-exists",
+  );
+  assert.equal((await data("studentProfiles/student1")).totalStars, 1);
+});
+
+test("PH02 achievement: scoped staff only; off-roster and other roles denied", async () => {
+  await awards.issueAchievementCore(db, "teacher1", issue({ achievementId: "ach_teacher1" }));
+  await awards.issueAchievementCore(db, "admin1", issue({ achievementId: "ach_admin1" }));
+  for (const uid of ["teacher2", "sup2", "parent1", "student1"]) {
+    await expectCode(awards.issueAchievementCore(db, uid, issue()), "permission-denied");
+  }
+  await expectCode(
+    awards.issueAchievementCore(db, "sup1", issue({ studentId: "student3" })),
+    "permission-denied",
+  );
+  await expectCode(
+    awards.issueAchievementCore(db, "sup1", issue({ halaqaId: "ghost" })),
+    "not-found",
+  );
+  await expectCode(awards.issueAchievementCore(db, undefined, issue()), "unauthenticated");
+  assert.equal((await db.doc("achievements/ach_0001").get()).exists, false);
+});
+
+test("PH02 achievement: bad input fails closed", async () => {
+  const bad = [
+    issue({ achievementId: "x" }),
+    issue({ achievementId: "../evil_id" }),
+    issue({ type: "performance_stars" }),
+    issue({ type: "coins" }),
+    issue({ title: "" }),
+    issue({ studentId: "" }),
+    issue({ halaqaId: "" }),
+  ];
+  for (const input of bad) {
+    await expectCode(awards.issueAchievementCore(db, "sup1", input), "invalid-argument");
+  }
+  assert.equal(await achievementsOf("student1"), 0);
 });

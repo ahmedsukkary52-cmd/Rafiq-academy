@@ -142,7 +142,18 @@ test("PH02 payment: Admin approves → paid with server-derived fields + one aud
     reviewedBy: "someone",
     status: "paid",
   });
-  assert.deepEqual(result, { paymentId: "p1", reviewStatus: "approved", status: "paid" });
+  assert.deepEqual(result, {
+    paymentId: "p1",
+    reviewStatus: "approved",
+    status: "paid",
+    amount: 200,
+    previousAmountPaidConfirmed: 0,
+    amountPaidConfirmed: 200,
+    remainingAmount: 0,
+    receiptAmount: 200,
+    amountMode: "approve_remaining",
+    replayed: false,
+  });
 
   const doc = await data("payments/p1");
   assert.equal(doc.status, "paid");
@@ -270,6 +281,282 @@ test("PH02 payment: not pending / wrong family / missing / bad input fail closed
   assert.equal(doc.remainingAmount, 150);
   assert.equal(doc.amountPaidConfirmed, 50);
   assert.equal(await auditCount("payment_review"), 1);
+});
+
+// ── Repeated partial payments: current contract (idempotent, proof-bound) ──
+
+const PROOF_A = "1790000000000.jpg";
+const PROOF_B = "1790000100000.jpg";
+
+function proofPayment(overrides = {}) {
+  return pendingPayment({
+    proofFileName: PROOF_A,
+    proofSubmittedAt: Timestamp.fromMillis(1_790_000_000_000),
+    ...overrides,
+  });
+}
+
+function currentReview(uid, overrides = {}) {
+  return review.reviewPaymentProofCore(db, uid, {
+    paymentId: "p1",
+    decision: "partial",
+    requestId: "req_aaaaaaaaaaaaaaaa",
+    expectedProofFileName: PROOF_A,
+    amountMode: "receipt",
+    amountValue: 60,
+    ...overrides,
+  });
+}
+
+/** Parent resubmission as Rules allow it: proof fields + pending_review only. */
+async function resubmit(fileName, millis) {
+  await db.doc("payments/p1").update({
+    proofFileName: fileName,
+    proofStoragePath: `payment_proofs/parent1/p1/${fileName}`,
+    proofSubmittedAt: Timestamp.fromMillis(millis),
+    reviewStatus: "pending_review",
+  });
+}
+
+async function auditEntries() {
+  const snap = await db.collection("auditLogs").where("action", "==", "payment_review").get();
+  return snap.docs.map((d) => d.data()).sort(
+    (a, b) => a.metadata.amountPaidConfirmed - b.metadata.amountPaidConfirmed,
+  );
+}
+
+async function requestCount() {
+  return (await db.collection("paymentReviewRequests").get()).size;
+}
+
+test("PH02 partial cycle: receipt → resubmit → receipt → resubmit → approve", async () => {
+  await seed({ "payments/p1": proofPayment() });
+
+  const first = await currentReview("admin1");
+  assert.equal(first.amountPaidConfirmed, 60);
+  assert.equal(first.remainingAmount, 140);
+  assert.equal(first.receiptAmount, 60);
+  assert.equal(first.replayed, false);
+
+  await resubmit(PROOF_B, 1_790_000_100_000);
+  const second = await currentReview("sup1", {
+    requestId: "req_bbbbbbbbbbbbbbbb",
+    expectedProofFileName: PROOF_B,
+    amountValue: 50,
+  });
+  assert.equal(second.previousAmountPaidConfirmed, 60);
+  assert.equal(second.amountPaidConfirmed, 110);
+  assert.equal(second.remainingAmount, 90);
+
+  await resubmit("1790000200000.png", 1_790_000_200_000);
+  const closed = await currentReview("admin1", {
+    requestId: "req_cccccccccccccccc",
+    expectedProofFileName: "1790000200000.png",
+    decision: "approve",
+    amountMode: undefined,
+    amountValue: undefined,
+  });
+  assert.equal(closed.status, "paid");
+  assert.equal(closed.receiptAmount, 90);
+
+  const doc = await data("payments/p1");
+  assert.equal(doc.status, "paid");
+  assert.equal(doc.amountPaidConfirmed, 200);
+  assert.equal(doc.remainingAmount, 0);
+  assert.equal(doc.amount, 200);
+
+  const entries = await auditEntries();
+  assert.equal(entries.length, 3);
+  assert.deepEqual(
+    entries.map((e) => [
+      e.metadata.amountMode,
+      e.metadata.amount,
+      e.metadata.receiptAmount,
+      e.metadata.previousAmountPaidConfirmed,
+      e.metadata.amountPaidConfirmed,
+      e.metadata.remainingAmount,
+    ]),
+    [
+      ["receipt", 200, 60, 0, 60, 140],
+      ["receipt", 200, 50, 60, 110, 90],
+      ["approve_remaining", 200, 90, 110, 200, 0],
+    ],
+  );
+  assert.deepEqual(entries.map((e) => e.metadata.requestId), [
+    "req_aaaaaaaaaaaaaaaa",
+    "req_bbbbbbbbbbbbbbbb",
+    "req_cccccccccccccccc",
+  ]);
+  for (const entry of entries) {
+    const raw = JSON.stringify(entry);
+    assert.ok(!raw.includes("payment_proofs/"), "audit must not carry the proof path");
+    assert.ok(!raw.includes(".jpg") && !raw.includes(".png"), "audit must not carry the proof name");
+  }
+  assert.equal(await requestCount(), 3);
+});
+
+test("PH02 partial cumulative mode stores the entered total", async () => {
+  await seed({ "payments/p1": proofPayment({ amountPaidConfirmed: 60, remainingAmount: 140 }) });
+  const result = await currentReview("admin1", { amountMode: "cumulative", amountValue: 150 });
+  assert.equal(result.previousAmountPaidConfirmed, 60);
+  assert.equal(result.amountPaidConfirmed, 150);
+  assert.equal(result.receiptAmount, 90);
+
+  await resubmit(PROOF_B, 1_790_000_100_000);
+  await expectCode(
+    currentReview("admin1", {
+      requestId: "req_dddddddddddddddd",
+      expectedProofFileName: PROOF_B,
+      amountMode: "cumulative",
+      amountValue: 120,
+    }),
+    "invalid-argument",
+  );
+  assert.equal((await data("payments/p1")).amountPaidConfirmed, 150);
+});
+
+test("PH02 idempotency: same requestId + content replays without a second review", async () => {
+  await seed({ "payments/p1": proofPayment() });
+  const first = await currentReview("admin1");
+  const replay = await currentReview("admin1");
+  assert.equal(replay.replayed, true);
+  assert.deepEqual({ ...replay, replayed: false }, first);
+
+  // Still a replay after the Parent resubmits: the stored result is returned
+  // and the newer proof stays pending, untouched.
+  await resubmit(PROOF_B, 1_790_000_100_000);
+  const late = await currentReview("admin1");
+  assert.equal(late.replayed, true);
+  assert.equal(late.amountPaidConfirmed, 60);
+
+  const doc = await data("payments/p1");
+  assert.equal(doc.reviewStatus, "pending_review");
+  assert.equal(doc.amountPaidConfirmed, 60);
+  assert.equal(await auditCount("payment_review"), 1);
+  assert.equal(await requestCount(), 1);
+});
+
+test("PH02 idempotency: reusing a requestId with different content is refused", async () => {
+  await seed({ "payments/p1": proofPayment() });
+  await currentReview("admin1");
+  for (const change of [
+    { amountValue: 61 },
+    { amountMode: "cumulative" },
+    { notes: "different" },
+    { decision: "reject", amountMode: undefined, amountValue: undefined },
+  ]) {
+    await assert.rejects(currentReview("admin1", change), (err) => {
+      assert.equal(err.code, "failed-precondition");
+      assert.equal(err.message, review.REQUEST_ID_REUSED_MESSAGE);
+      return true;
+    });
+  }
+  // Another reviewer's identical requestId is a separate key, never a replay.
+  await expectCode(currentReview("sup1"), "failed-precondition");
+  assert.equal((await data("payments/p1")).amountPaidConfirmed, 60);
+  assert.equal(await auditCount("payment_review"), 1);
+});
+
+test("PH02 proof binding: a request for an older proof never reviews a newer one", async () => {
+  await seed({ "payments/p1": proofPayment({ amountPaidConfirmed: 60, remainingAmount: 140 }) });
+  await resubmit(PROOF_B, 1_790_000_100_000);
+  await assert.rejects(currentReview("admin1", { amountValue: 20 }), (err) => {
+    assert.equal(err.code, "failed-precondition");
+    assert.equal(err.message, review.PROOF_CHANGED_MESSAGE);
+    return true;
+  });
+  const doc = await data("payments/p1");
+  assert.equal(doc.amountPaidConfirmed, 60);
+  assert.equal(doc.reviewStatus, "pending_review");
+  assert.equal(await auditCount("payment_review"), 0);
+  assert.equal(await requestCount(), 0);
+
+  await seed({ "payments/p2": pendingPayment() });
+  await expectCode(
+    currentReview("admin1", { paymentId: "p2", requestId: "req_eeeeeeeeeeeeeeee" }),
+    "failed-precondition",
+  );
+});
+
+test("PH02 concurrency: same requestId in parallel applies the receipt once", async () => {
+  await seed({ "payments/p1": proofPayment() });
+  // The emulator may close a contending transaction instead of retrying it;
+  // the invariant is that the receipt lands once and a retry replays it.
+  const settled = await Promise.allSettled([1, 2, 3].map(() => currentReview("admin1")));
+  const fulfilled = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  assert.equal(fulfilled.filter((r) => r.replayed === false).length, 1);
+  assert.ok(fulfilled.every((r) => r.amountPaidConfirmed === 60));
+  const retry = await currentReview("admin1");
+  assert.equal(retry.replayed, true);
+  assert.equal(retry.amountPaidConfirmed, 60);
+  assert.equal(retry.receiptAmount, 60);
+  assert.equal((await data("payments/p1")).amountPaidConfirmed, 60);
+  assert.equal(await auditCount("payment_review"), 1);
+  assert.equal(await requestCount(), 1);
+});
+
+test("PH02 concurrency: different requests on one proof commit exactly once", async () => {
+  await seed({ "payments/p1": proofPayment() });
+  const results = await Promise.allSettled([
+    currentReview("admin1", { requestId: "req_1111111111111111", amountValue: 60 }),
+    currentReview("sup1", { requestId: "req_2222222222222222", amountValue: 70 }),
+    currentReview("admin1", { requestId: "req_3333333333333333", amountMode: "cumulative", amountValue: 80 }),
+  ]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  const winner = results.find((r) => r.status === "fulfilled").value;
+  assert.equal((await data("payments/p1")).amountPaidConfirmed, winner.amountPaidConfirmed);
+  assert.equal(await auditCount("payment_review"), 1);
+  assert.equal(await requestCount(), 1);
+});
+
+test("PH02 reject keeps confirmed totals and records no receipt", async () => {
+  await seed({ "payments/p1": proofPayment({ amountPaidConfirmed: 60, remainingAmount: 140 }) });
+  const result = await currentReview("admin1", {
+    decision: "reject",
+    amountMode: undefined,
+    amountValue: undefined,
+    notes: "unclear",
+  });
+  assert.equal(result.receiptAmount, null);
+  assert.equal(result.amountMode, "reject_unchanged");
+  const doc = await data("payments/p1");
+  assert.equal(doc.reviewStatus, "rejected");
+  assert.equal(doc.amountPaidConfirmed, 60);
+  assert.equal(doc.remainingAmount, 140);
+  const [entry] = await auditEntries();
+  assert.equal(entry.metadata.amountMode, "reject_unchanged");
+  assert.ok(!("receiptAmount" in entry.metadata));
+  assert.equal(entry.metadata.previousAmountPaidConfirmed, 60);
+  assert.equal(entry.metadata.amountPaidConfirmed, 60);
+  assert.equal(entry.metadata.remainingAmount, 140);
+});
+
+test("PH02 legacy contract: cumulative total may not shrink; no request record", async () => {
+  await seed({ "payments/p1": proofPayment({ amountPaidConfirmed: 60, remainingAmount: 140 }) });
+  await expectCode(
+    review.reviewPaymentProofCore(db, "admin1", {
+      paymentId: "p1",
+      decision: "partial",
+      amountPaidConfirmed: 40,
+    }),
+    "invalid-argument",
+  );
+  const result = await review.reviewPaymentProofCore(db, "admin1", {
+    paymentId: "p1",
+    decision: "partial",
+    amountPaidConfirmed: 100,
+  });
+  assert.equal(result.amountMode, "legacy_cumulative");
+  assert.equal(result.receiptAmount, 40);
+  assert.equal((await data("payments/p1")).remainingAmount, 100);
+  assert.equal(await requestCount(), 0);
+});
+
+test("PH02 current contract: missing idempotency fields are invalid", async () => {
+  await seed({ "payments/p1": proofPayment() });
+  await expectCode(currentReview("admin1", { requestId: undefined }), "invalid-argument");
+  await expectCode(currentReview("admin1", { expectedProofFileName: undefined }), "invalid-argument");
+  assert.equal((await data("payments/p1")).reviewStatus, "pending_review");
 });
 
 // ── C6 attendance ──────────────────────────────────────────────────────────

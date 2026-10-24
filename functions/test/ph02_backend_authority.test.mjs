@@ -107,6 +107,338 @@ test("PH02 payment review: one audit id per review cycle", () => {
   );
 });
 
+test("Proof cycle: audit id is keyed by the server-issued cycle when present", () => {
+  const cycle = "pc_AAAAAAAAAAAAAAAAAAAAAAAA";
+  assert.equal(review.paymentReviewAuditId("p1", undefined, cycle), `payment_review_p1_c_${cycle}`);
+  assert.equal(review.paymentReviewAuditId("p1", undefined, ""), "payment_review_p1_initial");
+  assert.notEqual(
+    review.paymentReviewAuditId("p1", undefined, cycle),
+    review.paymentReviewAuditId("p1", undefined, "pc_BBBBBBBBBBBBBBBBBBBBBBBB"),
+  );
+});
+
+test("Proof cycle: server cycle ids are random, prefixed and never repeat", () => {
+  const submission = require("../lib/billing/paymentProofSubmission.js");
+  const ids = new Set();
+  for (let i = 0; i < 500; i++) {
+    const id = submission.newProofCycleId();
+    assert.match(id, review.PROOF_CYCLE_ID_PATTERN);
+    ids.add(id);
+  }
+  assert.equal(ids.size, 500);
+  assert.equal(
+    submission.paymentProofObjectPath("par1", "pay1", "1.jpg"),
+    "payment_proofs/par1/pay1/1.jpg",
+  );
+});
+
+// ── Repeated partial payments (receipt / cumulative, minor units) ─────────
+
+function pendingWith(previous, amount = 100) {
+  return {
+    amount,
+    status: "due",
+    reviewStatus: "pending_review",
+    ...(previous === undefined ? {} : { amountPaidConfirmed: previous }),
+  };
+}
+
+function partial(payment, mode, value) {
+  return review.decidePaymentReview({
+    payment,
+    decision: "partial",
+    amountInput: { mode, value },
+  });
+}
+
+test("PH02 partial receipt: first then second receipt add to the confirmed total", () => {
+  const first = partial(pendingWith(undefined), "receipt", 60);
+  assert.equal(first.ok, true);
+  assert.deepEqual(first.patch, {
+    reviewStatus: "partial",
+    amountPaidConfirmed: 60,
+    remainingAmount: 40,
+  });
+  assert.deepEqual(first.amounts, {
+    mode: "receipt", invoice: 10000, previous: 0, total: 6000, remaining: 4000, receipt: 6000,
+  });
+
+  const second = partial(pendingWith(60), "receipt", 20);
+  assert.deepEqual(second.patch, {
+    reviewStatus: "partial",
+    amountPaidConfirmed: 80,
+    remainingAmount: 20,
+  });
+  assert.equal(second.amounts.previous, 6000);
+  assert.equal(second.amounts.receipt, 2000);
+});
+
+test("PH02 partial cumulative: totals are entered, receipt is the difference", () => {
+  const first = partial(pendingWith(undefined), "cumulative", 60);
+  assert.deepEqual(first.patch.amountPaidConfirmed, 60);
+  assert.equal(first.amounts.receipt, 6000);
+
+  const second = partial(pendingWith(60), "cumulative", 80);
+  assert.deepEqual(second.patch, {
+    reviewStatus: "partial",
+    amountPaidConfirmed: 80,
+    remainingAmount: 20,
+  });
+  assert.equal(second.amounts.mode, "cumulative");
+  assert.equal(second.amounts.receipt, 2000);
+});
+
+test("PH02 partial: switching modes between consecutive reviews", () => {
+  const toCumulative = partial(pendingWith(60), "cumulative", 90);
+  assert.equal(toCumulative.patch.amountPaidConfirmed, 90);
+  assert.equal(toCumulative.amounts.receipt, 3000);
+  const toReceipt = partial(pendingWith(90), "receipt", 5);
+  assert.equal(toReceipt.patch.amountPaidConfirmed, 95);
+  assert.equal(toReceipt.patch.remainingAmount, 5);
+});
+
+test("PH02 approve after partials: invoice total, client amount ignored", () => {
+  const outcome = review.decidePaymentReview({
+    payment: pendingWith(80),
+    decision: "approve",
+    amountPaidConfirmed: 1,
+  });
+  assert.deepEqual(outcome.patch, {
+    reviewStatus: "approved",
+    status: "paid",
+    amountPaidConfirmed: 100,
+    remainingAmount: 0,
+  });
+  assert.deepEqual(outcome.amounts, {
+    mode: "approve_remaining", invoice: 10000, previous: 8000, total: 10000, remaining: 0, receipt: 2000,
+  });
+});
+
+test("PH02 reject never moves the confirmed totals", () => {
+  const outcome = review.decidePaymentReview({
+    payment: pendingWith(60),
+    decision: "reject",
+    amountPaidConfirmed: 99,
+  });
+  assert.deepEqual(outcome.patch, { reviewStatus: "rejected" });
+  assert.deepEqual(outcome.amounts, {
+    mode: "reject_unchanged", invoice: 10000, previous: 6000, total: 6000, remaining: 4000, receipt: null,
+  });
+});
+
+test("PH02 partial: exceeding or reaching the invoice is refused", () => {
+  for (const [mode, value] of [["receipt", 41], ["cumulative", 101], ["receipt", 1000]]) {
+    const outcome = partial(pendingWith(60), mode, value);
+    assert.equal(outcome.ok, false, `${mode} ${value}`);
+    assert.equal(outcome.code, "invalid-argument");
+    assert.match(outcome.message, /يتجاوز المتبقي/);
+  }
+  for (const [mode, value] of [["receipt", 40], ["cumulative", 100]]) {
+    const outcome = partial(pendingWith(60), mode, value);
+    assert.equal(outcome.ok, false, `${mode} ${value}`);
+    assert.match(outcome.message, /استخدم الاعتماد/);
+  }
+});
+
+test("PH02 partial: zero, negative, non-number and >2 decimals are refused", () => {
+  for (const mode of ["receipt", "cumulative", "legacy_cumulative"]) {
+    for (const bad of [0, -5, Number.NaN, Infinity, "20", null, undefined, 10.005]) {
+      const outcome = partial(pendingWith(undefined), mode, bad);
+      assert.equal(outcome.ok, false, `${mode} ${String(bad)} must fail`);
+      assert.equal(outcome.code, "invalid-argument");
+    }
+  }
+});
+
+test("PH02 partial: a cumulative / legacy total cannot shrink or repeat", () => {
+  for (const mode of ["cumulative", "legacy_cumulative"]) {
+    for (const value of [60, 50, 0.01]) {
+      const outcome = partial(pendingWith(60), mode, value);
+      assert.equal(outcome.ok, false, `${mode} ${value}`);
+      assert.match(outcome.message, /أكبر من الإجمالي المؤكد سابقاً/);
+    }
+  }
+  const legacy = review.decidePaymentReview({
+    payment: pendingWith(60),
+    decision: "partial",
+    amountPaidConfirmed: 70,
+  });
+  assert.equal(legacy.amounts.mode, "legacy_cumulative");
+  assert.equal(legacy.patch.amountPaidConfirmed, 70);
+  assert.equal(legacy.amounts.receipt, 1000);
+});
+
+test("PH02 partial: minor-unit math has no floating drift", () => {
+  const a = partial(pendingWith(undefined), "receipt", 33.33);
+  const b = partial(pendingWith(a.patch.amountPaidConfirmed), "receipt", 33.33);
+  assert.equal(b.patch.amountPaidConfirmed, 66.66);
+  assert.equal(b.patch.remainingAmount, 33.34);
+  const close = review.decidePaymentReview({
+    payment: pendingWith(b.patch.amountPaidConfirmed),
+    decision: "approve",
+  });
+  assert.equal(close.amounts.receipt, 3334);
+  const tiny = partial(pendingWith(0.1, 1), "receipt", 0.2);
+  assert.equal(tiny.patch.amountPaidConfirmed, 0.3);
+  assert.equal(tiny.patch.remainingAmount, 0.7);
+});
+
+test("PH02 partial: a corrupt stored total fails closed", () => {
+  for (const previous of [100, 150, -1, "60", 10.001]) {
+    const outcome = partial(pendingWith(previous), "receipt", 1);
+    assert.equal(outcome.ok, false, `previous ${String(previous)}`);
+    assert.equal(outcome.code, "failed-precondition");
+  }
+});
+
+function expectInvalid(fn, pattern) {
+  assert.throws(fn, (err) => {
+    assert.equal(err.code, "invalid-argument");
+    if (pattern) assert.match(err.message, pattern);
+    return true;
+  });
+}
+
+const current = (overrides = {}) => ({
+  paymentId: "p1",
+  decision: "partial",
+  requestId: "req_0123456789abcdef",
+  expectedProofFileName: "1760000000000.jpg",
+  amountMode: "receipt",
+  amountValue: 20,
+  ...overrides,
+});
+
+test("PH02 request: legacy shape keeps working without idempotency", () => {
+  const parsed = review.parseReviewRequest({
+    paymentId: "p1",
+    decision: "partial",
+    amountPaidConfirmed: 40,
+  });
+  assert.equal(parsed.idempotency, undefined);
+  assert.equal(parsed.legacyAmountPaidConfirmed, 40);
+  const approve = review.parseReviewRequest({
+    paymentId: "p1",
+    decision: "approve",
+    amountPaidConfirmed: 40,
+  });
+  assert.equal(approve.legacyAmountPaidConfirmed, undefined);
+});
+
+test("PH02 request: current contract requires requestId + expectedProofFileName", () => {
+  const parsed = review.parseReviewRequest(current());
+  assert.equal(parsed.idempotency.requestId, "req_0123456789abcdef");
+  assert.equal(parsed.idempotency.expectedProofFileName, "1760000000000.jpg");
+  assert.deepEqual(parsed.amountInput, { mode: "receipt", value: 20 });
+  assert.match(parsed.idempotency.fingerprint, /^[0-9a-f]{64}$/);
+
+  for (const requestId of [undefined, "", "short", "has space 0123456789", "x".repeat(65), 42]) {
+    expectInvalid(() => review.parseReviewRequest(current({ requestId })));
+  }
+  for (const expectedProofFileName of [undefined, "", "a/b.jpg", "../x.jpg", 7]) {
+    expectInvalid(() => review.parseReviewRequest(current({ expectedProofFileName })));
+  }
+  // Any single current-contract key opts into the full contract.
+  expectInvalid(() =>
+    review.parseReviewRequest({ paymentId: "p1", decision: "approve", requestId: "req_0123456789abcdef" }),
+  );
+});
+
+test("PH02 request: amounts are partial-only and never mixed with the legacy field", () => {
+  expectInvalid(() => review.parseReviewRequest(current({ amountPaidConfirmed: 20 })));
+  for (const amountMode of [undefined, "total", "RECEIPT"]) {
+    expectInvalid(() => review.parseReviewRequest(current({ amountMode })));
+  }
+  for (const amountValue of [undefined, 0, -1, "20", 1.234]) {
+    expectInvalid(() => review.parseReviewRequest(current({ amountValue })));
+  }
+  for (const decision of ["approve", "reject"]) {
+    expectInvalid(() => review.parseReviewRequest(current({ decision })), /الاعتماد أو الرفض/);
+    const ok = review.parseReviewRequest(
+      current({ decision, amountMode: undefined, amountValue: undefined }),
+    );
+    assert.equal(ok.amountInput, undefined);
+  }
+});
+
+test("PH02 request: fingerprint is stable and covers every intent field", () => {
+  const base = review.parseReviewRequest(current()).idempotency.fingerprint;
+  assert.equal(review.parseReviewRequest(current({ notes: "  " })).idempotency.fingerprint, base);
+  assert.equal(review.parseReviewRequest(current({ amountValue: 20.0 })).idempotency.fingerprint, base);
+  for (const change of [
+    { paymentId: "p2" },
+    { amountMode: "cumulative" },
+    { amountValue: 21 },
+    { notes: "x" },
+    { expectedProofFileName: "1760000000001.jpg" },
+  ]) {
+    assert.notEqual(
+      review.parseReviewRequest(current(change)).idempotency.fingerprint,
+      base,
+      JSON.stringify(change),
+    );
+  }
+  // requestId is the lookup key, not part of the intent.
+  assert.equal(
+    review.parseReviewRequest(current({ requestId: "req_fedcba9876543210" })).idempotency.fingerprint,
+    base,
+  );
+});
+
+test("Proof cycle: expectedProofCycleId is validated and fingerprinted", () => {
+  const cycleA = "pc_AAAAAAAAAAAAAAAAAAAAAAAA";
+  const cycleB = "pc_BBBBBBBBBBBBBBBBBBBBBBBB";
+  const parsed = review.parseReviewRequest(current({ expectedProofCycleId: cycleA }));
+  assert.equal(parsed.idempotency.expectedProofCycleId, cycleA);
+  assert.equal(review.parseReviewRequest(current()).idempotency.expectedProofCycleId, "");
+  assert.equal(
+    review.parseReviewRequest(current({ expectedProofCycleId: null })).idempotency.expectedProofCycleId,
+    "",
+  );
+  for (const expectedProofCycleId of ["", "pc_short", "AAAAAAAAAAAAAAAAAAAAAAAA", "pc_has space aaaaaaaaaaa", 7, {}]) {
+    expectInvalid(() => review.parseReviewRequest(current({ expectedProofCycleId })));
+  }
+  // The cycle alone opts into the full (idempotent, proof-bound) contract.
+  expectInvalid(() =>
+    review.parseReviewRequest({ paymentId: "p1", decision: "approve", expectedProofCycleId: cycleA }),
+  );
+
+  const base = review.parseReviewRequest(current()).idempotency.fingerprint;
+  const withA = parsed.idempotency.fingerprint;
+  const withB = review.parseReviewRequest(current({ expectedProofCycleId: cycleB })).idempotency.fingerprint;
+  assert.notEqual(withA, base);
+  assert.notEqual(withA, withB);
+  // Pre-cycle fingerprints are unchanged (stored records keep replaying).
+  assert.equal(
+    base,
+    review.paymentReviewFingerprint({
+      paymentId: "p1",
+      decision: "partial",
+      amountMode: "receipt",
+      amountValueMinor: 2000,
+      notes: "",
+      expectedProofFileName: "1760000000000.jpg",
+    }),
+  );
+});
+
+test("PH02 audit: payment review amount keys are allowlisted", () => {
+  for (const key of [
+    "amount",
+    "amountMode",
+    "receiptAmount",
+    "previousAmountPaidConfirmed",
+    "amountPaidConfirmed",
+    "remainingAmount",
+    "requestId",
+  ]) {
+    assert.ok(audit.AUDIT_METADATA_ALLOWLIST.has(key), `${key} must be auditable`);
+  }
+  for (const key of ["proofStoragePath", "proofDownloadUrl", "proofFileName", "fingerprint"]) {
+    assert.ok(!audit.AUDIT_METADATA_ALLOWLIST.has(key), `${key} must not be auditable`);
+  }
+});
+
 test("PH02 audit: payment/admission/transfer/correction actions are active", () => {
   assert.equal(audit.AUDIT_ACTION.paymentReview, "payment_review");
   assert.equal(audit.AUDIT_ACTION.studentAdmit, "student_admit");
@@ -393,6 +725,7 @@ test("PH02 index exports every new callable / trigger", () => {
   const index = readFileSync(join(__dirname, "..", "src", "index.ts"), "utf8");
   for (const name of [
     "reviewPaymentProof",
+    "submitPaymentProof",
     "recordSessionAttendance",
     "upsertSessionEvaluation",
     "notifyOnAssignmentCreated",
@@ -401,6 +734,7 @@ test("PH02 index exports every new callable / trigger", () => {
     "completeHomework",
     "purchaseAvatar",
     "grantAward",
+    "issueAchievement",
   ]) {
     assert.ok(index.includes(name), `${name} must be exported`);
   }
@@ -426,6 +760,7 @@ test("PH02 composite indexes for callable day-range queries exist", () => {
 test("PH02 callables are behind the production backend gate", () => {
   const files = [
     "billing/paymentReview.ts",
+    "billing/paymentProofSubmission.ts",
     "sessions/sessionRecordFunctions.ts",
     "halaqa/membershipFunctions.ts",
     "economy/economyFunctions.ts",
@@ -443,4 +778,17 @@ test("PH02 callables are behind the production backend gate", () => {
     "utf8",
   );
   assert.ok(trigger.includes('resolvePushSendMode() === "blocked"'));
+});
+
+test("H2 ownership trigger: a closed gate never throws; retry is bounded by the runner", () => {
+  const src = readFileSync(
+    join(__dirname, "..", "src", "notifications/fcmTokenOwnership.ts"),
+    "utf8",
+  );
+  const trigger = src.slice(src.indexOf("export const reconcileFcmTokenOwnership"));
+  assert.ok(!src.includes("assertBackendAllowed("), "triggers must not throw on a closed gate");
+  assert.match(trigger, /retry: true/);
+  assert.match(trigger, /await runOwnershipTrigger\(\{/);
+  assert.match(trigger, /gateOpen: isProductionBackendEnabled\(\) \|\| isEmulatorBackendAllowed\(\)/);
+  assert.match(trigger, /eventTime: event\.time/);
 });

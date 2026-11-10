@@ -14,6 +14,11 @@ class MushafAudioState extends Equatable {
   /// Repeat the same ayah on completion. Never advances to the next ayah.
   final bool isLooping;
 
+  /// Playback rate restored from the legacy mushaf reader.
+  final double playbackSpeed;
+
+  final bool isMuted;
+
   const MushafAudioState({
     this.status = MushafAudioStatus.idle,
     this.errorMessage,
@@ -21,6 +26,8 @@ class MushafAudioState extends Equatable {
     this.surahNumber,
     this.ayahNumberInSurah,
     this.isLooping = false,
+    this.playbackSpeed = 1.0,
+    this.isMuted = false,
   });
 
   bool get isPlaying => status == MushafAudioStatus.playing;
@@ -45,6 +52,8 @@ class MushafAudioState extends Equatable {
     int? ayahNumberInSurah,
     bool clearTarget = false,
     bool? isLooping,
+    double? playbackSpeed,
+    bool? isMuted,
   }) {
     return MushafAudioState(
       status: status ?? this.status,
@@ -55,6 +64,8 @@ class MushafAudioState extends Equatable {
           ? null
           : (ayahNumberInSurah ?? this.ayahNumberInSurah),
       isLooping: isLooping ?? this.isLooping,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      isMuted: isMuted ?? this.isMuted,
     );
   }
 
@@ -66,5 +77,7 @@ class MushafAudioState extends Equatable {
     surahNumber,
     ayahNumberInSurah,
     isLooping,
+    playbackSpeed,
+    isMuted,
   ];
 }

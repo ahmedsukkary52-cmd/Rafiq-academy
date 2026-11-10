@@ -74,6 +74,16 @@ class JustAudioMushafEngine implements MushafAudioEngine {
   Future<void> seek(Duration position) async => _player?.seek(position);
 
   @override
+  Future<void> setSpeed(double speed) async {
+    await _player?.setSpeed(speed);
+  }
+
+  @override
+  Future<void> setMuted(bool muted) async {
+    await _player?.setVolume(muted ? 0 : 1);
+  }
+
+  @override
   Future<void> dispose() async {
     for (final s in _subs) {
       await s.cancel();

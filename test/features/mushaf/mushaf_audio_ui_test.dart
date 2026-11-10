@@ -625,8 +625,12 @@ void main() {
             tokens: MushafReaderTokens.night,
             selectedReciterId: 'minshawi',
             isLooping: false,
+              playbackSpeed: 1.0,
+              isMuted: false,
             onSelectReciter: (id) => picked = id,
             onLoopChanged: (v) => looping = v,
+              onCycleSpeed: () {},
+              onToggleMute: () {},
           ),
         ),
       );
@@ -642,6 +646,71 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('mushaf-audio-loop')));
       await tester.pump();
       expect(looping, isTrue);
+
+      var speedTaps = 0;
+      var muteTaps = 0;
+      await tester.pumpWidget(
+        _rtlHost(
+          MushafAudioOptionsSheet(
+            key: const ValueKey('options-speed-mute-fixture'),
+            tokens: MushafReaderTokens.night,
+            selectedReciterId: 'minshawi',
+            isLooping: true,
+            playbackSpeed: 1.25,
+            isMuted: true,
+            onSelectReciter: (_) {},
+            onLoopChanged: (_) {},
+            onCycleSpeed: () => speedTaps++,
+            onToggleMute: () => muteTaps++,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byKey(const ValueKey('mushaf-audio-speed')), findsOneWidget);
+      expect(find.byKey(const ValueKey('mushaf-audio-mute')), findsOneWidget);
+      expect(find.text('x1.25'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('mushaf-audio-speed')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('mushaf-audio-mute')));
+      await tester.pump();
+      expect(speedTaps, 1);
+      expect(muteTaps, 1);
+      // Sheet keeps local chrome in sync (not stuck on constructor speed).
+      expect(find.byKey(const ValueKey('mushaf-audio-speed-chip')), findsOneWidget);
+      expect(find.text('x1.5'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+    });
+
+    testWidgets('options sheet speed chip cycles locally and mute icon flips', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _rtlHost(
+          MushafAudioOptionsSheet(
+            tokens: MushafReaderTokens.paper,
+            selectedReciterId: 'minshawi',
+            isLooping: false,
+            playbackSpeed: 1.0,
+            isMuted: false,
+            onSelectReciter: (_) {},
+            onLoopChanged: (_) {},
+            onCycleSpeed: () {},
+            onToggleMute: () {},
+          ),
+        ),
+      );
+      expect(find.text('x1'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('mushaf-audio-speed')));
+      await tester.pump();
+      expect(find.text('x1.25'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('mushaf-audio-speed')));
+      await tester.pump();
+      expect(find.text('x1.5'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('mushaf-audio-mute')));
+      await tester.pump();
+      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
     });
   });
 }

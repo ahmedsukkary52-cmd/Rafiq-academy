@@ -50,7 +50,13 @@ abstract class DiModule {
   /// WA-13 / C11 — token lifecycle only. Sending is Cloud Functions + Admin
   /// SDK; the client never holds server credentials.
   @lazySingleton
-  FirebaseMessaging get firebaseMessaging => FirebaseMessaging.instance;
+  /// Offline FCM is unsupported: local flavors ship without a [DEFAULT]
+  /// Firebase app, so asking for messaging in emulator mode fails loudly.
+  FirebaseMessaging get firebaseMessaging => useFirebaseEmulator
+      ? throw StateError(
+          'FirebaseMessaging is unavailable in Firebase Emulator mode.',
+        )
+      : FirebaseMessaging.instance;
 
   @lazySingleton
   FirebaseStorage get firebaseStorage => useFirebaseEmulator

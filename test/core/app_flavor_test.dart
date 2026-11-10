@@ -1,13 +1,5 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/firebase/app_flavor.dart';
-
-FirebaseOptions _options(String projectId) => FirebaseOptions(
-  apiKey: 'key',
-  appId: '1:1:android:1',
-  messagingSenderId: '1',
-  projectId: projectId,
-);
 
 void main() {
   group('parseAppFlavor', () {
@@ -26,48 +18,16 @@ void main() {
     });
   });
 
-  group('firebaseOptionsFor', () {
-    test('dev returns the rafiq-academy options', () {
-      final options = firebaseOptionsFor(
-        AppFlavor.dev,
-        devOptions: () => _options(devFirebaseProjectId),
-      );
-      expect(options.projectId, 'rafiq-academy');
+  group('local flavors are Emulator-only (Basma isolation)', () {
+    test('dev and staging are local, prod is not', () {
+      expect(isLocalFlavor(AppFlavor.dev), isTrue);
+      expect(isLocalFlavor(AppFlavor.staging), isTrue);
+      expect(isLocalFlavor(AppFlavor.prod), isFalse);
     });
 
-    test('dev refuses options for any other project', () {
-      expect(
-        () => firebaseOptionsFor(
-          AppFlavor.dev,
-          devOptions: () => _options('rafiq-academy-prod'),
-        ),
-        throwsStateError,
-      );
-    });
-
-    test('staging refuses to start until its project is configured', () {
-      expect(stagingFirebaseProjectId, 'rafiq-academy-staging');
-      expect(
-        () => firebaseOptionsFor(
-          AppFlavor.staging,
-          devOptions: () => _options(devFirebaseProjectId),
-        ),
-        throwsStateError,
-      );
-    });
-
-    test('prod refuses to start until its project is configured', () {
-      expect(
-        () => firebaseOptionsFor(
-          AppFlavor.prod,
-          devOptions: () => _options(devFirebaseProjectId),
-        ),
-        throwsStateError,
-      );
-    });
-
-    test('the generated options still target rafiq-academy', () {
-      expect(firebaseOptionsFor(AppFlavor.dev).projectId, devFirebaseProjectId);
+    test('the only local project is the fake demo project', () {
+      expect(localEmulatorProjectId, 'demo-rafiq-rules');
+      expect(localEmulatorProjectId, startsWith('demo-'));
     });
   });
 }

@@ -22,6 +22,7 @@ import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/notifications/data/services/fcm_sign_out_preparation.dart';
 import 'features/notifications/data/services/fcm_token_registrar.dart';
+import 'features/notifications/data/services/offline_notification_open_port.dart';
 import 'features/notifications/domain/services/notification_open_port.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'features/notifications/presentation/notification_deep_links.dart';
@@ -112,7 +113,10 @@ class _MyAppState extends State<MyApp> {
     _lifecycle = AppLifecycleListener(
       onResume: () => versionGate.add(const ClientVersionCheckRequested()),
     );
-    final opens = sl<NotificationOpenPort>();
+    // Offline FCM is unsupported in Emulator mode (no [DEFAULT] app).
+    final NotificationOpenPort opens = useFirebaseEmulator
+        ? const OfflineNotificationOpenPort()
+        : sl<NotificationOpenPort>();
     _pushOpenSub = opens.openedTypes().listen(_onPushOpened);
     unawaited(
       opens.initialOpenedType().then((type) {
@@ -180,7 +184,9 @@ class _MyAppState extends State<MyApp> {
         listener: (context, state) {
           if (state is AuthLogoutFailure) {
             _messengerKey.currentState?.showSnackBar(
-              SnackBar(content: Text(state.message, textAlign: TextAlign.right)),
+              SnackBar(
+                content: Text(state.message, textAlign: TextAlign.right),
+              ),
             );
             return;
           }

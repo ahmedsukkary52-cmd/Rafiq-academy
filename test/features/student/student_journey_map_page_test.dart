@@ -66,24 +66,30 @@ Widget _wrap(StudentState state) {
 }
 
 void main() {
-  testWidgets('journey map renders real profile data with a back action', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        const StudentState(
-          profileStatus: SectionStatus.loaded,
-          profile: _profile,
+  testWidgets(
+    'journey map says progress is not activated and shows no unwired '
+    'streak, level or progress values, with a back action',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const StudentState(
+            profileStatus: SectionStatus.loaded,
+            profile: _profile,
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(find.textContaining('جزء عم'), findsWidgets);
-    expect(find.textContaining('3 يوم متواصل'), findsOneWidget);
-    expect(find.textContaining('2 سورة'), findsOneWidget);
-    expect(find.byTooltip('رجوع'), findsOneWidget);
-  });
+      expect(
+        find.byKey(const Key('student-journey-unavailable')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('يوم متواصل'), findsNothing);
+      expect(find.textContaining('2 سورة'), findsNothing);
+      expect(find.textContaining('Lvl'), findsNothing);
+      expect(find.byTooltip('رجوع'), findsOneWidget);
+    },
+  );
 
   testWidgets('journey map loading keeps a back action', (tester) async {
     await tester.pumpWidget(

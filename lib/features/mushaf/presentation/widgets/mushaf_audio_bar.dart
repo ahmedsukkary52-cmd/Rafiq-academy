@@ -339,8 +339,12 @@ class MushafAudioOptionsSheet extends StatefulWidget {
     required this.tokens,
     required this.selectedReciterId,
     required this.isLooping,
+    required this.playbackSpeed,
+    required this.isMuted,
     required this.onSelectReciter,
     required this.onLoopChanged,
+    required this.onCycleSpeed,
+    required this.onToggleMute,
   });
 
   static const double maxWidth = 640;
@@ -348,8 +352,12 @@ class MushafAudioOptionsSheet extends StatefulWidget {
   final MushafReaderTokens tokens;
   final String selectedReciterId;
   final bool isLooping;
+  final double playbackSpeed;
+  final bool isMuted;
   final ValueChanged<String> onSelectReciter;
   final ValueChanged<bool> onLoopChanged;
+  final VoidCallback onCycleSpeed;
+  final VoidCallback onToggleMute;
 
   @override
   State<MushafAudioOptionsSheet> createState() =>
@@ -358,6 +366,23 @@ class MushafAudioOptionsSheet extends StatefulWidget {
 
 class _MushafAudioOptionsSheetState extends State<MushafAudioOptionsSheet> {
   late bool _looping = widget.isLooping;
+  late double _playbackSpeed = widget.playbackSpeed;
+  late bool _muted = widget.isMuted;
+  static const List<double> _speeds = [1.0, 1.25, 1.5, 2.0];
+
+  @override
+  void didUpdateWidget(covariant MushafAudioOptionsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playbackSpeed != widget.playbackSpeed) {
+      _playbackSpeed = widget.playbackSpeed;
+    }
+    if (oldWidget.isMuted != widget.isMuted) {
+      _muted = widget.isMuted;
+    }
+    if (oldWidget.isLooping != widget.isLooping) {
+      _looping = widget.isLooping;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,8 +436,85 @@ class _MushafAudioOptionsSheetState extends State<MushafAudioOptionsSheet> {
                   ),
                 Divider(height: 20, color: tokens.divider),
                 Semantics(
+                  toggled: _muted,
+                  label: '\u0643\u062a\u0645 \u0627\u0644\u0635\u0648\u062a',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    key: const ValueKey('mushaf-audio-mute'),
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      setState(() => _muted = !_muted);
+                      widget.onToggleMute();
+                    },
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 52),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _muted
+                                ? Icons.volume_off_rounded
+                                : Icons.volume_up_rounded,
+                            size: 20,
+                            color: _muted
+                                ? tokens.accent
+                                : tokens.chromeMuted,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '\u0643\u062a\u0645 \u0627\u0644\u0635\u0648\u062a',
+                              style: tokens.chromeLabelStyle(size: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Semantics(
+                  button: true,
+                  label: '\u0633\u0631\u0639\u0629 \u0627\u0644\u062a\u0634\u063a\u064a\u0644',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    key: const ValueKey('mushaf-audio-speed'),
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      final idx = _speeds.indexOf(_playbackSpeed);
+                      final next =
+                          _speeds[((idx < 0 ? 0 : idx) + 1) % _speeds.length];
+                      setState(() => _playbackSpeed = next);
+                      widget.onCycleSpeed();
+                    },
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 52),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.speed_rounded,
+                            size: 20,
+                            color: tokens.chromeMuted,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '\u0633\u0631\u0639\u0629 \u0627\u0644\u062a\u0634\u063a\u064a\u0644',
+                              style: tokens.chromeLabelStyle(size: 14),
+                            ),
+                          ),
+                          Text(
+                            _speedChipLabel(_playbackSpeed),
+                            key: const ValueKey('mushaf-audio-speed-chip'),
+                            style: tokens.chromeLabelStyle(size: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Divider(height: 20, color: tokens.divider),
+                Semantics(
                   toggled: _looping,
-                  label: 'تكرار الآية',
+                  label: '\u062a\u0643\u0631\u0627\u0631 \u0627\u0644\u0622\u064a\u0629',
                   excludeSemantics: true,
                   child: InkWell(
                     key: const ValueKey('mushaf-audio-loop'),
@@ -549,13 +651,25 @@ class _Toggle extends StatelessWidget {
   }
 }
 
+
+String _speedChipLabel(double speed) {
+  if ((speed - 1.0).abs() < 0.001) return 'x1';
+  if ((speed - 1.25).abs() < 0.001) return 'x1.25';
+  if ((speed - 1.5).abs() < 0.001) return 'x1.5';
+  if ((speed - 2.0).abs() < 0.001) return 'x2';
+  return 'x${speed.toStringAsFixed(2)}';
+}
 Future<void> showMushafAudioOptionsSheet({
   required BuildContext context,
   required MushafReaderTokens tokens,
   required String selectedReciterId,
   required bool isLooping,
+  required double playbackSpeed,
+  required bool isMuted,
   required ValueChanged<String> onSelectReciter,
   required ValueChanged<bool> onLoopChanged,
+  required VoidCallback onCycleSpeed,
+  required VoidCallback onToggleMute,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -570,11 +684,15 @@ Future<void> showMushafAudioOptionsSheet({
       tokens: tokens,
       selectedReciterId: selectedReciterId,
       isLooping: isLooping,
+      playbackSpeed: playbackSpeed,
+      isMuted: isMuted,
       onSelectReciter: (id) {
         onSelectReciter(id);
         Navigator.of(sheetContext).pop();
       },
       onLoopChanged: onLoopChanged,
+      onCycleSpeed: onCycleSpeed,
+      onToggleMute: onToggleMute,
     ),
   );
 }

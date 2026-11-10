@@ -70,17 +70,26 @@ class StudentHeaderWidget extends StatelessWidget {
                   onTap: onSearchTap!,
                 ),
               ],
-              const Spacer(),
-              GestureDetector(
+              // Audit fix: Spacer+Expanded split the row and pushed the avatar
+              // group off the header edge; Expanded alone + end alignment keeps it pinned.
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
                 onTap: onAvatarTap,
                 behavior: HitTestBehavior.opaque,
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Column(
+                    Flexible(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
                           '$name 👋',
+                          key: const Key('student-header-name'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
                           style: const TextStyle(
                             fontFamily: 'NotoNaskhArabic',
                             fontSize: 16,
@@ -91,6 +100,10 @@ class StudentHeaderWidget extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           _hijriToday(),
+                          key: const Key('student-header-hijri'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
                           style: TextStyle(
                             fontFamily: 'NotoNaskhArabic',
                             fontSize: 11,
@@ -98,6 +111,7 @@ class StudentHeaderWidget extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
                     ),
                     const SizedBox(width: 10),
                     Container(
@@ -120,6 +134,7 @@ class StudentHeaderWidget extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
               ),
             ],
           ),

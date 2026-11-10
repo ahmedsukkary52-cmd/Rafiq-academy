@@ -95,6 +95,15 @@ class FakeMushafAudioEngine implements MushafAudioEngine {
   @override
   Future<void> seek(Duration position) async => seeks.add(position);
 
+  final List<double> speeds = [];
+  final List<bool> mutes = [];
+
+  @override
+  Future<void> setSpeed(double speed) async => speeds.add(speed);
+
+  @override
+  Future<void> setMuted(bool muted) async => mutes.add(muted);
+
   @override
   Future<void> dispose() async {
     disposed = true;

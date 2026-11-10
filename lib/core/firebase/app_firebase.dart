@@ -7,15 +7,15 @@ import 'package:flutter/foundation.dart';
 
 import 'app_flavor.dart';
 
-/// `flutter run --dart-define=USE_FIREBASE_EMULATOR=true` routes the app to
-/// the local Emulator Suite. Debug builds only; absent or false uses the
-/// build flavor's project (see app_flavor.dart).
+/// `--dart-define=USE_FIREBASE_EMULATOR=true` is REQUIRED for the local
+/// flavors (dev, staging). Absent, false or malformed values are treated as
+/// "not requested" and the app refuses to start (see [assertFirebaseRouting]).
 const bool useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
 
 /// Must match the region the callables are deployed to (functions/src).
 const String functionsRegion = 'europe-west1';
 
-const String firebaseEmulatorProjectId = 'demo-rafiq-rules';
+const String firebaseEmulatorProjectId = localEmulatorProjectId;
 
 /// A physical phone reaches the PC's emulators through
 /// `adb reverse tcp:<port> tcp:<port>`, so the phone's own loopback is used.
@@ -35,16 +35,33 @@ const FirebaseOptions firebaseEmulatorOptions = FirebaseOptions(
   storageBucket: '$firebaseEmulatorProjectId.appspot.com',
 );
 
-/// The google-services Gradle plugin creates the native [DEFAULT] app from
-/// google-services.json before Dart runs, and firebase_core refuses to
-/// re-initialize [DEFAULT] with a different API key, so the emulator gets its
-/// own named app.
-const String _emulatorAppName = 'rafiq-emulator';
+/// Local flavors ship without a native [DEFAULT] app (FirebaseInitProvider is
+/// removed in android/app/src/{dev,staging}/AndroidManifest.xml), so the
+/// emulator always gets its own named app.
+const String _emulatorAppName = 'basma-emulator';
+
+/// Throws unless [host] is the literal IPv4 loopback used for the emulators.
+void assertLoopbackEmulatorHost(String host) {
+  if (host != '127.0.0.1') {
+    throw StateError('Firebase Emulator host must be 127.0.0.1, got "$host".');
+  }
+}
+
+/// Throws unless [options] are exactly the fake local emulator options.
+void assertEmulatorOptions(FirebaseOptions options) {
+  if (options.projectId != firebaseEmulatorProjectId ||
+      options.apiKey != firebaseEmulatorOptions.apiKey ||
+      options.appId != firebaseEmulatorOptions.appId) {
+    throw StateError(
+      'Firebase app "$_emulatorAppName" was initialized with non-emulator '
+      'options (project "${options.projectId}").',
+    );
+  }
+}
 
 FirebaseApp? _emulatorApp;
 
-/// The emulator app; only valid after [initializeAppFirebase] completed in
-/// emulator mode.
+/// The emulator app; only valid after [initializeAppFirebase] completed.
 FirebaseApp get firebaseEmulatorApp =>
     _emulatorApp ??
     (throw StateError(
@@ -52,36 +69,23 @@ FirebaseApp get firebaseEmulatorApp =>
       'finished wiring the emulators.',
     ));
 
-/// Initializes Firebase. In emulator mode every service the app uses is
-/// routed to the Emulator Suite before this returns, so call it before
-/// `initDependencies()`.
+/// Initializes Firebase. Fail-closed: only a local flavor in a debug build
+/// with USE_FIREBASE_EMULATOR=true gets past [assertFirebaseRouting]; every
+/// service the app uses is routed to the Emulator Suite before this returns,
+/// independent of whether the emulators are actually running.
 Future<void> initializeAppFirebase() async {
-  if (!useFirebaseEmulator) {
-    await Firebase.initializeApp(
-      options: firebaseOptionsFor(currentAppFlavor()),
-    );
-    return;
-  }
-
-  if (!kDebugMode) {
-    throw StateError(
-      'USE_FIREBASE_EMULATOR=true is only allowed in debug builds; '
-      'refusing to start instead of falling back to production.',
-    );
-  }
+  assertFirebaseRouting(
+    flavor: currentAppFlavor(),
+    emulatorRequested: useFirebaseEmulator,
+    isDebugBuild: kDebugMode,
+  );
+  assertLoopbackEmulatorHost(firebaseEmulatorHost);
 
   final app = await Firebase.initializeApp(
     name: _emulatorAppName,
     options: firebaseEmulatorOptions,
   );
-  if (app.options.projectId != firebaseEmulatorProjectId ||
-      app.options.apiKey != firebaseEmulatorOptions.apiKey ||
-      app.options.appId != firebaseEmulatorOptions.appId) {
-    throw StateError(
-      'Firebase app "$_emulatorAppName" was initialized with non-emulator '
-      'options (project "${app.options.projectId}").',
-    );
-  }
+  assertEmulatorOptions(app.options);
 
   // automaticHostMapping would rewrite 127.0.0.1 to 10.0.2.2 on Android,
   // which only exists inside the Android emulator.
@@ -95,8 +99,10 @@ Future<void> initializeAppFirebase() async {
     firestoreEmulatorPort,
     automaticHostMapping: false,
   );
-  FirebaseFunctions.instanceFor(app: app, region: functionsRegion)
-      .useFunctionsEmulator(
+  FirebaseFunctions.instanceFor(
+    app: app,
+    region: functionsRegion,
+  ).useFunctionsEmulator(
     firebaseEmulatorHost,
     functionsEmulatorPort,
     automaticHostMapping: false,

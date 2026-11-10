@@ -1,0 +1,32 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- LOCAL flavor (Firebase Emulator only). No native [DEFAULT] Firebase
+         app: the auto-initializing provider merged from firebase-common is
+         removed, so google-services resources are never used to start a
+         Firebase app natively. Dart creates the named emulator app itself
+         (lib/core/firebase/app_firebase.dart). -->
+    <application>
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+        <!-- firebase-messaging 24.1.2 registers FirebaseMessaging as an
+             alwaysEager component, so it would be created for ANY Firebase
+             app, including the named emulator app. Offline FCM is unsupported
+             in local flavors; nothing requires FirebaseMessaging (checked:
+             auth/firestore/functions/storage/installations/appcheck/iid
+             registrars), so the registrars are removed here only.
+             com.google.firebase.iid.Registrar is NOT removed: firebase-functions
+             21.2.1 requires FirebaseInstanceIdInternal. -->
+        <service
+            android:name="com.google.firebase.components.ComponentDiscoveryService"
+            android:exported="false">
+            <meta-data
+                android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingRegistrar"
+                tools:node="remove" />
+            <meta-data
+                android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingKtxRegistrar"
+                tools:node="remove" />
+        </service>
+    </application>
+</manifest>

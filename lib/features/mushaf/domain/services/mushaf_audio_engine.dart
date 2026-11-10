@@ -7,7 +7,7 @@ class MushafEngineSnapshot {
   const MushafEngineSnapshot({required this.playing, required this.phase});
 }
 
-/// Single-track ayah player used by `MushafAudioBloc`.
+/// Single-track ayah player used by MushafAudioBloc.
 abstract class MushafAudioEngine {
   Stream<MushafEngineSnapshot> get snapshots;
 
@@ -29,6 +29,12 @@ abstract class MushafAudioEngine {
   Future<void> stop();
 
   Future<void> seek(Duration position);
+
+  /// Playback rate (1.0, 1.25, 1.5, 2.0). Restored from legacy reader UX.
+  Future<void> setSpeed(double speed);
+
+  /// When true, volume is 0 while keeping the loaded track.
+  Future<void> setMuted(bool muted);
 
   Future<void> dispose();
 }

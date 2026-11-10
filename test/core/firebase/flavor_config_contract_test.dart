@@ -116,26 +116,90 @@ android {
     expect(manifest, contains('android:label="@string/app_name"'));
   });
 
-  test('committed google-services.json is the dev project only', () {
-    final json =
-        jsonDecode(File('android/app/google-services.json').readAsStringSync())
-            as Map<String, dynamic>;
-    final projectInfo = json['project_info'] as Map<String, dynamic>;
-    final packageNames = [
-      for (final client in json['client'] as List<dynamic>)
-        ((client as Map<String, dynamic>)['client_info']
-                as Map<String, dynamic>)['android_client_info']['package_name']
-            as String,
-    ];
+  Map<String, dynamic> readJson(String path) =>
+      jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>;
 
-    expect(projectInfo['project_id'], devFirebaseProjectId);
-    expect(packageNames, contains(_devApplicationId));
+  List<String> packagesOf(Map<String, dynamic> json) => [
+    for (final client in json['client'] as List<dynamic>)
+      ((client as Map<String, dynamic>)['client_info']
+              as Map<String, dynamic>)['android_client_info']['package_name']
+          as String,
+  ];
+
+  test(
+    'root google-services.json is preserved and never production-mapped',
+    () {
+      // Preserved byte-for-byte; local flavors override it (see below).
+      final json = readJson('android/app/google-services.json');
+      expect(
+        (json['project_info'] as Map<String, dynamic>)['project_id'],
+        'rafiq-academy',
+      );
+      expect(packagesOf(json), contains(_devApplicationId));
+      expect(
+        packagesOf(json).where((name) => name.startsWith(_prodApplicationId)),
+        isEmpty,
+        reason: 'prod and staging app IDs must not be registered in it',
+      );
+    },
+  );
+
+  for (final entry in {
+    'dev': _devApplicationId,
+    'staging': 'com.basmaacademy.app.staging',
+  }.entries) {
+    test('${entry.key} has its own fake emulator google-services.json', () {
+      final json = readJson(
+        'android/app/src/${entry.key}/google-services.json',
+      );
+      expect(
+        (json['project_info'] as Map<String, dynamic>)['project_id'],
+        localEmulatorProjectId,
+      );
+      expect(packagesOf(json), [entry.value]);
+    });
+
+    test('${entry.key} manifest removes the native FirebaseInitProvider', () {
+      final xml = File(
+        'android/app/src/${entry.key}/AndroidManifest.xml',
+      ).readAsStringSync();
+      expect(
+        xml,
+        contains('com.google.firebase.provider.FirebaseInitProvider'),
+      );
+      expect(xml, contains('tools:node="remove"'));
+      for (final registrar in [
+        'com.google.firebase.messaging.FirebaseMessagingRegistrar',
+        'com.google.firebase.messaging.FirebaseMessagingKtxRegistrar',
+      ]) {
+        expect(
+          RegExp(
+            'components:${RegExp.escape(registrar)}"\\s+tools:node="remove"',
+          ).hasMatch(xml),
+          isTrue,
+          reason: '$registrar must be removed in local flavors',
+        );
+      }
+      // firebase-functions requires FirebaseInstanceIdInternal from iid.
+      expect(RegExp(r'iid\.Registrar"\s+tools:node').hasMatch(xml), isFalse);
+    });
+  }
+
+  test('no prod-flavor google-services.json override exists', () {
     expect(
-      packageNames.where((name) => name.startsWith(_prodApplicationId)),
-      isEmpty,
-      reason:
-          'prod and staging app IDs must not be registered in the dev '
-          'project config',
+      File('android/app/src/prod/google-services.json').existsSync(),
+      isFalse,
     );
+  });
+
+  test('Gradle guards local variants and their resolved Firebase project', () {
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+    expect(
+      gradle,
+      contains('Basma local-flavor isolation (Firebase Emulator only)'),
+    );
+    expect(gradle, contains('demo-rafiq-rules'));
+    expect(gradle, contains('GoogleServices'));
+    expect(gradle, contains('firebaseMessagingAutoInitEnabled'));
   });
 }

@@ -368,4 +368,52 @@ void main() {
       expect(states, isEmpty);
     });
   });
+  group('H. Playback prefs (legacy reader UX)', () {
+    test('cycle speed rotates 1 → 1.25 → 1.5 → 2 → 1 and applies engine', () async {
+      expect(bloc.state.playbackSpeed, 1.0);
+      bloc.add(const MushafAudioCycleSpeedEvent());
+      await settle();
+      expect(bloc.state.playbackSpeed, 1.25);
+      expect(engine.speeds.last, 1.25);
+
+      bloc.add(const MushafAudioCycleSpeedEvent());
+      await settle();
+      expect(bloc.state.playbackSpeed, 1.5);
+
+      bloc.add(const MushafAudioCycleSpeedEvent());
+      await settle();
+      expect(bloc.state.playbackSpeed, 2.0);
+
+      bloc.add(const MushafAudioCycleSpeedEvent());
+      await settle();
+      expect(bloc.state.playbackSpeed, 1.0);
+      expect(engine.speeds.last, 1.0);
+    });
+
+    test('toggle mute flips state and calls setMuted', () async {
+      expect(bloc.state.isMuted, isFalse);
+      bloc.add(const MushafAudioToggleMuteEvent());
+      await settle();
+      expect(bloc.state.isMuted, isTrue);
+      expect(engine.mutes.last, isTrue);
+
+      bloc.add(const MushafAudioToggleMuteEvent());
+      await settle();
+      expect(bloc.state.isMuted, isFalse);
+      expect(engine.mutes.last, isFalse);
+    });
+
+    test('play reapplies current speed and mute prefs', () async {
+      bloc.add(const MushafAudioCycleSpeedEvent());
+      bloc.add(const MushafAudioToggleMuteEvent());
+      await settle();
+      engine.speeds.clear();
+      engine.mutes.clear();
+
+      await playFatihah1();
+      expect(engine.speeds, contains(1.25));
+      expect(engine.mutes, contains(true));
+    });
+  });
+
 }

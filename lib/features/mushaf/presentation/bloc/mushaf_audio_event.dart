@@ -84,3 +84,13 @@ class MushafAudioEngineSnapshotEvent extends MushafAudioEvent {
 class MushafAudioEngineErrorEvent extends MushafAudioEvent {
   const MushafAudioEngineErrorEvent();
 }
+
+/// Cycle playback speed through 1 / 1.25 / 1.5 / 2 (legacy reader UX).
+class MushafAudioCycleSpeedEvent extends MushafAudioEvent {
+  const MushafAudioCycleSpeedEvent();
+}
+
+/// Mute / unmute without unloading the current ayah.
+class MushafAudioToggleMuteEvent extends MushafAudioEvent {
+  const MushafAudioToggleMuteEvent();
+}

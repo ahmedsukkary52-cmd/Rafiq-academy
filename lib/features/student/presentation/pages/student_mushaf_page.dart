@@ -579,8 +579,12 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       tokens: tokens,
       selectedReciterId: state.reciter.id,
       isLooping: state.isLooping,
+      playbackSpeed: state.playbackSpeed,
+      isMuted: state.isMuted,
       onSelectReciter: (id) => audio.add(MushafAudioSelectReciterEvent(id)),
       onLoopChanged: (_) => audio.add(const MushafAudioToggleLoopEvent()),
+      onCycleSpeed: () => audio.add(const MushafAudioCycleSpeedEvent()),
+      onToggleMute: () => audio.add(const MushafAudioToggleMuteEvent()),
     );
   }
 

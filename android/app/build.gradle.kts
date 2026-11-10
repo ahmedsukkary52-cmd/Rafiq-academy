@@ -140,3 +140,71 @@ android {
 flutter {
     source = "../.."
 }
+
+// ---- Basma local-flavor isolation (Firebase Emulator only) ----
+// dev and staging are LOCAL flavors: debug-only, USE_FIREBASE_EMULATOR=true
+// required, and they must resolve ONLY their own fake
+// src/<flavor>/google-services.json (project demo-rafiq-rules). The root
+// android/app/google-services.json is preserved unchanged and must never be
+// selected for a local variant. prod is not touched by these guards.
+val localFlavors = setOf("dev", "staging")
+val localEmulatorProjectId = "demo-rafiq-rules"
+val localFlavorAppIds = mapOf(
+    "dev" to "com.example.rafiq_academy",
+    "staging" to "com.basmaacademy.app.staging",
+)
+val localArtifactTask = Regex("^(assemble|bundle|package|install)(Dev|Staging)(Debug|Profile|Release)$")
+gradle.taskGraph.whenReady {
+    val local = allTasks.map { it.name }.filter { localArtifactTask.matches(it) }
+    if (local.isNotEmpty()) {
+        if (local.any { !it.endsWith("Debug") }) {
+            throw GradleException(
+                "Local flavors (dev, staging) are debug-only Firebase Emulator builds: $local"
+            )
+        }
+        if (!useFirebaseEmulator) {
+            throw GradleException(
+                "Local flavors (dev, staging) require --dart-define=USE_FIREBASE_EMULATOR=true."
+            )
+        }
+    }
+}
+val googleServicesTask = Regex("^process(Dev|Staging)(Debug|Profile|Release)GoogleServices$")
+tasks.configureEach {
+    val match = googleServicesTask.find(name) ?: return@configureEach
+    val flavor = match.groupValues[1].lowercase()
+    val task = this
+    doFirst {
+        val file = project.file("src/$flavor/google-services.json")
+        if (!file.isFile) {
+            throw GradleException("Missing fake local config ${file.path} for flavor $flavor.")
+        }
+        val text = file.readText()
+        val projectId = Regex("\"project_id\"\\s*:\\s*\"([^\"]+)\"").find(text)?.groupValues?.get(1)
+        if (projectId != localEmulatorProjectId) {
+            throw GradleException("$flavor must use $localEmulatorProjectId, got $projectId in ${file.path}.")
+        }
+        if (!text.contains("\"${localFlavorAppIds.getValue(flavor)}\"")) {
+            throw GradleException("${file.path} does not register ${localFlavorAppIds.getValue(flavor)}.")
+        }
+    }
+    doLast {
+        val values = task.outputs.files.asFileTree.matching { include("**/values.xml") }.files
+        if (values.isEmpty()) throw GradleException("$name produced no values.xml to verify.")
+        values.forEach { xml ->
+            val ids = Regex("name=\"project_id\"[^>]*>([^<]+)<").findAll(xml.readText()).map { it.groupValues[1] }.toList()
+            if (ids != listOf(localEmulatorProjectId)) {
+                throw GradleException("$name resolved project_id $ids in ${xml.path}; expected only $localEmulatorProjectId.")
+            }
+        }
+    }
+}
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        if (variant.flavorName in localFlavors) {
+            // Local flavors never auto-initialize FCM natively.
+            variant.manifestPlaceholders.put("firebaseMessagingAutoInitEnabled", "false")
+        }
+    }
+}
+// ---- end Basma local-flavor isolation ----

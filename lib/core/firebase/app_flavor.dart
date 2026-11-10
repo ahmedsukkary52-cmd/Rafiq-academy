@@ -1,17 +1,18 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart' show appFlavor;
-
-import '../../firebase_options.dart';
 
 /// Build flavor, from `flutter run/build --flavor <name>` (pubspec
 /// `default-flavor` supplies `dev` when none is given).
+///
+/// Flavor != Firebase project. `dev` and `staging` are LOCAL flavors that may
+/// only talk to the Firebase Emulator Suite. `prod` has no Firebase project
+/// configured yet (the production decision is pending), so it refuses to
+/// start. No flavor can reach a real Firebase project from this file:
+/// `lib/firebase_options.dart` is intentionally not imported here.
 enum AppFlavor { dev, staging, prod }
 
-/// Firebase project the dev flavor talks to (seed and test data only).
-const String devFirebaseProjectId = 'rafiq-academy';
-
-/// Firebase project the staging flavor will talk to once it is configured.
-const String stagingFirebaseProjectId = 'rafiq-academy-staging';
+/// The only Firebase project ID a local flavor may use. `demo-` IDs are
+/// treated by the Emulator Suite as offline demo projects (no real project).
+const String localEmulatorProjectId = 'demo-rafiq-rules';
 
 /// The running build's flavor. Throws for a missing or unknown flavor rather
 /// than guessing, so a build can never silently use the wrong project.
@@ -27,33 +28,42 @@ AppFlavor parseAppFlavor(String? raw) => switch (raw) {
   ),
 };
 
-/// Firebase options for [flavor] on the current platform.
-///
-/// The staging and production projects are not configured yet, so those
-/// flavors refuse to start instead of falling back to the development project.
-FirebaseOptions firebaseOptionsFor(
-  AppFlavor flavor, {
-  FirebaseOptions Function()? devOptions,
-}) => switch (flavor) {
-  AppFlavor.dev => _requireDevProject(
-    (devOptions ?? () => DefaultFirebaseOptions.currentPlatform)(),
-  ),
-  AppFlavor.staging => throw _notConfigured(
-    'staging ($stagingFirebaseProjectId)',
-  ),
-  AppFlavor.prod => throw _notConfigured('production'),
-};
+/// True for flavors that must run against the local Emulator Suite only.
+bool isLocalFlavor(AppFlavor flavor) => flavor != AppFlavor.prod;
 
-FirebaseOptions _requireDevProject(FirebaseOptions options) {
-  if (options.projectId != devFirebaseProjectId) {
+/// Fail-closed routing gate, run before any Firebase call.
+///
+/// Returns normally only for a local flavor, in a debug build, with
+/// `USE_FIREBASE_EMULATOR=true`. Every other combination throws, so there is
+/// no path that falls back to a real Firebase project.
+void assertFirebaseRouting({
+  required AppFlavor flavor,
+  required bool emulatorRequested,
+  required bool isDebugBuild,
+}) {
+  if (flavor == AppFlavor.prod) {
+    if (emulatorRequested) {
+      throw StateError(
+        'The prod flavor must never be routed to the Firebase Emulator.',
+      );
+    }
     throw StateError(
-      'Dev flavor must use $devFirebaseProjectId, got "${options.projectId}".',
+      'The production Firebase project is not configured yet; '
+      'local review builds use --flavor dev|staging with '
+      '--dart-define=USE_FIREBASE_EMULATOR=true.',
     );
   }
-  return options;
+  if (!emulatorRequested) {
+    throw StateError(
+      'Local flavor "${flavor.name}" is Emulator-only: build with '
+      '--dart-define=USE_FIREBASE_EMULATOR=true. Refusing to start instead '
+      'of contacting any real Firebase project.',
+    );
+  }
+  if (!isDebugBuild) {
+    throw StateError(
+      'Local flavor "${flavor.name}" is debug-only; refusing to start a '
+      'non-debug Emulator build.',
+    );
+  }
 }
-
-StateError _notConfigured(String project) => StateError(
-  'The $project Firebase project is not configured yet; '
-  'build with --flavor dev.',
-);

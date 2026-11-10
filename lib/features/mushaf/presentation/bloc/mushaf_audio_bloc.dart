@@ -36,6 +36,8 @@ class MushafAudioBloc extends Bloc<MushafAudioEvent, MushafAudioState> {
     on<MushafAudioPauseEvent>(_onPause);
     on<MushafAudioStopEvent>(_onStop);
     on<MushafAudioToggleLoopEvent>(_onToggleLoop);
+    on<MushafAudioCycleSpeedEvent>(_onCycleSpeed);
+    on<MushafAudioToggleMuteEvent>(_onToggleMute);
     on<MushafAudioClearErrorEvent>(_onClearError);
     on<MushafAudioEngineSnapshotEvent>(_onSnapshot);
     on<MushafAudioEngineErrorEvent>(_onEngineError);
@@ -111,6 +113,10 @@ class MushafAudioBloc extends Bloc<MushafAudioEvent, MushafAudioState> {
     if (state.isTarget(surah, ayah)) {
       if (state.isLoading || state.isPlaying) return;
       if (state.isPaused) {
+        final resumeRequest = ++_request;
+        await _applyPlaybackPrefs();
+        // Audit fix: a Stop/target change during the await must win.
+        if (resumeRequest != _request || !state.isPaused) return;
         engine.play();
         emit(state.copyWith(status: MushafAudioStatus.playing));
         return;
@@ -160,6 +166,8 @@ class MushafAudioBloc extends Bloc<MushafAudioEvent, MushafAudioState> {
     if (request != _request) return;
     _loadInFlight = false;
 
+    await _applyPlaybackPrefs();
+    if (request != _request) return;
     engine.play();
     emit(state.copyWith(status: MushafAudioStatus.playing));
   }
@@ -193,6 +201,41 @@ class MushafAudioBloc extends Bloc<MushafAudioEvent, MushafAudioState> {
       ),
     );
     await _halt();
+  }
+
+  static const List<double> _speeds = [1.0, 1.25, 1.5, 2.0];
+
+  /// Best effort: a platform speed/volume failure must never strand playback.
+  Future<void> _applyPlaybackPrefs() async {
+    try {
+      await engine.setSpeed(state.playbackSpeed);
+    } catch (_) {}
+    try {
+      await engine.setMuted(state.isMuted);
+    } catch (_) {}
+  }
+
+  Future<void> _onCycleSpeed(
+    MushafAudioCycleSpeedEvent event,
+    Emitter<MushafAudioState> emit,
+  ) async {
+    final idx = _speeds.indexOf(state.playbackSpeed);
+    final next = _speeds[((idx < 0 ? 0 : idx) + 1) % _speeds.length];
+    emit(state.copyWith(playbackSpeed: next));
+    try {
+      await engine.setSpeed(next);
+    } catch (_) {}
+  }
+
+  Future<void> _onToggleMute(
+    MushafAudioToggleMuteEvent event,
+    Emitter<MushafAudioState> emit,
+  ) async {
+    final next = !state.isMuted;
+    emit(state.copyWith(isMuted: next));
+    try {
+      await engine.setMuted(next);
+    } catch (_) {}
   }
 
   void _onToggleLoop(

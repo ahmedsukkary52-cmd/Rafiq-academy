@@ -1,0 +1,20 @@
+{
+  "_comment": "FAKE local-only config for the dev flavor (Firebase Emulator Suite). Not a real Firebase project; contains no credentials. Selected by the google-services plugin ahead of android/app/google-services.json.",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "demo-rafiq-rules",
+    "storage_bucket": "demo-rafiq-rules.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "android_client_info": { "package_name": "com.example.rafiq_academy" }
+      },
+      "oauth_client": [],
+      "api_key": [ { "current_key": "fake-emulator-api-key" } ],
+      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+    }
+  ],
+  "configuration_version": "1"
+}

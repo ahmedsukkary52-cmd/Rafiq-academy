@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/core/router/router_app.dart';
+import 'package:rafiq_academy/core/router/app_routes.dart';
 import 'package:rafiq_academy/features/auth/domain/auth_error_messages.dart';
 import 'package:rafiq_academy/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rafiq_academy/features/auth/domain/usecases/send_password_reset_usecase.dart';

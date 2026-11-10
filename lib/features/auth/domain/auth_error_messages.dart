@@ -13,6 +13,10 @@ abstract final class AuthErrorMessages {
   static const tooManyRequests = 'تم تجاوز عدد المحاولات، حاول لاحقاً';
   static const sessionEnded = 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى';
   static const logoutFailed = 'تعذّر تسجيل الخروج، حاول مرة أخرى';
+  static const pushRevocationUnconfirmed =
+      'تم تسجيل الخروج، لكن تعذّر التأكد من إيقاف إشعارات الحساب على هذا '
+      'الجهاز بسبب الاتصال. قد تستمر بعض إشعاراته في الوصول حتى يتصل الجهاز '
+      'ويُسجَّل الدخول من جديد';
   static const permissionDenied = 'ليس لديك صلاحية الوصول إلى هذا الحساب';
 
   /// User-not-found and wrong-password share one message so the login form

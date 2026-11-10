@@ -4,7 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../repositories/teacher_repository.dart';
 
 class ReviewAbsenceRequestParams extends Equatable {

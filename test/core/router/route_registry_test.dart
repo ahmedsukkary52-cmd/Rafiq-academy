@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rafiq_academy/core/router/app_routes.dart';
 import 'package:rafiq_academy/core/router/router_app.dart';
 import 'package:rafiq_academy/features/app_update/presentation/bloc/client_version_gate_bloc.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_bloc.dart';

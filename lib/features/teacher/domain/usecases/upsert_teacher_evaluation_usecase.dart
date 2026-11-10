@@ -6,8 +6,8 @@ import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/evaluation_policy.dart';
 import '../../../../shared/domain/evaluation_service.dart';
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../entities/attendance_record_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/attendance_record_entity.dart';
 import '../repositories/teacher_repository.dart';
 import '../teacher_halaqa_ownership.dart';
 

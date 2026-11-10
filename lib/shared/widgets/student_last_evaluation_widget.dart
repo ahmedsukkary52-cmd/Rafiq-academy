@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../features/student/domain/entities/recitation_record_entity.dart';
+import '../domain/recitation_record_entity.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // StudentLastEvaluationWidget - آخر تقييم

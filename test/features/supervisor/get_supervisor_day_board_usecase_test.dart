@@ -1,19 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/absence_request.dart';
+import 'package:rafiq_academy/shared/domain/payment_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/supervisor_report_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';
+import 'package:rafiq_academy/features/supervisor/domain/read_models/supervisor_day_board.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/get_supervisor_day_board_usecase.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
+import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_day_readiness.dart';
+import 'package:rafiq_academy/shared/domain/load_halaqa_day_readiness.dart';
 import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 
 final _monday = DateTime(2024, 6, 3, 9, 0);
@@ -143,6 +146,41 @@ class _FakeTeacherRepository implements TeacherRepository {
   }) => throw UnimplementedError();
 }
 
+/// Implements only the shared read contract — no teacher repository surface.
+class _FakeDayFactsReader implements HalaqaDayFactsReader {
+  final _FakeTeacherRepository _facts;
+  final Failure? failure;
+  final calls = <String>[];
+
+  _FakeDayFactsReader(this._facts, {this.failure});
+
+  @override
+  Future<Either<Failure, List<AttendanceRecordEntity>>>
+  getHalaqaAttendanceForDate({
+    required String halaqaId,
+    required DateTime date,
+  }) async {
+    calls.add('attendance:$halaqaId');
+    if (failure != null) return Left(failure!);
+    return _facts.getHalaqaAttendanceForDate(halaqaId: halaqaId, date: date);
+  }
+
+  @override
+  Future<Either<Failure, DateTime?>> getLatestAssignmentDueDate(
+    String halaqaId,
+  ) {
+    calls.add('due:$halaqaId');
+    return _facts.getLatestAssignmentDueDate(halaqaId);
+  }
+
+  @override
+  Future<Either<Failure, List<RecitationRecordEntity>>>
+  getHalaqaRecitationRecords(String halaqaId) {
+    calls.add('reviews:$halaqaId');
+    return _facts.getHalaqaRecitationRecords(halaqaId);
+  }
+}
+
 class _FakeSupervisorRepository implements SupervisorRepository {
   final Map<String, String> names;
 
@@ -208,7 +246,7 @@ void main() {
   group('GetSupervisorDayBoardUseCase', () {
     test('excludes halaqat with no session today (D-W6-6)', () async {
       final useCase = GetSupervisorDayBoardUseCase(
-        teacherRepository: _FakeTeacherRepository(),
+        dayFactsReader: _FakeTeacherRepository(),
         supervisorRepository: _FakeSupervisorRepository(),
       );
 
@@ -227,7 +265,7 @@ void main() {
       'includes complete and incomplete; uses shared projector facts',
       () async {
         final useCase = GetSupervisorDayBoardUseCase(
-          teacherRepository: _FakeTeacherRepository(
+          dayFactsReader: _FakeTeacherRepository(
             attendance: {
               'ok': [_attendance('ok', 's1')],
               // gap: incomplete attendance
@@ -270,7 +308,7 @@ void main() {
 
     test('does not exception-sort — presentation owns Rule 3', () async {
       final useCase = GetSupervisorDayBoardUseCase(
-        teacherRepository: _FakeTeacherRepository(
+        dayFactsReader: _FakeTeacherRepository(
           attendance: {
             'ok': [_attendance('ok', 's1')],
           },
@@ -295,6 +333,71 @@ void main() {
 
       // D7 order by start time — incomplete comes first only because it starts earlier.
       expect(board.items.map((i) => i.halaqaId).toList(), ['gap', 'ok']);
+    });
+
+    group('reads through HalaqaDayFactsReader', () {
+      _FakeTeacherRepository facts() => _FakeTeacherRepository(
+        attendance: {
+          'ok': [_attendance('ok', 's1')],
+        },
+        latestDueByHalaqa: {'ok': _mondayDue, 'gap': _mondayDue},
+        recitations: {
+          'ok': [_recitation('ok', pending: false)],
+          'gap': [_recitation('gap', pending: true)],
+        },
+      );
+      final params = SupervisorDayBoardParams(
+        halaqat: [
+          _halaqa(id: 'gap', start: '10:00'),
+          _halaqa(id: 'ok', start: '09:00'),
+          _halaqa(id: 'empty', start: '11:00', studentIds: const []),
+        ],
+        now: _monday,
+      );
+
+      test('a reader-only fake yields the same board as the teacher repository',
+          () async {
+        final names = {'t1': 'أ. أحمد'};
+        final viaTeacherRepo = await GetSupervisorDayBoardUseCase(
+          dayFactsReader: facts(),
+          supervisorRepository: _FakeSupervisorRepository(names: names),
+        )(params);
+        final reader = _FakeDayFactsReader(facts());
+        final viaReader = await GetSupervisorDayBoardUseCase(
+          dayFactsReader: reader,
+          supervisorRepository: _FakeSupervisorRepository(names: names),
+        )(params);
+
+        final expected = viaTeacherRepo.getOrElse((f) => fail(f.message));
+        expect(viaReader.getOrElse((f) => fail(f.message)), expected);
+        expect(expected.sessionsTodayCount, 3);
+        expect(expected.items.map((i) => i.isComplete).toList(), [
+          true,
+          false,
+          true,
+        ]);
+        // Homework read is skipped for the empty roster, as before.
+        expect(reader.calls, [
+          'attendance:ok',
+          'due:ok',
+          'reviews:ok',
+          'attendance:gap',
+          'due:gap',
+          'reviews:gap',
+          'attendance:empty',
+          'reviews:empty',
+        ]);
+      });
+
+      test('propagates the reader failure unchanged', () async {
+        const failure = ServerFailure('denied');
+        final result = await GetSupervisorDayBoardUseCase(
+          dayFactsReader: _FakeDayFactsReader(facts(), failure: failure),
+          supervisorRepository: _FakeSupervisorRepository(),
+        )(params);
+
+        expect(result, const Left<Failure, SupervisorDayBoard>(failure));
+      });
     });
   });
 }

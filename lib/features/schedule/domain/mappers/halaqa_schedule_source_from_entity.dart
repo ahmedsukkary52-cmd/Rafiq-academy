@@ -1,4 +1,4 @@
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../entities/halaqa_schedule_source.dart';
 
 /// Bridges [HalaqaEntity] → schedule source for today's operational days.

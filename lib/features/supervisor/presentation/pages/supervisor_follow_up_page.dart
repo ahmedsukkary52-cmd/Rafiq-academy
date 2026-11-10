@@ -13,10 +13,9 @@ import '../../../chat/domain/usecases/chat_usecases.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/pages/chat_room.dart';
-import '../../../parent/domain/repositories/parent_repositories.dart';
-import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
-import '../../../teacher/domain/repositories/teacher_repository.dart';
-import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
+import '../../../../shared/domain/student_parent_links.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_state.dart';
@@ -81,7 +80,7 @@ class _SupervisorFollowUpPageState extends State<SupervisorFollowUpPage> {
 
     setState(() => _startingChat = true);
     try {
-      final parentsEither = await sl<ParentRepository>()
+      final parentsEither = await sl<StudentParentLinkReader>()
           .getParentIdsByStudentIds([row.studentId]);
       if (!mounted) return;
       final parentIds = parentsEither.fold<List<String>?>((_) {

@@ -7,19 +7,30 @@ import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/pages/notification_page.dart';
-import '../widgets/admin_subpage_scaffold.dart';
 import '../widgets/admin_figma_widgets.dart';
+import '../widgets/admin_halaqa_scope.dart';
+import '../widgets/admin_subpage_scaffold.dart';
 
 /// Admin chrome wrapper for shared content library.
+///
+/// Shared content is Halaqa-scoped (P0 §8), so the Admin picks a Halaqa.
 class AdminContentPage extends StatelessWidget {
   const AdminContentPage({super.key});
 
+  static Widget libraryFor(String halaqaId) => ContentLibraryPage(
+    key: ValueKey(halaqaId),
+    halaqaId: halaqaId,
+    embeddedInAdmin: true,
+  );
+
   @override
   Widget build(BuildContext context) {
-    return AdminSubpageScaffold(
+    return const AdminHalaqaScopedPage(
       title: 'مكتبة المحتوى',
-      subtitle: 'ملفات ومواد الأكاديمية',
-      body: const ContentLibraryPage(embeddedInAdmin: true),
+      subtitle: 'المحتوى المشترك للحلقات',
+      scopeHint: 'المحتوى مرتبط بحلقة واحدة ويظهر لأعضائها فقط',
+      emptyMessage: 'المحتوى مرتبط بالحلقات، ولا توجد حلقات في الأكاديمية.',
+      contentBuilder: libraryFor,
     );
   }
 }

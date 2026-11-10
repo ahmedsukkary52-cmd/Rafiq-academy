@@ -53,12 +53,13 @@ import 'package:rafiq_academy/features/awards/domain/usecases/awards_usecases.da
 import 'package:rafiq_academy/features/awards/presentation/bloc/awards_bloc.dart';
 import 'package:rafiq_academy/features/awards/presentation/bloc/awards_event.dart';
 import 'package:rafiq_academy/features/awards/presentation/pages/awards_page.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart';
 import 'package:rafiq_academy/features/supervisor/data/achievement_issue_payload_codec.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_state.dart';
+import 'package:rafiq_academy/features/teacher/presentation/teacher_award_grant_scope.dart';
 import 'package:rafiq_academy/shared/widgets/shared_widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -375,10 +376,7 @@ Future<void> _pumpHost(WidgetTester tester, AwardsBloc bloc) async {
   final auth = _AuthBlocStub(AuthAuthenticated(_teacher));
   await tester.pumpWidget(
     MultiBlocProvider(
-      providers: [
-        BlocProvider<TeacherBloc>.value(value: teacher),
-        BlocProvider<AuthBloc>.value(value: auth),
-      ],
+      providers: [BlocProvider<AuthBloc>.value(value: auth)],
       child: MaterialApp(
         home: Scaffold(
           body: Builder(
@@ -388,8 +386,9 @@ Future<void> _pumpHost(WidgetTester tester, AwardsBloc bloc) async {
                 isScrollControlled: true,
                 builder: (_) => BlocProvider.value(
                   value: bloc,
-                  child: const CreateAwardSheet(
+                  child: CreateAwardSheet(
                     halaqaId: 'h1',
+                    grantScope: TeacherAwardGrantScopeSource(teacher),
                     preset: AwardType.performanceStars,
                     preselectedStudentId: 's1',
                   ),

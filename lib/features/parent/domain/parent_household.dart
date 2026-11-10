@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../shared/domain/student_at_risk_policy.dart';
-import '../../student/domain/entities/recitation_record_entity.dart';
+import '../../../shared/domain/recitation_record_entity.dart';
 import 'entities/parent_entities.dart';
 
 class ParentStaffContact extends Equatable {

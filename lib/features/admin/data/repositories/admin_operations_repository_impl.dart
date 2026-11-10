@@ -5,7 +5,7 @@ import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import '../../domain/repositories/admin_operations_repository.dart';
 import '../datasources/admin_operations_remote_datasource.dart';

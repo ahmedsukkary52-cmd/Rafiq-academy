@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/schedule/data/models/halaqa_schedule_source_model.dart';
-import 'package:rafiq_academy/features/student/data/models/halaqa_schedule_model.dart';
+import 'package:rafiq_academy/shared/data/models/halaqa_schedule_model.dart';
 
 void main() {
   group('WA-7 schedule slotId serialization', () {

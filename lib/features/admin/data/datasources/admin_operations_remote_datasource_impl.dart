@@ -6,9 +6,9 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/payment_review_callable.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/domain/parent_payment_proof.dart';
-import '../../../student/data/models/halaqa_model.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/parent_payment_proof.dart';
+import '../../../../shared/data/models/halaqa_model.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import 'admin_operations_remote_datasource.dart';
 

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 import 'package:rafiq_academy/shared/domain/academy_payment_settings_contract.dart';
 import 'package:rafiq_academy/shared/domain/billing_report_status.dart';
 import 'package:rafiq_academy/shared/domain/family_bill_contract.dart';

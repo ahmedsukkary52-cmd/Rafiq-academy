@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/awards/domain/entities/award_entities.dart';
-import 'package:rafiq_academy/features/student/data/models/achievement_model.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
+import 'package:rafiq_academy/shared/data/models/achievement_model.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
 
 void main() {
   group('AchievementModel.typeFromFirestoreKey', () {

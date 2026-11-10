@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/di/injection_container.dart';
 import '../domain/halaqa_meeting_link.dart';
 
 /// What a screen knows about a halaqa's canonical meeting link.
@@ -41,18 +40,22 @@ typedef MeetingLinkViewBuilder =
       VoidCallback reload,
     );
 
-/// Loads `halaqaMeetingLinks/{halaqaId}` through [GetHalaqaMeetingLinkUseCase]
-/// and reloads when [halaqaId] or [reloadToken] (compared by identity)
-/// changes.
+/// Loads `halaqaMeetingLinks/{halaqaId}` through [getMeetingLink] and reloads
+/// when [halaqaId] or [reloadToken] (compared by identity) changes.
 class HalaqaMeetingLinkBuilder extends StatefulWidget {
   final String halaqaId;
   final Object? reloadToken;
   final MeetingLinkViewBuilder builder;
 
+  /// The canonical read; typed as the use case so no other source can be
+  /// substituted for `halaqaMeetingLinks`.
+  final GetHalaqaMeetingLinkUseCase getMeetingLink;
+
   const HalaqaMeetingLinkBuilder({
     super.key,
     required this.halaqaId,
     required this.builder,
+    required this.getMeetingLink,
     this.reloadToken,
   });
 
@@ -88,7 +91,7 @@ class _HalaqaMeetingLinkBuilderState extends State<HalaqaMeetingLinkBuilder> {
 
   Future<void> _fetch() async {
     final request = ++_request;
-    final result = await sl<GetHalaqaMeetingLinkUseCase>()(widget.halaqaId);
+    final result = await widget.getMeetingLink(widget.halaqaId);
     if (!mounted || request != _request) return;
     setState(() {
       _view = result.fold(

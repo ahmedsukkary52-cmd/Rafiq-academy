@@ -33,6 +33,9 @@ class _FakeMessagingPort implements FcmMessagingPort {
 
   @override
   Stream<String> tokenRefreshes() => refreshes.stream;
+
+  @override
+  Future<void> deleteToken() async {}
 }
 
 class _FakeDeviceIdProvider implements FcmDeviceIdProvider {
@@ -184,6 +187,7 @@ void main() {
     late FcmTokenRegistrar registrar;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       messaging = _FakeMessagingPort();
       deviceIds = _FakeDeviceIdProvider('dev_stable');
       repository = _RecordingTokenRepository();

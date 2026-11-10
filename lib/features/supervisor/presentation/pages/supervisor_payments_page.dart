@@ -4,14 +4,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
+import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/payment_review_amount_panel.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../../parent/domain/parent_payment_proof.dart';
-import '../../../parent/presentation/widgets/payment_proof_image.dart';
+import '../../../../shared/domain/payment_entity.dart';
+import '../../../../shared/domain/parent_payment_proof.dart';
+import '../../../../shared/domain/payment_proof_reader.dart';
+import '../../../../shared/widgets/payment_proof_image.dart';
 import '../../domain/entities/payment_review_params.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../bloc/supervisor_bloc.dart';
@@ -22,7 +24,7 @@ import '../widgets/supervisor_subpage_scaffold.dart';
 
 enum _PaymentFilter { all, awaiting, reviewed }
 
-String _money(double v) => '${formatMoneyAmount(v)} ر.س';
+String _money(double v) => academyMoneyLabel(v);
 
 /// Supervisor payment submissions — review external-pay proofs.
 class SupervisorPaymentsPage extends StatefulWidget {
@@ -653,6 +655,7 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                       parentId: p.parentId,
                       paymentId: p.id,
                       storagePath: proofPath,
+                      loader: sl<DownloadPaymentProofUseCase>().call,
                       height: 360,
                       onLoadedChanged: _onProofLoadedChanged,
                     ),
@@ -698,7 +701,7 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                       snapshot: _snapshot,
                       decision: _decision.wire,
                       draft: _draft,
-                      currency: 'ر.س',
+                      currency: academyCurrencyLabel,
                       enabled: !busy,
                     ),
                   ),
@@ -841,10 +844,7 @@ class _PaymentsReportPage extends StatelessWidget {
                 _InfoRow(label: 'مقبولة', value: '${approved.length}'),
                 _InfoRow(label: 'مرفوضة', value: '${rejected.length}'),
                 _InfoRow(label: 'جزئية', value: '${partial.length}'),
-                _InfoRow(
-                  label: 'إجمالي المقبول',
-                  value: '${approvedTotal.toStringAsFixed(0)} ر.س',
-                ),
+                _InfoRow(label: 'إجمالي المقبول', value: _money(approvedTotal)),
               ],
             ),
           ),
@@ -874,7 +874,7 @@ class _PaymentsReportPage extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${_reportReviewLabel(p)} · ${(p.amountPaidConfirmed ?? p.amount).toStringAsFixed(0)} ر.س',
+                        '${_reportReviewLabel(p)} · ${_money(p.amountPaidConfirmed ?? p.amount)}',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.textSecondary,
                         ),

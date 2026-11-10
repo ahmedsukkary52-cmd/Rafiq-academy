@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/parent/domain/parent_household.dart';
 import 'package:rafiq_academy/features/parent/presentation/parent_display.dart';
 import 'package:rafiq_academy/features/parent/presentation/parent_home_nav.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/student_at_risk_policy.dart';
 
 void main() {

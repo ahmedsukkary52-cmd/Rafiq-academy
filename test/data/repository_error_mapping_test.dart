@@ -16,8 +16,7 @@ import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.da
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart';
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
 import 'package:rafiq_academy/features/teacher/data/repositories/teacher_repository_impl.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
+import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/data/absence_request_model.dart';
 import 'package:rafiq_academy/shared/domain/academy_event.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';

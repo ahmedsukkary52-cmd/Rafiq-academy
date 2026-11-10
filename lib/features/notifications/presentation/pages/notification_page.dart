@@ -10,7 +10,7 @@ import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
+import '../widgets/notifications_list_skeleton.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../presentation/bloc/notifications_bloc.dart';
 import '../../presentation/bloc/notifications_event.dart';

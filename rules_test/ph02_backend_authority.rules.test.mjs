@@ -396,7 +396,7 @@ test('Halaqa reads: a student reads only Halaqat whose roster lists them', async
   await assertFails(student1.doc('halaqat/h1').get());
 });
 
-test('Halaqa reads: a deactivated student still on the roster reads only that Halaqa', async () => {
+test('Halaqa reads: a deactivated student still on the roster reads no Halaqa', async () => {
   await seedAll({
     'users/student5': { name: 'student5', role: 'student', isActive: false },
     'studentProfiles/student5': { uid: 'student5', halaqaId: 'h1', points: 0 },
@@ -413,9 +413,64 @@ test('Halaqa reads: a deactivated student still on the roster reads only that Ha
   });
 
   const student5 = authed('student5');
-  await assertSucceeds(student5.doc('halaqat/h1').get());
+  await assertFails(student5.doc('halaqat/h1').get());
+  await assertFails(
+    student5.collection('halaqat').where('studentIds', 'array-contains', 'student5').get(),
+  );
   await assertFails(student5.doc('halaqat/h2').get());
   await assertFails(student5.collection('halaqat').get());
+
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('users/student5').update({ isActive: true });
+  });
+  await assertSucceeds(student5.doc('halaqat/h1').get());
+  await assertFails(student5.doc('halaqat/h2').get());
+});
+
+test('Halaqa reads: unlinked, deactivated and profileless parents and staff read nothing', async () => {
+  await seedAll({
+    'halaqat/h2': {
+      name: 'H2',
+      teacherId: 'teacher2',
+      supervisorId: 'supervisor1',
+      studentIds: ['student3'],
+      status: 'active',
+    },
+    'users/parent2': { name: 'parent2', role: 'parent', isActive: true },
+    'parentProfiles/parent2': { uid: 'parent2', childrenIds: ['student3'] },
+    'users/parent3': { name: 'parent3', role: 'parent', isActive: true },
+    'users/parentOff': { name: 'parentOff', role: 'parent', isActive: false },
+    'parentProfiles/parentOff': { uid: 'parentOff', childrenIds: ['student1'] },
+    'users/teacherOff': { name: 'teacherOff', role: 'teacher', isActive: false },
+    'users/supervisorOff': { name: 'supervisorOff', role: 'supervisor', isActive: false },
+    'users/adminOff': { name: 'adminOff', role: 'admin', isActive: false },
+    'users/mystery': { name: 'mystery', role: 'guest', isActive: true },
+  });
+
+  const parent2 = authed('parent2');
+  await assertFails(parent2.doc('halaqat/h1').get());
+  await assertFails(
+    parent2.collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+  await assertFails(parent2.collection('halaqat').get());
+  await assertSucceeds(parent2.doc('halaqat/h2').get());
+
+  // Parent without a parentProfiles doc.
+  await assertFails(authed('parent3').doc('halaqat/h1').get());
+
+  const parentOff = authed('parentOff');
+  await assertFails(parentOff.doc('halaqat/h1').get());
+  await assertFails(
+    parentOff.collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+
+  await assertFails(authed('parent1').collection('halaqat').get());
+  await assertFails(authed('parent1').doc('halaqat/h2').get());
+
+  for (const uid of ['teacherOff', 'supervisorOff', 'adminOff', 'mystery', 'noUsersDoc']) {
+    await assertFails(authed(uid).doc('halaqat/h1').get());
+    await assertFails(authed(uid).collection('halaqat').get());
+  }
 });
 
 test('Halaqa reads: admin, teacher, supervisor and parent reads and queries unchanged', async () => {

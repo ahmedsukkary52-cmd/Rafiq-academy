@@ -13,7 +13,7 @@ import 'package:rafiq_academy/features/auth/domain/entities/user_entity.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_event.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_state.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_event.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_state.dart';

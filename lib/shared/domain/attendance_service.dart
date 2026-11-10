@@ -3,9 +3,8 @@ import 'package:injectable/injectable.dart';
 import '../../features/schedule/domain/entities/class_session_entity.dart';
 import '../../features/schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../features/schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../features/student/domain/entities/halaqa_entity.dart';
-import '../../features/teacher/domain/entities/attendance_record_entity.dart';
-import '../../features/teacher/domain/repositories/teacher_repository.dart';
+import 'halaqa_entity.dart';
+import 'attendance_record_entity.dart';
 import '../utils/attendance_policy.dart';
 
 /// Create vs edit for the attendance register sheet.

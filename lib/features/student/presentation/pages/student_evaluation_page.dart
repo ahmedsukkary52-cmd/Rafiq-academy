@@ -6,11 +6,11 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../domain/entities/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
-import '../widgets/student_loading_skeletons.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 
 class StudentEvaluationsPage extends StatefulWidget {
   const StudentEvaluationsPage({super.key});

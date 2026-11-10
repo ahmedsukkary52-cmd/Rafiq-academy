@@ -1,7 +1,7 @@
 import '../../../../shared/data/absence_request_model.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/data/models/parent_model.dart';
-import '../../../student/data/models/halaqa_model.dart';
+import '../../../../shared/data/models/payment_model.dart';
+import '../../../../shared/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';

@@ -10,6 +10,7 @@ import '../../domain/usecases/get_student_halaqa_usecase.dart';
 import '../../domain/usecases/get_student_profile_usecase.dart';
 import '../../domain/usecases/update_avatar_selection_usecase.dart';
 import '../../domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/id_params.dart';
 import 'student_event.dart';
 import 'student_state.dart';
 

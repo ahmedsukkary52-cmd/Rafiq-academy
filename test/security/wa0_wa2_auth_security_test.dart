@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/constants/app_constants.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/core/router/router_app.dart';
+import 'package:rafiq_academy/core/router/app_routes.dart';
 import 'package:rafiq_academy/features/admin/domain/repositories/admin_repository.dart';
 import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usecase.dart';
 

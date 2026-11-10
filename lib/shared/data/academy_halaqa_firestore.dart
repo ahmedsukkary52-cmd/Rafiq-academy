@@ -15,7 +15,6 @@ class AcademyHalaqaFirestore {
     required String name,
     required String teacherId,
     required String supervisorId,
-    String meetingLink = '',
     List<Map<String, dynamic>> schedule = const [],
   }) async {
     final trimmedName = name.trim();
@@ -37,7 +36,6 @@ class AcademyHalaqaFirestore {
       'supervisorId': trimmedSupervisorId,
       'studentIds': const <String>[],
       'schedule': schedule,
-      'meetingLink': meetingLink.trim(),
       'status': activeStatus,
       'createdAt': FieldValue.serverTimestamp(),
     });

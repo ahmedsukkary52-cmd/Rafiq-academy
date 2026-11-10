@@ -1,7 +1,7 @@
-import '../models/achievement_model.dart';
-import '../models/assignment_model.dart';
-import '../models/halaqa_model.dart';
-import '../models/recitation_record_model.dart';
+import '../../../../shared/data/models/achievement_model.dart';
+import '../../../../shared/data/models/assignment_model.dart';
+import '../../../../shared/data/models/halaqa_model.dart';
+import '../../../../shared/data/models/recitation_record_model.dart';
 import '../models/review_schedule_model.dart';
 import '../models/student_profile_model.dart';
 

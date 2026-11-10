@@ -3,8 +3,8 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
-import '../../../student/domain/entities/achievement_entity.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/achievement_entity.dart';
+import '../../../../shared/domain/id_params.dart';
 import '../repositories/parent_repositories.dart';
 
 /// Parent view of one linked child's achievements. The callable resolves the

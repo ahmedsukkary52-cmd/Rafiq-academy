@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/services/halaqa_student_summary_projector.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 

@@ -13,7 +13,7 @@ import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_state.dart';
 import 'package:rafiq_academy/features/parent/presentation/pages/parent_achievements_page.dart';
 import 'package:rafiq_academy/features/parent/presentation/parent_child_access.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
 import 'package:rafiq_academy/shared/widgets/shared_widgets.dart';
 
 class _FakeParentBloc extends Fake implements ParentBloc {

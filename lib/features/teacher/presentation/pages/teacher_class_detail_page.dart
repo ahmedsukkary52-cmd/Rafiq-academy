@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/widgets/app_search_field.dart';
@@ -17,12 +17,16 @@ import '../../../post/presentation/pages/posts_list_page.dart';
 import '../../../schedule/domain/entities/class_session_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
-import '../../domain/entities/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 import '../bloc/teacher_bloc.dart';
 import '../bloc/teacher_event.dart';
 import '../bloc/teacher_state.dart';
-import '../teacher_contact_parent.dart';
+import '../../../chat/domain/usecases/chat_usecases.dart';
+import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
+import '../../../chat/presentation/pages/chat_room.dart';
+import '../../../staff/contact_parent/contact_student_parent.dart';
+import '../../../../shared/domain/student_parent_links.dart';
 import '../tasks/teacher_tasks_tab.dart';
 import '../utils/assign_sheet_deep_link_gate.dart';
 import '../utils/teacher_surface_navigation.dart';
@@ -238,7 +242,20 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
   }
 
   Future<void> _contactParent(HalaqaStudentSummaryEntity student) {
-    return contactStudentParent(context: context, studentId: student.uid);
+    return contactStudentParent(
+      context: context,
+      studentId: student.uid,
+      deps: StaffParentContactDeps(
+        parentLinks: sl<StudentParentLinkReader>(),
+        getParticipant: sl<GetChatParticipantUseCase>(),
+        chatBloc: sl<ChatConversationsBloc>(),
+        chatRoom: (conversation, parent) => ChatRoomPage(
+          conversationId: conversation.id,
+          otherUserName: parent.name,
+          otherUserImage: parent.profileImageUrl,
+        ),
+      ),
+    );
   }
 
   @override

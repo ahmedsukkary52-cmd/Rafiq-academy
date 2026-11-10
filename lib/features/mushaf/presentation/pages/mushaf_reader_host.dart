@@ -5,10 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../student/presentation/pages/student_mushaf_page.dart';
 import '../bloc/mushaf_audio_bloc.dart';
 import '../bloc/mushaf_bloc.dart';
 import '../bloc/mushaf_event.dart';
+import '../mushaf_mode.dart';
+
+/// Builds the reader page shown by [MushafReaderHost].
+typedef MushafReaderBuilder = Widget Function(MushafMode initialMode);
 
 /// Student tab / route host — opens the reader directly with Blocs.
 class MushafReaderHost extends StatefulWidget {
@@ -16,9 +19,11 @@ class MushafReaderHost extends StatefulWidget {
   final int? preferredSurah;
   final bool forceSurahJump;
   final MushafMode initialMode;
+  final MushafReaderBuilder reader;
 
   const MushafReaderHost({
     super.key,
+    required this.reader,
     this.preferredSurah,
     this.forceSurahJump = false,
     this.initialMode = MushafMode.reading,
@@ -51,10 +56,8 @@ class _MushafReaderHostState extends State<MushafReaderHost> {
 
   @override
   Widget build(BuildContext context) {
-    return StudentMushafPage(
-      initialMode: widget.initialMode,
-      // Position is owned by MushafBloc (D23). Legacy surah/free flags unused.
-    );
+    // Position is owned by MushafBloc (D23). Legacy surah/free flags unused.
+    return widget.reader(widget.initialMode);
   }
 }
 

@@ -4,13 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/domain/current_student_profile.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/presentation/widgets/student_loading_skeletons.dart';
-import '../../../student/presentation/bloc/student_bloc.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 import '../../../student/presentation/widgets/halaqa_meeting_join.dart';
 import '../../domain/entities/class_session_entity.dart';
 import '../bloc/schedule_bloc.dart';
@@ -35,28 +35,29 @@ String _dayLabel(DateTime dt) {
 }
 
 class StudentSchedulePage extends StatelessWidget {
-  const StudentSchedulePage({super.key});
+  final CurrentStudentProfile currentStudent;
+
+  const StudentSchedulePage({super.key, required this.currentStudent});
 
   @override
   Widget build(BuildContext context) {
-    final halaqaId =
-        context.read<StudentBloc>().state.profile?.halaqaId?.trim() ?? '';
+    final halaqaId = currentStudent.halaqaId?.trim() ?? '';
 
     return BlocProvider(
       create: (_) => sl<ScheduleBloc>()..add(LoadWeeklySessionsEvent(halaqaId)),
-      child: _ScheduleView(halaqaId: halaqaId),
+      child: _ScheduleView(halaqaId: halaqaId, currentStudent: currentStudent),
     );
   }
 }
 
 class _ScheduleView extends StatelessWidget {
   final String halaqaId;
+  final CurrentStudentProfile currentStudent;
 
-  const _ScheduleView({required this.halaqaId});
+  const _ScheduleView({required this.halaqaId, required this.currentStudent});
 
   void _retry(BuildContext context) {
-    final id =
-        context.read<StudentBloc>().state.profile?.halaqaId?.trim() ?? halaqaId;
+    final id = currentStudent.halaqaId?.trim() ?? halaqaId;
     context.read<ScheduleBloc>().add(LoadWeeklySessionsEvent(id));
   }
 
@@ -101,9 +102,7 @@ class _ScheduleView extends StatelessWidget {
           }
 
           if (halaqaId.isEmpty &&
-              (context.read<StudentBloc>().state.profile?.halaqaId?.trim() ??
-                      '')
-                  .isEmpty) {
+              (currentStudent.halaqaId?.trim() ?? '').isEmpty) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
@@ -147,8 +146,7 @@ class _ScheduleView extends StatelessWidget {
               if (featured != null) ...[
                 _FeaturedSessionCard(
                   session: featured,
-                  onJoin: () =>
-                      joinHalaqaMeeting(context, _currentHalaqaId(context)),
+                  onJoin: () => joinHalaqaMeeting(context, _currentHalaqaId()),
                 ),
                 const SizedBox(height: 16),
                 if ((featured.topic ?? '').isNotEmpty)
@@ -179,8 +177,7 @@ class _ScheduleView extends StatelessWidget {
     );
   }
 
-  String _currentHalaqaId(BuildContext context) =>
-      context.read<StudentBloc>().state.profile?.halaqaId?.trim() ?? halaqaId;
+  String _currentHalaqaId() => currentStudent.halaqaId?.trim() ?? halaqaId;
 }
 
 class _FeaturedSessionCard extends StatelessWidget {

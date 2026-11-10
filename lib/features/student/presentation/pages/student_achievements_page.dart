@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../awards/domain/entities/award_entities.dart';
-import '../../domain/entities/achievement_entity.dart';
+import '../../../../shared/domain/achievement_entity.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
-import '../widgets/student_loading_skeletons.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 
 /// إنجازات الطالب — مصدر واحد: Firestore عبر StudentBloc.
 class StudentAchievementsPage extends StatefulWidget {
@@ -165,7 +166,7 @@ class _Header extends StatelessWidget {
     final profile = state.profile;
     final completed = state.achievements.length;
     final stars = profile?.totalStars ?? 0;
-    final memorizationAccuracy = (profile?.overallProgressPercent ?? 0)
+    final memorizationProgress = (profile?.overallProgressPercent ?? 0)
         .clamp(0, 100)
         .round();
 
@@ -229,12 +230,14 @@ class _Header extends StatelessWidget {
                   label: 'نجمة',
                   color: const Color(0xFF24C6CF),
                 ),
-                const SizedBox(width: 10),
-                _StatTile(
-                  value: '$memorizationAccuracy%',
-                  label: 'نسبة التقدم',
-                  color: const Color(0xFF34D18B),
-                ),
+                if (AppCapabilities.memorizationProgressAvailable) ...[
+                  const SizedBox(width: 10),
+                  _StatTile(
+                    value: '$memorizationProgress%',
+                    label: 'نسبة التقدم',
+                    color: const Color(0xFF34D18B),
+                  ),
+                ],
               ],
             ),
           ),

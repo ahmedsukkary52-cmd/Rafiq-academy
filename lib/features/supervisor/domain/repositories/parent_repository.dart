@@ -3,13 +3,15 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/absence_request.dart';
+import '../../../../shared/domain/payment_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/user_display_names.dart';
 import '../entities/achievement_issue_entity.dart';
 import '../entities/payment_review_params.dart';
 import '../entities/supervisor_report_entity.dart';
 
-abstract class SupervisorRepository {
+abstract class SupervisorRepository implements UserDisplayNameReader {
   Future<Either<Failure, List<HalaqaEntity>>> getSupervisedHalaqat(
     String supervisorId,
   );
@@ -39,6 +41,7 @@ abstract class SupervisorRepository {
   });
 
   /// Display names for [userIds] from `users` (W6 D-W6-4).
+  @override
   Future<Either<Failure, Map<String, String>>> getUserDisplayNames(
     List<String> userIds,
   );

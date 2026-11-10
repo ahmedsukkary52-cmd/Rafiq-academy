@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/contact_info_policy.dart';
+import '../../../../shared/domain/current_student_profile.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/app_back_button.dart';
@@ -16,14 +17,15 @@ import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../../student/presentation/pages/student_recitation_page.dart';
-import '../../../student/presentation/widgets/student_loading_skeletons.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 import '../../domain/entities/homework_entity.dart';
 import '../bloc/homework_bloc.dart';
 
 class StudentHomeworkPage extends StatelessWidget {
-  const StudentHomeworkPage({super.key});
+  final CurrentStudentProfile currentStudent;
+
+  const StudentHomeworkPage({super.key, required this.currentStudent});
 
   @override
   Widget build(BuildContext context) {
@@ -32,13 +34,15 @@ class StudentHomeworkPage extends StatelessWidget {
 
     return BlocProvider(
       create: (_) => sl<HomeworkBloc>()..add(LoadHomeworkEvent(uid)),
-      child: const _HomeworkView(),
+      child: _HomeworkView(currentStudent: currentStudent),
     );
   }
 }
 
 class _HomeworkView extends StatelessWidget {
-  const _HomeworkView();
+  final CurrentStudentProfile currentStudent;
+
+  const _HomeworkView({required this.currentStudent});
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +375,8 @@ class _HomeworkView extends StatelessWidget {
       AppSnackBar.showError(context, 'يجب تسجيل الدخول أولاً');
       return;
     }
-    final profile = context.read<StudentBloc>().state.profile;
+    final studentName = currentStudent.name;
+    final profileHalaqaId = currentStudent.halaqaId;
     final verses = hw.reviewRange.isNotEmpty
         ? hw.reviewRange
         : hw.newMemorizationRange;
@@ -389,11 +394,11 @@ class _HomeworkView extends StatelessWidget {
           endAyah: nav.endAyah,
           homeworkContext: HomeworkRecitationContext(
             studentId: auth.user.uid,
-            studentName: profile?.name ?? auth.user.name,
+            studentName: studentName ?? auth.user.name,
             teacherId: hw.assignedBy,
             halaqaId: hw.halaqaId.isNotEmpty
                 ? hw.halaqaId
-                : (profile?.halaqaId ?? ''),
+                : (profileHalaqaId ?? ''),
             assignmentId: hw.id,
             taskId: task.id,
             versesRange: verses,

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import '../../../student/data/models/achievement_model.dart';
+import '../../../../shared/data/models/achievement_model.dart';
 import '../../domain/parent_household.dart';
 import '../models/parent_model.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';

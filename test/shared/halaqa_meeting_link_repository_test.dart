@@ -242,8 +242,8 @@ void main() {
 
     test('halaqa read models no longer carry a meetingLink', () {
       for (final path in [
-        'lib/features/student/domain/entities/halaqa_entity.dart',
-        'lib/features/student/data/models/halaqa_model.dart',
+        'lib/shared/domain/halaqa_entity.dart',
+        'lib/shared/data/models/halaqa_model.dart',
         'lib/features/schedule/domain/entities/halaqa_schedule_source.dart',
         'lib/features/schedule/domain/entities/class_session_entity.dart',
         'lib/features/schedule/data/datasources/schedule_remote_datasource_impl.dart',
@@ -265,7 +265,7 @@ void main() {
         'lib/features/student/presentation/widgets/halaqa_meeting_join.dart':
             'sl<GetHalaqaMeetingLinkUseCase>()',
         'lib/shared/widgets/halaqa_meeting_link_builder.dart':
-            'sl<GetHalaqaMeetingLinkUseCase>()',
+            'widget.getMeetingLink(widget.halaqaId)',
       };
       consumers.forEach((path, marker) {
         final source = File(path).readAsStringSync();
@@ -278,6 +278,32 @@ void main() {
         'lib/features/schedule/presentation/pages/student_schedule_page.dart',
       ).readAsStringSync();
       expect(schedule, contains('joinHalaqaMeeting(context'));
+    });
+
+    test('the shared builder only accepts the canonical use case', () {
+      final builder = File(
+        'lib/shared/widgets/halaqa_meeting_link_builder.dart',
+      ).readAsStringSync();
+      expect(builder, contains('final GetHalaqaMeetingLinkUseCase getMeetingLink;'));
+      expect(builder, isNot(contains('injection_container')));
+
+      final card = File(
+        'lib/shared/widgets/student_session_card_widget.dart',
+      ).readAsStringSync();
+      expect(card, contains('final GetHalaqaMeetingLinkUseCase getMeetingLink;'));
+      expect(card, contains('getMeetingLink: getMeetingLink,'));
+
+      for (final path in [
+        'lib/features/student/presentation/pages/student_home_page.dart',
+        'lib/features/supervisor/presentation/pages/supervisor_halaqa_detail_page.dart',
+        'lib/features/admin/presentation/pages/admin_halaqat_page.dart',
+      ]) {
+        expect(
+          File(path).readAsStringSync(),
+          contains('getMeetingLink: sl<GetHalaqaMeetingLinkUseCase>(),'),
+          reason: path,
+        );
+      }
     });
   });
 }

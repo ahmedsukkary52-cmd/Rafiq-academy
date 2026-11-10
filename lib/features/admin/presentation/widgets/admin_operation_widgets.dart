@@ -6,7 +6,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_subpage_scaffold.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import '../bloc/admin_operations_bloc.dart';
 

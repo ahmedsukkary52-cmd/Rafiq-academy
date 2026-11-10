@@ -1,10 +1,10 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../domain/entities/achievement_entity.dart';
-import '../../domain/entities/assignment_entity.dart';
-import '../../domain/entities/halaqa_entity.dart';
-import '../../domain/entities/recitation_record_entity.dart';
+import '../../../../shared/domain/achievement_entity.dart';
+import '../../../../shared/domain/assignment_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
 import '../../domain/entities/review_schedule_entity.dart';
 import '../../domain/entities/student_profile_entity.dart';
 

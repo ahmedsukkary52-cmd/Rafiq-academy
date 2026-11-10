@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -728,17 +729,23 @@ class _AdminFinanceDetailPageState extends State<AdminFinanceDetailPage> {
                 children: [
                   _InfoRow(
                     label: 'إيرادات مدفوعة',
-                    value: '${formatAdminCount(f.totalRevenue.round())} ر.س',
+                    value: academyMoneyText(
+                      formatAdminCount(f.totalRevenue.round()),
+                    ),
                   ),
                   const Divider(),
                   _InfoRow(
                     label: 'معلق',
-                    value: '${formatAdminCount(f.totalPending.round())} ر.س',
+                    value: academyMoneyText(
+                      formatAdminCount(f.totalPending.round()),
+                    ),
                   ),
                   const Divider(),
                   _InfoRow(
                     label: 'متأخر',
-                    value: '${formatAdminCount(f.totalOverdue.round())} ر.س',
+                    value: academyMoneyText(
+                      formatAdminCount(f.totalOverdue.round()),
+                    ),
                   ),
                 ],
               ),

@@ -1,5 +1,5 @@
-import '../../features/student/domain/entities/recitation_record_entity.dart';
-import '../../features/teacher/domain/entities/attendance_record_entity.dart';
+import 'recitation_record_entity.dart';
+import 'attendance_record_entity.dart';
 import 'halaqa_day_readiness.dart';
 
 /// One I/O pass of W1/W2 facts used by readiness **and** Home activity projection.

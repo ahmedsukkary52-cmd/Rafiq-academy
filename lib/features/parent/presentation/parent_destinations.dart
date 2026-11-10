@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/router/router_app.dart';
+import '../../../core/router/app_routes.dart';
 import '../../chat/presentation/pages/chat_room.dart';
 import 'pages/parent_achievements_page.dart';
 import 'pages/parent_attendance_page.dart';

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/di/injection_container.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/student/domain/services/halaqa_meeting_joiner.dart';
 import 'package:rafiq_academy/features/student/presentation/widgets/halaqa_meeting_join.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_meeting_link.dart';
@@ -62,7 +62,6 @@ Future<void> _pumpHomeCard(
   required FakeHalaqaMeetingLinkRepository links,
   required HalaqaMeetingJoiner joiner,
 }) async {
-  registerFakeMeetingLinks(links);
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
@@ -70,6 +69,7 @@ Future<void> _pumpHomeCard(
           builder: (context) => SingleChildScrollView(
             child: StudentSessionCardWidget(
               halaqa: _halaqa,
+              getMeetingLink: GetHalaqaMeetingLinkUseCase(links),
               onJoinTap: () =>
                   joinHalaqaMeeting(context, _halaqa.id, joiner: joiner),
             ),

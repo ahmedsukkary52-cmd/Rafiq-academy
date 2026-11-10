@@ -5,7 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../repositories/parent_repository.dart';
 
 class SupervisedAbsenceRequestsParams extends Equatable {

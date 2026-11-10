@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../domain/auth_error_messages.dart';
+import '../../domain/services/sign_out_preparation.dart';
 import '../../domain/usecases/get_current_user_usecase.dart';
 import '../../domain/usecases/login_with_email_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
@@ -22,16 +24,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   StreamSubscription<String?>? _sessionSub;
   bool _loggingOut = false;
+  SignOutPreparation _signOutPreparation;
 
   AuthBloc({
     required this.loginWithEmail,
     required this.logout,
     required this.getCurrentUser,
     required this.watchSession,
-  }) : super(const AuthInitial()) {
+    @ignoreParam
+    SignOutPreparation signOutPreparation = const NoSignOutPreparation(),
+  }) : _signOutPreparation = signOutPreparation,
+       super(const AuthInitial()) {
     on<CheckAuthStatusEvent>(_onCheckAuthStatus);
     on<LoginWithEmailEvent>(_onLoginWithEmail);
-    on<LogoutEvent>(_onLogout);
+    on<LogoutEvent>(_onLogout, transformer: droppable());
     on<SessionEndedEvent>(_onSessionEnded);
     _sessionSub = watchSession().listen((uid) {
       if (uid == null && !_loggingOut && state is AuthAuthenticated) {
@@ -88,18 +94,45 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
+  /// The generated DI config is frozen (OA-56), so the composition root
+  /// attaches the push revocation instead of the constructor receiving it.
+  void attachSignOutPreparation(SignOutPreparation preparation) {
+    _signOutPreparation = preparation;
+  }
+
   Future<void> _onLogout(LogoutEvent event, Emitter<AuthState> emit) async {
     final current = state;
     _loggingOut = true;
+    final revocation = await _prepareSignOut();
     final result = await logout(const NoParams());
     _loggingOut = false;
-    result.fold((failure) {
-      if (current is AuthAuthenticated) {
-        emit(AuthLogoutFailure(current.user, failure.message));
-      } else {
-        emit(const AuthUnauthenticated());
-      }
-    }, (_) => emit(const AuthUnauthenticated()));
+    result.fold(
+      (failure) {
+        if (current is AuthAuthenticated) {
+          unawaited(_signOutPreparation.signOutAborted(current.user.uid));
+          emit(AuthLogoutFailure(current.user, failure.message));
+        } else {
+          emit(const AuthUnauthenticated());
+        }
+      },
+      (_) => emit(
+        AuthUnauthenticated(
+          message: revocation == DeviceRevocation.unconfirmed
+              ? AuthErrorMessages.pushRevocationUnconfirmed
+              : null,
+        ),
+      ),
+    );
+  }
+
+  /// Logout is never blocked by push revocation; an error is reported to the
+  /// user as unconfirmed rather than thrown out of the handler.
+  Future<DeviceRevocation> _prepareSignOut() async {
+    try {
+      return await _signOutPreparation.beforeSignOut();
+    } catch (_) {
+      return DeviceRevocation.unconfirmed;
+    }
   }
 
   void _onSessionEnded(SessionEndedEvent event, Emitter<AuthState> emit) {

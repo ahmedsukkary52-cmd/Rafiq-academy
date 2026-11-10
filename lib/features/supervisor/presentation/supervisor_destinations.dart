@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../student/presentation/pages/student_profile_page.dart';
+import '../../staff/student_profile/presentation/pages/student_profile_page.dart';
+import '../../staff/student_profile/presentation/student_profile_viewer.dart';
 import 'pages/supervisor_announcements_page.dart';
 import 'pages/supervisor_attendance_page.dart';
 import 'pages/supervisor_awards_hub_page.dart';
@@ -32,7 +33,11 @@ class SupervisorDestinations {
   }) {
     return _push(
       context,
-      StudentProfilePage(studentId: studentId, halaqaId: halaqaId),
+      StudentProfilePage(
+        studentId: studentId,
+        halaqaId: halaqaId,
+        viewer: StudentProfileViewer.supervisor,
+      ),
     );
   }
 

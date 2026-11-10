@@ -453,12 +453,30 @@ import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repos
     as _i1050;
 import 'package:rafiq_academy/features/teacher/domain/usecases/add_recitation_record_usecase.dart'
     as _i877;
-import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_attendance_for_date_usecase.dart'
+import 'package:rafiq_academy/shared/domain/halaqa_attendance_for_date.dart'
     as _i122;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_recitation_records_usecase.dart'
     as _i998;
-import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart'
+import 'package:rafiq_academy/shared/domain/halaqa_roster.dart'
     as _i440;
+import 'package:rafiq_academy/shared/domain/load_halaqa_day_readiness.dart'
+    as _i1201;
+import 'package:rafiq_academy/shared/domain/payment_proof_reader.dart'
+    as _i1202;
+import 'package:rafiq_academy/shared/domain/student_parent_links.dart'
+    as _i1203;
+import 'package:rafiq_academy/shared/domain/user_display_names.dart'
+    as _i1204;
+import 'package:rafiq_academy/shared/domain/recitation_records_reader.dart'
+    as _i1205;
+import 'package:rafiq_academy/shared/domain/student_profile_summary.dart'
+    as _i1206;
+import 'package:rafiq_academy/shared/domain/student_achievements_reader.dart'
+    as _i1207;
+import 'package:rafiq_academy/shared/domain/student_profile_details.dart'
+    as _i1208;
+import 'package:rafiq_academy/shared/domain/halaqa_name_reader.dart'
+    as _i1209;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_pending_absence_requests_usecase.dart'
     as _i775;
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_teacher_halaqt_usecase.dart'
@@ -882,6 +900,12 @@ extension GetItInjectableX on _i174.GetIt {
         eventSink: gh<_i273.AcademyEventSink>(),
       ),
     );
+    gh.lazySingleton<_i440.HalaqaRosterReader>(
+      () => diModule.halaqaRosterReader(gh<_i1050.TeacherRepository>()),
+    );
+    gh.lazySingleton<_i1201.HalaqaDayFactsReader>(
+      () => diModule.halaqaDayFactsReader(gh<_i1050.TeacherRepository>()),
+    );
     gh.lazySingleton<_i788.GetCurrentUserUseCase>(
       () => _i788.GetCurrentUserUseCase(gh<_i605.AuthRepository>()),
     );
@@ -899,7 +923,7 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i824.GetSupervisorDayBoardUseCase>(
       () => _i824.GetSupervisorDayBoardUseCase(
-        teacherRepository: gh<_i1050.TeacherRepository>(),
+        dayFactsReader: gh<_i1201.HalaqaDayFactsReader>(),
         supervisorRepository: gh<_i307.SupervisorRepository>(),
       ),
     );
@@ -941,7 +965,7 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i122.GetHalaqaAttendanceForDateUseCase>(
       () => _i122.GetHalaqaAttendanceForDateUseCase(
-        gh<_i1050.TeacherRepository>(),
+        gh<_i1201.HalaqaDayFactsReader>(),
       ),
     );
     gh.lazySingleton<_i998.GetHalaqaRecitationRecordsUseCase>(
@@ -950,7 +974,7 @@ extension GetItInjectableX on _i174.GetIt {
       ),
     );
     gh.lazySingleton<_i440.GetHalaqaStudentsUseCase>(
-      () => _i440.GetHalaqaStudentsUseCase(gh<_i1050.TeacherRepository>()),
+      () => _i440.GetHalaqaStudentsUseCase(gh<_i440.HalaqaRosterReader>()),
     );
     gh.lazySingleton<_i775.GetPendingAbsenceRequestsUseCase>(
       () => _i775.GetPendingAbsenceRequestsUseCase(
@@ -1393,8 +1417,19 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i347.SubmitPaymentProofUseCase>(
       () => _i347.SubmitPaymentProofUseCase(gh<_i493.ParentRepository>()),
     );
-    gh.lazySingleton<_i347.DownloadPaymentProofUseCase>(
-      () => _i347.DownloadPaymentProofUseCase(gh<_i493.ParentRepository>()),
+    gh.lazySingleton<_i1202.PaymentProofReader>(
+      () => diModule.paymentProofReader(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i1203.StudentParentLinkReader>(
+      () => diModule.studentParentLinkReader(gh<_i493.ParentRepository>()),
+    );
+    gh.lazySingleton<_i1204.UserDisplayNameReader>(
+      () => diModule.userDisplayNameReader(gh<_i307.SupervisorRepository>()),
+    );
+    gh.lazySingleton<_i1202.DownloadPaymentProofUseCase>(
+      () => _i1202.DownloadPaymentProofUseCase(
+        gh<_i1202.PaymentProofReader>(),
+      ),
     );
     gh.lazySingleton<_i937.AcademyEventObserverResolver>(
       () => _i890.DefaultAcademyEventObserverResolver(
@@ -1428,6 +1463,21 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i124.GetRecitationRecordsUseCase>(
       () => _i124.GetRecitationRecordsUseCase(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i1205.RecitationRecordsReader>(
+      () => diModule.recitationRecordsReader(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i1206.StudentProfileSummaryReader>(
+      () => diModule.studentProfileSummaryReader(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i1207.StudentAchievementsReader>(
+      () => diModule.studentAchievementsReader(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i1208.StudentProfileDetailsReader>(
+      () => diModule.studentProfileDetailsReader(gh<_i724.StudentRepository>()),
+    );
+    gh.lazySingleton<_i1209.HalaqaNameReader>(
+      () => diModule.halaqaNameReader(gh<_i724.StudentRepository>()),
     );
     gh.lazySingleton<_i554.GetStudentHalaqaUseCase>(
       () => _i554.GetStudentHalaqaUseCase(gh<_i724.StudentRepository>()),

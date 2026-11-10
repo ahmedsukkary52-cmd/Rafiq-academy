@@ -8,7 +8,7 @@ import 'package:rafiq_academy/features/homework/domain/entities/homework_entity.
 import 'package:rafiq_academy/features/homework/domain/repositories/homework_repository.dart';
 import 'package:rafiq_academy/features/homework/domain/usecases/homework_usecases.dart';
 import 'package:rafiq_academy/features/homework/presentation/bloc/homework_bloc.dart';
-import 'package:rafiq_academy/features/student/domain/usecases/watch_latest_assignment_usecase.dart';
+import 'package:rafiq_academy/shared/domain/id_params.dart';
 
 typedef _Feed = Either<Failure, HomeworkEntity?>;
 

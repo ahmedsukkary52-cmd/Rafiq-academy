@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/features/teacher/domain/usecases/send_assignment_usecase.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';

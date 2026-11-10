@@ -1,4 +1,4 @@
-import '../../features/student/domain/entities/recitation_record_entity.dart';
+import 'recitation_record_entity.dart';
 import '../utils/attendance_policy.dart';
 
 /// Business identity of a teacher live evaluation (session-scoped SSOT).

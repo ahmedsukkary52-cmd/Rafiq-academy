@@ -1,4 +1,4 @@
-import '../../student/data/models/achievement_model.dart';
+import '../../../shared/data/models/achievement_model.dart';
 
 const String kParentAchievementsLoadFailedMessage =
     'تعذر تحميل الإنجازات. حاول مرة أخرى.';

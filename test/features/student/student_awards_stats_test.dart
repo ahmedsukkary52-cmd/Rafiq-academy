@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/awards/domain/entities/award_entities.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
 import 'package:rafiq_academy/features/student/domain/student_awards_stats.dart';
 
 AchievementEntity _achievement({

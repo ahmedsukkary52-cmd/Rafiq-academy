@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/presentation/widgets/student_loading_skeletons.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/progress_report_entity.dart';
@@ -217,23 +218,26 @@ class _SummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('⭐', style: TextStyle(fontSize: 18)),
-                const SizedBox(height: 8),
-                Text(
-                  '${report.memorizationAccuracyPercent.toStringAsFixed(0)}٪',
-                  style: AppTextStyles.headlineMedium,
-                ),
-                Text('دقة الحفظ', style: AppTextStyles.labelSmall),
-              ],
+        // D11: this value is memorization progress, never «دقة الحفظ».
+        if (AppCapabilities.memorizationProgressAvailable) ...[
+          Expanded(
+            child: AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('⭐', style: TextStyle(fontSize: 18)),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${report.memorizationAccuracyPercent.toStringAsFixed(0)}٪',
+                    style: AppTextStyles.headlineMedium,
+                  ),
+                  Text('نسبة الحفظ', style: AppTextStyles.labelSmall),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
+          const SizedBox(width: 10),
+        ],
         Expanded(
           child: AppCard(
             child: Column(

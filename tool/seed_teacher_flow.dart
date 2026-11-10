@@ -28,11 +28,11 @@ import 'package:rafiq_academy/core/constants/app_constants.dart';
 import 'package:rafiq_academy/features/auth/data/models/user_model.dart';
 import 'package:rafiq_academy/features/awards/data/models/granted_award_model.dart';
 import 'package:rafiq_academy/features/awards/domain/entities/award_entities.dart';
-import 'package:rafiq_academy/features/student/data/models/halaqa_schedule_model.dart';
-import 'package:rafiq_academy/features/student/data/models/recitation_record_model.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/data/models/halaqa_schedule_model.dart';
+import 'package:rafiq_academy/shared/data/models/recitation_record_model.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
-import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
+import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 
 import 'seed_firebase.dart';

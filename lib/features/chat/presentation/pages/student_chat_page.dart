@@ -5,14 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../student/domain/usecases/get_student_halaqa_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
-import '../../../student/presentation/bloc/student_bloc.dart';
 import '../../domain/entities/chat_entities.dart';
+import '../../domain/student_chat_teacher.dart';
 import '../../domain/usecases/chat_usecases.dart';
 import '../bloc/chat_conversations_bloc.dart';
 import '../bloc/chat_conversations_event.dart';
@@ -20,10 +18,11 @@ import '../bloc/chat_conversations_state.dart';
 
 /// بوابة شات الطالب: تحدد معلم الحلقة → GetOrCreateConversation → تفتح ChatRoom.
 ///
-/// مصدر المعلم: `studentProfiles.halaqaId` → `halaqat.teacherId`
-/// (fallback: `assignments.assignedBy` لو الحلقة بدون teacherId).
+/// The teacher comes from [teacherResolver], supplied by the caller.
 class StudentChatPage extends StatefulWidget {
-  const StudentChatPage({super.key});
+  final StudentChatTeacherResolver teacherResolver;
+
+  const StudentChatPage({super.key, required this.teacherResolver});
 
   @override
   State<StudentChatPage> createState() => _StudentChatPageState();
@@ -49,39 +48,19 @@ class _StudentChatPageState extends State<StudentChatPage> {
       return;
     }
 
-    final studentState = context.read<StudentBloc>().state;
-    final profile = studentState.profile;
-
-    String? teacherUid = studentState.halaqa?.teacherId;
+    final resolved = await widget.teacherResolver.resolveTeacher();
+    final teacherUid = resolved.teacherUid;
     if (teacherUid == null || teacherUid.isEmpty) {
-      final halaqaId = profile?.halaqaId;
-      if (halaqaId != null && halaqaId.isNotEmpty) {
-        final halaqaResult = await sl<GetStudentHalaqaUseCase>()(
-          HalaqaIdParams(halaqaId),
-        );
-        halaqaResult.fold((f) => null, (h) => teacherUid = h.teacherId);
-      }
-    }
-
-    // Fallback أضعف: آخر تكليف
-    if (teacherUid == null || teacherUid!.isEmpty) {
-      final assignedBy = studentState.latestAssignment?.assignedBy;
-      if (assignedBy != null && assignedBy.isNotEmpty) {
-        teacherUid = assignedBy;
-      }
-    }
-
-    if (teacherUid == null || teacherUid!.isEmpty) {
       setState(() {
-        _error = profile?.halaqaId == null || profile!.halaqaId!.isEmpty
-            ? 'لم يتم تعيينك لحلقة بعد — تواصل مع الإدارة'
-            : 'تعذّر تحديد معلم الحلقة';
+        _error = resolved.hasHalaqa
+            ? 'تعذّر تحديد معلم الحلقة'
+            : 'لم يتم تعيينك لحلقة بعد — تواصل مع الإدارة';
       });
       return;
     }
 
     final teacherResult = await sl<GetChatParticipantUseCase>()(
-      ChatUidParams(teacherUid!),
+      ChatUidParams(teacherUid),
     );
     final teacher = teacherResult.fold<ChatParticipantEntity?>((f) {
       setState(() => _error = f.message);

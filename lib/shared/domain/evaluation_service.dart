@@ -2,8 +2,8 @@ import 'package:injectable/injectable.dart';
 
 import '../../features/schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../features/schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../features/student/domain/entities/halaqa_entity.dart';
-import '../../features/student/domain/entities/recitation_record_entity.dart';
+import 'halaqa_entity.dart';
+import 'recitation_record_entity.dart';
 import 'evaluation_policy.dart';
 
 /// Why [EvaluationService.openEvaluation] could not produce a ready model.

@@ -13,8 +13,8 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../schedule/domain/entities/class_session_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
-import '../../../supervisor/domain/repositories/parent_repository.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/user_display_names.dart';
 import '../../domain/read_models/teacher_day_agenda.dart';
 import '../../domain/usecases/get_today_agenda_usecase.dart';
 import '../bloc/teacher_bloc.dart';
@@ -105,7 +105,7 @@ class _TeacherClassesPageState extends State<TeacherClassesPage> {
       return;
     }
     setState(() => _loadingNames = true);
-    final result = await sl<SupervisorRepository>().getUserDisplayNames(ids);
+    final result = await sl<UserDisplayNameReader>().getUserDisplayNames(ids);
     if (!mounted) return;
     result.fold(
       (_) => setState(() => _loadingNames = false),

@@ -1,8 +1,8 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../shared/domain/academy_membership_invariant.dart';
-import '../../student/domain/entities/halaqa_entity.dart';
-import '../../teacher/domain/entities/halaqa_students_summary_entity.dart';
+import '../../../shared/domain/halaqa_entity.dart';
+import '../../../shared/domain/halaqa_students_summary_entity.dart';
 
 /// One student across assigned halaqat (deduped). Dual membership = 1–2 halaqa ids.
 class SupervisorStudentRow extends Equatable {

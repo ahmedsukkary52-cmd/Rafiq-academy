@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/core/router/router_app.dart';
+import 'package:rafiq_academy/core/router/app_routes.dart';
 import 'package:rafiq_academy/features/auth/domain/entities/user_entity.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_state.dart';
 

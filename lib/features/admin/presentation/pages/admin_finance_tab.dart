@@ -3,7 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
+import '../../../../core/router/app_routes.dart';
+import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../admin_format.dart';
@@ -75,7 +76,9 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                     else if (summary != null) ...[
                       AdminGradientHeroCard(
                         eyebrow: 'إجمالي الإيرادات',
-                        headline: '${fmt(summary.totalRevenue.round())} ر.س',
+                        headline: academyMoneyText(
+                          fmt(summary.totalRevenue.round()),
+                        ),
                         metrics: [
                           AdminHeroMetric(
                             value: fmt(summary.paidCount),
@@ -101,7 +104,9 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                         childAspectRatio: 1.25,
                         children: [
                           AdminStatTile(
-                            value: '${fmt(summary.totalPending.round())} ر.س',
+                            value: academyMoneyText(
+                              fmt(summary.totalPending.round()),
+                            ),
                             label: 'مدفوعات معلقة',
                             icon: Icons.schedule_outlined,
                             iconBg: const Color(0xFFFFF8E1),
@@ -112,7 +117,9 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                             badgeColor: AppColors.warning,
                           ),
                           AdminStatTile(
-                            value: '${fmt(summary.totalOverdue.round())} ر.س',
+                            value: academyMoneyText(
+                              fmt(summary.totalOverdue.round()),
+                            ),
                             label: 'مدفوعات متأخرة',
                             icon: Icons.warning_amber_outlined,
                             iconBg: const Color(0xFFFFEBEE),

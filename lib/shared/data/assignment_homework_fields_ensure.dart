@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../features/student/data/models/assignment_model.dart';
+import 'models/assignment_model.dart';
 import '../domain/assignment_kind.dart';
 import '../domain/assignment_policy.dart';
 

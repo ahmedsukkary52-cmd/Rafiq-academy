@@ -1,5 +1,5 @@
 import '../../../core/constants/app_constants.dart';
-import '../../../core/router/router_app.dart';
+import '../../../core/router/app_routes.dart';
 import '../../chat/domain/policies/chat_permission_policy.dart';
 import 'entities/analytics_entities.dart';
 

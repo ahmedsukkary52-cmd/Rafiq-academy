@@ -8,7 +8,7 @@ import 'package:rafiq_academy/core/error/exception.dart';
 import 'package:rafiq_academy/features/admin/data/datasources/admin_operations_remote_datasource.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/parent/data/models/parent_model.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 
 import '../../support/fake_callables.dart';
 import '../auth/auth_fakes.dart';

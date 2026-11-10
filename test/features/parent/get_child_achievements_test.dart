@@ -6,9 +6,9 @@ import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart';
 import 'package:rafiq_academy/features/parent/data/repositories/parent_repository_impl.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/get_child_achievements_usecase.dart';
-import 'package:rafiq_academy/features/student/data/models/achievement_model.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
-import 'package:rafiq_academy/features/student/domain/usecases/watch_latest_assignment_usecase.dart';
+import 'package:rafiq_academy/shared/data/models/achievement_model.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/id_params.dart';
 
 import '../../support/fake_callables.dart';
 

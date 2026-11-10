@@ -14,6 +14,10 @@ class StudentProgressWidget extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onDetailsTap;
 
+  /// False while no backend computes memorization progress: the card then
+  /// says so instead of showing zeros as if they were measured.
+  final bool progressAvailable;
+
   const StudentProgressWidget({
     super.key,
     required this.progressPercent,
@@ -23,6 +27,7 @@ class StudentProgressWidget extends StatelessWidget {
     this.totalStars = 0,
     this.onTap,
     this.onDetailsTap,
+    this.progressAvailable = true,
   });
 
   @override
@@ -75,7 +80,37 @@ class StudentProgressWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
+              child: progressAvailable
+                  ? _measured(pct)
+                  : _notYetMeasured(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _notYetMeasured() {
+    return Column(
+      children: [
+        Text(
+          'لم يُفعَّل احتساب تقدم الحفظ بعد؛ سيظهر هنا عند اعتماده من تقييمات المعلم.',
+          key: const Key('student-progress-unavailable'),
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Divider(height: 1, color: AppColors.border),
+        const SizedBox(height: 14),
+        _MiniStat(value: '$totalStars', label: 'نجمة'),
+      ],
+    );
+  }
+
+  Widget _measured(int pct) {
+    return Column(
                 children: [
                   Row(
                     children: [
@@ -141,20 +176,9 @@ class StudentProgressWidget extends StatelessWidget {
                           label: 'نجمة',
                         ),
                       ),
-                      Expanded(
-                        child: _MiniStat(
-                          value: '$pct%',
-                          label: 'دقة',
-                        ),
-                      ),
                     ],
                   ),
                 ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

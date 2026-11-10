@@ -1,11 +1,11 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../domain/entities/attendance_record_entity.dart';
-import '../../domain/entities/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/absence_request.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/attendance_record_entity.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 import '../../domain/read_models/teacher_day_agenda.dart';
 import '../../domain/read_models/teacher_recent_activity.dart';
 

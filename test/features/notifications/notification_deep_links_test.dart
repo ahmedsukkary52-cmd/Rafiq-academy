@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/constants/app_constants.dart';
-import 'package:rafiq_academy/core/router/router_app.dart';
+import 'package:rafiq_academy/core/router/app_routes.dart';
 import 'package:rafiq_academy/features/notifications/presentation/notification_deep_links.dart';
 
 void main() {

@@ -3,7 +3,8 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
 import '../repositories/teacher_repository.dart';
 
 @lazySingleton

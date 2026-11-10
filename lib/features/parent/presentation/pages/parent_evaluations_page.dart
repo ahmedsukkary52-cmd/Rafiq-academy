@@ -6,9 +6,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../../student/domain/usecases/get_recitation_records_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_reader.dart';
 import '../../domain/parent_performance.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_child_access.dart';
@@ -59,8 +58,8 @@ class _ParentEvaluationsPageState extends State<ParentEvaluationsPage> {
       _loading = true;
       _error = null;
     });
-    final result = await sl<GetRecitationRecordsUseCase>()(
-      StudentUidParams(widget.studentId),
+    final result = await sl<RecitationRecordsReader>().getRecitationRecords(
+      widget.studentId,
     );
     if (!mounted) return;
     result.fold(

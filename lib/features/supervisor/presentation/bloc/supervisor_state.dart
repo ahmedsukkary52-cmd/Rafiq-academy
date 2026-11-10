@@ -2,8 +2,9 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/absence_request.dart';
+import '../../../../shared/domain/payment_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/read_models/supervisor_day_board.dart';
 
 class _Unset {

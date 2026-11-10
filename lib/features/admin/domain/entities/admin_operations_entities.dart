@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:equatable/equatable.dart';
 
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/domain/parent_payment_proof.dart';
+import '../../../../shared/domain/parent_payment_proof.dart';
 
 /// Idempotency key for adminCreateHalaqa (`^[A-Za-z0-9_-]{8,64}$`): one key
 /// per create form, so a retried submit converges on the same Halaqa.

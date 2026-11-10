@@ -12,7 +12,7 @@ import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/parent_entities.dart';
-import '../../domain/parent_payment_proof.dart';
+import '../../../../shared/domain/parent_payment_proof.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';

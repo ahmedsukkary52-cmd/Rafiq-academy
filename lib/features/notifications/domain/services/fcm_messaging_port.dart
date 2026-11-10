@@ -12,6 +12,10 @@ abstract class FcmMessagingPort {
   /// Emits the new token whenever FCM rotates it.
   Stream<String> tokenRefreshes();
 
+  /// Invalidates this device's token at FCM (needs the network); the next
+  /// [currentToken] returns a new one.
+  Future<void> deleteToken();
+
   /// One of [FcmTokenContract.supportedPlatforms].
   String platformKey();
 }

@@ -1,9 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../domain/entities/attendance_record_entity.dart';
-import '../../domain/repositories/teacher_repository.dart';
-
+import '../../../../shared/domain/attendance_record_entity.dart';
 class AttendanceRecordModel extends AttendanceRecordEntity {
   const AttendanceRecordModel({
     required super.id,

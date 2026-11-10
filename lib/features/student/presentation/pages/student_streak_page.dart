@@ -9,7 +9,7 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/student_bloc.dart';
 import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
-import '../widgets/student_loading_skeletons.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 
 class StudentStreakPage extends StatefulWidget {
   const StudentStreakPage({super.key});

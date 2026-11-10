@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/id_params.dart';
 import '../../domain/entities/homework_entity.dart';
 import '../../domain/repositories/homework_repository.dart';
 import '../../domain/usecases/homework_usecases.dart';

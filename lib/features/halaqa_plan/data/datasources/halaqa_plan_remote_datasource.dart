@@ -4,8 +4,8 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/domain/assignment_policy.dart';
-import '../../../student/data/models/assignment_model.dart';
-import '../../../student/domain/entities/assignment_entity.dart';
+import '../../../../shared/data/models/assignment_model.dart';
+import '../../../../shared/domain/assignment_entity.dart';
 
 abstract class HalaqaPlanRemoteDatasource {
   Future<List<AssignmentEntity>> getLessonAssignments(String studentId);

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/supervisor_roster.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 
 HalaqaEntity _halaqa({
   required String id,

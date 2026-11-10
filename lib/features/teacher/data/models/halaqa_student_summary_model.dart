@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../domain/entities/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 
 class HalaqaStudentSummaryModel extends HalaqaStudentSummaryEntity {
   const HalaqaStudentSummaryModel({

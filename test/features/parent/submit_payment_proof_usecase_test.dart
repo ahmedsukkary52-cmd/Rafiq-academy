@@ -5,10 +5,11 @@ import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/features/parent/domain/parent_household.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/submit_payment_proof_usecase.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/payment_proof_reader.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
 import 'package:rafiq_academy/shared/domain/academy_billing_entities.dart';
 import 'package:rafiq_academy/shared/domain/payment_access_entity.dart';
 

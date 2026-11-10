@@ -4,7 +4,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/id_params.dart';
 import '../entities/homework_entity.dart';
 import '../repositories/homework_repository.dart';
 

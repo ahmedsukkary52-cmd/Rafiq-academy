@@ -6,7 +6,9 @@ import 'package:fpdart/fpdart.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
-import '../../../student/domain/entities/achievement_entity.dart';
+import '../../../../shared/domain/payment_proof_reader.dart';
+import '../../../../shared/domain/student_parent_links.dart';
+import '../../../../shared/domain/achievement_entity.dart';
 import '../entities/parent_entities.dart';
 import '../parent_household.dart';
 
@@ -14,11 +16,13 @@ import '../parent_household.dart';
 // Repository Interface
 // ══════════════════════════════════════════════════════════════════════════════
 
-abstract class ParentRepository {
+abstract class ParentRepository
+    implements PaymentProofReader, StudentParentLinkReader {
   /// جلب معرّفات أبناء ولي الأمر
   Future<Either<Failure, List<String>>> getChildrenIds(String parentId);
 
   /// Reverse lookup: student UIDs → linked parent profile IDs.
+  @override
   Future<Either<Failure, Map<String, List<String>>>> getParentIdsByStudentIds(
     List<String> studentIds,
   );
@@ -68,6 +72,7 @@ abstract class ParentRepository {
   });
 
   /// Proof image for Parent / Admin / scoped Supervisor review.
+  @override
   Future<Either<Failure, Uint8List>> downloadPaymentProof({
     required String parentId,
     required String paymentId,

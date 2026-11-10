@@ -15,12 +15,13 @@ import 'package:rafiq_academy/features/parent/presentation/bloc/parent_state.dar
 import 'package:rafiq_academy/features/parent/presentation/pages/parent_child_profile_page.dart';
 import 'package:rafiq_academy/features/parent/presentation/parent_child_access.dart';
 import 'package:rafiq_academy/features/parent/presentation/widgets/parent_loading_skeletons.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/student/domain/entities/student_profile_entity.dart';
 import 'package:rafiq_academy/features/student/domain/repositories/student_repository.dart';
-import 'package:rafiq_academy/features/student/domain/usecases/get_recitation_records_usecase.dart';
-import 'package:rafiq_academy/features/student/domain/usecases/get_student_profile_usecase.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_reader.dart';
+import 'package:rafiq_academy/features/student/data/repositories/student_profile_summary_reader_impl.dart';
+import 'package:rafiq_academy/shared/domain/student_profile_summary.dart';
 
 const _emptyText = 'لا توجد نشاطات أو إنجازات ممنوحة بعد.';
 const _failure = 'تعذر تحميل الإنجازات. حاول مرة أخرى.';
@@ -119,10 +120,10 @@ void main() {
       (_) async => const Right(<AchievementEntity>[]),
     );
     final studentRepo = _FakeStudentRepository();
-    _replace<GetStudentProfileUseCase>(GetStudentProfileUseCase(studentRepo));
-    _replace<GetRecitationRecordsUseCase>(
-      GetRecitationRecordsUseCase(studentRepo),
+    _replace<StudentProfileSummaryReader>(
+      StudentProfileSummaryReaderImpl(studentRepo),
     );
+    _replace<RecitationRecordsReader>(studentRepo);
     _replace<GetChildAchievementsUseCase>(
       GetChildAchievementsUseCase(parentRepo),
     );
@@ -133,8 +134,8 @@ void main() {
   });
 
   tearDown(() {
-    _remove<GetStudentProfileUseCase>();
-    _remove<GetRecitationRecordsUseCase>();
+    _remove<StudentProfileSummaryReader>();
+    _remove<RecitationRecordsReader>();
     _remove<GetChildAchievementsUseCase>();
     _remove<ChatConversationsBloc>();
   });

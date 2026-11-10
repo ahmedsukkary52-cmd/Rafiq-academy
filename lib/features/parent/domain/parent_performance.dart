@@ -1,5 +1,5 @@
 import '../../analytics/domain/analytics_recitation_honesty.dart';
-import '../../student/domain/entities/recitation_record_entity.dart';
+import '../../../shared/domain/recitation_record_entity.dart';
 
 /// Parent-facing performance % using Analytics grade weights (100/80/60/40).
 class ParentPerformance {

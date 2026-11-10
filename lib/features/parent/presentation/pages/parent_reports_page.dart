@@ -5,9 +5,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../../student/domain/usecases/get_recitation_records_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_reader.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_performance.dart';
 import '../bloc/parent_bloc.dart';
@@ -64,8 +63,8 @@ class _ParentReportsPageState extends State<ParentReportsPage> {
       _recordsLoading = true;
       _accessError = null;
     });
-    final result = await sl<GetRecitationRecordsUseCase>()(
-      StudentUidParams(studentId),
+    final result = await sl<RecitationRecordsReader>().getRecitationRecords(
+      studentId,
     );
     if (!mounted) return;
     setState(() {

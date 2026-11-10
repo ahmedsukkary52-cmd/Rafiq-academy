@@ -2,7 +2,7 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../entities/admin_operations_entities.dart';
 
 /// P0-01 … P0-04 operational contracts. Every mutation is an existing

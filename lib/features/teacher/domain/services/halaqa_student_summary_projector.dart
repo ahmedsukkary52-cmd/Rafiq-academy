@@ -1,7 +1,7 @@
 import '../../../../shared/domain/student_at_risk_policy.dart';
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../entities/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 
 /// Pure enrichment for teacher class-detail roster cards.
 ///

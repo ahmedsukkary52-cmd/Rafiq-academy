@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/payment_entity.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 
 void main() {
   PaymentEntity payment({

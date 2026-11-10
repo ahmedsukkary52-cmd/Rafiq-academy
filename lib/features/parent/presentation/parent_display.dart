@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../shared/domain/payment_review_amounts.dart';
+import '../../../shared/presentation/academy_currency_label.dart';
 import '../../../shared/domain/student_at_risk_policy.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/utils/attendance_policy.dart';
-import '../../student/domain/entities/recitation_record_entity.dart';
+import '../../../shared/domain/recitation_record_entity.dart';
 import '../domain/entities/parent_entities.dart';
 import '../domain/parent_household.dart';
 
@@ -141,7 +142,7 @@ const _arabicMonths = [
 /// Whole amounts stay whole; partial confirmations keep their piasters.
 String parentMoneyLabel(double amount) {
   final text = formatMoneyAmount(amount).replaceAll('.', '٫');
-  return '${parentEasternDigits(text)} جنيه';
+  return academyMoneyText(parentEasternDigits(text));
 }
 
 String parentPaymentPeriodLabel(DateTime date) {

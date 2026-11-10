@@ -4,7 +4,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../student/domain/usecases/get_student_profile_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/id_params.dart';
 import '../../domain/entities/progress_report_entity.dart';
 import '../../domain/usecases/get_progress_report_usecase.dart';
 

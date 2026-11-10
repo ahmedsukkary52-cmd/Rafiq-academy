@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/shared/domain/assignment_policy.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
-import 'package:rafiq_academy/features/student/data/models/assignment_model.dart';
+import 'package:rafiq_academy/shared/data/models/assignment_model.dart';
 
 void main() {
   group('AssignmentPolicy (H2 / A-H2)', () {

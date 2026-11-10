@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../../student/domain/entities/assignment_entity.dart';
+import '../../../../shared/domain/assignment_entity.dart';
 
 enum HalaqaPlanTrackKind { newMemorization, review }
 

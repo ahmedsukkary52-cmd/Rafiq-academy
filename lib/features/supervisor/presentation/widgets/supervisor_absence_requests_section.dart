@@ -4,8 +4,8 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../parent/domain/absence_request_projection.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../../shared/domain/absence_request_projection.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../supervisor_destinations.dart';
 import 'supervisor_loading_skeletons.dart';
 

@@ -1,0 +1,1 @@
+enum MushafMode { reading, recitation }

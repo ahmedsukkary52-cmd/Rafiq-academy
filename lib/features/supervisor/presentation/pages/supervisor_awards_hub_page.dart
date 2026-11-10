@@ -4,12 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/domain/entities/achievement_entity.dart';
-import '../../../student/domain/usecases/get_achievements_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
-import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
-import '../../../teacher/domain/repositories/teacher_repository.dart';
-import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
+import '../../../../shared/domain/achievement_entity.dart';
+import '../../../../shared/domain/student_achievements_reader.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../supervisor_destinations.dart';
@@ -135,8 +133,8 @@ class _SupervisorAwardsHubPageState extends State<SupervisorAwardsHubPage> {
 
     final sample = roster.take(20).toList();
     for (final row in sample) {
-      final result = await sl<GetAchievementsUseCase>()(
-        StudentUidParams(row.studentId),
+      final result = await sl<StudentAchievementsReader>().getAchievements(
+        row.studentId,
       );
       if (!mounted) return;
       result.fold((_) {}, (list) {

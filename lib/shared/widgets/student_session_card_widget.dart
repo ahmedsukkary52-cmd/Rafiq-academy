@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
-import '../../features/student/domain/entities/halaqa_entity.dart';
+import '../domain/halaqa_entity.dart';
 import '../domain/halaqa_meeting_link.dart';
 import 'halaqa_meeting_link_builder.dart';
 
@@ -10,11 +10,13 @@ class StudentSessionCardWidget extends StatelessWidget {
   final HalaqaEntity halaqa;
   final VoidCallback onJoinTap;
   final VoidCallback? onDetailsTap;
+  final GetHalaqaMeetingLinkUseCase getMeetingLink;
 
   const StudentSessionCardWidget({
     super.key,
     required this.halaqa,
     required this.onJoinTap,
+    required this.getMeetingLink,
     this.onDetailsTap,
   });
 
@@ -138,6 +140,7 @@ class StudentSessionCardWidget extends StatelessWidget {
             ),
             HalaqaMeetingLinkBuilder(
               halaqaId: halaqa.id,
+              getMeetingLink: getMeetingLink,
               builder: (context, view, reload) {
                 final status = _linkStatusText(view);
                 if (status == null) return const SizedBox.shrink();

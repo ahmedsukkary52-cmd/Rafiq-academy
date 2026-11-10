@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/core/presentation/bloc_status.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/read_models/supervisor_day_board.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';

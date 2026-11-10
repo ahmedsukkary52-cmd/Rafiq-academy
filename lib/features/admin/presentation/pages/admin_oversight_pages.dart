@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../domain/entities/admin_directory_entity.dart';
@@ -165,7 +166,7 @@ class _AdminPaymentsReviewPageState extends State<AdminPaymentsReviewPage> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '${formatAdminCount(p.amount.round())} ر.س',
+                                    academyMoneyLabel(p.amount),
                                     style: AppTextStyles.titleMedium.copyWith(
                                       fontWeight: FontWeight.w700,
                                     ),

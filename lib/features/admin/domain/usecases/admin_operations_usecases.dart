@@ -6,7 +6,7 @@ import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/meeting_link_policy.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../entities/admin_operations_entities.dart';
 import '../repositories/admin_operations_repository.dart';
 

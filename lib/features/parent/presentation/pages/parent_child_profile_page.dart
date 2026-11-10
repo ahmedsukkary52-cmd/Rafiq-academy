@@ -12,13 +12,12 @@ import '../../../chat/domain/entities/chat_entities.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
-import '../../../student/domain/entities/achievement_entity.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../../student/domain/entities/student_profile_entity.dart';
-import '../../../student/domain/student_profile_latest_evaluation.dart';
-import '../../../student/domain/usecases/get_recitation_records_usecase.dart';
-import '../../../student/domain/usecases/get_student_profile_usecase.dart';
-import '../../../student/domain/usecases/watch_latest_assignment_usecase.dart';
+import '../../../../shared/domain/achievement_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/student_profile_latest_evaluation.dart';
+import '../../../../shared/domain/recitation_records_reader.dart';
+import '../../../../shared/domain/student_profile_summary.dart';
+import '../../../../shared/domain/id_params.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_performance.dart';
 import '../../domain/usecases/get_child_achievements_usecase.dart';
@@ -46,7 +45,7 @@ class ParentChildProfilePage extends StatefulWidget {
 class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
   bool _loading = true;
   String? _error;
-  StudentProfileEntity? _profile;
+  StudentProfileSummary? _profile;
   StudentProfileLatestEvaluation? _latest;
   double? _performance;
   List<AchievementEntity> _achievements = const [];
@@ -87,8 +86,10 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
       _achievementsError = null;
     });
     final uid = StudentUidParams(widget.studentId);
-    final profileResult = await sl<GetStudentProfileUseCase>()(uid);
-    final recitationsResult = await sl<GetRecitationRecordsUseCase>()(uid);
+    final profileResult = await sl<StudentProfileSummaryReader>()
+        .getStudentProfileSummary(widget.studentId);
+    final recitationsResult = await sl<RecitationRecordsReader>()
+        .getRecitationRecords(widget.studentId);
     final achievementsResult = await sl<GetChildAchievementsUseCase>()(uid);
     if (!mounted) return;
 

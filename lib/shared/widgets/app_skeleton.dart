@@ -102,6 +102,32 @@ class AppSkeletonLine extends StatelessWidget {
   }
 }
 
+/// Bordered surface card holding skeleton bones.
+class AppSkeletonCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const AppSkeletonCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(AppSizes.paddingM),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: child,
+    );
+  }
+}
+
 /// Circular skeleton bone (avatars).
 class AppSkeletonCircle extends StatelessWidget {
   final Color bone;

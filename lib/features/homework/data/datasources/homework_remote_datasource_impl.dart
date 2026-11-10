@@ -10,10 +10,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
 import '../../../../shared/data/assignment_homework_fields_ensure.dart';
 import '../../../../shared/domain/assignment_policy.dart';
-import '../../../student/data/models/assignment_model.dart';
-import '../../../student/data/models/recitation_record_model.dart';
-import '../../../student/domain/entities/assignment_entity.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
+import '../../../../shared/data/models/assignment_model.dart';
+import '../../../../shared/data/models/recitation_record_model.dart';
+import '../../../../shared/domain/assignment_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
 import '../../domain/entities/homework_entity.dart';
 import 'homework_remote_datasource.dart';
 

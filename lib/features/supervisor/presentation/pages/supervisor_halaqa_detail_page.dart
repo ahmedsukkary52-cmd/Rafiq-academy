@@ -11,10 +11,9 @@ import '../../../admin/domain/entities/admin_operations_entities.dart';
 import '../../../admin/domain/usecases/admin_operations_usecases.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
-import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
-import '../../../teacher/domain/repositories/teacher_repository.dart';
-import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
@@ -188,6 +187,7 @@ class _SupervisorHalaqaDetailPageState
               const SizedBox(height: 16),
               HalaqaMeetingLinkBuilder(
                 halaqaId: halaqa.id,
+                getMeetingLink: sl<GetHalaqaMeetingLinkUseCase>(),
                 reloadToken: _linkRevision,
                 builder: (context, view, reload) => _SupervisorMeetingLinkCard(
                   view: view,

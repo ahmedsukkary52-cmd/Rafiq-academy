@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 import 'package:rafiq_academy/shared/domain/storage_paths_contract.dart';
 
 void main() {

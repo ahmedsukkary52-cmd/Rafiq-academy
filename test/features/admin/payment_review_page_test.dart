@@ -18,8 +18,8 @@ import 'package:rafiq_academy/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_event.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_state.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
-import 'package:rafiq_academy/features/parent/domain/usecases/submit_payment_proof_usecase.dart';
-import 'package:rafiq_academy/features/parent/presentation/widgets/payment_proof_image.dart';
+import 'package:rafiq_academy/shared/domain/payment_proof_reader.dart';
+import 'package:rafiq_academy/shared/widgets/payment_proof_image.dart';
 import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 import 'package:rafiq_academy/shared/theme/app_theme.dart';
 

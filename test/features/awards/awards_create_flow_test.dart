@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/awards/data/award_image_storage_path.dart';
 import 'package:rafiq_academy/features/awards/domain/award_recipient_selection.dart';
 import 'package:rafiq_academy/features/awards/domain/entities/award_entities.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
-import 'package:rafiq_academy/features/student/domain/merge_student_achievements.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/merge_student_achievements.dart';
 import 'package:rafiq_academy/shared/data/achievements_firestore_contract.dart';
 
 GrantedAwardEntity _grant({

@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/core/presentation/bloc_status.dart';
-import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
+import 'package:rafiq_academy/shared/domain/payment_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart';
 import 'package:rafiq_academy/features/supervisor/domain/repositories/parent_repository.dart';
 import 'package:rafiq_academy/features/supervisor/domain/usecases/admit_student_to_halaqa_usecase.dart';

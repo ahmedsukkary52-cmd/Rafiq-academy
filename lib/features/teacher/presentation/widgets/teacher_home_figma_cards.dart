@@ -1,22 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/utils/eastern_digits.dart';
 import '../../../../shared/widgets/app_stat_tile.dart';
+
+export '../../../../shared/utils/eastern_digits.dart'
+    show teacherHomeEasternDigits;
 
 /// Figma 1:432 stats + session cards (shared by Home and visual capture tests).
 /// Presentation only — no BLoC / UseCase logic here.
-
-String teacherHomeEasternDigits(String input) {
-  const western = '0123456789';
-  const eastern = '٠١٢٣٤٥٦٧٨٩';
-  final buffer = StringBuffer();
-  for (final code in input.runes) {
-    final ch = String.fromCharCode(code);
-    final i = western.indexOf(ch);
-    buffer.write(i >= 0 ? eastern[i] : ch);
-  }
-  return buffer.toString();
-}
 
 String teacherHomeSessionTime(DateTime dt) {
   final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;

@@ -139,6 +139,12 @@ service cloud.firestore {
         && studentId in halaqaData(halaqaId).get('studentIds', []);
     }
 
+    // Caller-side roster access. Deactivation does not remove a student from
+    // studentIds, so the roster alone never authorizes a deactivated account.
+    function isActiveSelfOnRoster(halaqaId) {
+      return hasActiveProfile() && isStudentOnRoster(halaqaId, uid());
+    }
+
     /// D12: linkage comes from parentProfiles.childrenIds (CF/Admin written).
     function isLinkedParentOf(studentId) {
       return isParent()
@@ -183,7 +189,7 @@ service cloud.firestore {
     /// (or roster-derived staff scope for cross-halaqa student views).
     function canReadStudentRecord(data) {
       return isAdmin()
-        || (signedIn() && data.studentId == uid())
+        || (hasActiveProfile() && data.studentId == uid())
         || isStaffOfHalaqa(data.halaqaId)
         || isLinkedParentOf(data.studentId)
         || isRosterStaffOf(data.studentId);
@@ -206,7 +212,7 @@ service cloud.firestore {
     function canAccessHalaqaCommunity(halaqaId) {
       return isAdmin()
         || isStaffOfHalaqa(halaqaId)
-        || (signedIn() && isStudentOnRoster(halaqaId, uid()))
+        || isActiveSelfOnRoster(halaqaId)
         || isLinkedParentOfHalaqa(halaqaId);
     }
 
@@ -298,7 +304,7 @@ service cloud.firestore {
         || isStaffRole()
         || isSelf(studentId)
         || isLinkedParentOf(studentId)
-        || isStudentOnRoster(resource.data.get('halaqaId', ''), uid());
+        || isActiveSelfOnRoster(resource.data.get('halaqaId', ''));
       allow create: if false;
       allow delete: if false;
       // D16: never allow phone on profile projections via client writes.
@@ -365,17 +371,29 @@ service cloud.firestore {
     // adminAddHalaqaSlot (D8 ≥1 slot, D9 conflict engine, teacher lock). No
     // client — not even Admin — creates a Halaqa or edits schedule/teacher.
     match /halaqat/{halaqaId} {
-      // Role read regardless of isActive, so deactivating a student never
-      // widens their reads. Non-student reads are unchanged.
-      function isStudentAccount() {
-        return exists(/databases/$(database)/documents/users/$(uid()))
-          && userDoc().get('role', '') == 'student';
+      // A linked parent's children on this Halaqa's roster. Written against
+      // resource.data so the parent's `studentIds array-contains` query is
+      // provable.
+      function isLinkedParentOfThisHalaqa() {
+        return isParent()
+          && exists(/databases/$(database)/documents/parentProfiles/$(uid()))
+          && resource.data.studentIds.hasAny(
+              get(/databases/$(database)/documents/parentProfiles/$(uid()))
+                .data.get('childrenIds', []));
       }
 
-      // A student reads only Halaqat whose roster (studentIds) lists them.
-      allow read: if signedIn()
-        && (!isStudentAccount()
-          || uid() in resource.data.get('studentIds', []));
+      // The document still carries the legacy meetingLink mirror, so reads
+      // need an active profile and a relationship: Admin and staff keep their
+      // directory reads, a student reads only Halaqat whose roster lists them,
+      // a parent only Halaqat of a linked child. Deactivated accounts, users
+      // without a profile and unknown roles read nothing.
+      allow read: if hasActiveProfile()
+        && (
+          isAdmin()
+          || isStaffRole()
+          || (hasRole('student') && uid() in resource.data.get('studentIds', []))
+          || isLinkedParentOfThisHalaqa()
+        );
       allow create: if false;
       allow delete: if false;
       // meetingLink is written only by adminCreateHalaqa / setHalaqaMeetingLink
@@ -387,7 +405,8 @@ service cloud.firestore {
     // B14 — canonical meeting link { meetingLink, updatedAt }, written only by
     // setHalaqaMeetingLink / adminCreateHalaqa. Rules cannot hide fields, so
     // access is per document; listing is Admin-only. The legacy
-    // halaqat.meetingLink field stays readable through halaqat until stripped.
+    // halaqat.meetingLink field stays readable through halaqat (active staff
+    // and linked parents included) until it is stripped.
     match /halaqaMeetingLinks/{halaqaId} {
       function ownStudentProfilePath() {
         return /databases/$(database)/documents/studentProfiles/$(uid());
@@ -426,7 +445,7 @@ service cloud.firestore {
     // P0-05 — exactly-once homework reward markers (CF-only).
     match /homeworkRewards/{assignmentId} {
       allow read: if isAdmin()
-        || (signedIn() && resource.data.get('studentId', '') == uid());
+        || (hasActiveProfile() && resource.data.get('studentId', '') == uid());
       allow write: if false;
     }
 
@@ -547,7 +566,7 @@ service cloud.firestore {
         let d = request.resource.data;
         return d.studentId == uid()
           && d.get('reviewStatus', '') == 'pending'
-          && isStudentOnRoster(d.halaqaId, uid())
+          && isActiveSelfOnRoster(d.halaqaId)
           && !recordId.matches('.*_(memorization|review)$')
           && !d.keys().hasAny(['grade', 'behaviorGrade', 'sessionId', 'createdAt'])
           && !hasContactField(d);
@@ -590,7 +609,7 @@ service cloud.firestore {
         : (
           isAdmin()
           || (signedIn() && resource.data.requestedBy == uid())
-          || (signedIn() && resource.data.studentId == uid())
+          || (hasActiveProfile() && resource.data.studentId == uid())
           || isStaffOfHalaqa(resource.data.halaqaId)
           || isLinkedParentOf(resource.data.studentId)
         );
@@ -631,8 +650,8 @@ service cloud.firestore {
 
       allow get: if isAdmin()
         || isStaffRole()
-        || (signedIn() && resource.data.get('studentId', '') == uid())
-        || (signedIn()
+        || (hasActiveProfile() && resource.data.get('studentId', '') == uid())
+        || (hasActiveProfile()
             && resource.data.keys().hasAll(['recipientStudentIds'])
             && resource.data.recipientStudentIds is list
             && uid() in resource.data.recipientStudentIds)
@@ -643,8 +662,8 @@ service cloud.firestore {
       // get(parentProfiles), or student/staff list queries break.
       allow list: if isAdmin()
         || isStaffRole()
-        || (signedIn() && resource.data.get('studentId', '') == uid())
-        || (signedIn() && uid() in resource.data.recipientStudentIds);
+        || (hasActiveProfile() && resource.data.get('studentId', '') == uid())
+        || (hasActiveProfile() && uid() in resource.data.recipientStudentIds);
 
       allow create, update, delete: if false;
     }
@@ -675,7 +694,7 @@ service cloud.firestore {
       // kinds), so `tasks` edits are evidence only. `kind` may only be set
       // once, on a legacy doc without it, to lesson homework.
       function studentOwnHomeworkUpdate() {
-        return signedIn()
+        return hasActiveProfile()
           && resource.data.get('studentId', '') == uid()
           && resource.data.get('status', '') != 'completed'
           && resource.data.get('isSubmitted', false) != true
@@ -692,18 +711,17 @@ service cloud.firestore {
 
       // Rostered student refreshing the respondent counter of an activity.
       function studentActivityCounterUpdate() {
-        return signedIn()
-          && resource.data.get('studentId', '') == ''
-          && isStudentOnRoster(resource.data.get('halaqaId', ''), uid())
+        return resource.data.get('studentId', '') == ''
+          && isActiveSelfOnRoster(resource.data.get('halaqaId', ''))
           && changedKeys().hasOnly(['responseCount', 'respondentStudentIds'])
           && request.resource.data.get('responseCount', 0) is int
           && uid() in request.resource.data.get('respondentStudentIds', []);
       }
 
       allow read: if isAdmin()
-        || (signedIn() && resource.data.studentId == uid())
+        || (hasActiveProfile() && resource.data.studentId == uid())
         || isStaffOfHalaqa(resource.data.halaqaId)
-        || isStudentOnRoster(resource.data.halaqaId, uid())
+        || isActiveSelfOnRoster(resource.data.halaqaId)
         || isLinkedParentOf(resource.data.studentId);
       allow create: if teacherCreateOk()
         && !request.resource.data.keys().hasAny(['completedAt'])
@@ -728,10 +746,9 @@ service cloud.firestore {
 
         allow read: if isAdmin()
           || isStaffOfHalaqa(activityHalaqaId())
-          || isStudentOnRoster(activityHalaqaId(), uid());
-        allow create: if signedIn()
-          && request.resource.data.get('studentId', '') == uid()
-          && isStudentOnRoster(activityHalaqaId(), uid())
+          || isActiveSelfOnRoster(activityHalaqaId());
+        allow create: if request.resource.data.get('studentId', '') == uid()
+          && isActiveSelfOnRoster(activityHalaqaId())
           && !hasContactField(request.resource.data);
         allow update, delete: if false;
       }

@@ -133,16 +133,21 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
   }
 
   Future<void> _openFile(ContentFileEntity file) async {
-    // For image, pdf, etc., try launching the URL
-    final uri = Uri.parse(file.downloadUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تعذر فتح الملف')));
+    // No canLaunchUrl precheck: without an https <queries> entry it reports
+    // false on Android 11+ even when a browser can open the link.
+    final uri = Uri.tryParse(file.downloadUrl);
+    var opened = false;
+    if (uri != null && uri.hasScheme) {
+      try {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        opened = false;
       }
+    }
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تعذر فتح الملف')));
     }
   }
 
@@ -327,6 +332,12 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
               Expanded(
                 child: state.filesStatus == SectionStatus.loading
                     ? const AppLoadingWidget()
+                    : state.filesStatus == SectionStatus.error
+                    ? AppErrorWidget(
+                        message: state.filesError ?? 'تعذر تحميل المحتوى',
+                        onRetry: () =>
+                            _bloc.add(LoadFilesEvent(halaqaId: _halaqaId)),
+                      )
                     : files.isEmpty
                     ? Center(
                         child: Column(

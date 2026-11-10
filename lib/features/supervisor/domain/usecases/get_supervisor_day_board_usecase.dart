@@ -8,8 +8,7 @@ import '../../../../shared/domain/halaqa_day_readiness.dart';
 import '../../../../shared/domain/load_halaqa_day_readiness.dart';
 import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
-import '../../../teacher/domain/repositories/teacher_repository.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../read_models/supervisor_day_board.dart';
 import '../repositories/parent_repository.dart';
 
@@ -38,12 +37,12 @@ class SupervisorDayBoardParams extends Equatable {
 @lazySingleton
 class GetSupervisorDayBoardUseCase
     extends UseCase<SupervisorDayBoard, SupervisorDayBoardParams> {
-  final TeacherRepository teacherRepository;
+  final HalaqaDayFactsReader dayFactsReader;
   final SupervisorRepository supervisorRepository;
   final HalaqaWeeklySessionsMapper _sessionsMapper;
 
   GetSupervisorDayBoardUseCase({
-    required this.teacherRepository,
+    required this.dayFactsReader,
     required this.supervisorRepository,
   }) : _sessionsMapper = const HalaqaWeeklySessionsMapper();
 
@@ -80,7 +79,7 @@ class GetSupervisorDayBoardUseCase
       if (halaqa == null) continue;
 
       final readinessEither = await loadHalaqaDayReadiness(
-        teacherRepository: teacherRepository,
+        teacherRepository: dayFactsReader,
         halaqa: halaqa,
         now: now,
       );

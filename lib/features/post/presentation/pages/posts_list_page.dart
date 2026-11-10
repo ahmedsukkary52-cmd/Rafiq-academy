@@ -14,7 +14,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
+import '../widgets/posts_list_skeleton.dart';
 import '../../domain/entities/posts_entities.dart';
 import '../../domain/post_attachment_policy.dart';
 import '../../domain/post_audience_target.dart';
@@ -641,10 +641,18 @@ class _AttachmentItemState extends State<_AttachmentItem> {
     if (_opening) return;
     if (_isLegacyLink) {
       if (!isAllowedExternalLink(attachment.url)) return;
-      final uri = Uri.parse(attachment.url.trim());
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // No canLaunchUrl precheck: without an https <queries> entry it reports
+      // false on Android 11+ even when a browser can open the link.
+      var opened = false;
+      try {
+        opened = await launchUrl(
+          Uri.parse(attachment.url.trim()),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {
+        opened = false;
       }
+      if (!opened) _showSnack('تعذر فتح الرابط');
       return;
     }
     if (!_isPrivate) {

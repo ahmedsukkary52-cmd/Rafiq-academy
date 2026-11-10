@@ -1,14 +1,17 @@
 import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
-import '../entities/achievement_entity.dart';
-import '../entities/assignment_entity.dart';
-import '../entities/halaqa_entity.dart';
-import '../entities/recitation_record_entity.dart';
+import '../../../../shared/domain/achievement_entity.dart';
+import '../../../../shared/domain/assignment_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_reader.dart';
+import '../../../../shared/domain/student_achievements_reader.dart';
 import '../entities/review_schedule_entity.dart';
 import '../entities/student_profile_entity.dart';
 
-abstract class StudentRepository {
+abstract class StudentRepository
+    implements RecitationRecordsReader, StudentAchievementsReader {
   Future<Either<Failure, StudentProfileEntity>> getStudentProfile(String uid);
 
   Future<Either<Failure, List<ReviewScheduleEntity>>> getMonthlyReviewSchedule({
@@ -16,10 +19,12 @@ abstract class StudentRepository {
     required DateTime month,
   });
 
+  @override
   Future<Either<Failure, List<RecitationRecordEntity>>> getRecitationRecords(
     String studentId,
   );
 
+  @override
   Future<Either<Failure, List<AchievementEntity>>> getAchievements(
     String studentId,
   );

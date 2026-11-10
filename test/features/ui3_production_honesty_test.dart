@@ -9,7 +9,7 @@ import 'package:rafiq_academy/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_event.dart';
 import 'package:rafiq_academy/features/auth/presentation/bloc/auth_state.dart';
 import 'package:rafiq_academy/features/parent/presentation/widgets/parent_payment_access_banner.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_bloc.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_event.dart';
 import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_state.dart';

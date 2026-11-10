@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 import '../../domain/entities/parent_entities.dart';
-import '../../domain/parent_payment_proof.dart';
+import '../../../../shared/domain/parent_payment_proof.dart';
 import '../parent_display.dart';
 
 /// Invoice total / confirmed so far / still owed, for an invoice that has

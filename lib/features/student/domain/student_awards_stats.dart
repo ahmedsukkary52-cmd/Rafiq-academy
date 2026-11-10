@@ -1,5 +1,5 @@
 import '../../awards/domain/entities/award_entities.dart';
-import 'entities/achievement_entity.dart';
+import '../../../shared/domain/achievement_entity.dart';
 
 class StudentAwardsStats {
   final int totalCount;

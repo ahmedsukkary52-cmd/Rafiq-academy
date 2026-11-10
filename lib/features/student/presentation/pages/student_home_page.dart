@@ -5,10 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
+import '../../../../core/router/app_routes.dart';
+import '../../../../shared/domain/halaqa_meeting_link.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../../shared/widgets/student_daily_task_widget.dart';
+import '../widgets/student_daily_task_widget.dart';
 import '../../../../shared/widgets/student_header_widget.dart';
 import '../../../../shared/widgets/student_last_evaluation_widget.dart';
 import '../../../../shared/widgets/student_progress_widget.dart';
@@ -29,8 +30,9 @@ import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
 import '../../../mushaf/presentation/pages/mushaf_reader_host.dart';
 import '../widgets/halaqa_meeting_join.dart';
-import '../widgets/student_loading_skeletons.dart';
+import '../../../../shared/widgets/student_page_skeletons.dart';
 import 'student_badges_page.dart';
+import 'student_mushaf_page.dart';
 
 class StudentHomePage extends StatefulWidget {
   const StudentHomePage({super.key});
@@ -104,7 +106,9 @@ class _StudentHomePageState extends State<StudentHomePage> {
               onTabChanged: (index) => setState(() => _currentTab = index),
               onRetryProfile: _loadStudentData,
             ),
-            const MushafBlocScope(child: MushafReaderHost()),
+            const MushafBlocScope(
+              child: MushafReaderHost(reader: buildStudentMushafReader),
+            ),
             const StudentBadgesPage(),
             const _StudentPlanTab(),
             const StudentProfileTab(),
@@ -214,11 +218,14 @@ class _StudentHomeTab extends StatelessWidget {
                       unreadNotificationsCount: unreadCount,
                       onNotificationsTap: () =>
                           context.push('/student/notifications'),
-                      onSearchTap: () => context.push(AppRoutes.studentContent),
+                      onSearchTap: () => context.push(
+                        AppRoutes.studentContentFor(halaqaId ?? ''),
+                      ),
                       onAvatarTap: () => context.push('/student/avatar'),
                       onCoinsTap: () => onTabChanged(2),
                       onStarsTap: () => context.push(AppRoutes.studentAchieve),
                       onStreakTap: () => context.push(AppRoutes.studentStreak),
+                      showStreak: AppCapabilities.streakAndLevelAvailable,
                     );
                   },
                 ),
@@ -234,10 +241,15 @@ class _StudentHomeTab extends StatelessWidget {
                   ),
                   child: StudentQuickActionsWidget(
                     onMushafTap: () => onTabChanged(1),
-                    onReviewTap: () =>
-                        context.push(AppRoutes.studentReviewSchedule),
+                    onReviewTap: AppCapabilities.reviewSchedulesAvailable
+                        ? () => context.push(AppRoutes.studentReviewSchedule)
+                        : null,
                     onTeacherTap: () => context.push(AppRoutes.studentChat),
-                    onMapTap: () => context.push(AppRoutes.studentJourneyMap),
+                    onMapTap:
+                        AppCapabilities.memorizationProgressAvailable &&
+                            AppCapabilities.streakAndLevelAvailable
+                        ? () => context.push(AppRoutes.studentJourneyMap)
+                        : null,
                   ),
                 ),
               ),
@@ -300,6 +312,8 @@ class _StudentHomeTab extends StatelessWidget {
                     totalVerses: profile?.totalVersesMemorized ?? 0,
                     completedSurahs: profile?.completedSurahs ?? 0,
                     totalStars: profile?.totalStars ?? 0,
+                    progressAvailable:
+                        AppCapabilities.memorizationProgressAvailable,
                     onTap: () => context.push(AppRoutes.studentProgressReport),
                     onDetailsTap: () =>
                         context.push(AppRoutes.studentProgressReport),
@@ -361,6 +375,7 @@ class _StudentHomeTab extends StatelessWidget {
             child: StudentSessionCardWidget(
               halaqa: state.halaqa!,
               onJoinTap: () => joinHalaqaMeeting(context, state.halaqa!.id),
+              getMeetingLink: sl<GetHalaqaMeetingLinkUseCase>(),
               onDetailsTap: () => context.push(AppRoutes.studentSchedule),
             ),
           ),
@@ -598,33 +613,37 @@ class StudentProfileTab extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.circular(999),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.secondary.withValues(alpha: 0.35),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                    if (AppCapabilities.streakAndLevelAvailable) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.secondary.withValues(
+                                alpha: 0.35,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          'المستوى ${profile?.level ?? 1} • حافظ مجتهد 🏆',
+                          style: const TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF3A2E00),
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        'المستوى ${profile?.level ?? 1} • حافظ مجتهد 🏆',
-                        style: const TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF3A2E00),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -648,28 +667,32 @@ class StudentProfileTab extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        _ProfileStat(
-                          value: '${profile?.streakDays ?? 0}',
-                          label: 'يوم متواصل',
-                        ),
-                        Container(
-                          width: 1,
-                          height: 36,
-                          color: AppColors.border,
-                        ),
+                        if (AppCapabilities.streakAndLevelAvailable) ...[
+                          _ProfileStat(
+                            value: '${profile?.streakDays ?? 0}',
+                            label: 'يوم متواصل',
+                          ),
+                          Container(
+                            width: 1,
+                            height: 36,
+                            color: AppColors.border,
+                          ),
+                        ],
                         _ProfileStat(
                           value: '${profile?.totalStars ?? 0}',
                           label: 'نجمة',
                         ),
-                        Container(
-                          width: 1,
-                          height: 36,
-                          color: AppColors.border,
-                        ),
-                        _ProfileStat(
-                          value: '${profile?.completedSurahs ?? 0}',
-                          label: 'سور محفوظة',
-                        ),
+                        if (AppCapabilities.memorizationProgressAvailable) ...[
+                          Container(
+                            width: 1,
+                            height: 36,
+                            color: AppColors.border,
+                          ),
+                          _ProfileStat(
+                            value: '${profile?.completedSurahs ?? 0}',
+                            label: 'سور محفوظة',
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -785,7 +808,11 @@ class StudentProfileTab extends StatelessWidget {
                         _ProfileMenuItem(
                           icon: Icons.folder_open_rounded,
                           label: 'مكتبة المحتوى',
-                          onTap: () => context.push(AppRoutes.studentContent),
+                          onTap: () => context.push(
+                            AppRoutes.studentContentFor(
+                              profile?.halaqaId ?? '',
+                            ),
+                          ),
                         ),
                         _ProfileMenuItem(
                           icon: Icons.chat_bubble_outline_rounded,

@@ -376,13 +376,55 @@ test('B14 links: halaqat read access never implies canonical link access', async
     teacher1: authed('teacher1'),
     parent1: authed('parent1'),
     sup2: authed('sup2'),
-    ghost: authed('ghost'),
     archived: authed(archId('exact')),
   };
   for (const [label, db] of Object.entries(callers)) {
     await allow(`${label} reads halaqat/h1`, db.doc('halaqat/h1').get());
     await deny(`${label} get ${COL}/h1`, getLink(db, 'h1'));
   }
+});
+
+test('B14 links: the legacy halaqat.meetingLink mirror is not exposed to unrelated or deactivated callers', async () => {
+  await seedAll({
+    'users/parent2': { name: 'parent2', role: 'parent', isActive: true },
+    'parentProfiles/parent2': { uid: 'parent2', childrenIds: ['student3'] },
+    'users/parentOff': { name: 'parentOff', role: 'parent', isActive: false },
+    'parentProfiles/parentOff': { uid: 'parentOff', childrenIds: ['student1'] },
+    'users/teacherOff': { name: 'teacherOff', role: 'teacher', isActive: false },
+  });
+  const callers = {
+    // Roster entry and profile, but no users doc.
+    ghost: authed('ghost'),
+    studentOff: authed('studentOff'),
+    student3: authed('student3'),
+    parent2: authed('parent2'),
+    parentOff: authed('parentOff'),
+    teacherOff: authed('teacherOff'),
+    supOff: authed('supOff'),
+    adminOff: authed('adminOff'),
+    unauthed: unauthed(),
+  };
+  for (const [label, db] of Object.entries(callers)) {
+    await deny(`${label} reads halaqat/h1`, db.doc('halaqat/h1').get());
+    await deny(`${label} lists halaqat`, db.collection('halaqat').get());
+    await deny(
+      `${label} queries halaqat by student1`,
+      db.collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+    );
+    await deny(`${label} get ${COL}/h1`, getLink(db, 'h1'));
+  }
+  await deny('supOff reads own hSupOff', authed('supOff').doc('halaqat/hSupOff').get());
+
+  // Legitimate relationships keep reading the Halaqa document.
+  await allow('student1 reads own halaqat/h1', authed('student1').doc('halaqat/h1').get());
+  await allow('student3 reads own halaqat/h2', authed('student3').doc('halaqat/h2').get());
+  await allow('parent2 reads linked halaqat/h2', authed('parent2').doc('halaqat/h2').get());
+  await allow(
+    'parent1 queries halaqat by linked child',
+    authed('parent1').collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+  await allow('sup1 queries own halaqat', authed('sup1').collection('halaqat').where('supervisorId', '==', 'sup1').get());
+  await allow('admin1 lists halaqat', authed('admin1').collection('halaqat').get());
 });
 
 test('B14 links: nested paths and collection-group queries are not opened', async () => {

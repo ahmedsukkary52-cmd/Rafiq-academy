@@ -9,7 +9,7 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../../shared/domain/absence_request.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';

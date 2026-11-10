@@ -4,14 +4,14 @@ import 'package:rafiq_academy/features/admin/data/datasources/admin_operations_r
 import 'package:rafiq_academy/features/admin/data/datasources/admin_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/admin/domain/entities/admin_operations_entities.dart';
 import 'package:rafiq_academy/features/homework/data/datasources/homework_remote_datasource_impl.dart';
-import 'package:rafiq_academy/features/student/data/models/recitation_record_model.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/data/models/recitation_record_model.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart'
     as supervisor;
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
-import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
+import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/payment_review_amounts.dart';
 
 import '../support/fake_callables.dart';

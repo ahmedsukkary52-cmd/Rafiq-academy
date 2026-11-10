@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/error/exception.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/parent/data/parent_achievements_response.dart';
-import 'package:rafiq_academy/features/student/domain/entities/achievement_entity.dart';
+import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
 
 import '../../support/fake_callables.dart';
 

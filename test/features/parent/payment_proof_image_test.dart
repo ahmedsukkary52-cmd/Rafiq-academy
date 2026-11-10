@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/features/parent/domain/usecases/submit_payment_proof_usecase.dart';
-import 'package:rafiq_academy/features/parent/presentation/widgets/payment_proof_image.dart';
+import 'package:rafiq_academy/shared/domain/payment_proof_reader.dart';
+import 'package:rafiq_academy/shared/widgets/payment_proof_image.dart';
 
 /// 1×1 transparent PNG.
 final _png = Uint8List.fromList(const [

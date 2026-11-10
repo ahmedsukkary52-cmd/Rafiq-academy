@@ -12,7 +12,8 @@ import '../../../../shared/widgets/payment_review_amount_panel.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../parent/presentation/widgets/payment_proof_image.dart';
+import '../../../../shared/domain/payment_proof_reader.dart';
+import '../../../../shared/widgets/payment_proof_image.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import '../bloc/payment_review_bloc.dart';
 
@@ -247,6 +248,7 @@ class _ProofCardState extends State<_ProofCard> {
                 parentId: item.parentId,
                 paymentId: item.paymentId,
                 storagePath: item.proofStoragePath,
+                loader: sl<DownloadPaymentProofUseCase>().call,
                 onLoadedChanged: _onProofLoadedChanged,
               ),
             )

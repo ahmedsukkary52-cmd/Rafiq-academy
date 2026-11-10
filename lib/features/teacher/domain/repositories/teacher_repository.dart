@@ -3,21 +3,23 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../shared/domain/academy_event_publication.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../entities/attendance_record_entity.dart';
-import '../entities/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/absence_request.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/attendance_record_entity.dart';
+import '../../../../shared/domain/halaqa_students_summary_entity.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
+import '../../../../shared/domain/load_halaqa_day_readiness.dart';
 
-enum AttendanceStatus { present, absent, late, excused }
-
-abstract class TeacherRepository {
+abstract class TeacherRepository
+    implements HalaqaRosterReader, HalaqaDayFactsReader {
   /// الحلقات المسندة للمعلم
   Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(
     String teacherId,
   );
 
   /// طلاب الحلقة
+  @override
   Future<Either<Failure, List<HalaqaStudentSummaryEntity>>> getHalaqaStudents(
     String halaqaId,
   );
@@ -34,6 +36,7 @@ abstract class TeacherRepository {
   );
 
   /// سجلات الحضور لحلقة في يوم معيّن
+  @override
   Future<Either<Failure, List<AttendanceRecordEntity>>>
   getHalaqaAttendanceForDate({
     required String halaqaId,
@@ -59,6 +62,7 @@ abstract class TeacherRepository {
   );
 
   /// تقييمات التسميع لحلقة معيّنة
+  @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
   getHalaqaRecitationRecords(String halaqaId);
 
@@ -75,6 +79,7 @@ abstract class TeacherRepository {
   ///
   /// Returns `null` when the halaqa has no assignments. Used by W3 to derive
   /// "homework assigned for today?" without inventing a second homework rule.
+  @override
   Future<Either<Failure, DateTime?>> getLatestAssignmentDueDate(
     String halaqaId,
   );
@@ -99,15 +104,6 @@ class TeacherIdParams extends Equatable {
 
   @override
   List<Object?> get props => [teacherId];
-}
-
-class HalaqaStudentsParams extends Equatable {
-  final String halaqaId;
-
-  const HalaqaStudentsParams(this.halaqaId);
-
-  @override
-  List<Object?> get props => [halaqaId];
 }
 
 class SendAssignmentParams extends Equatable {

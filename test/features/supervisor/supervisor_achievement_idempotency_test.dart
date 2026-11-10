@@ -14,7 +14,7 @@ import 'package:rafiq_academy/features/awards/data/award_grant_errors.dart';
 import 'package:rafiq_academy/features/awards/data/shared_preferences_unresolved_award_store.dart';
 import 'package:rafiq_academy/features/awards/domain/award_submission_id.dart';
 import 'package:rafiq_academy/features/awards/domain/unresolved_award_store.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/features/supervisor/data/data_sources/supervisor_remote_datasource_impl.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/read_models/supervisor_day_board.dart';
@@ -31,9 +31,9 @@ import 'package:rafiq_academy/features/supervisor/domain/usecases/transfer_stude
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/bloc/supervisor_event.dart';
 import 'package:rafiq_academy/features/supervisor/presentation/pages/supervisor_grant_award_page.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
-import 'package:rafiq_academy/features/teacher/domain/usecases/get_halaqa_students_usecase.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_roster.dart';
 import 'package:rafiq_academy/shared/domain/absence_request.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,5 +1,5 @@
 import '../../../core/constants/app_constants.dart';
-import '../../../core/router/router_app.dart';
+import '../../../core/router/app_routes.dart';
 
 /// Where opening a notification leads. Exactly one of [route] /
 /// [unavailableMessage] is set, or neither for informational notices.

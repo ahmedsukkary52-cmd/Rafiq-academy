@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,12 +12,11 @@ import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../teacher/domain/repositories/teacher_repository.dart';
-import '../../../teacher/domain/usecases/get_halaqa_students_usecase.dart';
-import '../../../teacher/presentation/bloc/teacher_bloc.dart';
-import '../../../teacher/presentation/widgets/teacher_loading_skeletons.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
+import '../widgets/awards_loading_skeletons.dart';
 import '../../data/award_grant_errors.dart';
 import '../../data/granted_award_payload_codec.dart';
+import '../../domain/award_grant_scope.dart';
 import '../../domain/award_recipient_selection.dart';
 import '../../domain/award_submission_id.dart';
 import '../../domain/entities/award_entities.dart';
@@ -244,6 +245,7 @@ class _AwardsPageState extends State<AwardsPage> {
   }
 
   void _showCreateAwardSheet(BuildContext context, {AwardType? preset}) {
+    final grantScope = context.read<AwardGrantScopeSource>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -252,6 +254,7 @@ class _AwardsPageState extends State<AwardsPage> {
         value: _bloc,
         child: CreateAwardSheet(
           halaqaId: widget.halaqaId,
+          grantScope: grantScope,
           preset: preset,
         ),
       ),
@@ -540,12 +543,14 @@ class _AwardHistoryTile extends StatelessWidget {
 
 class CreateAwardSheet extends StatefulWidget {
   final String halaqaId;
+  final AwardGrantScopeSource grantScope;
   final AwardType? preset;
   final String? preselectedStudentId;
 
   const CreateAwardSheet({
     super.key,
     required this.halaqaId,
+    required this.grantScope,
     this.preset,
     this.preselectedStudentId,
   });
@@ -566,10 +571,12 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
   String? _imageName;
   late final AwardSubmissionId<GrantedAwardEntity> _submissionId;
   String? _grantError;
+  StreamSubscription<AwardGrantScope>? _grantScopeSub;
 
   @override
   void initState() {
     super.initState();
+    _listenToGrantScope();
     final auth = context.read<AuthBloc>().state;
     final grantor = auth is AuthAuthenticated ? auth.user.uid : '';
     _submissionId = AwardSubmissionId.durable(
@@ -606,7 +613,19 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
   }
 
   @override
+  void didUpdateWidget(CreateAwardSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.grantScope != widget.grantScope) _listenToGrantScope();
+  }
+
+  void _listenToGrantScope() {
+    _grantScopeSub?.cancel();
+    _grantScopeSub = widget.grantScope.stream.listen((_) => setState(() {}));
+  }
+
+  @override
   void dispose() {
+    _grantScopeSub?.cancel();
     _titleCtrl.removeListener(_onFieldsChanged);
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
@@ -622,20 +641,12 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
   }
 
   void _seedKnownRoster() {
-    final teacherState = context.read<TeacherBloc>().state;
-    final loadedId = teacherState.studentsHalaqaId;
-    if (loadedId == null || teacherState.students.isEmpty) return;
+    final grantScope = widget.grantScope.state;
+    final loadedId = grantScope.rosterHalaqaId;
+    if (loadedId == null || grantScope.roster.isEmpty) return;
     _rosters.putIfAbsent(
       loadedId,
-      () => AwardRecipientSelection.uniqueStudents(
-        teacherState.students.map(
-          (student) => AwardRecipientStudent(
-            uid: student.uid,
-            name: student.name,
-            imageUrl: student.profileImageUrl,
-          ),
-        ),
-      ),
+      () => AwardRecipientSelection.uniqueStudents(grantScope.roster),
     );
     _selection = _selection.ensuringStudentSelected(
       widget.preselectedStudentId ?? '',
@@ -712,37 +723,29 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     final uid = authState is AuthAuthenticated ? authState.user.uid : '';
-    final teacherState = context.watch<TeacherBloc>().state;
-    final loadedId = teacherState.studentsHalaqaId;
+    final grantScope = widget.grantScope.state;
+    final loadedId = grantScope.rosterHalaqaId;
     if (loadedId != null &&
-        teacherState.students.isNotEmpty &&
+        grantScope.roster.isNotEmpty &&
         !_rosters.containsKey(loadedId)) {
       _rosters[loadedId] = AwardRecipientSelection.uniqueStudents(
-        teacherState.students.map(
-          (student) => AwardRecipientStudent(
-            uid: student.uid,
-            name: student.name,
-            imageUrl: student.profileImageUrl,
-          ),
-        ),
+        grantScope.roster,
       );
     }
-    final teacherHalaqat = teacherState.halaqat
-        .map((halaqa) => AwardHalaqaOption(id: halaqa.id, name: halaqa.name))
-        .toList(growable: false);
-    final allHalaqaIds = teacherHalaqat.map((halaqa) => halaqa.id);
+    final halaqat = grantScope.halaqat;
+    final allHalaqaIds = halaqat.map((halaqa) => halaqa.id);
     final allHalaqatSelected =
-        teacherHalaqat.isNotEmpty &&
-        _selection.selectedHalaqaIds.length == teacherHalaqat.length &&
+        halaqat.isNotEmpty &&
+        _selection.selectedHalaqaIds.length == halaqat.length &&
         _selection.selectedHalaqaIds.containsAll(allHalaqaIds);
     final groups = AwardRecipientSelection.visibleGroups(
-      teacherHalaqat: teacherHalaqat,
+      teacherHalaqat: halaqat,
       selectedHalaqaIds: _selection.selectedHalaqaIds,
       rosters: _rosters,
     );
     final recipients = _selection.resolvedRecipients(_rosters);
     final selectedHalaqat = AwardRecipientSelection.selectedHalaqatInOrder(
-      teacherHalaqat: teacherHalaqat,
+      teacherHalaqat: halaqat,
       selectedHalaqaIds: _selection.selectedHalaqaIds,
     );
     final selectedHalaqaIds = selectedHalaqat.map((h) => h.id).toList();
@@ -845,7 +848,7 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  if (teacherHalaqat.isEmpty)
+                  if (halaqat.isEmpty)
                     Text(
                       'لا توجد حلقات محمّلة',
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -868,7 +871,7 @@ class _CreateAwardSheetState extends State<CreateAwardSheet> {
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    ...teacherHalaqat.map(
+                    ...halaqat.map(
                       (halaqa) => CheckboxListTile(
                         value: _selection.selectedHalaqaIds.contains(halaqa.id),
                         onChanged: (_) {

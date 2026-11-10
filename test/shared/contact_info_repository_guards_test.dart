@@ -14,7 +14,7 @@ import 'package:rafiq_academy/features/halaqa_activity/data/repositories/halaqa_
 import 'package:rafiq_academy/features/halaqa_activity/domain/entities/halaqa_activity_entity.dart';
 import 'package:rafiq_academy/features/parent/data/data_source/parent_remote_datasource.dart';
 import 'package:rafiq_academy/features/parent/data/repositories/parent_repository_impl.dart';
-import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
+import 'package:rafiq_academy/shared/domain/absence_request.dart';
 import 'package:rafiq_academy/features/post/domain/repositories/posts_repository.dart';
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart';
 import 'package:rafiq_academy/features/teacher/data/repositories/teacher_repository_impl.dart';

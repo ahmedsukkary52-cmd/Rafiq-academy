@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/awards/data/award_image_storage_path.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 import 'package:rafiq_academy/features/post/domain/entities/posts_entities.dart';
 import 'package:rafiq_academy/features/post/domain/post_attachment_policy.dart';
 import 'package:rafiq_academy/shared/domain/upload_file_policy.dart';

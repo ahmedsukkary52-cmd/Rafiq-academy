@@ -9,7 +9,7 @@ import 'package:rafiq_academy/features/halaqa_plan/domain/repositories/halaqa_pl
 import 'package:rafiq_academy/features/halaqa_plan/domain/usecases/get_student_halaqa_plan_usecase.dart';
 import 'package:rafiq_academy/features/halaqa_plan/presentation/bloc/halaqa_plan_bloc.dart';
 import 'package:rafiq_academy/features/halaqa_plan/presentation/pages/student_halaqa_plan_page.dart';
-import 'package:rafiq_academy/features/student/domain/entities/assignment_entity.dart';
+import 'package:rafiq_academy/shared/domain/assignment_entity.dart';
 
 AssignmentEntity _a(
   String id,

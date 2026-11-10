@@ -5,9 +5,9 @@ import 'package:rafiq_academy/features/teacher/presentation/bloc/teacher_state.d
 import '../../../../core/presentation/bloc_status.dart';
 import '../../domain/repositories/teacher_repository.dart';
 import '../../domain/usecases/add_recitation_record_usecase.dart';
-import '../../domain/usecases/get_halaqa_attendance_for_date_usecase.dart';
+import '../../../../shared/domain/halaqa_attendance_for_date.dart';
 import '../../domain/usecases/get_halaqa_recitation_records_usecase.dart';
-import '../../domain/usecases/get_halaqa_students_usecase.dart';
+import '../../../../shared/domain/halaqa_roster.dart';
 import '../../domain/usecases/get_pending_absence_requests_usecase.dart';
 import '../../domain/usecases/get_teacher_halaqt_usecase.dart';
 import '../../domain/usecases/get_teacher_home_feed_usecase.dart';

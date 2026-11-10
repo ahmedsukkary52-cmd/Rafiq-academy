@@ -1,6 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
-import 'package:rafiq_academy/features/student/domain/usecases/watch_latest_assignment_usecase.dart';
+import 'package:rafiq_academy/shared/domain/id_params.dart';
 
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';

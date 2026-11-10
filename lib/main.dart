@@ -16,15 +16,18 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/student/presentation/bloc/student_bloc.dart';
 import 'features/teacher/presentation/bloc/teacher_bloc.dart';
+import 'features/teacher/presentation/teacher_award_grant_scope.dart';
 import 'features/parent/presentation/bloc/parent_bloc.dart';
 import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
+import 'features/notifications/data/services/fcm_sign_out_preparation.dart';
 import 'features/notifications/data/services/fcm_token_registrar.dart';
 import 'features/notifications/domain/services/notification_open_port.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'features/notifications/presentation/notification_deep_links.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/analytics/presentation/bloc/analytics_bloc.dart';
+import 'features/awards/domain/award_grant_scope.dart';
 import 'features/awards/presentation/bloc/awards_bloc.dart';
 import 'features/calendar/presentation/bloc/calendar_bloc.dart';
 import 'features/content/presentation/bloc/content_bloc.dart';
@@ -39,6 +42,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeAppFirebase();
   await initDependencies();
+  if (!useFirebaseEmulator) {
+    sl<AuthBloc>().attachSignOutPreparation(
+      FcmSignOutPreparation(() => sl<FcmTokenRegistrar>()),
+    );
+  }
 
   final prefs = await SharedPreferences.getInstance();
   final onboardingSeen = ValueNotifier<bool>(
@@ -78,6 +86,10 @@ class _MyAppState extends State<MyApp> {
   ).router;
 
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  /// Award sheets offer the teacher's loaded halaqat for every staff viewer.
+  late final AwardGrantScopeSource _awardGrantScope =
+      TeacherAwardGrantScopeSource(sl<TeacherBloc>());
 
   StreamSubscription<ClientVersionGateState>? _versionGateSub;
   late final _authStart = AuthStartAfterGate(
@@ -143,6 +155,9 @@ class _MyAppState extends State<MyApp> {
         BlocProvider.value(value: versionGate),
         BlocProvider.value(value: sl<StudentBloc>()),
         BlocProvider.value(value: sl<TeacherBloc>()),
+        RepositoryProvider<AwardGrantScopeSource>.value(
+          value: _awardGrantScope,
+        ),
         BlocProvider.value(value: sl<ParentBloc>()),
         BlocProvider.value(value: sl<SupervisorBloc>()),
         BlocProvider.value(value: sl<AdminBloc>()),

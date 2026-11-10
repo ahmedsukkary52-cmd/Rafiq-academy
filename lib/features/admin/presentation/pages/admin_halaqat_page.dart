@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../shared/domain/halaqa_meeting_link.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/halaqa_meeting_link_builder.dart';
 import '../../../../shared/widgets/meeting_link_dialog.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import '../../domain/usecases/admin_operations_usecases.dart';
 import '../bloc/admin_operations_bloc.dart';
@@ -126,6 +127,7 @@ class _HalaqatBody extends StatelessWidget {
                     ),
                   HalaqaMeetingLinkBuilder(
                     halaqaId: h.id,
+                    getMeetingLink: sl<GetHalaqaMeetingLinkUseCase>(),
                     reloadToken: state.halaqat,
                     builder: (context, view, reload) => _MeetingLinkRow(
                       view: view,

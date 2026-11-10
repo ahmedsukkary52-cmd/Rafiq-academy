@@ -5,7 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
+import '../../../../shared/domain/payment_entity.dart';
 import '../entities/payment_review_params.dart';
 import '../repositories/parent_repository.dart';
 

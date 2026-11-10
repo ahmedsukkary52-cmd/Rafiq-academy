@@ -13,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/router_app.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -30,6 +30,7 @@ import '../../../mushaf/presentation/bloc/mushaf_audio_state.dart';
 import '../../../mushaf/presentation/bloc/mushaf_bloc.dart';
 import '../../../mushaf/presentation/bloc/mushaf_event.dart';
 import '../../../mushaf/presentation/bloc/mushaf_state.dart';
+import '../../../mushaf/presentation/mushaf_mode.dart';
 import '../../../mushaf/presentation/widgets/mushaf_audio_bar.dart';
 import '../../../mushaf/presentation/widgets/mushaf_navigation_sheet.dart';
 import '../../../mushaf/presentation/widgets/mushaf_page_surface.dart';
@@ -38,7 +39,9 @@ import '../../../mushaf/presentation/widgets/mushaf_reader_tokens.dart';
 import '../../../mushaf/presentation/widgets/mushaf_reader_top_chrome.dart';
 import 'student_recitation_page.dart';
 
-enum MushafMode { reading, recitation }
+/// [MushafReaderBuilder] for the student entry points.
+Widget buildStudentMushafReader(MushafMode initialMode) =>
+    StudentMushafPage(initialMode: initialMode);
 
 class AyahModel {
   final int number;

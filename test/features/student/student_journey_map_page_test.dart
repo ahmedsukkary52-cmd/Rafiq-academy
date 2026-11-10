@@ -9,7 +9,7 @@ import 'package:rafiq_academy/features/student/presentation/bloc/student_bloc.da
 import 'package:rafiq_academy/features/student/presentation/bloc/student_event.dart';
 import 'package:rafiq_academy/features/student/presentation/bloc/student_state.dart';
 import 'package:rafiq_academy/features/student/presentation/pages/student_journey_map_page.dart';
-import 'package:rafiq_academy/features/student/presentation/widgets/student_loading_skeletons.dart';
+import 'package:rafiq_academy/shared/widgets/student_page_skeletons.dart';
 import 'package:rafiq_academy/shared/theme/app_locale_config.dart';
 import 'package:rafiq_academy/shared/theme/app_theme.dart';
 

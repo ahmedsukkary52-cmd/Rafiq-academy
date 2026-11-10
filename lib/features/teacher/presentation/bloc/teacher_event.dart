@@ -1,9 +1,9 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../shared/domain/evaluation_policy.dart';
-import '../../../parent/domain/entities/parent_entities.dart';
-import '../../../student/domain/entities/recitation_record_entity.dart';
-import '../../domain/entities/attendance_record_entity.dart';
+import '../../../../shared/domain/absence_request.dart';
+import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/attendance_record_entity.dart';
 
 abstract class TeacherEvent extends Equatable {
   const TeacherEvent();

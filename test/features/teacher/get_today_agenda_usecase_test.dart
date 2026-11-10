@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
-import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
-import 'package:rafiq_academy/features/student/domain/entities/recitation_record_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/absence_request.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/halaqa_students_summary_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/read_models/teacher_day_agenda.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:rafiq_academy/features/teacher/domain/usecases/get_today_agenda_usecase.dart';

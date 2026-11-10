@@ -12,7 +12,7 @@ import 'package:rafiq_academy/features/admin/domain/usecases/approve_new_student
 import 'package:rafiq_academy/features/admin/domain/usecases/provision_user_usecase.dart';
 import 'package:rafiq_academy/features/admin/presentation/bloc/admin_operations_bloc.dart';
 import 'package:rafiq_academy/features/admin/presentation/pages/admin_halaqat_page.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_meeting_link.dart';
 import 'package:rafiq_academy/shared/theme/app_theme.dart';
 

@@ -9,7 +9,7 @@ import '../../../../shared/domain/load_halaqa_day_readiness.dart';
 import '../../../schedule/domain/entities/class_session_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart';
 import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../read_models/teacher_day_agenda.dart';
 import '../repositories/teacher_repository.dart';
 

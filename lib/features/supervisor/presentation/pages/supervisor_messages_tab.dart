@@ -15,8 +15,8 @@ import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../chat/presentation/pages/chat_room.dart';
-import '../../../parent/domain/repositories/parent_repositories.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/student_parent_links.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../widgets/supervisor_loading_skeletons.dart';
@@ -483,7 +483,7 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
     // Parents linked to roster students.
     final studentIds = SupervisorRoster.uniqueStudentIds(widget.halaqat);
     if (studentIds.isNotEmpty) {
-      final parentsResult = await sl<ParentRepository>()
+      final parentsResult = await sl<StudentParentLinkReader>()
           .getParentIdsByStudentIds(studentIds);
       parentsResult.fold((_) {}, (map) {
         for (final ids in map.values) {

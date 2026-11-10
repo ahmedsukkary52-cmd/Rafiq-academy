@@ -99,4 +99,18 @@ class AppCapabilities {
 
   /// When false: recitation tasks are optional/deferred; no Storage uploads.
   static const bool audioUploadsEnabled = false;
+
+  /// D11 memorization progress (`overallProgressPercent`, verses, surahs,
+  /// current plan) has no writer: the Wave C projector is blocked on the
+  /// undecided `versesRange` source (OA-19 / OA-75). While false, surfaces
+  /// must not present these fields as real values.
+  static const bool memorizationProgressAvailable = false;
+
+  /// `streakDays` / `level` have no writer and no design (E-12 quarantine);
+  /// `points` is quarantined (P0 §3).
+  static const bool streakAndLevelAvailable = false;
+
+  /// `reviewSchedules` has no writer (OA-20); the page could only ever be
+  /// empty.
+  static const bool reviewSchedulesAvailable = false;
 }

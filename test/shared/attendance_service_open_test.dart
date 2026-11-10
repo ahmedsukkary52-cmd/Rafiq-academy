@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rafiq_academy/features/student/domain/entities/halaqa_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/entities/attendance_record_entity.dart';
-import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
+import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
+import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/attendance_service.dart';
 import 'package:rafiq_academy/shared/utils/attendance_policy.dart';
 

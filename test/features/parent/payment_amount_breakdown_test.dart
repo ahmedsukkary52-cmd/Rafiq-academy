@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
-import 'package:rafiq_academy/features/parent/domain/parent_payment_proof.dart';
+import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 import 'package:rafiq_academy/features/parent/presentation/parent_display.dart';
 import 'package:rafiq_academy/features/parent/presentation/widgets/payment_amount_breakdown.dart';
 

@@ -18,6 +18,9 @@ class StudentHeaderWidget extends StatelessWidget {
   final VoidCallback? onStreakTap;
   final int unreadNotificationsCount;
 
+  /// False while `streakDays` has no writer, so no fabricated count is shown.
+  final bool showStreak;
+
   const StudentHeaderWidget({
     super.key,
     required this.name,
@@ -32,6 +35,7 @@ class StudentHeaderWidget extends StatelessWidget {
     this.onStarsTap,
     this.onStreakTap,
     this.unreadNotificationsCount = 0,
+    this.showStreak = true,
   });
 
   @override
@@ -141,16 +145,18 @@ class StudentHeaderWidget extends StatelessWidget {
                   onTap: onStarsTap,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatPill(
-                  icon: Icons.local_fire_department_rounded,
-                  iconColor: const Color(0xFFFF8A65),
-                  value: _eastern('$streakDays'),
-                  label: 'يوم متواصل',
-                  onTap: onStreakTap,
+              if (showStreak) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatPill(
+                    icon: Icons.local_fire_department_rounded,
+                    iconColor: const Color(0xFFFF8A65),
+                    value: _eastern('$streakDays'),
+                    label: 'يوم متواصل',
+                    onTap: onStreakTap,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],

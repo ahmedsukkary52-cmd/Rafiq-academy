@@ -3,8 +3,9 @@
  *
  * A teacher/supervisor still named on halaqat/{id}.teacherId / supervisorId
  * (or listed in studentSearch.visibleTo) loses that halaqa's records once
- * deactivated; reactivation restores them. Parent and Admin access is
- * unaffected. users/{uid}: self stays readable while deactivated (sign-in
+ * deactivated; reactivation restores them. A deactivated student still on the
+ * roster likewise loses its own and its halaqa's records. Parent and Admin
+ * access is unaffected. users/{uid}: self stays readable while deactivated (sign-in
  * shows the disabled message); other profiles need an active caller.
  *
  * Run (isolated emulator, both services):
@@ -296,6 +297,146 @@ test('deactivated supervisor cannot write; reactivation restores the same writes
   for (const write of writes(authed('supervisor1'))) {
     await assertSucceeds(write());
   }
+});
+
+// ── Student ────────────────────────────────────────────────────────────────
+// Deactivation leaves the student on halaqat.studentIds, so neither the
+// roster nor studentId == uid may authorize a deactivated account.
+
+async function seedStudentScope() {
+  await seedAll({
+    'users/student7': { name: 'student7', role: 'student', isActive: true },
+    'studentProfiles/student7': { uid: 'student7', halaqaId: '' },
+    'studentProfiles/classmate': { uid: 'classmate', halaqaId: 'h1' },
+    'assignments/act1': {
+      studentId: '',
+      halaqaId: 'h1',
+      assignedBy: 'teacher1',
+      kind: 'activity',
+      tasks: [],
+      responseCount: 0,
+      respondentStudentIds: [],
+    },
+    'assignments/act1/activityResponses/classmate': { studentId: 'classmate', answer: 'a' },
+    'achievements/a1': { studentId: 'student1', title: 't' },
+    'achievements/a2': { recipientStudentIds: ['student1'], title: 't' },
+    'homeworkRewards/hw1': { studentId: 'student1', coins: 1 },
+  });
+}
+
+const STUDENT_READS = [
+  'halaqat/h1',
+  'studentProfiles/classmate',
+  'attendanceRecords/s1_student1',
+  'recitationRecords/pending1',
+  'assignments/hw1',
+  'assignments/act1',
+  'assignments/act1/activityResponses/classmate',
+  'absenceRequests/h1_student1_20261015',
+  'achievements/a1',
+  'achievements/a2',
+  'homeworkRewards/hw1',
+  'posts/post1',
+  'contentLibrary/c1',
+];
+
+const studentQueries = (db) => [
+  () => db.collection('assignments').where('studentId', '==', 'student1').get(),
+  () => db.collection('assignments').where('halaqaId', '==', 'h1').get(),
+  () => db.collection('attendanceRecords').where('studentId', '==', 'student1').get(),
+  () => db.collection('posts').where('audienceTarget', '==', 'h1').get(),
+  () => db.collection('contentLibrary').where('halaqaId', '==', 'h1').get(),
+];
+
+const studentWrites = (db) => [
+  () => db.doc('recitationRecords/sub1').set({
+    studentId: 'student1',
+    halaqaId: 'h1',
+    type: 'memorization',
+    reviewStatus: 'pending',
+  }),
+  () => db.doc('assignments/hw1').update({ tasks: [{ title: 'done' }] }),
+  () => db.doc('assignments/act1/activityResponses/student1').set({
+    studentId: 'student1',
+    answer: 'a',
+  }),
+  () => db.doc('assignments/act1').update({
+    responseCount: 1,
+    respondentStudentIds: ['student1'],
+  }),
+];
+
+test('deactivated student still on the roster loses direct reads and queries; reactivation restores them', async () => {
+  await seedStudentScope();
+  const db = authed('student1');
+  for (const path of STUDENT_READS) await assertSucceeds(db.doc(path).get());
+  for (const q of studentQueries(db)) await assertSucceeds(q());
+
+  await setActive('student1', false);
+  for (const path of STUDENT_READS) await assertFails(db.doc(path).get());
+  for (const q of studentQueries(db)) await assertFails(q());
+  // Own profile docs stay readable so the client can show the disabled state.
+  await assertSucceeds(db.doc('users/student1').get());
+  await assertSucceeds(db.doc('studentProfiles/student1').get());
+
+  await setActive('student1', true);
+  for (const path of STUDENT_READS) await assertSucceeds(db.doc(path).get());
+});
+
+test('deactivated student cannot submit; reactivation restores the same writes', async () => {
+  await seedStudentScope();
+  await setActive('student1', false);
+  for (const write of studentWrites(authed('student1'))) await assertFails(write());
+
+  await setActive('student1', true);
+  for (const write of studentWrites(authed('student1'))) await assertSucceeds(write());
+});
+
+test('active student not on the roster reads and writes nothing of that halaqa', async () => {
+  await seedStudentScope();
+  const db = authed('student7');
+  for (const path of [
+    'halaqat/h1',
+    'studentProfiles/classmate',
+    'assignments/act1',
+    'assignments/act1/activityResponses/classmate',
+    'posts/post1',
+    'contentLibrary/c1',
+    'attendanceRecords/s1_student1',
+  ]) {
+    await assertFails(db.doc(path).get());
+  }
+  await assertFails(db.collection('assignments').where('halaqaId', '==', 'h1').get());
+  await assertFails(db.doc('recitationRecords/sub7').set({
+    studentId: 'student7',
+    halaqaId: 'h1',
+    type: 'memorization',
+    reviewStatus: 'pending',
+  }));
+  await assertFails(db.doc('assignments/act1/activityResponses/student7').set({
+    studentId: 'student7',
+    answer: 'a',
+  }));
+});
+
+test('teacher, supervisor and admin keep access to a deactivated student\'s records', async () => {
+  await seedStudentScope();
+  await setActive('student1', false);
+  const paths = [
+    'halaqat/h1',
+    'attendanceRecords/s1_student1',
+    'recitationRecords/pending1',
+    'assignments/hw1',
+    'assignments/act1/activityResponses/classmate',
+    'achievements/a1',
+  ];
+  for (const uid of ['teacher1', 'supervisor1', 'admin1']) {
+    for (const path of paths) await assertSucceeds(authed(uid).doc(path).get());
+  }
+  await assertSucceeds(
+    authed('teacher1').doc('recitationRecords/pending1').update({ reviewStatus: 'reviewed', grade: 9 }),
+  );
+  await assertSucceeds(authed('admin1').doc('users/student1').get());
 });
 
 // ── Parent / Admin unaffected ──────────────────────────────────────────────

@@ -8,11 +8,11 @@ import '../../../../core/error/exception.dart';
 import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/data/assignment_homework_fields_ensure.dart';
 import '../../../../shared/domain/assignment_policy.dart';
-import '../../domain/merge_student_achievements.dart';
-import '../models/achievement_model.dart';
-import '../models/assignment_model.dart';
-import '../models/halaqa_model.dart';
-import '../models/recitation_record_model.dart';
+import '../../../../shared/domain/merge_student_achievements.dart';
+import '../../../../shared/data/models/achievement_model.dart';
+import '../../../../shared/data/models/assignment_model.dart';
+import '../../../../shared/data/models/halaqa_model.dart';
+import '../../../../shared/data/models/recitation_record_model.dart';
 import '../models/review_schedule_model.dart';
 import '../models/student_profile_model.dart';
 

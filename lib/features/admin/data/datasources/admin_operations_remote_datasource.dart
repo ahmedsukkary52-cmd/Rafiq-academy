@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../shared/domain/payment_review_amounts.dart';
-import '../../../parent/domain/parent_payment_proof.dart';
-import '../../../student/domain/entities/halaqa_entity.dart';
+import '../../../../shared/domain/parent_payment_proof.dart';
+import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 
 abstract class AdminOperationsRemoteDatasource {

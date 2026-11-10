@@ -20,6 +20,13 @@ class ChatParticipantEntity extends Equatable {
   List<Object?> get props => [uid, name, role, profileImageUrl];
 }
 
+/// Server-written `conversations.kind` values.
+abstract final class ConversationKinds {
+  static const direct = 'direct';
+  static const halaqaGroup = 'halaqa_group';
+  static const customGroup = 'custom_group';
+}
+
 class ConversationEntity extends Equatable {
   final String id;
   final List<ChatParticipantEntity> participants;
@@ -33,6 +40,15 @@ class ConversationEntity extends Equatable {
   /// ومالهاش علاقة بمين هو "المستخدم الحالي".
   final int unreadCount;
 
+  /// [ConversationKinds]; legacy 1:1 documents carry no kind.
+  final String kind;
+  final String? title;
+  final String? description;
+
+  /// Storage path under `chat_group_images/` (rules-checked, never a URL).
+  final String? imagePath;
+  final List<String> groupAdminIds;
+
   const ConversationEntity({
     required this.id,
     required this.participants,
@@ -40,7 +56,35 @@ class ConversationEntity extends Equatable {
     this.lastMessageAt,
     this.lastMessageSenderId,
     required this.unreadCount,
+    this.kind = ConversationKinds.direct,
+    this.title,
+    this.description,
+    this.imagePath,
+    this.groupAdminIds = const [],
   });
+
+  bool get isGroup =>
+      kind == ConversationKinds.halaqaGroup ||
+      kind == ConversationKinds.customGroup;
+
+  /// Admin-managed group (members, name, image editable by Admin).
+  bool get isCustomGroup => kind == ConversationKinds.customGroup;
+
+  /// Name shown in lists and the room header.
+  String displayTitle(String viewerUid) {
+    final t = title?.trim() ?? '';
+    if (isGroup && t.isNotEmpty) return t;
+    if (isGroup) return 'مجموعة';
+    return displayTitleForObserver(viewerUid);
+  }
+
+  /// Display name of [uid] from the denormalized member list.
+  String? participantName(String uid) {
+    for (final p in participants) {
+      if (p.uid == uid) return p.name.trim().isEmpty ? null : p.name;
+    }
+    return null;
+  }
 
   /// الطرف التاني في المحادثة (مش أنا). مفيد جداً للـ UI عشان يعرض
   /// "بتكلم مين" من غير ما يدور بنفسه في الـ participants.
@@ -59,6 +103,8 @@ class ConversationEntity extends Equatable {
 
   /// Title for Admin oversight when the viewer is not a participant.
   String displayTitleForObserver(String observerUid) {
+    final groupTitle = title?.trim() ?? '';
+    if (isGroup && groupTitle.isNotEmpty) return groupTitle;
     final isParticipant = participants.any((p) => p.uid == observerUid);
     if (isParticipant) return otherParticipant(observerUid).name;
     if (participants.length >= 2) {
@@ -81,7 +127,48 @@ class ConversationEntity extends Equatable {
     lastMessageAt,
     lastMessageSenderId,
     unreadCount,
+    kind,
+    title,
+    description,
+    imagePath,
+    groupAdminIds,
   ];
+}
+
+/// Reactions accepted by `reactToChatMessage`.
+enum ChatReaction {
+  like('👍'),
+  heart('❤️'),
+  laugh('😂'),
+  sad('😢');
+
+  final String emoji;
+  const ChatReaction(this.emoji);
+
+  static ChatReaction? fromWire(Object? raw) {
+    for (final r in values) {
+      if (r.name == raw) return r;
+    }
+    return null;
+  }
+}
+
+/// Server-written quote of the message being replied to.
+class ChatReplyEntity extends Equatable {
+  final String messageId;
+  final String senderId;
+  final ChatMessageType type;
+  final String preview;
+
+  const ChatReplyEntity({
+    required this.messageId,
+    required this.senderId,
+    required this.type,
+    required this.preview,
+  });
+
+  @override
+  List<Object?> get props => [messageId, senderId, type, preview];
 }
 
 enum ChatMessageType {
@@ -132,6 +219,11 @@ class MessageEntity extends Equatable {
   final bool deleted;
   final DateTime? deletedAt;
   final String? deletedBy;
+  final ChatReplyEntity? replyTo;
+
+  /// uid → reaction (one per member).
+  final Map<String, ChatReaction> reactions;
+  final bool hasLink;
 
   const MessageEntity({
     required this.id,
@@ -145,7 +237,20 @@ class MessageEntity extends Equatable {
     this.deleted = false,
     this.deletedAt,
     this.deletedBy,
+    this.replyTo,
+    this.reactions = const {},
+    this.hasLink = false,
   });
+
+  /// Reaction counts in [ChatReaction] order, zero counts omitted.
+  List<(ChatReaction, int)> get reactionSummary {
+    if (reactions.isEmpty) return const [];
+    return [
+      for (final r in ChatReaction.values)
+        if (reactions.values.where((v) => v == r).isNotEmpty)
+          (r, reactions.values.where((v) => v == r).length),
+    ];
+  }
 
   /// هل الرسالة دي مبعوتة من المستخدم الحالي؟ بيُستخدم في الـ UI عشان
   /// يحدد محاذاة فقاعة الرسالة (يمين/شمال).
@@ -169,5 +274,8 @@ class MessageEntity extends Equatable {
     deleted,
     deletedAt,
     deletedBy,
+    replyTo,
+    reactions,
+    hasLink,
   ];
 }

@@ -26,9 +26,11 @@ const int functionsEmulatorPort = 5001;
 const int storageEmulatorPort = 9199;
 
 /// Fake API key and app ID: if emulator routing were ever skipped, requests
-/// would be rejected instead of reaching a real project.
+/// would be rejected instead of reaching a real project. The key keeps the
+/// `A` + 38 `[\w-]` shape: Android Firebase Installations (pulled in by every
+/// callable) throws "Please set a valid API key" before any request otherwise.
 const FirebaseOptions firebaseEmulatorOptions = FirebaseOptions(
-  apiKey: 'fake-emulator-api-key',
+  apiKey: 'AIzaFakeEmulatorKeyNotForProduction0000',
   appId: '1:000000000000:android:0000000000000000',
   messagingSenderId: '000000000000',
   projectId: firebaseEmulatorProjectId,

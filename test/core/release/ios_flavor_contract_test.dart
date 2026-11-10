@@ -94,6 +94,41 @@ void main() {
     }
   });
 
+  test('every flavor signs with the push entitlement', () {
+    final entitlements = _read('ios/Runner/Runner.entitlements');
+    expect(
+      entitlements,
+      contains(
+        '<key>aps-environment</key>\n\t<string>development</string>',
+      ),
+    );
+    for (final flavor in _flavors) {
+      expect(
+        _setting(
+          _read('ios/Flutter/Flavor-$flavor.xcconfig'),
+          'CODE_SIGN_ENTITLEMENTS',
+        ),
+        'Runner/Runner.entitlements',
+        reason: flavor,
+      );
+    }
+    expect(
+      _read('ios/Runner.xcodeproj/project.pbxproj'),
+      isNot(contains('CODE_SIGN_ENTITLEMENTS')),
+      reason: 'a target-level value would override the flavor xcconfig',
+    );
+  });
+
+  test('Info.plist enables remote-notification background delivery', () {
+    expect(
+      _read('ios/Runner/Info.plist'),
+      contains(
+        '<key>UIBackgroundModes</key>\n\t<array>\n'
+        '\t\t<string>remote-notification</string>\n\t</array>',
+      ),
+    );
+  });
+
   test('Podfile maps every configuration and targets iOS 13', () {
     final podfile = _read('ios/Podfile');
     expect(podfile, contains("platform :ios, '13.0'"));
@@ -123,5 +158,26 @@ void main() {
       expect(build, greaterThan(configure), reason: flavor);
     }
     expect(yaml, isNot(contains('ios_signing:')));
+  });
+
+  test('Codemagic archives each unsigned app before the next build', () {
+    final yaml = _read('codemagic.yaml');
+    final devBuild = yaml.indexOf(
+      'flutter build ios --flavor dev --release --no-codesign',
+    );
+    final prodBuild = yaml.indexOf(
+      'flutter build ios --flavor prod --release --no-codesign',
+    );
+    final devArchive = yaml.indexOf(
+      'build/ios/iphoneos/Runner.app build/ios-artifacts/Runner-dev-unsigned.zip',
+    );
+    final prodArchive = yaml.indexOf(
+      'build/ios/iphoneos/Runner.app build/ios-artifacts/Runner-prod-unsigned.zip',
+    );
+    expect(devArchive, greaterThan(devBuild));
+    expect(prodBuild, greaterThan(devArchive));
+    expect(prodArchive, greaterThan(prodBuild));
+    expect(yaml, contains('- build/ios-artifacts/*.zip'));
+    expect(yaml, isNot(contains('build/ios/iphoneos/*.app')));
   });
 }

@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../../shared/theme/app_theme.dart';
 
 /// Quick actions — Figma home: مصحفي / المراجعة / المعلم / خريطتي (square tiles).
+///
+/// A null [onReviewTap] / [onMapTap] hides that tile (feature has no data
+/// source yet).
 class StudentQuickActionsWidget extends StatelessWidget {
   final VoidCallback onMushafTap;
-  final VoidCallback onReviewTap;
+  final VoidCallback? onReviewTap;
   final VoidCallback onTeacherTap;
-  final VoidCallback onMapTap;
+  final VoidCallback? onMapTap;
 
   const StudentQuickActionsWidget({
     super.key,
@@ -19,39 +22,30 @@ class StudentQuickActionsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final review = onReviewTap;
+    final map = onMapTap;
+    final items = <Widget>[
+      _ActionItem(
+        icon: Icons.menu_book_rounded,
+        label: 'مصحفي',
+        onTap: onMushafTap,
+      ),
+      if (review != null)
+        _ActionItem(icon: Icons.sync_rounded, label: 'المراجعة', onTap: review),
+      _ActionItem(
+        icon: Icons.school_rounded,
+        label: 'المعلم',
+        onTap: onTeacherTap,
+      ),
+      if (map != null)
+        _ActionItem(icon: Icons.map_outlined, label: 'خريطتي', onTap: map),
+    ];
     return Row(
       children: [
-        Expanded(
-          child: _ActionItem(
-            icon: Icons.menu_book_rounded,
-            label: 'مصحفي',
-            onTap: onMushafTap,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ActionItem(
-            icon: Icons.sync_rounded,
-            label: 'المراجعة',
-            onTap: onReviewTap,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ActionItem(
-            icon: Icons.school_rounded,
-            label: 'المعلم',
-            onTap: onTeacherTap,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ActionItem(
-            icon: Icons.map_outlined,
-            label: 'خريطتي',
-            onTap: onMapTap,
-          ),
-        ),
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(child: items[i]),
+        ],
       ],
     );
   }

@@ -308,9 +308,12 @@ class _ChildStatusCard extends StatelessWidget {
     final overdue = snapshot?.paymentStatus == PaymentStatus.overdue;
     final atRisk = snapshot?.isAtRisk == true;
     final accent = (atRisk || overdue) ? AppColors.error : AppColors.success;
+    final showsProgress =
+        AppCapabilities.memorizationProgressAvailable &&
+        (snapshot?.overallProgressPercent ?? 0) > 0;
     final percent = snapshot == null
         ? null
-        : (snapshot!.overallProgressPercent > 0
+        : (showsProgress
               ? snapshot!.overallProgressPercent
               : snapshot!.attendancePercentInWindow);
     final halaqa = snapshot?.halaqaName.trim() ?? '';
@@ -411,7 +414,7 @@ class _ChildStatusCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                'إجمالي',
+                                showsProgress ? 'إجمالي' : 'حضور',
                                 style: AppTextStyles.labelSmall.copyWith(
                                   color: AppColors.textHint,
                                   fontSize: 10,
@@ -450,6 +453,7 @@ class _ChildStatusCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (AppCapabilities.memorizationProgressAvailable) ...[
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -482,6 +486,7 @@ class _ChildStatusCard extends StatelessWidget {
                           color: AppColors.secondary,
                         ),
                       ),
+                      ],
                       if (banner != null) ...[
                         const SizedBox(height: 12),
                         _BannerStrip(text: banner, warning: atRisk),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -26,6 +28,7 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
   }
 
   void _loadProfile() {
+    if (!AppCapabilities.streakAndLevelAvailable) return;
     final auth = context.read<AuthBloc>().state;
     if (auth is AuthAuthenticated) {
       context.read<StudentBloc>().add(LoadStudentProfileEvent(auth.user.uid));
@@ -34,6 +37,29 @@ class _StudentStreakPageState extends State<StudentStreakPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The entry point is hidden, but the route stays reachable by link.
+    if (!AppCapabilities.streakAndLevelAvailable) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: const Text('الاستمرارية'),
+            leading: const AppBackButton.appBar(),
+          ),
+          body: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(AppSizes.paddingXL),
+              child: Text(
+                'لم يُفعَّل احتساب أيام الاستمرارية بعد.',
+                key: Key('student-streak-unavailable'),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(

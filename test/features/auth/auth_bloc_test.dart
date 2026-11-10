@@ -225,6 +225,23 @@ void main() {
       expect((bloc.state as PasswordResetFailure).retryable, isTrue);
     });
 
+    test('academy usernames and their internal .invalid address never '
+        'trigger a reset email; the member is sent to the Admin', () async {
+      final bloc = resetBloc();
+      for (final input in [
+        'st000001@members.rafiq-academy.invalid',
+        ' ST000001@Members.Rafiq-Academy.Invalid ',
+        'st000001',
+      ]) {
+        bloc.add(PasswordResetRequested(input));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        final state = bloc.state as PasswordResetFailure;
+        expect(state.message, kUsernameRecoveryMessage, reason: input);
+        expect(state.retryable, isFalse, reason: input);
+      }
+      expect(repo.resetCalls, 0);
+    });
+
     test('double submit while sending sends only one email', () async {
       repo.resetGate = Completer<void>();
       final bloc = resetBloc()

@@ -125,7 +125,27 @@ export type ParsedSendInput = {
     fileName: string;
     durationMs: number | null;
   };
+  /** Present only when the message quotes an earlier one. */
+  replyToMessageId?: string;
 };
+
+export const CHAT_LINK_PATTERN = /\bhttps?:\/\/[^\s]+/i;
+
+export function messageHasLink(type: ChatMessageType, text: string): boolean {
+  return type === "text" && CHAT_LINK_PATTERN.test(text);
+}
+
+function parseReplyTo(raw: unknown, messageId: string): { replyToMessageId?: string } {
+  if (raw === undefined || raw === null || raw === "") return {};
+  if (typeof raw !== "string" || !CHAT_MESSAGE_ID_PATTERN.test(raw.trim())) {
+    throw new ChatInputError("invalid-argument", "الرسالة المقتبسة غير صالحة");
+  }
+  const id = raw.trim();
+  if (id === messageId) {
+    throw new ChatInputError("invalid-argument", "لا يمكن الرد على الرسالة نفسها");
+  }
+  return { replyToMessageId: id };
+}
 
 function nonEmptyId(raw: unknown, field: string): string {
   if (typeof raw !== "string" || raw.trim().length === 0) {
@@ -212,6 +232,7 @@ export function parseSendChatMessageInput(raw: unknown): ParsedSendInput {
   }
 
   const text = normalizeMessageText(data.text);
+  const reply = parseReplyTo(data.replyToMessageId, messageId);
 
   if (type === "text") {
     if (text.length === 0) {
@@ -220,7 +241,7 @@ export function parseSendChatMessageInput(raw: unknown): ParsedSendInput {
     if (data.media !== undefined && data.media !== null) {
       throw new ChatInputError("invalid-argument", "رسالة نصية لا تحمل ملفاً");
     }
-    return { conversationId, messageId, type, text, media: null };
+    return { conversationId, messageId, type, text, media: null, ...reply };
   }
 
   const media = (data.media ?? null) as Record<string, unknown> | null;
@@ -275,6 +296,7 @@ export function parseSendChatMessageInput(raw: unknown): ParsedSendInput {
     type,
     text,
     media: { storagePath, fileName, durationMs },
+    ...reply,
   };
 }
 

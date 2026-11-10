@@ -2,7 +2,9 @@ import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../../core/error/failure.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../domain/content_upload_policy.dart';
 import '../../domain/usecases/content_usecases.dart';
 import 'content_event.dart';
 import 'content_state.dart';
@@ -28,7 +30,19 @@ class ContentLibraryBloc
       transformer: droppable(),
     );
     on<ResetUploadEvent>(_onResetUpload);
+    on<RetryUploadEvent>(_onRetryUpload);
     on<DeleteFileEvent>(_onDeleteFile);
+  }
+
+  UploadFileEvent? _lastUpload;
+
+  void _onRetryUpload(RetryUploadEvent event, Emitter<ContentLibraryState> emit) {
+    final last = _lastUpload;
+    if (last != null &&
+        state.uploadStatus == SubmissionStatus.error &&
+        state.canRetryUpload) {
+      add(last);
+    }
   }
 
   Future<void> _onLoadFiles(
@@ -68,11 +82,13 @@ class ContentLibraryBloc
     UploadFileEvent event,
     Emitter<ContentLibraryState> emit,
   ) async {
+    _lastUpload = event;
     emit(
       state.copyWith(
         uploadStatus: SubmissionStatus.submitting,
         uploadProgress: 0.0,
         uploadError: null,
+        canRetryUpload: false,
       ),
     );
 
@@ -92,10 +108,14 @@ class ContentLibraryBloc
           uploadStatus: SubmissionStatus.error,
           uploadError: failure.message,
           uploadProgress: null,
+          canRetryUpload:
+              failure is NetworkFailure ||
+              ContentUploadErrors.isRetryable(failure.message),
         ),
         (progress) {
           if (progress >= 1.0) {
             // الرفع اكتمل - نضيف الملف الجديد للقائمة بعد reload
+            _lastUpload = null;
             return state.copyWith(
               uploadStatus: SubmissionStatus.success,
               uploadProgress: null,
@@ -105,6 +125,17 @@ class ContentLibraryBloc
         },
       ),
     );
+    // A stream that ends without success or error never stored the file.
+    if (state.uploadStatus == SubmissionStatus.submitting) {
+      emit(
+        state.copyWith(
+          uploadStatus: SubmissionStatus.error,
+          uploadError: ContentUploadErrors.incomplete,
+          uploadProgress: null,
+          canRetryUpload: true,
+        ),
+      );
+    }
   }
 
   void _onResetUpload(
@@ -116,6 +147,7 @@ class ContentLibraryBloc
         uploadStatus: SubmissionStatus.idle,
         uploadProgress: null,
         uploadError: null,
+        canRetryUpload: false,
       ),
     );
   }
@@ -124,10 +156,17 @@ class ContentLibraryBloc
     DeleteFileEvent event,
     Emitter<ContentLibraryState> emit,
   ) async {
-    // Optimistic: نشيل الملف من القائمة فوراً
-    final updated = state.allFiles.where((f) => f.id != event.file.id).toList();
-    emit(state.copyWith(allFiles: updated));
+    // Optimistic: نشيل الملف من القائمة فوراً، ونرجعه لو فشل الحذف
+    final before = state.allFiles;
+    final updated = before.where((f) => f.id != event.file.id).toList();
+    emit(state.copyWith(allFiles: updated, deleteError: null));
 
-    await deleteFile(event.file);
+    final result = await deleteFile(event.file);
+    result.fold(
+      (failure) => emit(
+        state.copyWith(allFiles: before, deleteError: failure.message),
+      ),
+      (_) {},
+    );
   }
 }

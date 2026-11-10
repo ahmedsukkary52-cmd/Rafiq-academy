@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,8 +9,6 @@ import '../../features/admin/presentation/pages/admin_announcements_page.dart';
 import '../../features/admin/presentation/pages/admin_broadcast_page.dart';
 import '../../features/admin/presentation/pages/admin_chat_inbox_page.dart';
 import '../../features/admin/presentation/pages/admin_communication_hub_page.dart';
-import '../../features/admin/presentation/pages/admin_complaints_page.dart';
-import '../../features/admin/presentation/pages/admin_complaints_review_page.dart';
 import '../../features/admin/presentation/pages/admin_embedded_pages.dart';
 import '../../features/admin/presentation/pages/admin_halaqat_page.dart';
 import '../../features/admin/presentation/pages/admin_home_page.dart';
@@ -17,6 +16,7 @@ import '../../features/admin/presentation/pages/admin_internal_chat_page.dart';
 import '../../features/admin/presentation/pages/admin_membership_page.dart';
 import '../../features/admin/presentation/pages/admin_misc_pages.dart';
 import '../../features/admin/presentation/pages/admin_oversight_pages.dart';
+import '../../features/admin/presentation/pages/admin_payments_ledger_page.dart';
 import '../../features/admin/presentation/pages/admin_parent_links_page.dart';
 import '../../features/admin/presentation/pages/admin_payment_destinations_page.dart';
 import '../../features/admin/presentation/pages/admin_registration_requests_page.dart';
@@ -28,6 +28,16 @@ import '../../features/app_update/presentation/pages/update_required_page.dart';
 import '../../features/app_update/presentation/version_gate_redirect.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
+import '../../features/accounts/domain/onboarding_models.dart';
+import '../../features/accounts/presentation/admin_account_access_card.dart';
+import '../../features/accounts/presentation/admin_onboard_student_page.dart';
+import '../../features/assistant/presentation/assistant_home_page.dart';
+import '../../features/directory/domain/directory_models.dart';
+import '../../features/directory/presentation/admin_add_member_page.dart';
+import '../../features/directory/presentation/admin_directory_page.dart';
+import '../../features/directory/presentation/admin_halaqa_profile_page.dart';
+import '../../features/directory/presentation/admin_person_profile_page.dart';
+import '../../features/auth/presentation/pages/first_login_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
@@ -36,6 +46,7 @@ import '../../features/awards/presentation/pages/awards_page.dart';
 import '../../features/chat/presentation/chat_route_extra.dart';
 import '../../features/chat/presentation/pages/chat_room.dart';
 import '../../features/chat/presentation/pages/student_chat_page.dart';
+import '../../features/complaints/presentation/complaints_entry.dart';
 import '../../features/content/presentation/pages/content_library_page.dart';
 import '../../features/homework/presentation/pages/student_homework_page.dart';
 import '../../features/notifications/presentation/pages/notification_page.dart';
@@ -66,6 +77,8 @@ import '../../features/teacher/presentation/pages/teacher_evalutation_page.dart'
 import '../../features/teacher/presentation/pages/teacher_excuses_page.dart';
 // Teacher
 import '../../features/teacher/presentation/pages/teacher_home_page.dart';
+import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/shared_widgets.dart';
 import '../constants/app_constants.dart';
 import 'supervisor_escalation_paths.dart';
 
@@ -77,6 +90,9 @@ class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String forgotPassword = '/forgot-password';
+
+  /// Mandatory replacement of an Admin-issued temporary password.
+  static const String firstLogin = '/first-login';
 
   /// D1 / WA-1 — public self-registration removed. Path kept only so deep links
   /// redirect to login (no RegisterPage route).
@@ -138,6 +154,12 @@ class AppRoutes {
   static const String teacherNotifs = '/teacher/notifications';
   static const String teacherExcuses = '/teacher/excuses';
 
+  /// Halaqat a teacher covers temporarily (Admin-activated cover).
+  static const String teacherCover = '/teacher/cover';
+
+  /// مساعد مدرس — assigned halaqat and active covers.
+  static const String assistant = '/assistant';
+
   // Other roles
   static const String parent = '/parent';
   static const String parentAbsence = '/parent/absence-requests';
@@ -164,6 +186,9 @@ class AppRoutes {
   static const String adminAccess = '/admin/access';
 
   static const String adminAdmit = '/admin/admit';
+
+  /// Student onboarding wizard (accounts + link + halaqa + credentials).
+  static const String adminOnboardStudent = '/admin/onboard-student';
   static const String adminComplaints = '/admin/complaints';
   static const String adminBroadcast = '/admin/broadcast';
   static const String adminTeachers = '/admin/teachers';
@@ -180,8 +205,6 @@ class AppRoutes {
   static const String adminReports = '/admin/reports';
   static const String adminRewards = '/admin/rewards';
   static const String adminInternalNotes = '/admin/internal-notes';
-  static const String adminCommunicationSettings =
-      '/admin/communication-settings';
 
   /// Academy payment destinations (Vodafone Cash, InstaPay) shown to parents.
   static const String adminPaymentDestinations = '/admin/payment-destinations';
@@ -196,6 +219,16 @@ class AppRoutes {
 
   /// Read-only academy-wide halaqat directory.
   static const String adminHalaqatDirectory = '/admin/halaqat-directory';
+
+  /// Central academy directory (people, halaqat, relationships).
+  static const String adminDirectory = '/admin/directory';
+  static String adminPersonProfile(String uid) =>
+      '/admin/person/${Uri.encodeComponent(uid.trim())}';
+  static String adminHalaqaProfile(String halaqaId) =>
+      '/admin/halaqa/${Uri.encodeComponent(halaqaId.trim())}';
+  static const String adminAddMember = '/admin/add-member';
+  static String adminAddMemberFor(String role) =>
+      '$adminAddMember?role=${Uri.encodeQueryComponent(role)}';
   static const String adminStudent = '/admin/student/:studentId';
 
   /// Admin view of [StudentProfilePage]. Pass [halaqaId] when opening from roster.
@@ -221,6 +254,7 @@ class AppRouteAccess {
     AppRoles.teacher => AppRoutes.teacher,
     AppRoles.supervisor => AppRoutes.supervisor,
     AppRoles.admin => AppRoutes.admin,
+    AppRoles.assistantTeacher => AppRoutes.assistant,
     _ => AppRoutes.login,
   };
 
@@ -267,6 +301,9 @@ class AuthRedirect {
       if (home == AppRoutes.login) {
         return path == AppRoutes.login ? null : AppRoutes.login;
       }
+      if (state.user.mustChangePassword) {
+        return path == AppRoutes.firstLogin ? null : AppRoutes.firstLogin;
+      }
       if (path == AppRoutes.splash ||
           path == AppRoutes.register ||
           publicAuthPaths.contains(path)) {
@@ -296,7 +333,7 @@ class AppRouter {
 
   late final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: kDebugMode,
     refreshListenable: Listenable.merge([
       _BlocListenable(authBloc.stream),
       _BlocListenable(versionGate.stream),
@@ -329,6 +366,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.forgotPassword,
         builder: (_, __) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.firstLogin,
+        builder: (_, __) => const FirstLoginPage(),
       ),
       // WA-1: /register intentionally omitted — redirects to login above.
 
@@ -508,7 +549,17 @@ class AppRouter {
             path: 'excuses',
             builder: (_, __) => const TeacherExcusesPage(),
           ),
+          GoRoute(
+            path: 'cover',
+            builder: (_, __) => const AssistantHomePage(assistant: false),
+          ),
         ],
+      ),
+
+      // ── Assistant teacher ─────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.assistant,
+        builder: (_, __) => const AssistantHomePage(),
       ),
 
       // ── Parent ────────────────────────────────────────────────
@@ -569,8 +620,39 @@ class AppRouter {
           GoRoute(path: 'access', builder: (_, __) => const AdminAccessPage()),
           GoRoute(path: 'admit', builder: (_, __) => const AdminAdmitPage()),
           GoRoute(
+            path: 'onboard-student',
+            builder: (_, state) => AdminOnboardStudentPage(
+              initialParent: state.extra is MemberSearchHit
+                  ? state.extra as MemberSearchHit
+                  : null,
+            ),
+          ),
+          GoRoute(
+            path: 'directory',
+            builder: (_, __) => const AdminDirectoryPage(),
+          ),
+          GoRoute(
+            path: 'person/:uid',
+            builder: (_, state) =>
+                AdminPersonProfilePage(uid: state.pathParameters['uid']!),
+          ),
+          GoRoute(
+            path: 'halaqa/:halaqaId',
+            builder: (_, state) => AdminHalaqaProfilePage(
+              halaqaId: state.pathParameters['halaqaId']!,
+            ),
+          ),
+          GoRoute(
+            path: 'add-member',
+            builder: (_, state) => AdminAddMemberPage(
+              initialRole: DirectoryRole.fromWire(
+                state.uri.queryParameters['role'],
+              ),
+            ),
+          ),
+          GoRoute(
             path: 'complaints',
-            builder: (_, __) => const AdminComplaintsPage(),
+            builder: (context, __) => buildComplaintsPage(context),
           ),
           GoRoute(
             path: 'broadcast',
@@ -594,7 +676,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'communication-analytics',
-            builder: (_, __) => const AdminCommunicationAnalyticsPage(),
+            redirect: (_, __) => AppRoutes.adminCommunication,
           ),
           GoRoute(
             path: 'chat',
@@ -616,7 +698,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'complaints-review',
-            builder: (_, __) => const AdminComplaintsReviewPage(),
+            redirect: (_, __) => AppRoutes.adminComplaints,
           ),
           GoRoute(
             path: 'registration-requests',
@@ -624,10 +706,17 @@ class AppRouter {
           ),
           GoRoute(
             path: 'student/:studentId',
-            builder: (_, state) => StudentProfilePage(
-              studentId: state.pathParameters['studentId']!,
-              halaqaId: state.uri.queryParameters['halaqaId'],
-            ),
+            builder: (_, state) {
+              final studentId = state.pathParameters['studentId']!;
+              return StudentProfilePage(
+                studentId: studentId,
+                halaqaId: state.uri.queryParameters['halaqaId'],
+                adminPanelBuilder: (name) => AdminAccountAccessCard(
+                  studentId: studentId,
+                  studentName: name,
+                ),
+              );
+            },
           ),
           GoRoute(
             path: 'announcements',
@@ -646,10 +735,6 @@ class AppRouter {
             builder: (_, __) => const AdminInternalChatPage(),
           ),
           GoRoute(
-            path: 'communication-settings',
-            builder: (_, __) => const AdminCommunicationSettingsPage(),
-          ),
-          GoRoute(
             path: 'payment-destinations',
             builder: (_, __) => const AdminPaymentDestinationsRoute(),
           ),
@@ -659,11 +744,11 @@ class AppRouter {
           ),
           GoRoute(
             path: 'finance-detail',
-            builder: (_, __) => const AdminFinanceDetailPage(),
+            redirect: (_, __) => AppRoutes.adminPaymentsOverview,
           ),
           GoRoute(
             path: 'payments-overview',
-            builder: (_, __) => const AdminPaymentsReviewPage(),
+            builder: (_, __) => const AdminPaymentsLedgerPage(),
           ),
           GoRoute(
             path: 'supervisors',
@@ -681,10 +766,7 @@ class AppRouter {
       ),
     ],
 
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('خطأ')),
-      body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
-    ),
+    errorBuilder: (context, state) => const RouteNotFoundPage(),
   );
 
   String? _onboardingThenAuth(String currentPath) {
@@ -696,6 +778,44 @@ class AppRouter {
       return AppRoutes.splash;
     }
     return AuthRedirect.resolve(state: authBloc.state, path: currentPath);
+  }
+}
+
+/// Shown for unknown or malformed links; never echoes the raw router error.
+class RouteNotFoundPage extends StatelessWidget {
+  const RouteNotFoundPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الصفحة غير متاحة')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSizes.paddingXL),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.link_off_rounded,
+                color: AppColors.textSecondary,
+                size: 48,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'هذه الصفحة غير موجودة أو لم تعد متاحة.',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              AppButton(
+                label: 'العودة إلى الرئيسية',
+                onPressed: () => context.go(AppRoutes.splash),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

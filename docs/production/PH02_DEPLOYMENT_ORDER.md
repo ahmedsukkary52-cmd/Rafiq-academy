@@ -218,6 +218,25 @@ directory scans, off-roster / multi-recipient client achievements, student
 submissions at live-evaluation ids or carrying `createdAt`, and direct Admin
 writes of `halaqat.meetingLink`). Until it ships, the old paths remain open.
 
+J.9: these rules also scope `halaqat` reads per role (active profile
+required), make a Halaqa that still carries a legacy `meetingLink` Admin-only
+for `get`, and require an active profile for `teacherProfiles`,
+`calendarEvents` and `sessions`. Scoped `list` queries cannot hide the legacy
+field, so the legacy-link exposure ends only after the approved copy and
+strip in `B14_MEETING_LINKS.md` §8, followed by link rotation where needed.
+
+J.10: Parents no longer read `halaqat` at all; the J.10 client uses the
+`getParentChildHalaqat` callable (deploy it with the other Functions, before
+these rules, with the backend switch already allowing callables).
+`teacherProfiles` is readable by Admin and the Teacher themself only;
+`calendarEvents` reads follow the event's Halaqa community (events without a
+`halaqaId` stay academy-wide) and only Admin or that Halaqa's staff create
+events. Older app releases lose parent Halaqa/staff details and the
+supervisor teacher-name lookup once these rules are live, so the minimum app
+version must be the first J.10 release (owner action, not changed here).
+The ordered J.10 steps, backend switch and backup/inspection procedure are in
+`RELEASE_RUNBOOK_J10.md`.
+
 ## 6. Storage rules
 
 Deploy `storage.rules` (unchanged in PH-02; redeploy only to keep the

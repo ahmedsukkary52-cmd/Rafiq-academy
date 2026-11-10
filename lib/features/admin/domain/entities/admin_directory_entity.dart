@@ -7,16 +7,30 @@ class AdminHalaqaSummaryEntity extends Equatable {
   final String supervisorId;
   final int studentCount;
 
+  /// Display names resolved from `users`; empty when unknown.
+  final String teacherName;
+  final String supervisorName;
+
   const AdminHalaqaSummaryEntity({
     required this.id,
     required this.name,
     required this.teacherId,
     required this.supervisorId,
     required this.studentCount,
+    this.teacherName = '',
+    this.supervisorName = '',
   });
 
   @override
-  List<Object?> get props => [id, name, teacherId, supervisorId, studentCount];
+  List<Object?> get props => [
+    id,
+    name,
+    teacherId,
+    supervisorId,
+    studentCount,
+    teacherName,
+    supervisorName,
+  ];
 }
 
 class AdminStaffSummaryEntity extends Equatable {

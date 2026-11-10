@@ -96,20 +96,46 @@ class ChatMessageBubble extends StatelessWidget {
   final ChatMediaLoader loader;
   final VoidCallback? onLongPress;
 
+  /// Shown above incoming messages in groups.
+  final String? senderName;
+
+  /// Display name of the quoted message's sender ("أنت" for own).
+  final String? replySenderName;
+
   const ChatMessageBubble({
     super.key,
     required this.message,
     required this.isMine,
     required this.loader,
     this.onLongPress,
+    this.senderName,
+    this.replySenderName,
   });
 
   @override
   Widget build(BuildContext context) {
     final media = message.visibleMedia;
+    final reactions = message.deleted
+        ? const <(ChatReaction, int)>[]
+        : message.reactionSummary;
     final footer = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        for (final (reaction, count) in reactions)
+          Container(
+            key: Key('reaction-${message.id}-${reaction.name}'),
+            margin: const EdgeInsetsDirectional.only(end: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              count > 1 ? '${reaction.emoji} $count' : reaction.emoji,
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
         if (message.isEdited) ...[
           Text('تم التعديل', style: _metaStyle),
           const SizedBox(width: 6),
@@ -117,14 +143,42 @@ class ChatMessageBubble extends StatelessWidget {
         Text(formatTimeHm12Ar(message.sentAt), style: _metaStyle),
       ],
     );
+    final name = senderName?.trim() ?? '';
+    final header = name.isEmpty || isMine
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              name,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          );
+    final reply = message.replyTo;
+    final quote = reply == null || message.deleted
+        ? null
+        : _ReplyQuote(
+            reply: reply,
+            senderName: replySenderName,
+            isMine: isMine,
+          );
 
     if (message.deleted) {
       return _BubbleFrame(
         isMine: isMine,
         footer: footer,
-        child: Text(
-          'تم حذف هذه الرسالة',
-          style: _bodyStyle(isMine).copyWith(fontStyle: FontStyle.italic),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ?header,
+            Text(
+              'تم حذف هذه الرسالة',
+              style: _bodyStyle(isMine).copyWith(fontStyle: FontStyle.italic),
+            ),
+          ],
         ),
       );
     }
@@ -154,11 +208,16 @@ class ChatMessageBubble extends StatelessWidget {
       isMine: isMine,
       footer: footer,
       onLongPress: onLongPress,
-      tight: message.type == ChatMessageType.image && mediaView != null,
+      tight: message.type == ChatMessageType.image &&
+          mediaView != null &&
+          header == null &&
+          quote == null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ?header,
+          ?quote,
           if (mediaView != null) mediaView,
           if (mediaView == null && message.type != ChatMessageType.text)
             Text(
@@ -169,6 +228,59 @@ class ChatMessageBubble extends StatelessWidget {
             if (mediaView != null) const SizedBox(height: 6),
             Text(caption, style: _bodyStyle(isMine), softWrap: true),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyQuote extends StatelessWidget {
+  final ChatReplyEntity reply;
+  final String? senderName;
+  final bool isMine;
+
+  const _ReplyQuote({
+    required this.reply,
+    required this.senderName,
+    required this.isMine,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isMine ? AppColors.onPrimary : AppColors.textPrimary;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      decoration: BoxDecoration(
+        color: (isMine ? Colors.white : AppColors.primaryLight).withValues(
+          alpha: isMine ? 0.18 : 0.7,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        border: BorderDirectional(
+          start: BorderSide(
+            color: isMine ? AppColors.onPrimary : AppColors.primary,
+            width: 3,
+          ),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if ((senderName ?? '').isNotEmpty)
+            Text(
+              senderName!,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          Text(
+            reply.preview,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.labelSmall.copyWith(color: fg),
+          ),
         ],
       ),
     );

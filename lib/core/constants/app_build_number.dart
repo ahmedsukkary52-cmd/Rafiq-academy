@@ -8,4 +8,4 @@
 /// differ). Do not pass `--build-number` to `flutter build` unless this
 /// constant is changed to the same value; otherwise the store build number
 /// and the gate's number disagree.
-const int kAppBuildNumber = 1;
+const int kAppBuildNumber = 2;

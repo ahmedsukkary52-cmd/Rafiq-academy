@@ -133,6 +133,8 @@ import 'package:rafiq_academy/features/auth/data/repositories/auth_repository_im
     as _i127;
 import 'package:rafiq_academy/features/auth/domain/repositories/auth_repository.dart'
     as _i605;
+import 'package:rafiq_academy/features/auth/domain/services/sign_out_preparation.dart'
+    as _i600;
 import 'package:rafiq_academy/features/auth/domain/usecases/get_current_user_usecase.dart'
     as _i788;
 import 'package:rafiq_academy/features/auth/domain/usecases/login_with_email_usecase.dart'
@@ -273,12 +275,16 @@ import 'package:rafiq_academy/features/notifications/data/repositories/notifiact
     as _i579;
 import 'package:rafiq_academy/features/notifications/data/services/fcm_device_id_provider.dart'
     as _i761;
+import 'package:rafiq_academy/features/notifications/data/services/fcm_pending_revocation_store.dart'
+    as _i153;
 import 'package:rafiq_academy/features/notifications/data/services/fcm_token_registrar.dart'
     as _i578;
 import 'package:rafiq_academy/features/notifications/data/services/firebase_messaging_adapter.dart'
     as _i615;
 import 'package:rafiq_academy/features/notifications/data/services/firebase_notification_open_adapter.dart'
     as _i999;
+import 'package:rafiq_academy/features/notifications/data/services/foreground_push_presenter.dart'
+    as _i541;
 import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_handler.dart'
     as _i815;
 import 'package:rafiq_academy/features/notifications/domain/repositories/fcm_token_repository.dart'
@@ -507,6 +513,9 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i892.FirebaseMessaging>(() => diModule.firebaseMessaging);
     gh.lazySingleton<_i457.FirebaseStorage>(() => diModule.firebaseStorage);
     gh.lazySingleton<_i809.FirebaseFunctions>(() => diModule.firebaseFunctions);
+    gh.lazySingleton<_i600.SignOutPreparation>(
+      () => diModule.signOutPreparation,
+    );
     gh.lazySingleton<_i161.InternetConnection>(
       () => diModule.internetConnection,
     );
@@ -522,6 +531,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i81.EvaluationService>(
       () => const _i81.EvaluationService(),
+    );
+    gh.lazySingleton<_i153.FcmPendingRevocationStore>(
+      () => _i153.SharedPreferencesFcmPendingRevocationStore(),
     );
     gh.lazySingleton<_i65.SupervisorRemoteDatasource>(
       () => _i615.SupervisorRemoteDatasourceImpl(
@@ -564,11 +576,6 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i761.FcmDeviceIdProvider>(
       () => _i761.SharedPreferencesFcmDeviceIdProvider(),
-    );
-    gh.lazySingleton<_i542.NotificationOpenPort>(
-      () => _i999.FirebaseNotificationOpenAdapter(
-        messaging: gh<_i892.FirebaseMessaging>(),
-      ),
     );
     gh.lazySingleton<_i115.MushafAudioEngine>(
       () => _i567.JustAudioMushafEngine(),
@@ -630,6 +637,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i696.NetworkInfo>(
       () => diModule.networkInfo(gh<_i161.InternetConnection>()),
+    );
+    gh.lazySingleton<_i541.ForegroundPushPresenter>(
+      () => _i541.ForegroundPushPresenter(gh<_i892.FirebaseMessaging>()),
     );
     gh.lazySingleton<_i444.AwardsRemoteDatasource>(
       () => _i982.AwardsRemoteDatasourceImpl(
@@ -850,6 +860,12 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i964.ParentRepositoryImpl(
         remoteDatasource: gh<_i892.ParentRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i542.NotificationOpenPort>(
+      () => _i999.FirebaseNotificationOpenAdapter(
+        messaging: gh<_i892.FirebaseMessaging>(),
+        foreground: gh<_i541.ForegroundPushPresenter>(),
       ),
     );
     gh.lazySingleton<_i605.AuthRepository>(
@@ -1308,18 +1324,20 @@ extension GetItInjectableX on _i174.GetIt {
       () =>
           _i544.SaveMushafPositionUseCase(gh<_i195.MushafReadingRepository>()),
     );
-    gh.lazySingleton<_i578.FcmTokenRegistrar>(
-      () => _i578.FcmTokenRegistrar(
-        messaging: gh<_i643.FcmMessagingPort>(),
-        deviceIdProvider: gh<_i761.FcmDeviceIdProvider>(),
-        repository: gh<_i641.FcmTokenRepository>(),
-      ),
-    );
     gh.factory<_i999.AnalyticsBloc>(
       () => _i999.AnalyticsBloc(
         getHalaqaAnalytics: gh<_i1010.GetHalaqaAnalyticsUseCase>(),
         getAtRiskStudents: gh<_i1010.GetAtRiskStudentsUseCase>(),
         getTopStudents: gh<_i1010.GetTopStudentsUseCase>(),
+      ),
+    );
+    gh.singleton<_i18.AuthBloc>(
+      () => _i18.AuthBloc(
+        loginWithEmail: gh<_i339.LoginWithEmailUseCase>(),
+        logout: gh<_i608.LogoutUseCase>(),
+        getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
+        watchSession: gh<_i315.WatchAuthSessionUseCase>(),
+        signOutPreparation: gh<_i600.SignOutPreparation>(),
       ),
     );
     gh.singleton<_i933.TeacherBloc>(
@@ -1472,14 +1490,6 @@ extension GetItInjectableX on _i174.GetIt {
         savePosition: gh<_i544.SaveMushafPositionUseCase>(),
       ),
     );
-    gh.singleton<_i18.AuthBloc>(
-      () => _i18.AuthBloc(
-        loginWithEmail: gh<_i339.LoginWithEmailUseCase>(),
-        logout: gh<_i608.LogoutUseCase>(),
-        getCurrentUser: gh<_i788.GetCurrentUserUseCase>(),
-        watchSession: gh<_i315.WatchAuthSessionUseCase>(),
-      ),
-    );
     gh.factory<_i421.HomeworkBloc>(
       () => _i421.HomeworkBloc(
         watchLatestHomework: gh<_i81.WatchLatestHomeworkUseCase>(),
@@ -1591,6 +1601,14 @@ extension GetItInjectableX on _i174.GetIt {
         addComment: gh<_i918.AddCommentUseCase>(),
         togglePin: gh<_i918.TogglePinUseCase>(),
         deletePost: gh<_i918.DeletePostUseCase>(),
+      ),
+    );
+    gh.lazySingleton<_i578.FcmTokenRegistrar>(
+      () => _i578.FcmTokenRegistrar(
+        messaging: gh<_i643.FcmMessagingPort>(),
+        deviceIdProvider: gh<_i761.FcmDeviceIdProvider>(),
+        repository: gh<_i641.FcmTokenRepository>(),
+        pendingRevocations: gh<_i153.FcmPendingRevocationStore>(),
       ),
     );
     gh.singleton<_i149.SupervisorBloc>(

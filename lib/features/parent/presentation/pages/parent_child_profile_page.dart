@@ -451,7 +451,8 @@ class _ProfileHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final halaqaLine = [
       if (halaqa.isNotEmpty) halaqa,
-      'المستوى ${parentEasternDigits('$level')}',
+      if (AppCapabilities.streakAndLevelAvailable)
+        'المستوى ${parentEasternDigits('$level')}',
     ].join(' - ');
     final staffLine = [
       if (teacher.isNotEmpty) 'المعلم: $teacher',
@@ -628,8 +629,10 @@ class _StatsCard extends StatelessWidget {
           _StatCell(value: performance, label: 'الأداء'),
           _Divider(),
           _StatCell(value: attendance, label: 'الحضور'),
-          _Divider(),
-          _StatCell(value: verses, label: 'آية'),
+          if (AppCapabilities.memorizationProgressAvailable) ...[
+            _Divider(),
+            _StatCell(value: verses, label: 'آية'),
+          ],
         ],
       ),
     );
@@ -827,6 +830,35 @@ class _MemorizationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!AppCapabilities.memorizationProgressAvailable) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'تقدم الحفظ',
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            key: const Key('parent-child-progress-unavailable'),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              'لم يُفعَّل احتساب تقدم الحفظ بعد؛ سيظهر هنا عند اعتماده من تقييمات المعلم.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     final pct = progressPercent.round().clamp(0, 100);
     // Remaining verses for *current surah* are not stored as a separate field.
     // Do not invent: show dash unless progress is complete (0 remaining).

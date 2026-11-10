@@ -20,6 +20,7 @@ import 'features/parent/presentation/bloc/parent_bloc.dart';
 import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/notifications/data/services/fcm_token_registrar.dart';
+import 'features/notifications/data/services/foreground_push_presenter.dart';
 import 'features/notifications/domain/services/notification_open_port.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'features/notifications/presentation/notification_deep_links.dart';
@@ -39,6 +40,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeAppFirebase();
   await initDependencies();
+  if (!useFirebaseEmulator) {
+    await sl<ForegroundPushPresenter>().start();
+  }
 
   final prefs = await SharedPreferences.getInstance();
   final onboardingSeen = ValueNotifier<bool>(

@@ -66,7 +66,7 @@ class _SupervisorExcusesPageState extends State<SupervisorExcusesPage> {
     for (final h in state.halaqat) {
       if (h.id == id) return h.name;
     }
-    return id;
+    return 'حلقة';
   }
 
   @override
@@ -116,7 +116,7 @@ class _SupervisorExcusesPageState extends State<SupervisorExcusesPage> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'لا توجد طلبات استئذان اليوم في حلقاتك',
+                      'لا توجد طلبات استئذان اليوم أو قادمة في حلقاتك',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textSecondary,
@@ -141,8 +141,7 @@ class _SupervisorExcusesPageState extends State<SupervisorExcusesPage> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
               final request = items[i];
-              final studentName =
-                  _names[request.studentId] ?? request.studentId;
+              final studentName = _names[request.studentId] ?? 'طالب';
               return AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

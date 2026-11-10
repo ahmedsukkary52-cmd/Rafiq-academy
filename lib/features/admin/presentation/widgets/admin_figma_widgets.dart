@@ -279,12 +279,16 @@ class AdminGradientHeroCard extends StatelessWidget {
   final String eyebrow;
   final String headline;
   final List<AdminHeroMetric> metrics;
+  final IconData? statusIcon;
+  final bool centered;
 
   const AdminGradientHeroCard({
     super.key,
     required this.eyebrow,
     required this.headline,
     required this.metrics,
+    this.statusIcon,
+    this.centered = false,
   });
 
   @override
@@ -306,8 +310,13 @@ class AdminGradientHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (statusIcon != null) ...[
+            Icon(statusIcon, color: AppColors.onPrimary, size: 28),
+            const SizedBox(height: 6),
+          ],
           Text(
             eyebrow,
+            textAlign: centered ? TextAlign.center : null,
             style: AppTextStyles.labelMedium.copyWith(
               color: AppColors.onPrimaryMuted,
             ),
@@ -315,6 +324,7 @@ class AdminGradientHeroCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             headline,
+            textAlign: centered ? TextAlign.center : null,
             style: AppTextStyles.displayMedium.copyWith(
               color: AppColors.onPrimary,
               fontWeight: FontWeight.w800,

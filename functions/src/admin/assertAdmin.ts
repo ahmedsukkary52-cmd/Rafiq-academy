@@ -33,6 +33,7 @@ export const ALLOWED_PROVISION_ROLES = [
   "parent",
   "teacher",
   "supervisor",
+  "assistant_teacher",
   "admin",
 ] as const;
 

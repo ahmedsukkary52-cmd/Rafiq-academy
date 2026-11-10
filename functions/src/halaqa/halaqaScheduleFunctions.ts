@@ -39,6 +39,9 @@ import {
 } from "../authority/callerContext";
 import { contactInfoViolation } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
+import { appendRelationshipHistory, RELATIONSHIP_KIND } from "../relationships/relationshipHistory";
+import { HALAQA_NAME_INDEX_COLLECTION, halaqaNameKey } from "./halaqaNameKey";
+import { claimAcademyRefInTx, reserveAcademyRefInTx } from "../accounts/academyRefs";
 import {
   HALAQA_MEETING_LINKS_COLLECTION,
   canonicalMeetingLinkData,
@@ -237,7 +240,7 @@ function sourceFromDoc(doc: admin.firestore.DocumentSnapshot): HalaqaScheduleSou
   };
 }
 
-async function loadOtherHalaqat(
+export async function loadOtherHalaqat(
   db: admin.firestore.Firestore,
   tx: admin.firestore.Transaction,
   teacherId: string,
@@ -259,22 +262,31 @@ async function loadOtherHalaqat(
 }
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+export const HALAQA_DUPLICATE_NAME_MESSAGE =
+  "يوجد حلقة بنفس الاسم بالفعل. اختر اسماً مختلفاً.";
 
 export type CreateHalaqaResult = {
   halaqaId: string;
   slotIds: string[];
   alreadyExisted: boolean;
+  academyRef: string;
 };
 
 /**
  * Creates an active Halaqa with ≥1 slot. `requestId` (optional, client
  * generated once per form) makes retries idempotent: it becomes the Halaqa id.
+ *
+ * The Halaqa receives the next free H-code in the same transaction, so a
+ * failed or replayed request consumes no code. Bulk import passes the
+ * roster's code in [options.academyRef] (server-side only, never from the
+ * client payload) and keeps its own ledger entry for it.
  */
 export async function adminCreateHalaqaCore(
   db: admin.firestore.Firestore,
   callerUid: string | undefined,
   data: Record<string, unknown>,
   generateId: () => string = () => randomUUID(),
+  options: { academyRef?: string } = {},
 ): Promise<CreateHalaqaResult> {
   const uid = requireCallerUid(callerUid);
   const name = requireText(data.name, "name", MAX_HALAQA_NAME_LENGTH);
@@ -298,9 +310,19 @@ export async function adminCreateHalaqaCore(
   const parsedSlots = data.schedule.map(parseSlotInput);
   await requireAdmin(db, uid);
 
+  const nameKey = halaqaNameKey(name);
+  if (nameKey === "") {
+    throw new HttpsError("invalid-argument", "اسم الحلقة غير صالح");
+  }
   const halaqaRef = requestId
     ? db.collection("halaqat").doc(requestId)
     : db.collection("halaqat").doc();
+  const nameLockRef = db.collection(HALAQA_NAME_INDEX_COLLECTION).doc(nameKey);
+  // Halaqat created before the name index existed have no lock document.
+  const legacy = await db.collection("halaqat").select("name").get();
+  if (legacy.docs.some((d) => d.id !== halaqaRef.id && halaqaNameKey(d.data()?.name) === nameKey)) {
+    throw new HttpsError("already-exists", HALAQA_DUPLICATE_NAME_MESSAGE);
+  }
   const lockRef = db
     .collection(HALAQA_SCHEDULE_LOCKS_COLLECTION)
     .doc(`teacher_${teacherId}`);
@@ -318,9 +340,18 @@ export async function adminCreateHalaqaCore(
         const ids = (Array.isArray(d.schedule) ? d.schedule : [])
           .map((s: Record<string, unknown>) => text(s?.slotId))
           .filter((id: string) => id !== "");
-        return { halaqaId: halaqaRef.id, slotIds: ids, alreadyExisted: true };
+        return {
+          halaqaId: halaqaRef.id,
+          slotIds: ids,
+          alreadyExisted: true,
+          academyRef: text(d.academyRef),
+        };
       }
       throw new HttpsError("already-exists", "الحلقة موجودة مسبقاً");
+    }
+    const nameLock = await tx.get(nameLockRef);
+    if (nameLock.exists && text(nameLock.data()?.halaqaId) !== halaqaRef.id) {
+      throw new HttpsError("already-exists", HALAQA_DUPLICATE_NAME_MESSAGE);
     }
 
     const teacherUser = await tx.get(teacherUserRef);
@@ -346,15 +377,26 @@ export async function adminCreateHalaqaCore(
       }),
     );
 
+    const reservation = options.academyRef
+      ? null
+      : await reserveAcademyRefInTx(db, tx, "halaqa");
+    const academyRef = options.academyRef ?? reservation!.ref;
+    if (reservation) claimAcademyRefInTx(db, tx, reservation, { id: halaqaRef.id, name });
+
     const schedule: WeeklySlot[] = parsedSlots.map((s) => ({ ...s, slotId: generateId() }));
+    tx.set(nameLockRef, {
+      halaqaId: halaqaRef.id,
+      createdAt: FieldValue.serverTimestamp(),
+    });
     tx.create(halaqaRef, {
       name,
+      nameKey,
       teacherId,
       supervisorId: supervisorId || "",
       studentIds: [],
       schedule,
-      meetingLink,
       status: "active",
+      academyRef,
       createdBy: uid,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -388,16 +430,36 @@ export async function adminCreateHalaqaCore(
             teacherId,
             ...(supervisorId ? { supervisorId } : {}),
             slotCount: schedule.length,
+            academyRef,
           },
           source: "adminCreateHalaqa",
         },
         FieldValue.serverTimestamp(),
       ),
     );
+    appendRelationshipHistory(db, tx, {
+      kind: RELATIONSHIP_KIND.halaqaTeacher,
+      operation: "create",
+      actorId: uid,
+      actorRole: "admin",
+      halaqaId: halaqaRef.id,
+      staffId: teacherId,
+    });
+    if (supervisorId) {
+      appendRelationshipHistory(db, tx, {
+        kind: RELATIONSHIP_KIND.halaqaSupervisor,
+        operation: "create",
+        actorId: uid,
+        actorRole: "admin",
+        halaqaId: halaqaRef.id,
+        staffId: supervisorId,
+      });
+    }
     return {
       halaqaId: halaqaRef.id,
       slotIds: schedule.map((s) => s.slotId),
       alreadyExisted: false,
+      academyRef,
     };
   });
 }

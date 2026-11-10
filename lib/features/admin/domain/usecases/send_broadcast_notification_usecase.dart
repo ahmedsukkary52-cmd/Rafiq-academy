@@ -20,5 +20,6 @@ class SendBroadcastNotificationUseCase extends UseCase<Unit, BroadcastParams> {
         title: params.title,
         body: params.body,
         targetRole: params.targetRole,
+        requestId: params.requestId,
       );
 }

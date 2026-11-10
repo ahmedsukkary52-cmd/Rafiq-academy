@@ -8,6 +8,7 @@ import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/contact_info_policy.dart';
+import '../../domain/content_upload_policy.dart';
 import '../../domain/entities/content_file_entity.dart';
 import '../../domain/repositories/content_library_repository.dart';
 import '../datasources/content_library_remote_datasource.dart';
@@ -75,7 +76,13 @@ class ContentLibraryRepositoryImpl implements ContentLibraryRepository {
             Either<Failure, double>
           >.fromHandlers(
             handleError: (e, _, sink) => sink.add(
-              Left(ServerFailure(e is ServerException ? e.message : '$e')),
+              Left(
+                ServerFailure(
+                  e is ServerException
+                      ? e.message
+                      : ContentUploadErrors.generic,
+                ),
+              ),
             ),
           ),
         );

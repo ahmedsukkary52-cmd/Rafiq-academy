@@ -12,8 +12,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { assertBackendAllowed } from "../productionGate";
 import {
+  CHAT_DELETED_PREVIEW,
   CHAT_SIGNATURE_HEAD_BYTES,
   ChatInputError,
+  isChatMessageType,
+  messageHasLink,
   messagePreview,
   parseSendChatMessageInput,
   validateStoredMedia,
@@ -116,9 +119,14 @@ export async function sendChatMessageCore(
     ? { ...input.media, ...(await verifyStoredMedia(bucket, callerUid, input)) }
     : null;
 
+  const replyRef = input.replyToMessageId
+    ? convRef.collection("messages").doc(input.replyToMessageId)
+    : null;
+
   return db.runTransaction(async (tx) => {
     const convSnap = await tx.get(convRef);
     const msgSnap = await tx.get(msgRef);
+    const replySnap = replyRef ? await tx.get(replyRef) : null;
     if (!convSnap.exists) {
       throw new HttpsError("not-found", "المحادثة غير موجودة");
     }
@@ -146,6 +154,22 @@ export async function sendChatMessageCore(
       sentAt: FieldValue.serverTimestamp(),
       deleted: false,
     };
+    if (messageHasLink(input.type, input.text)) messageDoc.hasLink = true;
+    if (replySnap) {
+      if (!replySnap.exists) {
+        throw new HttpsError("not-found", "الرسالة المقتبسة غير موجودة");
+      }
+      const quoted = replySnap.data() ?? {};
+      const quotedType = isChatMessageType(quoted.type) ? quoted.type : "text";
+      messageDoc.replyTo = {
+        messageId: replySnap.id,
+        senderId: typeof quoted.senderId === "string" ? quoted.senderId : "",
+        type: quotedType,
+        preview: quoted.deleted === true
+          ? CHAT_DELETED_PREVIEW
+          : messagePreview(quotedType, typeof quoted.text === "string" ? quoted.text : ""),
+      };
+    }
     if (media) {
       messageDoc.media = {
         storagePath: media.storagePath,

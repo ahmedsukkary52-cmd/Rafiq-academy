@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
@@ -820,26 +821,28 @@ class _StudentCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _avatarBg,
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusFull,
+                        if (AppCapabilities.streakAndLevelAvailable) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _avatarBg,
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusFull,
+                              ),
+                            ),
+                            child: Text(
+                              'المستوى ${teacherHomeEasternDigits('${student.level}')}',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: _accent,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                          child: Text(
-                            'المستوى ${teacherHomeEasternDigits('${student.level}')}',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: _accent,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
+                          const SizedBox(width: 10),
+                        ],
                         Container(
                           width: 7,
                           height: 7,
@@ -873,24 +876,26 @@ class _StudentCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            'تقدم الحفظ',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
+          if (AppCapabilities.memorizationProgressAvailable) ...[
+            const SizedBox(height: 12),
+            Text(
+              'تقدم الحفظ',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-            child: LinearProgressIndicator(
-              value: (student.overallProgressPercent / 100).clamp(0.0, 1.0),
-              minHeight: 7,
-              backgroundColor: AppColors.surfaceGrey,
-              color: _progressColor,
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+              child: LinearProgressIndicator(
+                value: (student.overallProgressPercent / 100).clamp(0.0, 1.0),
+                minHeight: 7,
+                backgroundColor: AppColors.surfaceGrey,
+                color: _progressColor,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 14),
           Row(
             children: [

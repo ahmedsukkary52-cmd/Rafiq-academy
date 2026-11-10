@@ -348,7 +348,7 @@ class _FiltersCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppSizes.radiusM),
               child: InputDecorator(
                 decoration: const InputDecoration(
-                  labelText: 'اليوم',
+                  labelText: 'من تاريخ',
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.calendar_today_outlined),
                 ),
@@ -387,7 +387,7 @@ class _RequestsBody extends StatelessWidget {
       return const AppEmptyState(
         icon: Icons.event_busy_outlined,
         title: 'اختر حلقة أولاً',
-        message: 'حدّد الحلقة والتاريخ لعرض طلبات الاستئذان المعلّقة.',
+        message: 'حدّد الحلقة لعرض طلبات الاستئذان المعلّقة القادمة.',
       );
     }
 
@@ -407,7 +407,7 @@ class _RequestsBody extends StatelessWidget {
       return const AppEmptyState(
         icon: Icons.inbox_outlined,
         title: 'لا توجد طلبات معلّقة',
-        message: 'لا يوجد استئذان قيد المراجعة لهذه الحلقة في اليوم المحدد.',
+        message: 'لا يوجد استئذان قيد المراجعة لهذه الحلقة من التاريخ المحدد فصاعداً.',
       );
     }
 

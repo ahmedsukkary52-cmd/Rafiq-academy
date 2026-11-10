@@ -1,10 +1,11 @@
 /**
- * Deactivated staff (isActive == false) — Storage.
+ * Deactivated staff and students (isActive == false) — Storage.
  *
  * Halaqa-scoped Storage paths authorize staff through the halaqa document
- * (isStaffOfHalaqaDoc / isStaffOfAssignmentHalaqa). A deactivated
- * teacher/supervisor still named there gets nothing; active staff, linked
- * parents and Admin are unchanged.
+ * (isStaffOfHalaqaDoc / isStaffOfAssignmentHalaqa) and students through its
+ * roster. A deactivated teacher/supervisor still named there, or a
+ * deactivated student still on the roster, gets nothing; active staff,
+ * rostered students, linked parents and Admin are unchanged.
  *
  * The Storage emulator caches cross-service reads across clearFirestore(),
  * so active and deactivated staff are separate accounts on separate halaqat
@@ -77,11 +78,24 @@ test.beforeEach(async () => {
       'users/daParent': user('parent'),
       'users/daStudentA': user('student'),
       'users/daStudentB': user('student'),
+      'users/daStudentOff': user('student', false),
+      'users/daStudentOut': user('student'),
       'parentProfiles/daParent': { childrenIds: ['daStudentB'] },
       'halaqat/daHOn': {
         teacherId: 'daTeacherOn',
         supervisorId: 'daSvOn',
-        studentIds: ['daStudentA'],
+        studentIds: ['daStudentA', 'daStudentOff'],
+      },
+      'posts/DaPostCccccccccccccc': {
+        authorId: 'daTeacherOn',
+        halaqaId: 'daHOn',
+        audienceTarget: 'daHOn',
+      },
+      'conversations/daConv': {
+        participantIds: ['daStudentA', 'daStudentOff', 'daTeacherOn'],
+      },
+      'conversations/daConv/messages/DaMsgAaaaaaaaaaa': {
+        media: { storagePath: 'chat_media/daConv/DaMsgAaaaaaaaaaa/a.jpg' },
       },
       'halaqat/daHOff': {
         teacherId: 'daTeacherOff',
@@ -99,6 +113,85 @@ test.beforeEach(async () => {
   await adminPut('content_library/daHOff/daAdmin/a.jpg');
   await adminPut('halaqa_activities/daActOn/daStudentA/images/a.jpg');
   await adminPut('halaqa_activities/daActOff/daStudentB/images/a.jpg');
+  await adminPut('halaqa_activities/daActOn/daStudentOff/images/a.jpg');
+  await adminPut('chat_media/daConv/DaMsgAaaaaaaaaaa/a.jpg');
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await image(
+      ctx.storage().ref('posts/daHOn/DaPostCccccccccccccc/att_0.jpg'),
+      { uploaderId: 'daTeacherOn' },
+    );
+  });
+});
+
+// Deactivation leaves a student on halaqat.studentIds and in
+// conversations.participantIds; neither may authorize the account.
+const STUDENT_FILES = [
+  'content_library/daHOn/daAdmin/a.jpg',
+  'posts/daHOn/DaPostCccccccccccccc/att_0.jpg',
+  'halaqa_activities/daActOn/daStudentA/images/a.jpg',
+  'chat_media/daConv/DaMsgAaaaaaaaaaa/a.jpg',
+];
+
+test('deactivated student on the roster cannot read halaqa, activity or chat files', async () => {
+  for (const path of STUDENT_FILES) {
+    await assertSucceeds(storageOf('daStudentA').ref(path).getDownloadURL());
+    await assertFails(storageOf('daStudentOff').ref(path).getDownloadURL());
+  }
+  await assertSucceeds(
+    storageOf('daStudentA').ref('halaqa_activities/daActOn/daStudentOff/images/a.jpg').getDownloadURL(),
+  );
+  // Own activity upload stays closed too.
+  await assertFails(
+    storageOf('daStudentOff').ref('halaqa_activities/daActOn/daStudentOff/images/a.jpg').getDownloadURL(),
+  );
+});
+
+test('deactivated student on the roster cannot upload activity or chat files', async () => {
+  await assertSucceeds(
+    image(storageOf('daStudentA').ref('halaqa_activities/daActOn/daStudentA/images/n.jpg')),
+  );
+  await assertFails(
+    image(storageOf('daStudentOff').ref('halaqa_activities/daActOn/daStudentOff/images/n.jpg')),
+  );
+  await assertSucceeds(
+    image(
+      storageOf('daStudentA').ref('chat_media/daConv/DaMsgBbbbbbbbbbbb/n.jpg'),
+      { uploaderId: 'daStudentA' },
+    ),
+  );
+  await assertFails(
+    image(
+      storageOf('daStudentOff').ref('chat_media/daConv/DaMsgCcccccccccccc/n.jpg'),
+      { uploaderId: 'daStudentOff' },
+    ),
+  );
+});
+
+test('active student not on the roster gets no halaqa or activity files', async () => {
+  for (const path of STUDENT_FILES) {
+    await assertFails(storageOf('daStudentOut').ref(path).getDownloadURL());
+  }
+  await assertFails(
+    image(storageOf('daStudentOut').ref('halaqa_activities/daActOn/daStudentOut/images/n.jpg')),
+  );
+});
+
+test('staff and admin keep file access on a halaqa with a deactivated student', async () => {
+  for (const uid of ['daTeacherOn', 'daSvOn', 'daAdmin']) {
+    await assertSucceeds(
+      storageOf(uid).ref('halaqa_activities/daActOn/daStudentOff/images/a.jpg').getDownloadURL(),
+    );
+    await assertSucceeds(storageOf(uid).ref('content_library/daHOn/daAdmin/a.jpg').getDownloadURL());
+    await assertSucceeds(
+      storageOf(uid).ref('posts/daHOn/DaPostCccccccccccccc/att_0.jpg').getDownloadURL(),
+    );
+  }
+  await assertSucceeds(
+    storageOf('daTeacherOn').ref('chat_media/daConv/DaMsgAaaaaaaaaaa/a.jpg').getDownloadURL(),
+  );
+  await assertSucceeds(
+    storageOf('daAdmin').ref('chat_media/daConv/DaMsgAaaaaaaaaaa/a.jpg').getDownloadURL(),
+  );
 });
 
 test('deactivated staff cannot read their halaqa shared content', async () => {

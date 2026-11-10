@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
+import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../admin_format.dart';
@@ -74,8 +75,10 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                       )
                     else if (summary != null) ...[
                       AdminGradientHeroCard(
-                        eyebrow: 'إجمالي الإيرادات',
-                        headline: '${fmt(summary.totalRevenue.round())} ر.س',
+                        eyebrow: 'إجمالي المحصّل',
+                        headline: academyMoneyText(
+                          fmt(summary.totalRevenue.round()),
+                        ),
                         metrics: [
                           AdminHeroMetric(
                             value: fmt(summary.paidCount),
@@ -83,7 +86,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                           ),
                           AdminHeroMetric(
                             value: fmt(summary.dueCount),
-                            label: 'معلقة',
+                            label: 'مستحقة',
                           ),
                           AdminHeroMetric(
                             value: fmt(summary.overdueCount),
@@ -101,8 +104,10 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                         childAspectRatio: 1.25,
                         children: [
                           AdminStatTile(
-                            value: '${fmt(summary.totalPending.round())} ر.س',
-                            label: 'مدفوعات معلقة',
+                            value: academyMoneyText(
+                              fmt(summary.totalPending.round()),
+                            ),
+                            label: 'مستحقات قائمة',
                             icon: Icons.schedule_outlined,
                             iconBg: const Color(0xFFFFF8E1),
                             iconColor: AppColors.warning,
@@ -112,7 +117,9 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                             badgeColor: AppColors.warning,
                           ),
                           AdminStatTile(
-                            value: '${fmt(summary.totalOverdue.round())} ر.س',
+                            value: academyMoneyText(
+                              fmt(summary.totalOverdue.round()),
+                            ),
                             label: 'مدفوعات متأخرة',
                             icon: Icons.warning_amber_outlined,
                             iconBg: const Color(0xFFFFEBEE),
@@ -126,20 +133,18 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                       ),
                       const SizedBox(height: 16),
                       AppButton(
-                        label: 'مراجعة المدفوعات',
-                        onPressed: () => context.push(AppRoutes.adminPayments),
-                      ),
-                      const SizedBox(height: 10),
-                      AppButton(
-                        label: 'سجل المدفوعات',
+                        key: const Key('finance-open-ledger'),
+                        label: 'سجل المدفوعات والتفاصيل',
                         onPressed: () =>
                             context.push(AppRoutes.adminPaymentsOverview),
                       ),
                       const SizedBox(height: 10),
                       AppButton(
-                        label: 'لوحة مالية تفصيلية',
-                        onPressed: () =>
-                            context.push(AppRoutes.adminFinanceDetail),
+                        key: const Key('finance-open-review'),
+                        label: summary.awaitingReviewCount > 0
+                            ? 'إيصالات بانتظار المراجعة (${fmt(summary.awaitingReviewCount)})'
+                            : 'إيصالات بانتظار المراجعة',
+                        onPressed: () => context.push(AppRoutes.adminPayments),
                       ),
                     ],
                   ],

@@ -34,7 +34,7 @@ class SupervisorAbsenceRequestsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'استئذان اليوم (عرض فقط)',
+          'الاستئذان اليوم والقادم (عرض فقط)',
           style: AppTextStyles.headlineMedium,
           textAlign: TextAlign.right,
         ),
@@ -58,7 +58,7 @@ class SupervisorAbsenceRequestsSection extends StatelessWidget {
         else if (requests.isEmpty)
           AppCard(
             child: Text(
-              'لا توجد طلبات استئذان لهذا اليوم في الحلقات المشرفة.',
+              'لا توجد طلبات استئذان اليوم أو قادمة في الحلقات المشرفة.',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textHint,
               ),
@@ -106,7 +106,7 @@ class SupervisorAbsenceRequestsSection extends StatelessWidget {
                         (request.reviewedBy?.trim().isNotEmpty ?? false)) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'راجع: ${request.reviewedBy}',
+                        'تمت المراجعة من معلم الحلقة',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.textHint,
                         ),

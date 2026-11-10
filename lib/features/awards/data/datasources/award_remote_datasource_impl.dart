@@ -5,14 +5,13 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:injectable/injectable.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
-import '../../../../shared/data/achievements_firestore_contract.dart';
 import '../../../../shared/domain/upload_file_policy.dart';
 import '../../domain/award_submission_id.dart';
 import '../../domain/entities/award_entities.dart';
 import '../award_grant_errors.dart';
 import '../award_image_storage_path.dart';
+import '../halaqa_awards_response.dart';
 import '../models/granted_award_model.dart';
 import 'award_remote_datasource.dart';
 
@@ -27,9 +26,6 @@ class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
     required this.storage,
     required this.functions,
   });
-
-  CollectionReference get _awardsRef =>
-      firestore.collection(FirestoreCollections.achievements);
 
   @override
   Future<AwardsStatsEntity> getAwardsStats(String halaqaId) async {
@@ -50,24 +46,20 @@ class AwardsRemoteDatasourceImpl implements AwardsRemoteDatasource {
     }
   }
 
+  /// Staff cannot list `achievements` directly (rules cannot prove halaqa
+  /// scope for `halaqaIds array-contains`); `getHalaqaAwards` checks that the
+  /// caller teaches or supervises the halaqa and returns its grants.
   Future<List<GrantedAwardModel>> _grantsForHalaqa(
     String halaqaId, {
     int? limit,
   }) async {
-    final byIdSnap = await _awardsRef
-        .where(AchievementsFirestoreContract.halaqaIdField, isEqualTo: halaqaId)
-        .get();
-    final byIdsSnap = await _awardsRef
-        .where(
-          AchievementsFirestoreContract.halaqaIdsField,
-          arrayContains: halaqaId,
-        )
-        .get();
-    final byId = byIdSnap.docs.map(GrantedAwardModel.fromFirestore);
-    final byIds = byIdsSnap.docs.map(GrantedAwardModel.fromFirestore);
+    final result = await functions
+        .httpsCallable('getHalaqaAwards')
+        .call<dynamic>({'halaqaId': halaqaId});
+    final grants = parseHalaqaAwardsResponse(result.data);
     return mergeHalaqaScopedAwards(
-      byHalaqaIdField: byId,
-      byHalaqaIdsField: byIds,
+      byHalaqaIdField: grants,
+      byHalaqaIdsField: const <GrantedAwardModel>[],
       idOf: (grant) => grant.id,
       grantedAtOf: (grant) => grant.grantedAt,
       limit: limit,

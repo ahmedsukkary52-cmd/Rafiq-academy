@@ -45,6 +45,11 @@ class ConversationModel extends ConversationEntity {
     super.lastMessageAt,
     super.lastMessageSenderId,
     required super.unreadCount,
+    super.kind,
+    super.title,
+    super.description,
+    super.imagePath,
+    super.groupAdminIds,
   });
 
   /// [currentUid] is required so we can extract this user's unread count from
@@ -88,9 +93,22 @@ class ConversationModel extends ConversationEntity {
       lastMessageAt: dateTimeFromFirestore(data['lastMessageAt']),
       lastMessageSenderId: _stringFrom(data['lastMessageSenderId']),
       unreadCount: intFromFirestore(unreadCounts[currentUid]),
+      kind: _nonEmpty(data['kind']) ?? ConversationKinds.direct,
+      title: _nonEmpty(data['title']),
+      description: _nonEmpty(data['description']),
+      imagePath: _nonEmpty(data['imagePath']),
+      groupAdminIds: data['groupAdminIds'] is List
+          ? [
+              for (final id in data['groupAdminIds'] as List)
+                if (id is String) id,
+            ]
+          : const [],
     );
   }
 }
+
+String? _nonEmpty(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value.trim() : null;
 
 class MessageModel extends MessageEntity {
   const MessageModel({
@@ -105,6 +123,9 @@ class MessageModel extends MessageEntity {
     super.deleted,
     super.deletedAt,
     super.deletedBy,
+    super.replyTo,
+    super.reactions,
+    super.hasLink,
   });
 
   factory MessageModel.fromFirestore(DocumentSnapshot doc, {
@@ -137,7 +158,32 @@ class MessageModel extends MessageEntity {
       deleted: deleted,
       deletedAt: dateTimeFromFirestore(data['deletedAt']),
       deletedBy: _stringFrom(data['deletedBy']),
+      replyTo: _replyFrom(data['replyTo']),
+      reactions: deleted ? const {} : _reactionsFrom(data['reactions']),
+      hasLink: data['hasLink'] == true,
     );
+  }
+
+  static ChatReplyEntity? _replyFrom(Object? raw) {
+    if (raw is! Map) return null;
+    final id = raw['messageId'];
+    if (id is! String || id.isEmpty) return null;
+    return ChatReplyEntity(
+      messageId: id,
+      senderId: raw['senderId']?.toString() ?? '',
+      type: ChatMessageType.fromWire(raw['type']),
+      preview: raw['preview']?.toString() ?? '',
+    );
+  }
+
+  static Map<String, ChatReaction> _reactionsFrom(Object? raw) {
+    if (raw is! Map) return const {};
+    final out = <String, ChatReaction>{};
+    raw.forEach((uid, value) {
+      final r = ChatReaction.fromWire(value);
+      if (uid is String && r != null) out[uid] = r;
+    });
+    return out;
   }
 
   static ChatMediaEntity? _mediaFrom(Object? raw) {

@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rafiq_academy/core/firebase/app_firebase.dart';
 import 'package:rafiq_academy/core/firebase/app_flavor.dart';
 
 const _devApplicationId = 'com.example.rafiq_academy';
 const _stagingApplicationId = 'com.basmaacademy.app.staging';
 const _prodApplicationId = 'com.basmaacademy.app';
+const _emulatorApplicationId = 'com.example.rafiq_academy.emulator';
 
 /// Index of the `}` closing the block whose body starts at [bodyStart].
 int _closingBrace(String source, int bodyStart) {
@@ -103,6 +105,68 @@ android {
     expect(_appName(flavors['staging']!), 'بصمة (تجريبي)');
     expect(_applicationId(flavors['prod']!), _prodApplicationId);
     expect(_appName(flavors['prod']!), 'بصمة');
+    expect(_applicationId(flavors['emulator']!), _emulatorApplicationId);
+    expect(_appName(flavors['emulator']!), 'بصمة (محاكي)');
+  });
+
+  test('the emulator flavor is debug-signed and never shares the dev ID', () {
+    final emulator = flavors['emulator']!;
+    expect(
+      emulator,
+      contains('signingConfig = signingConfigs.getByName("debug")'),
+    );
+    expect(emulator, isNot(contains('"upload"')));
+    expect(_emulatorApplicationId, isNot(_devApplicationId));
+  });
+
+  test(
+    'an emulator artifact needs a USE_FIREBASE_EMULATOR=true debug build',
+    () {
+      expect(
+        gradle,
+        contains('Regex("^(assemble|bundle|package|install)Emulator.*")'),
+      );
+      expect(
+        gradle,
+        contains('Regex("^(assemble|bundle|package|install)EmulatorDebug.*")'),
+      );
+      expect(
+        gradle,
+        contains(
+          '(!useFirebaseEmulator || emulatorTasks.any { '
+          '!emulatorDebugArtifactTask.matches(it.name) })',
+        ),
+      );
+    },
+  );
+
+  test('emulator google-services.json is the fake demo identity only', () {
+    final json =
+        jsonDecode(
+              File(
+                'android/app/src/emulator/google-services.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+    final projectInfo = json['project_info'] as Map<String, dynamic>;
+    final clients = json['client'] as List<dynamic>;
+    expect(projectInfo['project_id'], firebaseEmulatorProjectId);
+    expect(clients, hasLength(1));
+    final client = clients.single as Map<String, dynamic>;
+    final clientInfo = client['client_info'] as Map<String, dynamic>;
+    expect(
+      clientInfo['android_client_info']['package_name'],
+      _emulatorApplicationId,
+    );
+    expect(clientInfo['mobilesdk_app_id'], firebaseEmulatorOptions.appId);
+    expect(
+      [
+        for (final key in client['api_key'] as List<dynamic>)
+          (key as Map<String, dynamic>)['current_key'],
+      ],
+      [firebaseEmulatorOptions.apiKey],
+    );
+    expect(client['oauth_client'], isEmpty);
   });
 
   test('defaultConfig leaves the application ID to the flavors', () {

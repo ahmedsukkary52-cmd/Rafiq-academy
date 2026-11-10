@@ -3,9 +3,13 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:get_it/get_it.dart';
 import 'package:injectable/injectable.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
+import '../../features/auth/domain/services/sign_out_preparation.dart';
+import '../../features/notifications/data/services/fcm_sign_out_preparation.dart';
+import '../../features/notifications/data/services/fcm_token_registrar.dart';
 import '../../features/notifications/data/sinks/in_app_academy_event_handler.dart';
 import '../../shared/domain/academy_event_sink.dart';
 import '../../shared/domain/fan_out_academy_event_sink.dart';
@@ -50,6 +54,13 @@ abstract class DiModule {
           region: functionsRegion,
         )
       : FirebaseFunctions.instanceFor(region: 'europe-west1');
+
+  /// FCM is not wired in emulator mode (see main.dart), so there is nothing
+  /// to revoke there.
+  @lazySingleton
+  SignOutPreparation get signOutPreparation => useFirebaseEmulator
+      ? const NoSignOutPreparation()
+      : FcmSignOutPreparation(() => GetIt.instance<FcmTokenRegistrar>());
 
   @lazySingleton
   InternetConnection get internetConnection => InternetConnection();

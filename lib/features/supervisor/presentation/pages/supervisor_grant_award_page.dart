@@ -265,7 +265,7 @@ class _SupervisorGrantAwardPageState extends State<SupervisorGrantAwardPage> {
                     summary: pinned == null
                         ? kAwardRecordUnreadableSummary
                         : '${pinned.title} — '
-                              '${_rowFor(pinned.studentId)?.displayName ?? pinned.studentId}',
+                              '${_rowFor(pinned.studentId)?.displayName ?? 'طالب'}',
                     blockedReason: awardRecoveryNotice(problem),
                     enabled: !submitting,
                     onAbandon: _abandonUnresolved,

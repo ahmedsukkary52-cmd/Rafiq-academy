@@ -215,6 +215,7 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
           text: text,
           status: ChatOutgoingStatus.sending,
           createdAt: DateTime.now(),
+          replyToMessageId: event.replyToMessageId,
         ),
       ],
     ));
@@ -320,6 +321,7 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
               fileName: ChatMediaPolicy.displayFileName(draft.fileName),
               durationMs: draft.durationMs,
             ),
+      replyToMessageId: item.replyToMessageId,
     ));
     result.fold(
       (failure) => _update(emit, id, (o) => o.copyWith(

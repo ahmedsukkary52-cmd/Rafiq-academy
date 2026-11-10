@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/di/injection_container.dart';
 import '../../../core/presentation/bloc_status.dart';
 import '../../../shared/widgets/shared_widgets.dart';
@@ -11,10 +12,27 @@ import '../../chat/domain/entities/chat_entities.dart';
 import '../../chat/domain/usecases/chat_usecases.dart';
 import '../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../chat/presentation/bloc/chat_conversations_event.dart';
+import '../../chat/presentation/pages/chat_room.dart';
 import '../../parent/domain/repositories/parent_repositories.dart';
 
-/// Teacher → parent chat, same flow as Class Details.
-/// Does not change Chat internals; starts the existing conversation use case.
+/// Staff roles offered "contact parent" on a student surface. UX pre-filter
+/// only: `createDirectConversation` enforces the parent relationship.
+bool staffCanContactStudentParent(String role) =>
+    role == AppRoles.teacher ||
+    role == AppRoles.supervisor ||
+    role == AppRoles.admin;
+
+/// Router path of a parent conversation for [role], or null when the role has
+/// no chat route and opens the room in-feature (supervisor).
+String? staffParentChatRoute(String role, String conversationId) =>
+    switch (role) {
+      AppRoles.teacher => '/teacher/chat/$conversationId',
+      AppRoles.admin => '/admin/chat/$conversationId',
+      _ => null,
+    };
+
+/// Staff → parent chat for the signed-in role: starts the existing
+/// conversation use case, then opens it on the role's own chat surface.
 Future<void> contactStudentParent({
   required BuildContext context,
   required String studentId,
@@ -23,6 +41,11 @@ Future<void> contactStudentParent({
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) {
       AppSnackBar.showInfo(context, 'يجب تسجيل الدخول أولاً');
+      return;
+    }
+    final role = auth.user.role;
+    if (!staffCanContactStudentParent(role)) {
+      AppSnackBar.showInfo(context, 'غير مسموح بفتح هذه المحادثة');
       return;
     }
 
@@ -64,7 +87,7 @@ Future<void> contactStudentParent({
         currentUser: ChatParticipantEntity(
           uid: auth.user.uid,
           name: auth.user.name,
-          role: auth.user.role,
+          role: role,
           profileImageUrl: auth.user.profileImageUrl,
         ),
         otherUser: parent,
@@ -87,9 +110,22 @@ Future<void> contactStudentParent({
     }
 
     final conversation = state.startedConversation!;
-    context.push(
-      '/teacher/chat/${conversation.id}',
-      extra: {'name': parent.name, 'imageUrl': parent.profileImageUrl},
+    final route = staffParentChatRoute(role, conversation.id);
+    if (route != null) {
+      context.push(
+        route,
+        extra: {'name': parent.name, 'imageUrl': parent.profileImageUrl},
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatRoomPage(
+          conversationId: conversation.id,
+          otherUserName: parent.name,
+          otherUserImage: parent.profileImageUrl,
+        ),
+      ),
     );
   } catch (_) {
     if (!context.mounted) return;

@@ -59,6 +59,23 @@ gradle.taskGraph.whenReady {
     }
 }
 
+// The emulator flavor talks only to the local Emulator Suite: an emulator
+// artifact that is not a USE_FIREBASE_EMULATOR=true debug build stops here.
+val emulatorArtifactTask = Regex("^(assemble|bundle|package|install)Emulator.*")
+val emulatorDebugArtifactTask = Regex("^(assemble|bundle|package|install)EmulatorDebug.*")
+gradle.taskGraph.whenReady {
+    val emulatorTasks = allTasks.filter { emulatorArtifactTask.matches(it.name) }
+    if (emulatorTasks.isNotEmpty() &&
+        (!useFirebaseEmulator || emulatorTasks.any { !emulatorDebugArtifactTask.matches(it.name) })
+    ) {
+        throw GradleException(
+            "The emulator flavor is debug-only and needs " +
+                "--dart-define=USE_FIREBASE_EMULATOR=true, e.g. " +
+                "flutter build apk --flavor emulator --debug --dart-define=USE_FIREBASE_EMULATOR=true"
+        )
+    }
+}
+
 android {
     namespace = "com.example.rafiq_academy"
     compileSdk = flutter.compileSdkVersion
@@ -67,6 +84,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -120,6 +139,16 @@ android {
             resValue("string", "app_name", "بصمة")
             if (hasUploadKey) signingConfig = signingConfigs.getByName("upload")
         }
+        create("emulator") {
+            dimension = "env"
+            // Phone testing against the PC's Emulator Suite over adb reverse.
+            // Installs next to dev; src/emulator/google-services.json is the
+            // fake demo-rafiq-rules identity, so no native SDK sees a real
+            // project either.
+            applicationId = "com.example.rafiq_academy.emulator"
+            resValue("string", "app_name", "بصمة (محاكي)")
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     buildTypes {
@@ -139,4 +168,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

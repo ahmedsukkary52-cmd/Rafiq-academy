@@ -11,10 +11,12 @@ FirebaseOptions _options(String projectId) => FirebaseOptions(
 
 void main() {
   group('parseAppFlavor', () {
-    test('accepts dev, staging and prod', () {
+    test('accepts dev, staging, prod and emulator', () {
       expect(parseAppFlavor('dev'), AppFlavor.dev);
       expect(parseAppFlavor('staging'), AppFlavor.staging);
       expect(parseAppFlavor('prod'), AppFlavor.prod);
+      expect(parseAppFlavor('emulator'), AppFlavor.emulator);
+      expect(() => parseAppFlavor('Emulator'), throwsStateError);
     });
 
     test('refuses to guess a missing or unknown flavor', () {
@@ -63,6 +65,22 @@ void main() {
           devOptions: () => _options(devFirebaseProjectId),
         ),
         throwsStateError,
+      );
+    });
+
+    test('emulator never falls back to a real project', () {
+      expect(
+        () => firebaseOptionsFor(
+          AppFlavor.emulator,
+          devOptions: () => _options(devFirebaseProjectId),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('USE_FIREBASE_EMULATOR=true'),
+          ),
+        ),
       );
     });
 

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
+import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/payment_review_amount_panel.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -22,7 +23,7 @@ import '../widgets/supervisor_subpage_scaffold.dart';
 
 enum _PaymentFilter { all, awaiting, reviewed }
 
-String _money(double v) => '${formatMoneyAmount(v)} ر.س';
+String _money(double v) => academyMoneyLabel(v);
 
 /// Supervisor payment submissions — review external-pay proofs.
 class SupervisorPaymentsPage extends StatefulWidget {
@@ -134,8 +135,8 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
           value: context.read<SupervisorBloc>(),
           child: _PaymentReviewPage(
             payment: payment,
-            studentName: _names[payment.studentId] ?? payment.studentId,
-            parentName: _names[payment.parentId] ?? payment.parentId,
+            studentName: _names[payment.studentId] ?? 'طالب',
+            parentName: _names[payment.parentId] ?? 'ولي أمر',
           ),
         ),
       ),
@@ -306,7 +307,7 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
                     )
                   else
                     ...visible.map((p) {
-                      final name = _names[p.studentId] ?? p.studentId;
+                      final name = _names[p.studentId] ?? 'طالب';
                       final color = _reviewColor(p);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -698,7 +699,7 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                       snapshot: _snapshot,
                       decision: _decision.wire,
                       draft: _draft,
-                      currency: 'ر.س',
+                      currency: academyCurrencyLabel,
                       enabled: !busy,
                     ),
                   ),
@@ -841,10 +842,7 @@ class _PaymentsReportPage extends StatelessWidget {
                 _InfoRow(label: 'مقبولة', value: '${approved.length}'),
                 _InfoRow(label: 'مرفوضة', value: '${rejected.length}'),
                 _InfoRow(label: 'جزئية', value: '${partial.length}'),
-                _InfoRow(
-                  label: 'إجمالي المقبول',
-                  value: '${approvedTotal.toStringAsFixed(0)} ر.س',
-                ),
+                _InfoRow(label: 'إجمالي المقبول', value: _money(approvedTotal)),
               ],
             ),
           ),
@@ -860,7 +858,7 @@ class _PaymentsReportPage extends StatelessWidget {
             const AppCard(child: Text('لا توجد مراجعات بعد'))
           else
             ...reviewed.map((p) {
-              final name = names[p.studentId] ?? p.studentId;
+              final name = names[p.studentId] ?? 'طالب';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: AppCard(
@@ -874,7 +872,7 @@ class _PaymentsReportPage extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${_reportReviewLabel(p)} · ${(p.amountPaidConfirmed ?? p.amount).toStringAsFixed(0)} ر.س',
+                        '${_reportReviewLabel(p)} · ${_money(p.amountPaidConfirmed ?? p.amount)}',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.textSecondary,
                         ),

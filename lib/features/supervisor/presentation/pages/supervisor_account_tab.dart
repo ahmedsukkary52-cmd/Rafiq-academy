@@ -3,10 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../shared/theme/app_preferences_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/confirm_logout.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../complaints/presentation/complaints_entry.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../notifications/presentation/pages/notification_page.dart';
 import '../../../teacher/domain/entities/halaqa_students_summary_entity.dart';
@@ -366,7 +366,6 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prefs = AppPreferencesScope.of(context);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -382,20 +381,6 @@ class _SettingsCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: prefs.themeMode,
-            builder: (context, mode, _) {
-              return _ToggleRow(
-                icon: Icons.dark_mode_rounded,
-                iconBg: const Color(0xFFE8E8F0),
-                iconColor: AppColors.textPrimary,
-                label: 'الوضع الليلي',
-                value: mode == ThemeMode.dark,
-                onChanged: prefs.setDarkMode,
-              );
-            },
-          ),
-          const _SettingsDivider(),
           _NavRow(
             icon: Icons.notifications_rounded,
             iconBg: const Color(0xFFD6F6F8),
@@ -404,12 +389,12 @@ class _SettingsCard extends StatelessWidget {
             onTap: onNotifications,
           ),
           const _SettingsDivider(),
-          const _NavRow(
-            icon: Icons.language_rounded,
-            iconBg: Color(0xFFFEF3C7),
-            iconColor: AppColors.secondary,
-            label: 'اللغة',
-            trailing: 'العربية',
+          _NavRow(
+            icon: Icons.support_agent_rounded,
+            iconBg: AppColors.primaryLight,
+            iconColor: AppColors.primaryDark,
+            label: 'الشكاوى',
+            onTap: () => openMyComplaints(context),
           ),
           const _SettingsDivider(),
           _LogoutRow(onTap: onLogout),
@@ -449,58 +434,11 @@ class _RoundIcon extends StatelessWidget {
   }
 }
 
-class _ToggleRow extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleRow({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          _RoundIcon(icon: icon, bg: iconBg, color: iconColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          Switch.adaptive(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: AppColors.onPrimary,
-            activeTrackColor: AppColors.primary,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _NavRow extends StatelessWidget {
   final IconData icon;
   final Color iconBg;
   final Color iconColor;
   final String label;
-  final String? trailing;
   final VoidCallback? onTap;
 
   const _NavRow({
@@ -508,7 +446,6 @@ class _NavRow extends StatelessWidget {
     required this.iconBg,
     required this.iconColor,
     required this.label,
-    this.trailing,
     this.onTap,
   });
 
@@ -533,13 +470,6 @@ class _NavRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailing != null)
-                Text(
-                  trailing!,
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.textHint,
-                  ),
-                ),
               if (onTap != null) ...[
                 const SizedBox(width: 4),
                 Icon(

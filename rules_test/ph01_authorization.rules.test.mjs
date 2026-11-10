@@ -1377,7 +1377,11 @@ test('PH01 privacy: studentProfiles are not readable student-to-student', async 
   await assertSucceeds(authed('parent1').doc('studentProfiles/student1').get());
   await assertFails(authed('parent2').doc('studentProfiles/student1').get());
   await assertFails(authed('parent1').doc('studentProfiles/student2').get());
-  await assertSucceeds(authed('teacher1').doc('studentProfiles/student2').get());
+  // P1-5: staff read only students they serve, one profile at a time.
+  await assertSucceeds(authed('teacher1').doc('studentProfiles/student1').get());
+  await assertFails(authed('teacher1').doc('studentProfiles/student2').get());
+  await assertFails(authed('supervisor1').doc('studentProfiles/student2').get());
+  await assertFails(authed('teacher1').collection('studentProfiles').get());
   await assertFails(authed('student1').collection('studentProfiles').get());
 });
 
@@ -1452,11 +1456,23 @@ test('PH01 privacy: achievements are own/linked/staff scoped', async () => {
       .where('studentId', '==', 'student1')
       .get(),
   );
+  // P1-5: staff list their own halaqa's grants by halaqaId; multi-halaqa
+  // lookups go through getHalaqaAwards, so halaqaIds lists are denied.
   await assertSucceeds(
+    authed('teacher1')
+      .collection('achievements')
+      .where('halaqaId', '==', 'h1')
+      .get(),
+  );
+  await assertFails(
     authed('teacher1')
       .collection('achievements')
       .where('halaqaIds', 'array-contains', 'h1')
       .get(),
+  );
+  await assertFails(authed('teacher2').doc('achievements/a1').get());
+  await assertFails(
+    authed('teacher2').collection('achievements').where('halaqaId', '==', 'h1').get(),
   );
 });
 

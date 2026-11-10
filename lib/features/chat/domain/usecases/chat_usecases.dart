@@ -25,7 +25,7 @@ class WatchConversationsUseCase
   Stream<Either<Failure, List<ConversationEntity>>> call(
       ChatUidParams params,
       ) =>
-      repository.watchConversations(params.uid);
+      repository.watchConversations(params.uid, limit: params.limit);
 }
 
 /// Admin-only academy-wide inbox (read oversight; does not join threads).
@@ -39,7 +39,10 @@ class WatchAllConversationsUseCase
   Stream<Either<Failure, List<ConversationEntity>>> call(
     ChatUidParams params,
   ) =>
-      repository.watchAllConversations(observerUid: params.uid);
+      repository.watchAllConversations(
+        observerUid: params.uid,
+        limit: params.limit,
+      );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -124,6 +127,7 @@ class SendMessageUseCase extends UseCase<Unit, SendMessageParams> {
       type: params.type,
       text: trimmed,
       media: media,
+      replyToMessageId: params.replyToMessageId,
     );
   }
 }
@@ -252,10 +256,13 @@ class EditChatMessageUseCase extends UseCase<Unit, EditChatMessageParams> {
 
 class ChatUidParams extends Equatable {
   final String uid;
-  const ChatUidParams(this.uid);
+
+  /// Live window size for inbox streams; null keeps the unbounded stream.
+  final int? limit;
+  const ChatUidParams(this.uid, {this.limit});
 
   @override
-  List<Object?> get props => [uid];
+  List<Object?> get props => [uid, limit];
 }
 
 class ConversationIdParams extends Equatable {
@@ -296,6 +303,7 @@ class SendMessageParams extends Equatable {
   final ChatMessageType type;
   final String text;
   final ChatSendMedia? media;
+  final String? replyToMessageId;
 
   const SendMessageParams({
     required this.conversationId,
@@ -303,10 +311,12 @@ class SendMessageParams extends Equatable {
     this.type = ChatMessageType.text,
     required this.text,
     this.media,
+    this.replyToMessageId,
   });
 
   @override
-  List<Object?> get props => [conversationId, messageId, type, text, media];
+  List<Object?> get props =>
+      [conversationId, messageId, type, text, media, replyToMessageId];
 }
 
 class StartChatUploadParams extends Equatable {

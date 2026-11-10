@@ -32,6 +32,9 @@ class FirebaseMessagingAdapter implements FcmMessagingPort {
   Stream<String> tokenRefreshes() => messaging.onTokenRefresh;
 
   @override
+  Future<void> deleteToken() => messaging.deleteToken();
+
+  @override
   String platformKey() => FcmTokenContract.platformKey(
     isWeb: kIsWeb,
     operatingSystem: kIsWeb ? '' : Platform.operatingSystem,

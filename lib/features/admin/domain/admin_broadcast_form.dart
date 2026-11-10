@@ -20,6 +20,22 @@ class AdminBroadcastFormValidation {
     AppRoles.supervisor: 'المشرفون',
   };
 
+  /// Who reads a role/`all` notification (`audience in [uid, role, 'all']`).
+  static String audienceExplanation(String targetRole) => switch (targetRole) {
+    'all' =>
+      'يصل إلى كل حسابات الأكاديمية: الطلاب وأولياء الأمور والمعلمين '
+          'والمشرفين والإدارة.',
+    AppRoles.parent => 'يصل إلى حسابات أولياء الأمور فقط.',
+    AppRoles.student => 'يصل إلى حسابات الطلاب فقط.',
+    AppRoles.teacher => 'يصل إلى حسابات المعلمين فقط.',
+    AppRoles.supervisor => 'يصل إلى حسابات المشرفين فقط.',
+    _ => 'اختر فئة المستلمين',
+  };
+
+  static const deliveryNote =
+      'يظهر داخل التطبيق في صفحة الإشعارات لكل حساب من هذه الفئة، '
+      'بما في ذلك الحسابات التي تُضاف لاحقًا. لا يُرسل إشعار فوري (Push) حاليًا.';
+
   static String? error({
     required String title,
     required String body,

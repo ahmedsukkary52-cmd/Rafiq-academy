@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/halaqa_meeting_link.dart';
+import '../../../../shared/domain/halaqa_name_key.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/halaqa_meeting_link_builder.dart';
@@ -100,7 +101,7 @@ class _HalaqatBody extends StatelessWidget {
             itemBuilder: (context, i) {
               final h = state.halaqat[i];
               return AdminSectionCard(
-                title: h.name.trim().isEmpty ? h.id : h.name.trim(),
+                title: h.name.trim().isEmpty ? 'حلقة بدون اسم' : h.name.trim(),
                 subtitle:
                     'المعلم: ${state.nameOf(h.teacherId)}'
                     '${h.supervisorId.isEmpty ? '' : ' · المشرف: ${state.nameOf(h.supervisorId)}'}'
@@ -257,7 +258,18 @@ class _CreateHalaqaSheetState extends State<_CreateHalaqaSheet> {
     if (slot != null) setState(() => _slots.add(slot));
   }
 
+  String? _duplicateError(AdminOperationsState state) {
+    final clash = duplicateHalaqaName(
+      _name.text,
+      state.halaqat.map((h) => h.name),
+    );
+    return clash == null ? null : 'يوجد حلقة بنفس الاسم بالفعل ($clash)';
+  }
+
   void _submit() {
+    if (_duplicateError(context.read<AdminOperationsBloc>().state) != null) {
+      return;
+    }
     context.read<AdminOperationsBloc>().add(
       CreateHalaqaEvent(
         CreateHalaqaParams(
@@ -292,8 +304,13 @@ class _CreateHalaqaSheetState extends State<_CreateHalaqaSheet> {
               Text('إنشاء حلقة', style: AppTextStyles.titleLarge),
               const SizedBox(height: 12),
               TextField(
+                key: const Key('halaqa-name-field'),
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'اسم الحلقة'),
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'اسم الحلقة',
+                  errorText: _duplicateError(state),
+                ),
               ),
               const SizedBox(height: 12),
               AdminUserDropdown(

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/constants/app_constants.dart';
 import 'package:rafiq_academy/core/router/router_app.dart';
+import 'package:rafiq_academy/features/teacher/presentation/teacher_contact_parent.dart';
 import 'package:rafiq_academy/features/teacher/presentation/utils/teacher_surface_navigation.dart';
 
 void main() {
@@ -41,12 +42,28 @@ void main() {
       expect(actions, [StudentCardAction.evaluate, StudentCardAction.award]);
     });
 
-    test('supervisor is not offered profile or parent chat when at risk', () {
+    test('supervisor is offered parent contact, not profile, when at risk', () {
       final actions = TeacherSurfaceNavigation.studentCardActions(
         role: AppRoles.supervisor,
         isAtRisk: true,
       );
-      expect(actions, [StudentCardAction.evaluate]);
+      expect(actions, [
+        StudentCardAction.evaluate,
+        StudentCardAction.contactParent,
+      ]);
+    });
+
+    test('non-staff viewers are never offered parent contact', () {
+      for (final role in [AppRoles.parent, AppRoles.student, '']) {
+        expect(
+          TeacherSurfaceNavigation.studentCardActions(
+            role: role,
+            isAtRisk: true,
+          ),
+          isNot(contains(StudentCardAction.contactParent)),
+          reason: role,
+        );
+      }
     });
 
     test('every offered destination is one the router allows for the role', () {
@@ -60,12 +77,19 @@ void main() {
             StudentCardAction.profile: AppRoutes.teacherStudentProfile('s1'),
             StudentCardAction.evaluate:
                 '/teacher/halaqa/h1/evaluations?studentId=s1',
-            StudentCardAction.contactParent: '/teacher/chat/c1',
+            StudentCardAction.contactParent: staffParentChatRoute(role, 'c1'),
             StudentCardAction.award: '/teacher/halaqa/h1/awards',
           };
           for (final action in actions) {
+            final path = paths[action];
+            if (path == null) {
+              // Supervisor parent chat opens in-feature, not via the router.
+              expect(action, StudentCardAction.contactParent);
+              expect(role, AppRoles.supervisor);
+              continue;
+            }
             expect(
-              AppRouteAccess.isAllowed(path: paths[action]!, role: role),
+              AppRouteAccess.isAllowed(path: path, role: role),
               isTrue,
               reason: '$role offered $action',
             );

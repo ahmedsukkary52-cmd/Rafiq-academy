@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/presentation/academy_data_revision.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../student/domain/entities/halaqa_entity.dart';
@@ -161,6 +162,7 @@ class AdminOperationsBloc
       },
     );
     if (reloadDirectory && result.isRight()) {
+      AcademyDataRevision.bumpStructure();
       add(const LoadAdminDirectoryEvent());
     }
   }

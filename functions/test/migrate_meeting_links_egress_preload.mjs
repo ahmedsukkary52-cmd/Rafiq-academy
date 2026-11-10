@@ -10,7 +10,8 @@
 //    CommonJS require (Module._load) and ESM import (module.register resolve
 //    hook, Node >= 20.6), proving a run never reached the SDK.
 // On exit it reports the number of refused attempts on stderr (never targets).
-// Works on Node 20 (functions/package.json engines) and later; it refuses to
+// Works on Node 20.6 and later, including the Node 22 runtime in
+// functions/package.json engines; it refuses to
 // run rather than start without a barrier.
 import dns from "node:dns";
 import fs from "node:fs";

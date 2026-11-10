@@ -6,10 +6,10 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_status_chip.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../chat/domain/entities/chat_entities.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
@@ -18,6 +18,8 @@ import '../bloc/admin_bloc.dart';
 import '../bloc/admin_event.dart';
 import '../bloc/admin_state.dart';
 import '../widgets/admin_figma_widgets.dart';
+import 'admin_chat_inbox_page.dart' show adminInboxPageSize;
+import 'admin_dashboard_tab.dart' show isOpenComplaintStatus;
 import '../widgets/admin_subpage_scaffold.dart';
 import '../widgets/admin_loading_skeletons.dart';
 
@@ -34,25 +36,18 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminBloc>().add(const RefreshAdminDashboardEvent());
       final auth = context.read<AuthBloc>().state;
       if (auth is AuthAuthenticated) {
         sl<ChatConversationsBloc>().add(
-          StartWatchingAllConversationsEvent(auth.user.uid),
+          StartWatchingAllConversationsEvent(
+            auth.user.uid,
+            pageSize: adminInboxPageSize,
+          ),
         );
       }
     });
-  }
-
-  List<double> _weekdayCounts(List<ConversationEntity> conversations) {
-    final counts = List<double>.filled(7, 0);
-    for (final c in conversations) {
-      final at = c.lastMessageAt;
-      if (at == null) continue;
-      counts[at.weekday % 7] += 1;
-    }
-    return counts;
   }
 
   @override
@@ -65,11 +60,6 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
       subtitle: 'نظرة تنفيذية شاملة',
       actions: [
         AdminIconButton(
-          icon: Icons.search_rounded,
-          onTap: () => context.push('${AppRoutes.admin}/chat'),
-        ),
-        const SizedBox(width: 8),
-        AdminIconButton(
           icon: Icons.notifications_none_rounded,
           onTap: () => context.push(AppRoutes.adminNotifications),
         ),
@@ -81,7 +71,10 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
           context.read<AdminBloc>().add(const RefreshAdminDashboardEvent());
           if (adminUid.isNotEmpty) {
             sl<ChatConversationsBloc>().add(
-              StartWatchingAllConversationsEvent(adminUid),
+              StartWatchingAllConversationsEvent(
+                adminUid,
+                pageSize: adminInboxPageSize,
+              ),
             );
           }
         },
@@ -94,27 +87,35 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
               builder: (context, chatState) {
                 return BlocBuilder<AdminBloc, AdminState>(
                   builder: (context, adminState) {
-                    final convCount = chatState.conversations.length;
+                    // Paged list: when more exist, show "N+" rather than a
+                    // fabricated total.
+                    final listed = chatState.conversations.length;
+                    final convCount = chatState.hasMoreConversations
+                        ? '+${adminFormatCount(listed)}'
+                        : adminFormatCount(listed);
                     final unread = chatState.totalUnreadCount;
-                    final openComplaints = adminState.complaints
-                        .where((c) => c.status != 'resolved')
+                    final openCount = adminState.complaints
+                        .where((c) => isOpenComplaintStatus(c.status))
                         .length;
+                    // The preview query is capped; never present it as exact.
+                    final openComplaints = openCount >= 20
+                        ? '+20'
+                        : adminFormatCount(openCount);
                     final teachers = adminState.stats?.totalTeachers ?? 0;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         AdminGradientHeroCard(
-                          eyebrow: 'نشاط التواصل اليوم',
-                          headline:
-                              '${adminFormatCount(convCount)} محادثة نشطة',
+                          eyebrow: 'نشاط التواصل',
+                          headline: '$convCount محادثة',
                           metrics: [
                             AdminHeroMetric(
                               value: adminFormatCount(unread),
                               label: 'غير مقروءة',
                             ),
                             AdminHeroMetric(
-                              value: adminFormatCount(openComplaints),
+                              value: openComplaints,
                               label: 'شكاوى مفتوحة',
                             ),
                             AdminHeroMetric(
@@ -133,7 +134,7 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
                           childAspectRatio: 1.25,
                           children: [
                             AdminStatTile(
-                              value: adminFormatCount(convCount),
+                              value: convCount,
                               label: 'إجمالي المحادثات',
                               icon: Icons.chat_bubble_outline,
                               iconBg: AppColors.primaryLight,
@@ -142,85 +143,35 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
                                   context.push('${AppRoutes.admin}/chat'),
                             ),
                             AdminStatTile(
-                              value: adminFormatCount(unread),
-                              label: 'محادثات غير مقروءة',
-                              icon: Icons.mail_outline,
+                              value: 'إعلانات',
+                              label: 'إعلانات الحلقات',
+                              icon: Icons.campaign_outlined,
                               iconBg: const Color(0xFFFFF3E0),
                               iconColor: AppColors.warning,
                               onTap: () =>
-                                  context.push('${AppRoutes.admin}/chat'),
+                                  context.push(AppRoutes.adminAnnouncements),
                             ),
                             AdminStatTile(
+                              key: const Key('hub-teachers'),
                               value: adminFormatCount(teachers),
                               label: 'إجمالي المعلمين',
                               icon: Icons.groups_outlined,
                               iconBg: AppColors.successBg,
                               iconColor: AppColors.success,
+                              onTap: () =>
+                                  context.push(AppRoutes.adminTeachers),
                             ),
                             AdminStatTile(
-                              value: adminFormatCount(openComplaints),
-                              label: 'شكاوى معلقة',
+                              key: const Key('hub-complaints'),
+                              value: openComplaints,
+                              label: 'شكاوى مفتوحة',
                               icon: Icons.flag_outlined,
                               iconBg: const Color(0xFFFFEBEE),
                               iconColor: AppColors.error,
                               onTap: () =>
-                                  context.push(AppRoutes.adminComplaintsReview),
+                                  context.push(AppRoutes.adminComplaints),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 20),
-                        AppCard(
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE3F2FD),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.notifications_active_outlined,
-                                  color: AppColors.info,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      adminFormatCount(unread),
-                                      style: AppTextStyles.titleLarge.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    Text(
-                                      'رسائل غير مقروءة',
-                                      style: AppTextStyles.labelSmall.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        AdminSectionHeader(
-                          title: 'تحليلات التواصل — آخر 7 أيام',
-                          actionLabel: 'التفاصيل',
-                          onAction: () => context.push(
-                            '${AppRoutes.admin}/communication-analytics',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        AppCard(
-                          child: AdminSimpleBarChart(
-                            values: _weekdayCounts(chatState.conversations),
-                            labels: const ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'],
-                          ),
                         ),
                         const SizedBox(height: 24),
                         AdminSectionHeader(
@@ -281,12 +232,29 @@ class _AdminCommunicationHubPageState extends State<AdminCommunicationHubPage> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            title,
-                                            style: AppTextStyles.titleMedium
-                                                .copyWith(
-                                                  fontWeight: FontWeight.w700,
+                                          Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  title,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: AppTextStyles
+                                                      .titleMedium
+                                                      .copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
                                                 ),
+                                              ),
+                                              if (!isMine) ...[
+                                                const SizedBox(width: 6),
+                                                const AppStatusChip(
+                                                  label: 'مراقبة — قراءة فقط',
+                                                  tone: AppStatusTone.info,
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                           Text(
                                             c.lastMessage ?? '',

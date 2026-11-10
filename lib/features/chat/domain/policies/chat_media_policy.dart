@@ -59,6 +59,7 @@ class ChatMediaPolicy {
   static const int fileNameMaxChars = 120;
   static const Duration voiceMaxDuration = Duration(minutes: 10);
   static const Duration editWindow = Duration(minutes: 15);
+  static const Duration deleteWindow = Duration(minutes: 60);
 
   static const int imageMaxBytes = 10 * 1024 * 1024;
   static const int voiceMaxBytes = 20 * 1024 * 1024;
@@ -187,6 +188,21 @@ class ChatMediaPolicy {
     if (message.type != ChatMessageType.text) return false;
     final at = now ?? DateTime.now();
     return at.difference(message.sentAt) <= editWindow;
+  }
+
+  /// Mirrors `canSoftDeleteMessage`: senders within [deleteWindow], Admin
+  /// (moderation) at any time.
+  static bool canDelete(
+    MessageEntity message,
+    String uid, {
+    required bool isAdmin,
+    DateTime? now,
+  }) {
+    if (message.deleted) return false;
+    if (isAdmin) return true;
+    if (message.senderId != uid) return false;
+    final at = now ?? DateTime.now();
+    return at.difference(message.sentAt) <= deleteWindow;
   }
 }
 

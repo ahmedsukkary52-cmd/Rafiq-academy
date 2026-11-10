@@ -789,6 +789,9 @@ test("H2 ownership trigger: a closed gate never throws; retry is bounded by the 
   assert.ok(!src.includes("assertBackendAllowed("), "triggers must not throw on a closed gate");
   assert.match(trigger, /retry: true/);
   assert.match(trigger, /await runOwnershipTrigger\(\{/);
-  assert.match(trigger, /gateOpen: isProductionBackendEnabled\(\) \|\| isEmulatorBackendAllowed\(\)/);
+  assert.match(trigger, /gateOpen: isOwnershipReconcileEnabled\(\)/);
   assert.match(trigger, /eventTime: event\.time/);
+  const pushGate = readFileSync(join(__dirname, "..", "src", "notifications/pushGate.ts"), "utf8");
+  assert.ok(!pushGate.includes("FCM_OWNERSHIP_ENABLED"), "the ownership gate never opens push");
+  assert.ok(!pushGate.includes("ownershipGate"), "the ownership gate never opens push");
 });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
@@ -156,10 +157,11 @@ class _ParentAchievementsPageState extends State<ParentAchievementsPage> {
                   value: parentEasternDigits('$_badgeCount'),
                   label: 'شارة',
                 ),
-                _HeaderStat(
-                  value: verses > 0 ? parentEasternDigits('$verses') : '—',
-                  label: 'آية',
-                ),
+                if (AppCapabilities.memorizationProgressAvailable)
+                  _HeaderStat(
+                    value: verses > 0 ? parentEasternDigits('$verses') : '—',
+                    label: 'آية',
+                  ),
               ],
             ),
           ),

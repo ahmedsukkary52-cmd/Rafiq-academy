@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import 'auth_error_reason.dart';
+import 'user_facing_error.dart';
 
 export 'auth_error_reason.dart';
 
@@ -15,6 +16,10 @@ abstract class Failure extends Equatable {
 
 class ServerFailure extends Failure {
   const ServerFailure(super.message);
+
+  /// Datasources wrap raw `e.toString()`; never surface that text as-is.
+  @override
+  String get message => userFacingErrorText(super.message);
 }
 
 class NetworkFailure extends Failure {

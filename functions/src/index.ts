@@ -62,6 +62,7 @@ export {
 export { completeHomework, purchaseAvatar } from "./economy/economyFunctions";
 export { grantAward, issueAchievement } from "./awards/awardFunctions";
 export { getParentAchievements } from "./awards/parentAchievementFunctions";
+export { getHalaqaAwards } from "./awards/halaqaAwardsFunctions";
 
 // P0 completion — Admin operational workflows (server-authoritative).
 export { adminLinkParentChild } from "./relationships/parentLinkFunctions";
@@ -70,3 +71,42 @@ export {
   adminCreateHalaqa,
 } from "./halaqa/halaqaScheduleFunctions";
 export { setHalaqaMeetingLink } from "./halaqa/meetingLinkFunctions";
+export { getParentChildHalaqat } from "./halaqa/parentHalaqaFunctions";
+
+// Admin milestone — complaints lifecycle and absence-request notifications.
+export { respondToComplaint, submitComplaint } from "./complaints/complaintFunctions";
+export {
+  notifyOnAbsenceRequestCreated,
+  notifyOnAbsenceRequestReviewed,
+} from "./notifications/absenceRequestNotificationFunctions";
+export { notifyOnPaymentUpdated } from "./notifications/paymentNotificationFunctions";
+export {
+  adminOnboardStudent,
+  adminResetMemberPassword,
+  completeFirstLogin,
+} from "./accounts/onboardingFunctions";
+export { adminBackfillUserNameNormalized } from "./accounts/memberDirectory";
+export {
+  adminCreateChatGroup,
+  adminSetChatGroupMembers,
+  adminUpdateChatGroup,
+  reactToChatMessage,
+} from "./chat/chatGroupFunctions";
+export { adminImportAcademyRow } from "./accounts/academyImportFunctions";
+export {
+  adminReassignHalaqaStaff,
+  adminSetStaffStatus,
+} from "./staff/staffLifecycleFunctions";
+
+// Academy relationships — assistant teachers, temporary cover, accounts.
+export {
+  adminEndHalaqaCover,
+  adminSetHalaqaAssistant,
+  adminStartHalaqaCover,
+} from "./staff/halaqaAssistantFunctions";
+export { adminReplaceParentLink } from "./relationships/parentLinkFunctions";
+export {
+  adminCreateMemberAccount,
+  adminGetMemberAccount,
+} from "./accounts/memberAccountFunctions";
+export { adminSetMemberActive } from "./accounts/memberStatusFunctions";

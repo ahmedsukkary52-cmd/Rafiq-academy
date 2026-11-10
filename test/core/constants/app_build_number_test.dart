@@ -17,4 +17,10 @@ void main() {
       reason: 'Bump kAppBuildNumber together with the pubspec +N',
     );
   });
+
+  test('kAppBuildNumber is above every build made before J.10', () {
+    // Builds before J.10 shipped build 1; appConfig/clientVersion
+    // .minimumBuildNumber can only block them if this build is higher.
+    expect(kAppBuildNumber, greaterThanOrEqualTo(2));
+  });
 }

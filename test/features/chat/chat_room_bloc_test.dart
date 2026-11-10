@@ -43,6 +43,7 @@ class FakeChatRepository implements ChatRepository {
       StreamController<Either<Failure, List<MessageEntity>>>.broadcast();
   final watchLimits = <int>[];
   final sends = <({String messageId, ChatMessageType type, String text, ChatSendMedia? media})>[];
+  final replyIds = <String?>[];
   final uploads = <FakeUploadTask>[];
   final discarded = <String>[];
   final List<Either<Failure, Unit>> sendResults = [];
@@ -66,8 +67,10 @@ class FakeChatRepository implements ChatRepository {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
+    String? replyToMessageId,
   }) async {
     sends.add((messageId: messageId, type: type, text: text, media: media));
+    replyIds.add(replyToMessageId);
     return sendResults.isEmpty ? const Right(unit) : sendResults.removeAt(0);
   }
 
@@ -192,6 +195,21 @@ void main() {
     final confirmed = await until((s) => s.messages.length == 1);
     expect(confirmed.outbox, isEmpty);
     expect(confirmed.pendingOutbox, isEmpty);
+  });
+
+  test('reply: quoted id is sent and kept on retry', () async {
+    await loaded([msg('a')]);
+    repo.sendResults.add(const Left(ServerFailure('unavailable')));
+    bloc.add(const SendMessageRequestedEvent('نعم', replyToMessageId: 'a'));
+    final failed = await until(
+      (s) => s.outbox.isNotEmpty && s.outbox.single.status == ChatOutgoingStatus.failed,
+    );
+    bloc.add(RetryOutgoingRequestedEvent(failed.outbox.single.messageId));
+    await until(
+      (s) => s.outbox.isNotEmpty && s.outbox.single.status == ChatOutgoingStatus.sent,
+    );
+    expect(repo.replyIds, ['a', 'a']);
+    expect(repo.sends[0].messageId, repo.sends[1].messageId);
   });
 
   test('failed send keeps the item; retry re-sends with the same id', () async {

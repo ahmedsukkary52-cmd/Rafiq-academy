@@ -223,15 +223,23 @@ export function canEditMessage(params: {
   return now.getTime() - params.sentAt.getTime() <= MESSAGE_EDIT_WINDOW_MS;
 }
 
+/** Sender "delete for everyone" window; Admin moderation has no window. */
+export const MESSAGE_DELETE_WINDOW_MS = 60 * 60 * 1000;
+
 export function canSoftDeleteMessage(params: {
   senderId: string;
   callerUid: string;
   callerRole: ChatRole;
   alreadyDeleted?: boolean;
+  sentAt?: Date;
+  now?: Date;
 }): boolean {
   if (params.alreadyDeleted) return false;
   if (params.callerRole === "admin") return true;
-  return params.senderId.trim() === params.callerUid.trim();
+  if (params.senderId.trim() !== params.callerUid.trim()) return false;
+  if (!params.sentAt) return true;
+  const now = params.now ?? new Date();
+  return now.getTime() - params.sentAt.getTime() <= MESSAGE_DELETE_WINDOW_MS;
 }
 
 /** Empty relationship context for tests / missing users. */

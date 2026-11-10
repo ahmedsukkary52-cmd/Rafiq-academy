@@ -117,6 +117,28 @@ void main() {
     });
   });
 
+  group('halaqa scope', () {
+    CalendarEventModel model({String? halaqaId}) => CalendarEventModel(
+      id: '',
+      title: 't',
+      type: CalendarEventType.holiday,
+      date: DateTime(2026, 11, 3),
+      halaqaId: halaqaId,
+      createdBy: '',
+    );
+
+    test('a general event stores halaqaId: null (matched by isNull)', () {
+      final data = model().toCreateData(creatorUid: 'admin1');
+      expect(data.containsKey('halaqaId'), isTrue);
+      expect(data['halaqaId'], isNull);
+    });
+
+    test('a Halaqa event stores its halaqaId', () {
+      final data = model(halaqaId: 'h1').toCreateData(creatorUid: 'sup1');
+      expect(data['halaqaId'], 'h1');
+    });
+  });
+
   group('error messages', () {
     test('Firestore codes map to user-facing Arabic text', () {
       for (final code in [

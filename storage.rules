@@ -19,9 +19,11 @@ service firebase.storage {
       );
     }
 
-    // Deactivated profiles (isActive == false) hold no role (fail closed).
+    // Deactivated profiles (isActive == false) and Admins still on their
+    // provisioning password (passwordChangeRequired) hold no role.
     function activeRole() {
       return userDoc().data.get('isActive', true) != false
+          && userDoc().data.get('passwordChangeRequired', false) != true
         ? userDoc().data.get('role', '')
         : '';
     }
@@ -148,8 +150,9 @@ service firebase.storage {
     }
 
     /// WA-11: membership from conversations.participantIds (not client claims).
+    /// Mirrors Firestore: a deactivated participant holds no chat access.
     function isConversationParticipant(conversationId) {
-      return signedIn()
+      return hasActiveProfile()
         && conversationExists(conversationId)
         && conversationDoc(conversationId).data.participantIds is list
         && uid() in conversationDoc(conversationId).data.participantIds;
@@ -304,6 +307,21 @@ service firebase.storage {
       allow delete: if canDeleteOrphanChatObject(conversationId, messageId);
     }
 
+    // ── Admin-managed group image: members read; Admin uploads (no URLs
+    //    are shared, so removal from the group revokes access). ──────────────
+    match /chat_group_images/{conversationId}/{fileName} {
+      allow read: if isAdmin() || isConversationParticipant(conversationId);
+
+      allow create, update: if isAdmin()
+        && conversationExists(conversationId)
+        && conversationDoc(conversationId).data.get('kind', '') == 'custom_group'
+        && fileName.matches('^[A-Za-z0-9._-]{1,80}$')
+        && isChatImageType()
+        && underChatImageSize();
+
+      allow delete: if isAdmin();
+    }
+
     // ── C10 awards/{teacherId}/{file} — grantor staff path lock ─────────────
     match /awards/{teacherId}/{fileName} {
       allow read: if signedIn()
@@ -358,8 +376,11 @@ service firebase.storage {
         );
     }
 
+    // Deactivation leaves the student on studentIds; the roster alone never
+    // authorizes a deactivated account.
     function isStudentOnHalaqa(halaqaId) {
-      return nonEmpty(halaqaId)
+      return hasActiveProfile()
+        && nonEmpty(halaqaId)
         && firestore.exists(/databases/(default)/documents/halaqat/$(halaqaId))
         && uid() in halaqaDoc(halaqaId).data.get('studentIds', []);
     }
@@ -552,13 +573,13 @@ service firebase.storage {
         && nonEmpty(fileName)
         && (folder == 'images' || folder == 'audio')
         && (
-          uid() == studentId
+          (hasActiveProfile() && uid() == studentId)
           || isAdmin()
           || isStaffOfAssignmentHalaqa(activityId)
-          || studentOnAssignmentHalaqa(activityId, uid())
+          || (hasActiveProfile() && studentOnAssignmentHalaqa(activityId, uid()))
         );
 
-      allow create: if signedIn()
+      allow create: if hasActiveProfile()
         && resource == null
         && uid() == studentId
         && folder == 'images'

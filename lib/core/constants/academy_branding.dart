@@ -5,6 +5,9 @@
 class AcademyBranding {
   const AcademyBranding._();
 
+  /// Logo tile (transparent rounded corners), also the launcher/splash art.
+  static const String logoAsset = 'assets/branding/academy_logo.png';
+
   /// Primary product / academy name shown in chrome and titles.
   static const String displayName = 'أكاديمية رفيق';
 

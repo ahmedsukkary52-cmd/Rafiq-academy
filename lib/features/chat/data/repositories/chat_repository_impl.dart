@@ -51,15 +51,34 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Stream<Either<Failure, List<ConversationEntity>>> watchConversations(
-    String uid,
-  ) => remoteDatasource.watchConversations(uid).transform(_toEither());
+    String uid, {
+    int? limit,
+  }) => remoteDatasource
+      .watchConversations(uid, limit: limit)
+      .transform(_toEither());
 
   @override
   Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
     required String observerUid,
+    int? limit,
   }) => remoteDatasource
-      .watchAllConversations(observerUid: observerUid)
+      .watchAllConversations(observerUid: observerUid, limit: limit)
       .transform(_toEither());
+
+  @override
+  Future<Either<Failure, List<ConversationEntity>>> fetchConversationsAfter({
+    String? participantUid,
+    required String viewerUid,
+    required String afterConversationId,
+    required int limit,
+  }) => _guard(
+    () => remoteDatasource.fetchConversationsAfter(
+      participantUid: participantUid,
+      viewerUid: viewerUid,
+      afterConversationId: afterConversationId,
+      limit: limit,
+    ),
+  );
 
   @override
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(
@@ -87,6 +106,7 @@ class ChatRepositoryImpl implements ChatRepository {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
+    String? replyToMessageId,
   }) async {
     final violation =
         contactInfoViolation(text) ?? contactInfoViolation(media?.fileName);
@@ -98,6 +118,7 @@ class ChatRepositoryImpl implements ChatRepository {
         type: type,
         text: text,
         media: media,
+        replyToMessageId: replyToMessageId,
       );
       return unit;
     });

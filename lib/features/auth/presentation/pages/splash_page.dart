@@ -6,6 +6,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../widgets/auth_widgets.dart';
 
 /// Session restore screen. Routing is driven by the router redirect; Splash
 /// only renders progress, or a retry when Firebase could not be reached.
@@ -53,24 +54,12 @@ class _SplashMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: const Icon(
-            Icons.menu_book_rounded,
-            color: Colors.white,
-            size: 52,
-          ),
-        ),
+        const AcademyLogo(size: 120),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           AcademyBranding.shortName,
           style: TextStyle(
-            fontFamily: 'NotoNaskhArabic',
+            fontFamily: AppTextStyles.fontFamily,
             fontSize: 36,
             fontWeight: FontWeight.w700,
             color: Colors.white,
@@ -81,7 +70,7 @@ class _SplashMark extends StatelessWidget {
         Text(
           AcademyBranding.tagline,
           style: TextStyle(
-            fontFamily: 'NotoNaskhArabic',
+            fontFamily: AppTextStyles.fontFamily,
             fontSize: 14,
             color: Colors.white.withValues(alpha: 0.8),
           ),
@@ -105,8 +94,8 @@ class _StartupRetry extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontFamily: 'NotoNaskhArabic',
+          style: TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
             fontSize: 15,
             color: Colors.white,
           ),

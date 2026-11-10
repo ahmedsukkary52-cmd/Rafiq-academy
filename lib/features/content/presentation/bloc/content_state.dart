@@ -20,6 +20,12 @@ class ContentLibraryState extends Equatable {
   final SubmissionStatus uploadStatus;
   final String? uploadError;
 
+  /// The failed upload can be re-sent with [RetryUploadEvent].
+  final bool canRetryUpload;
+
+  /// Last delete failure; the file is restored to the list.
+  final String? deleteError;
+
   const ContentLibraryState({
     this.filesStatus = SectionStatus.initial,
     this.allFiles = const [],
@@ -28,6 +34,8 @@ class ContentLibraryState extends Equatable {
     this.uploadProgress,
     this.uploadStatus = SubmissionStatus.idle,
     this.uploadError,
+    this.canRetryUpload = false,
+    this.deleteError,
   });
 
   factory ContentLibraryState.initial() => const ContentLibraryState();
@@ -45,6 +53,8 @@ class ContentLibraryState extends Equatable {
     Object? uploadProgress = _unset,
     SubmissionStatus? uploadStatus,
     Object? uploadError = _unset,
+    bool? canRetryUpload,
+    Object? deleteError = _unset,
   }) {
     return ContentLibraryState(
       filesStatus: filesStatus ?? this.filesStatus,
@@ -62,6 +72,10 @@ class ContentLibraryState extends Equatable {
       uploadError: identical(uploadError, _unset)
           ? this.uploadError
           : uploadError as String?,
+      canRetryUpload: canRetryUpload ?? this.canRetryUpload,
+      deleteError: identical(deleteError, _unset)
+          ? this.deleteError
+          : deleteError as String?,
     );
   }
 
@@ -74,5 +88,7 @@ class ContentLibraryState extends Equatable {
     uploadProgress,
     uploadStatus,
     uploadError,
+    canRetryUpload,
+    deleteError,
   ];
 }

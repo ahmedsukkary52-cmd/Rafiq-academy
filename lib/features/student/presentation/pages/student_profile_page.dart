@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/router/supervisor_escalation_paths.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -11,6 +13,8 @@ import '../../../awards/presentation/bloc/awards_bloc.dart';
 import '../../../awards/presentation/bloc/awards_event.dart';
 import '../../../awards/presentation/bloc/awards_state.dart';
 import '../../../awards/presentation/pages/awards_page.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../chat/domain/usecases/chat_usecases.dart';
 import '../../../parent/domain/repositories/parent_repositories.dart';
 import '../../../teacher/domain/repositories/teacher_repository.dart';
@@ -28,11 +32,30 @@ import '../../domain/usecases/get_student_halaqa_usecase.dart';
 import '../../domain/usecases/get_student_profile_usecase.dart';
 import '../../domain/usecases/watch_latest_assignment_usecase.dart';
 
+/// Whether [role] can open the teacher evaluations screen
+/// ([studentProfileEvaluationsPath]) without the router sending it back home.
+/// Admin has no evaluations surface.
+bool staffCanOpenStudentEvaluations(String role) => switch (role) {
+  AppRoles.teacher => true,
+  AppRoles.supervisor => SupervisorEscalationPaths.isAllowed(
+    '${SupervisorEscalationPaths.teacherRoot}/halaqa/',
+  ),
+  _ => false,
+};
+
 class StudentProfilePage extends StatefulWidget {
   final String studentId;
   final String? halaqaId;
 
-  const StudentProfilePage({super.key, required this.studentId, this.halaqaId});
+  /// Extra section for the Admin route only (e.g. account recovery).
+  final Widget Function(String displayName)? adminPanelBuilder;
+
+  const StudentProfilePage({
+    super.key,
+    required this.studentId,
+    this.halaqaId,
+    this.adminPanelBuilder,
+  });
 
   @override
   State<StudentProfilePage> createState() => _StudentProfilePageState();
@@ -193,6 +216,12 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       return;
     }
     context.push(path);
+  }
+
+  bool get _canOpenEvaluations {
+    final auth = context.read<AuthBloc>().state;
+    return auth is AuthAuthenticated &&
+        staffCanOpenStudentEvaluations(auth.user.role);
   }
 
   Future<void> _contactParent() {
@@ -360,12 +389,20 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                             _ProgressCard(
                               versesMemorized: profile.totalVersesMemorized,
                               progressPercent: progressPercent,
-                              onDetailsTap: _openEvaluations,
+                              progressAvailable: AppCapabilities
+                                  .memorizationProgressAvailable,
+                              onDetailsTap: _canOpenEvaluations
+                                  ? _openEvaluations
+                                  : null,
                             ),
                             const SizedBox(height: 16),
                             _LatestEvaluationCard(
                               evaluation: _latestEvaluation,
                             ),
+                            if (widget.adminPanelBuilder != null) ...[
+                              const SizedBox(height: 16),
+                              widget.adminPanelBuilder!(displayName),
+                            ],
                           ],
                         ),
                       ),
@@ -459,7 +496,9 @@ class _ProfileHeader extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'المستوى ${teacherHomeEasternDigits('$level')} - $halaqaName',
+            AppCapabilities.streakAndLevelAvailable
+                ? 'المستوى ${teacherHomeEasternDigits('$level')} - $halaqaName'
+                : halaqaName,
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -567,22 +606,26 @@ class _StatsCard extends StatelessWidget {
             Expanded(
               child: _StatCell(value: attendanceLabel, label: 'الحضور'),
             ),
-            const VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: AppColors.border,
-            ),
-            Expanded(
-              child: _StatCell(value: streakLabel, label: 'يوم متتالي'),
-            ),
-            const VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: AppColors.border,
-            ),
-            Expanded(
-              child: _StatCell(value: versesLabel, label: 'آية حفظ'),
-            ),
+            if (AppCapabilities.streakAndLevelAvailable) ...[
+              const VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: AppColors.border,
+              ),
+              Expanded(
+                child: _StatCell(value: streakLabel, label: 'يوم متتالي'),
+              ),
+            ],
+            if (AppCapabilities.memorizationProgressAvailable) ...[
+              const VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: AppColors.border,
+              ),
+              Expanded(
+                child: _StatCell(value: versesLabel, label: 'آية حفظ'),
+              ),
+            ],
           ],
         ),
       ),
@@ -764,11 +807,13 @@ class _InfoRow extends StatelessWidget {
 class _ProgressCard extends StatelessWidget {
   final int versesMemorized;
   final double progressPercent;
-  final VoidCallback onDetailsTap;
+  final bool progressAvailable;
+  final VoidCallback? onDetailsTap;
 
   const _ProgressCard({
     required this.versesMemorized,
     required this.progressPercent,
+    required this.progressAvailable,
     required this.onDetailsTap,
   });
 
@@ -793,43 +838,54 @@ class _ProgressCard extends StatelessWidget {
               Expanded(
                 child: Text('تقدم الحفظ', style: AppTextStyles.titleMedium),
               ),
-              GestureDetector(
-                onTap: onDetailsTap,
-                child: Text(
-                  'التفاصيل',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+              if (onDetailsTap != null)
+                GestureDetector(
+                  onTap: onDetailsTap,
+                  child: Text(
+                    'التفاصيل',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(versesLabel, style: AppTextStyles.titleMedium),
+          if (!progressAvailable)
+            Text(
+              'لم يُفعَّل احتساب تقدم الحفظ بعد؛ سيظهر هنا عند اعتماده من تقييمات المعلم.',
+              key: const Key('staff-student-progress-unavailable'),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
               ),
-              Text(
-                percentLabel,
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(versesLabel, style: AppTextStyles.titleMedium),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-            child: LinearProgressIndicator(
-              value: (progressPercent / 100).clamp(0.0, 1.0),
-              minHeight: 10,
-              backgroundColor: AppColors.primaryLight,
-              color: AppColors.primary,
+                Text(
+                  percentLabel,
+                  style: AppTextStyles.titleMedium.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-          ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+              child: LinearProgressIndicator(
+                value: (progressPercent / 100).clamp(0.0, 1.0),
+                minHeight: 10,
+                backgroundColor: AppColors.primaryLight,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
         ],
       ),
     );

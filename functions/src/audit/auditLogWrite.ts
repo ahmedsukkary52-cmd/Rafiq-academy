@@ -11,6 +11,7 @@ import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   ACTOR_ROLE_ADMIN,
+  ACTOR_ROLE_ASSISTANT_TEACHER,
   ACTOR_ROLE_SUPERVISOR,
   ACTOR_ROLE_SYSTEM,
   ACTOR_ROLE_TEACHER,
@@ -68,6 +69,8 @@ export function actorForCallerRole(uid: string, role: string): AuditActor {
       return supervisorActor(uid);
     case ACTOR_ROLE_TEACHER:
       return teacherActor(uid);
+    case ACTOR_ROLE_ASSISTANT_TEACHER:
+      return { actorId: requireNonEmpty(uid, "actorId"), actorRole: ACTOR_ROLE_ASSISTANT_TEACHER };
     default:
       throw new Error(`audit actorRole not allowed for caller role: ${role}`);
   }
@@ -116,7 +119,8 @@ export function buildAuditLogEntry<T>(
     actorRole !== ACTOR_ROLE_ADMIN &&
     actorRole !== ACTOR_ROLE_SYSTEM &&
     actorRole !== ACTOR_ROLE_SUPERVISOR &&
-    actorRole !== ACTOR_ROLE_TEACHER
+    actorRole !== ACTOR_ROLE_TEACHER &&
+    actorRole !== ACTOR_ROLE_ASSISTANT_TEACHER
   ) {
     throw new Error(`audit actorRole invalid: ${actorRole}`);
   }

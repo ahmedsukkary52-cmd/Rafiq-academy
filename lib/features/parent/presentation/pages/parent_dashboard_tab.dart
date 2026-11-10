@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hijri/hijri_calendar.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -817,14 +818,16 @@ class _ChildFollowUpCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: AppStatTile(
-                  value: progress,
-                  label: 'أداء',
-                  variant: AppStatTileVariant.compact,
+              if (AppCapabilities.memorizationProgressAvailable) ...[
+                Expanded(
+                  child: AppStatTile(
+                    value: progress,
+                    label: 'أداء',
+                    variant: AppStatTileVariant.compact,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
+                const SizedBox(width: 6),
+              ],
               Expanded(
                 child: AppStatTile(
                   value: attendancePct,
@@ -1064,10 +1067,11 @@ class _FamilyCard extends StatelessWidget {
                     value: attendance,
                     label: 'متوسط الحضور (١٤ يوماً)',
                   ),
-                  _FamilyMetric(
-                    value: parentEasternDigits('$verses'),
-                    label: 'إجمالي الآيات',
-                  ),
+                  if (AppCapabilities.memorizationProgressAvailable)
+                    _FamilyMetric(
+                      value: parentEasternDigits('$verses'),
+                      label: 'إجمالي الآيات',
+                    ),
                 ],
               ),
               const SizedBox(height: 8),

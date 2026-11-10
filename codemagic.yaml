@@ -79,12 +79,17 @@ workflows:
           ruby ios/scripts/configure_flavors.rb
       - name: Build dev iOS app without code signing
         script: flutter build ios --flavor dev --release --no-codesign
-      - name: Export the generated Xcode project for review
+      # Both flavors build to build/ios/iphoneos/Runner.app, so the dev app is
+      # archived before the prod build replaces it.
+      - name: Archive the dev app and export the generated Xcode project
         script: |
-          mkdir -p build/ios-flavor-setup
+          mkdir -p build/ios-artifacts build/ios-flavor-setup
+          ditto -c -k --keepParent build/ios/iphoneos/Runner.app build/ios-artifacts/Runner-dev-unsigned.zip
           zip -r build/ios-flavor-setup/ios-flavor-project.zip ios/Runner.xcodeproj ios/Podfile.lock
       - name: Build prod iOS app without code signing
         script: flutter build ios --flavor prod --release --no-codesign
+      - name: Archive the prod app
+        script: ditto -c -k --keepParent build/ios/iphoneos/Runner.app build/ios-artifacts/Runner-prod-unsigned.zip
     artifacts:
-      - build/ios/iphoneos/*.app
+      - build/ios-artifacts/*.zip
       - build/ios-flavor-setup/*.zip

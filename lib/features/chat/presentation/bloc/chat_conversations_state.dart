@@ -20,6 +20,10 @@ class ChatConversationsState extends Equatable {
   final ConversationEntity? startedConversation;
   final String? startConversationError;
 
+  /// Paged inbox only: older conversations may exist beyond the list.
+  final bool hasMoreConversations;
+  final bool loadingMoreConversations;
+
   const ChatConversationsState({
     this.conversationsStatus = SectionStatus.initial,
     this.conversations = const [],
@@ -27,6 +31,8 @@ class ChatConversationsState extends Equatable {
     this.startConversationStatus = SubmissionStatus.idle,
     this.startedConversation,
     this.startConversationError,
+    this.hasMoreConversations = false,
+    this.loadingMoreConversations = false,
   });
 
   factory ChatConversationsState.initial() => const ChatConversationsState();
@@ -43,6 +49,8 @@ class ChatConversationsState extends Equatable {
     SubmissionStatus? startConversationStatus,
     Object? startedConversation = _unset,
     Object? startConversationError = _unset,
+    bool? hasMoreConversations,
+    bool? loadingMoreConversations,
   }) {
     return ChatConversationsState(
       conversationsStatus: conversationsStatus ?? this.conversationsStatus,
@@ -58,6 +66,9 @@ class ChatConversationsState extends Equatable {
       startConversationError: identical(startConversationError, _unset)
           ? this.startConversationError
           : startConversationError as String?,
+      hasMoreConversations: hasMoreConversations ?? this.hasMoreConversations,
+      loadingMoreConversations:
+          loadingMoreConversations ?? this.loadingMoreConversations,
     );
   }
 
@@ -69,5 +80,7 @@ class ChatConversationsState extends Equatable {
     startConversationStatus,
     startedConversation,
     startConversationError,
+    hasMoreConversations,
+    loadingMoreConversations,
   ];
 }

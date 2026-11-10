@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -52,6 +53,27 @@ class StudentJourneyMapPage extends StatelessWidget {
                   );
                 }
               },
+            ),
+          );
+        }
+
+        if (!AppCapabilities.memorizationProgressAvailable ||
+            !AppCapabilities.streakAndLevelAvailable) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: const Text('خريطتي'),
+              leading: const AppBackButton.appBar(),
+            ),
+            body: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(AppSizes.paddingXL),
+                child: Text(
+                  'لم يُفعَّل احتساب تقدم الحفظ بعد؛ ستظهر خريطتك هنا عند اعتماده من تقييمات المعلم.',
+                  key: Key('student-journey-unavailable'),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           );
         }

@@ -143,6 +143,20 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
     }
   }
 
+  Future<DocumentSnapshot<Map<String, dynamic>>?> _studentProfileOrNull(
+    String id,
+  ) async {
+    try {
+      return await firestore
+          .collection(FirestoreCollections.studentProfiles)
+          .doc(id)
+          .get();
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return null;
+      rethrow;
+    }
+  }
+
   @override
   Future<Map<String, String>> getUserDisplayNames(List<String> userIds) async {
     try {
@@ -155,36 +169,24 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
 
       final names = <String, String>{};
       for (final chunk in FirestoreInQuery.chunkIds(unique)) {
-        // Prefer studentProfiles / teacherProfiles to avoid users.phone (D16).
-        final studentSnap = await firestore
-            .collection(FirestoreCollections.studentProfiles)
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get();
-        for (final doc in studentSnap.docs) {
-          final name = (doc.data()['name'] as String?)?.trim() ?? '';
-          if (name.isNotEmpty) names[doc.id] = name;
+        // studentProfiles first, then users. teacherProfiles holds HR data
+        // readable by Admin and the teacher only. Profiles are read one by
+        // one: the rules authorize staff per student, and an id that is not
+        // a student the caller serves falls through to users.
+        final studentDocs = await Future.wait([
+          for (final id in chunk) _studentProfileOrNull(id),
+        ]);
+        for (final doc in studentDocs) {
+          final name = (doc?.data()?['name'] as String?)?.trim() ?? '';
+          if (name.isNotEmpty) names[doc!.id] = name;
         }
 
         final missing = chunk.where((id) => !names.containsKey(id)).toList();
         if (missing.isEmpty) continue;
 
-        final teacherSnap = await firestore
-            .collection(FirestoreCollections.teacherProfiles)
-            .where(FieldPath.documentId, whereIn: missing)
-            .get();
-        for (final doc in teacherSnap.docs) {
-          final name = (doc.data()['name'] as String?)?.trim() ?? '';
-          if (name.isNotEmpty) names[doc.id] = name;
-        }
-
-        final stillMissing = missing
-            .where((id) => !names.containsKey(id))
-            .toList();
-        if (stillMissing.isEmpty) continue;
-
         final usersSnap = await firestore
             .collection(FirestoreCollections.users)
-            .where(FieldPath.documentId, whereIn: stillMissing)
+            .where(FieldPath.documentId, whereIn: missing)
             .get();
         for (final doc in usersSnap.docs) {
           final raw = doc.data()['name'];
@@ -204,18 +206,18 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
     required DateTime date,
   }) async {
     try {
-      final items = <AbsenceRequestModel>[];
-      for (final rawId in halaqaIds) {
-        items.addAll(
-          await AbsenceRequestFirestoreReads.forHalaqaOnDate(
+      // Today and upcoming requests (read-only awareness; teacher decides).
+      final pages = await Future.wait(
+        halaqaIds.map(
+          (rawId) => AbsenceRequestFirestoreReads.forHalaqaFrom(
             firestore: firestore,
             halaqaId: rawId,
-            date: date,
-            pendingOnly: false,
+            from: date,
           ),
-        );
-      }
-      AbsenceRequestFirestoreReads.sortSupervisorDay(items);
+        ),
+      );
+      final items = [for (final page in pages) ...page];
+      AbsenceRequestFirestoreReads.sortUpcoming(items);
       return items;
     } catch (e) {
       throw ServerException(e.toString());

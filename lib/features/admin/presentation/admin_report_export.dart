@@ -1,3 +1,4 @@
+import '../../../shared/presentation/academy_currency_label.dart';
 import '../domain/entities/academy_stats_entity.dart';
 import '../domain/entities/complaint_entity.dart';
 import '../domain/entities/financial_summary_entity.dart';
@@ -34,7 +35,7 @@ class AdminReportExport {
         ),
       ],
       AdminReportKind.finance => [
-        ['البند', 'المبلغ (ر.س)', 'العدد'],
+        ['البند', 'المبلغ ($academyCurrencyLabel)', 'العدد'],
         [
           'مدفوع',
           '${finance?.totalRevenue.round() ?? 0}',

@@ -671,48 +671,6 @@ class AdminFormSkeleton extends StatelessWidget {
   }
 }
 
-/// Communication settings toggles skeleton.
-class AdminSettingsTogglesSkeleton extends StatelessWidget {
-  const AdminSettingsTogglesSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AdminPulse(
-      builder: (context, bone) {
-        return adminSkeletonCard(
-          bone: bone,
-          child: Column(
-            children: List.generate(4, (i) {
-              return Column(
-                children: [
-                  if (i > 0) const Divider(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: adminSkeletonBar(
-                          bone: bone,
-                          width: 180,
-                          height: 12,
-                        ),
-                      ),
-                      adminSkeletonBar(
-                        bone: bone,
-                        width: 44,
-                        height: 24,
-                        radius: 12,
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            }),
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// Full-page centered flow (internal chat bootstrap).
 class AdminFlowBootstrapSkeleton extends StatelessWidget {
   const AdminFlowBootstrapSkeleton({super.key});

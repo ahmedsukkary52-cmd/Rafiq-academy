@@ -105,10 +105,15 @@ local emulators only. It takes no arguments and fails closed, in order:
     1. A write already sent, including the one that sets `complete`, may
     still be applied later, even after the seeder has exited.
 
-Dataset v1 is six accounts (`admin@`, `supervisor1@`, `teacher@`, `parent@`,
+Dataset v2 is six accounts (`admin@`, `supervisor1@`, `teacher@`, `parent@`,
 `student01@`, `student02@rafiq.demo`, UIDs `demo-<role>-NN`) with the same
-`users`, `userPrivate` and role-profile fields `adminProvisionUser` writes.
-`users` documents never carry `phone`.
+`users`, `userPrivate` and role-profile fields `adminProvisionUser` writes,
+including `users.nameNormalized` (from the compiled Functions normalizer, so
+`lib/` must be built; `npm run serve` does that) for Directory name search.
+Like a provisioned Admin, `admin@rafiq.demo` has no Admin rights until it
+replaces `SeedDemo123!` on first sign-in (`passwordChangeRequired` /
+`mustChangePassword`). No relationships, halaqat, academy codes or audit log
+entries are seeded. `users` documents never carry `phone`.
 
 ### After a failed run
 
@@ -195,7 +200,7 @@ covered by `functions/test/seed_emulator_*.test.mjs`.
 ## What is created (Dart seeder dataset)
 
 The sections below describe the Dart seeder's full academy. The Node
-seeder's dataset v1 is only the six accounts listed above.
+seeder's dataset v2 is only the six accounts listed above.
 
 ### Academy
 | Doc | Contents |

@@ -10,7 +10,18 @@ class AppRoles {
   static const String supervisor = 'supervisor';
   static const String admin = 'admin';
 
-  static const List<String> all = [student, parent, teacher, supervisor, admin];
+  /// مساعد مدرس — read-only on assigned halaqat; records attendance and
+  /// evaluations only while an Admin-activated cover period is active.
+  static const String assistantTeacher = 'assistant_teacher';
+
+  static const List<String> all = [
+    student,
+    parent,
+    teacher,
+    supervisor,
+    admin,
+    assistantTeacher,
+  ];
 }
 
 /// أسماء collections في Firestore
@@ -55,6 +66,12 @@ class FirestoreCollections {
 
   /// C6 / WA-8 — first-class session occurrences (SSOT).
   static const String sessions = 'sessions';
+
+  /// Append-only relationship changes (Admin read, server written).
+  static const String relationshipHistory = 'relationshipHistory';
+
+  /// Temporary cover periods per halaqa (active → completed).
+  static const String halaqaCoverPeriods = 'halaqaCoverPeriods';
 }
 
 /// أنواع التقييمات في سجل التسميع
@@ -76,6 +93,8 @@ class NotificationTypes {
   static const String payment = 'payment';
   static const String assignment = 'assignment';
   static const String attendance = 'attendance';
+  static const String absenceRequest = 'absence_request';
+  static const String complaint = 'complaint';
   static const String general = 'general';
 }
 
@@ -99,4 +118,18 @@ class AppCapabilities {
 
   /// When false: recitation tasks are optional/deferred; no Storage uploads.
   static const bool audioUploadsEnabled = false;
+
+  /// D11 memorization progress (`overallProgressPercent`, verses, surahs,
+  /// current plan) has no writer: the Wave C projector is blocked on the
+  /// undecided `versesRange` source (OA-19 / OA-75). While false, surfaces
+  /// must not present these fields as real values.
+  static const bool memorizationProgressAvailable = false;
+
+  /// `streakDays` / `level` have no writer and no design (E-12 quarantine);
+  /// `points` is quarantined (P0 §3).
+  static const bool streakAndLevelAvailable = false;
+
+  /// `reviewSchedules` has no writer (OA-20); the page could only ever be
+  /// empty.
+  static const bool reviewSchedulesAvailable = false;
 }

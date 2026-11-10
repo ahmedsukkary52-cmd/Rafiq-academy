@@ -940,15 +940,20 @@ test("A7 static guard: the unfenced canonicalWriter stays inside the emulator-on
 
   const script = readFileSync(join(root, "scripts", "migrate-meeting-links.mjs"), "utf8");
   assert.match(script, /export const EMULATOR_PROJECT = "demo-[a-z0-9-]+";/);
-  assert.equal(script.match(/tx\.create\(/g)?.length, 1, "one write call in the entry point");
-  assert.doesNotMatch(script, /tx\.(set|update|delete)\(/);
+  assert.equal(script.match(/tx\.create\(/g)?.length, 1, "one copy write call in the entry point");
+  assert.equal(script.match(/tx\.update\(/g)?.length, 1, "one strip write call in the entry point");
+  assert.match(script, /tx\.update\(halaqaRef, \{ meetingLink: deleteField\(\) \}\)/);
+  assert.doesNotMatch(script, /tx\.(set|delete)\(/);
   const main = script.slice(script.indexOf("async function main()"));
-  const call = main.indexOf("canonicalWriter(db");
-  assert.ok(call > 0, "the writer is only constructed in main");
-  for (const guard of ["checkInvocation(", "startEgressGuard(", "verifyHub(", "initializeApp({ projectId: EMULATOR_PROJECT }", "refuse(\"firebase-admin resolved a different project.\")"]) {
-    const at = main.indexOf(guard);
-    assert.ok(at >= 0 && at < call, `${guard} precedes canonicalWriter`);
+  for (const writer of ["canonicalWriter(db", "legacyStripper(db"]) {
+    const call = main.indexOf(writer);
+    assert.ok(call > 0, `${writer} is only constructed in main`);
+    for (const guard of ["checkInvocation(", "startEgressGuard(", "verifyHub(", "initializeApp({ projectId: EMULATOR_PROJECT }", "refuse(\"firebase-admin resolved a different project.\")"]) {
+      const at = main.indexOf(guard);
+      assert.ok(at >= 0 && at < call, `${guard} precedes ${writer}`);
+    }
   }
+  assert.equal(script.match(/legacyStripper\(db/g)?.length, 2, "one stripper definition and one construction");
   assert.equal(script.match(/canonicalWriter\(db/g)?.length, 2, "one definition and one construction");
 
   assert.match(script, /from "\.\/meeting-link-migration-core\.mjs"/);

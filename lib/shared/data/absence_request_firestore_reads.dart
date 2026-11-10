@@ -39,6 +39,45 @@ class AbsenceRequestFirestoreReads {
     );
   }
 
+  /// Requests dated on/after the start of [from]'s day, date ASC, bounded.
+  /// Composite indexes: `halaqaId+date` and `halaqaId+status+date`.
+  static const upcomingLimit = 100;
+
+  static Future<List<AbsenceRequestModel>> forHalaqaFrom({
+    required FirebaseFirestore firestore,
+    required String halaqaId,
+    required DateTime from,
+    bool pendingOnly = false,
+  }) async {
+    final id = halaqaId.trim();
+    if (id.isEmpty) return const [];
+
+    Query<Map<String, dynamic>> q = firestore
+        .collection(FirestoreCollections.absenceRequests)
+        .where('halaqaId', isEqualTo: id);
+    if (pendingOnly) q = q.where('status', isEqualTo: 'pending');
+    final snap = await q
+        .where(
+          'date',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(
+            AttendancePolicy.dayStart(from),
+          ),
+        )
+        .orderBy('date')
+        .limit(upcomingLimit)
+        .get();
+    return snap.docs.map(AbsenceRequestModel.fromFirestore).toList();
+  }
+
+  /// Upcoming sort: date ASC, then studentId.
+  static void sortUpcoming(List<AbsenceRequestModel> items) {
+    items.sort((a, b) {
+      final byDate = a.date.compareTo(b.date);
+      if (byDate != 0) return byDate;
+      return a.studentId.compareTo(b.studentId);
+    });
+  }
+
   /// Parent own-history list (W7 Slice 1) — no day filter; date DESC.
   static Future<List<AbsenceRequestModel>> forParent({
     required FirebaseFirestore firestore,

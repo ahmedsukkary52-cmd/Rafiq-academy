@@ -9,6 +9,7 @@ import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_profil
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../assistant/presentation/teacher_cover_banner.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
@@ -64,19 +65,26 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _currentTab,
+      body: Column(
         children: [
-          TeacherDashboardTab(
-            onSwitchTab: _switchTab,
-            tabStudents: _tabStudents,
-            tabMessages: _tabMessages,
-            tabProfile: _tabProfile,
+          const TeacherCoverBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentTab,
+              children: [
+                TeacherDashboardTab(
+                  onSwitchTab: _switchTab,
+                  tabStudents: _tabStudents,
+                  tabMessages: _tabMessages,
+                  tabProfile: _tabProfile,
+                ),
+                const TeacherClassesPage(),
+                const TeacherAwardsTab(),
+                const TeacherMessagesTab(),
+                const TeacherProfileTab(),
+              ],
+            ),
           ),
-          const TeacherClassesPage(),
-          const TeacherAwardsTab(),
-          const TeacherMessagesTab(),
-          const TeacherProfileTab(),
         ],
       ),
       bottomNavigationBar: _TeacherBottomNav(

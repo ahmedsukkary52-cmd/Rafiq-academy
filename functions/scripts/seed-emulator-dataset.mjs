@@ -1,12 +1,19 @@
-// Demo dataset v1 for the emulator seeder: accounts plus the documents
-// adminProvisionUser writes for them (users, userPrivate email, role
-// profiles). No personal phone numbers are seeded anywhere.
+// Demo dataset v2 for the emulator seeder: accounts plus the documents
+// adminProvisionUser writes for them (users with nameNormalized, userPrivate
+// email, the pending first-login flags of a new Admin, role profiles). No
+// personal phone numbers are seeded anywhere. No audit log entries either:
+// an entry records an operation someone performed, and seeding is not one.
 // Pure data and write orchestration; firebase-admin handles are injected.
+//
+// nameNormalized comes from the compiled Functions normalizer. `npm run serve`
+// rebuilds lib/ from src/ before the emulators start; without lib/ this
+// module fails to load, before any check or write.
 //
 // Writes use create() only, so nothing that already exists is overwritten,
 // and nothing is ever deleted.
+import { normalizeArabicSearchText } from "../lib/search/arabicNormalization.js";
 
-export const DEMO_SEED_VERSION = 1;
+export const DEMO_SEED_VERSION = 2;
 export const SEED_META = { collection: "_seedMeta", id: "demo" };
 
 // Emulator-only password shared by every demo account.
@@ -72,6 +79,9 @@ export function buildDemoDataset(accounts = DEMO_ACCOUNTS) {
       displayName: account.name,
       disabled: false,
     });
+    // A provisioned Admin holds no authority until completeFirstLogin replaces
+    // the issued password; the demo Admin starts in that state too.
+    const pendingAdmin = account.role === "admin";
     documents.push({
       collection: "users",
       id: account.uid,
@@ -80,6 +90,8 @@ export function buildDemoDataset(accounts = DEMO_ACCOUNTS) {
         role: account.role,
         isActive: true,
         createdAt: SERVER_TIMESTAMP,
+        nameNormalized: normalizeArabicSearchText(account.name),
+        ...(pendingAdmin ? { passwordChangeRequired: true } : {}),
       },
     });
     documents.push({
@@ -89,6 +101,7 @@ export function buildDemoDataset(accounts = DEMO_ACCOUNTS) {
         email: account.email,
         emailSource: "auth",
         emailUpdatedAt: SERVER_TIMESTAMP,
+        ...(pendingAdmin ? { mustChangePassword: true } : {}),
       },
     });
     const profile = roleProfile(account);

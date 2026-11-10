@@ -152,7 +152,6 @@ test.beforeEach(async () => {
     studentIds,
     schedule: [{ day: 0, startTime: '16:00', endTime: '17:00', slotId: 'slot-1' }],
     status: 'active',
-    meetingLink: LINK,
   });
 
   await seedAll({
@@ -318,7 +317,7 @@ test('B14 links: conservative fail-closed — strings containing lowercase archi
     await deny(`conservative ${key}: get h1 (backend: active, rules: deny)`, getLink(db, 'h1'));
     await deny(`conservative ${key}: get h3 (backend: active, rules: deny)`, getLink(db, 'h3'));
     await deny(`conservative ${key}: list`, listAll(db));
-    // The roster entry itself is unaffected: halaqat read is unchanged.
+    // The roster entry itself is unaffected: an active rostered student reads halaqat/h1.
     await allow(`conservative ${key}: still reads halaqat/h1`, db.doc('halaqat/h1').get());
   }
 });
@@ -369,20 +368,87 @@ test('B14 links: no client role can create, set, merge, update or delete', async
 
 // ── Overlapping rules ──────────────────────────────────────────────────────
 
-test('B14 links: halaqat read access never implies canonical link access', async () => {
-  // These callers can read halaqat/h1 (legacy field included until the strip
-  // phase), yet the canonical collection stays closed to them.
-  const callers = {
-    teacher1: authed('teacher1'),
-    parent1: authed('parent1'),
-    sup2: authed('sup2'),
-    ghost: authed('ghost'),
-    archived: authed(archId('exact')),
-  };
-  for (const [label, db] of Object.entries(callers)) {
+test('B14 links (J.9): halaqat read access never implies canonical link access', async () => {
+  // Assigned teacher and an archived roster student read the halaqa document
+  // (it carries no link), yet the canonical link stays closed.
+  for (const [label, db] of Object.entries({
+    'teacher1 (assigned)': authed('teacher1'),
+    'archived roster student': authed(archId('exact')),
+  })) {
     await allow(`${label} reads halaqat/h1`, db.doc('halaqat/h1').get());
     await deny(`${label} get ${COL}/h1`, getLink(db, 'h1'));
   }
+  // J.10: a linked parent reads neither (getParentChildHalaqat projects it).
+  await deny('parent1 (child on roster) reads halaqat/h1', authed('parent1').doc('halaqat/h1').get());
+  await deny(`parent1 (child on roster) get ${COL}/h1`, getLink(authed('parent1'), 'h1'));
+  // Unassigned, deactivated and profile-less callers read neither.
+  for (const [label, db] of Object.entries({
+    'sup2 (unassigned)': authed('sup2'),
+    'teacher2 (unassigned)': authed('teacher2'),
+    'supOff (deactivated)': authed('supOff'),
+    'studentOff (deactivated, on roster)': authed('studentOff'),
+    'adminOff (deactivated)': authed('adminOff'),
+    'ghost (no users doc, on roster)': authed('ghost'),
+    'signed-out': unauthed(),
+  })) {
+    await deny(`${label} reads halaqat/h1`, db.doc('halaqat/h1').get());
+    await deny(`${label} get ${COL}/h1`, getLink(db, 'h1'));
+  }
+  await deny('student3 (not on roster) reads halaqat/h1', authed('student3').doc('halaqat/h1').get());
+  await allow('sup1 (assigned) reads halaqat/h1', authed('sup1').doc('halaqat/h1').get());
+  await allow('student1 (eligible) reads halaqat/h1', authed('student1').doc('halaqat/h1').get());
+});
+
+test('B14 links (J.9): a legacy halaqat.meetingLink is readable only by Admin; the canonical link is unaffected', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc('halaqat/h1').update({ meetingLink: LINK });
+  });
+  for (const uid of ['teacher1', 'parent1', 'sup1', 'student1', archId('exact'), 'sup2', 'ghost']) {
+    await deny(`${uid} gets halaqat/h1 carrying a legacy link`, authed(uid).doc('halaqat/h1').get());
+  }
+  const snap = await allow('admin gets halaqat/h1 carrying a legacy link', authed('admin1').doc('halaqat/h1').get());
+  if (snap.data().meetingLink !== LINK) throw new Error('legacy seed missing');
+  await allow('sup1 still gets the canonical link', getLink(authed('sup1'), 'h1'));
+  await allow('student1 still gets the canonical link', getLink(authed('student1'), 'h1'));
+});
+
+test('B14 links (J.9): halaqat list and query attempts follow the role scope', async () => {
+  await allow('admin lists halaqat', authed('admin1').collection('halaqat').get());
+  for (const uid of ['teacher1', 'sup1', 'sup2', 'parent1', 'student1', 'ghost', 'adminOff']) {
+    await deny(`${uid} lists all halaqat`, authed(uid).collection('halaqat').get());
+  }
+  await allow(
+    'teacher1 queries own halaqat',
+    authed('teacher1').collection('halaqat').where('teacherId', '==', 'teacher1').get(),
+  );
+  await deny(
+    'teacher1 queries teacher2 halaqat',
+    authed('teacher1').collection('halaqat').where('teacherId', '==', 'teacher2').get(),
+  );
+  await allow(
+    'sup1 queries own halaqat',
+    authed('sup1').collection('halaqat').where('supervisorId', '==', 'sup1').get(),
+  );
+  await deny(
+    'sup2 queries sup1 halaqat',
+    authed('sup2').collection('halaqat').where('supervisorId', '==', 'sup1').get(),
+  );
+  await allow(
+    'student1 queries own roster',
+    authed('student1').collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+  await deny(
+    "parent1 queries child's roster (J.10: parents use getParentChildHalaqat)",
+    authed('parent1').collection('halaqat').where('studentIds', 'array-contains', 'student1').get(),
+  );
+  await deny(
+    'parent1 queries another roster',
+    authed('parent1').collection('halaqat').where('studentIds', 'array-contains', 'student3').get(),
+  );
+  await deny(
+    'ghost queries its roster entry',
+    authed('ghost').collection('halaqat').where('studentIds', 'array-contains', 'ghost').get(),
+  );
 });
 
 test('B14 links: nested paths and collection-group queries are not opened', async () => {

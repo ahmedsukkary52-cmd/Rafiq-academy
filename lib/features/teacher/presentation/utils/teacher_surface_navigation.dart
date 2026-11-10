@@ -4,13 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/router/router_app.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../teacher_contact_parent.dart';
 
 /// Actions offered on a Class Details student card.
 enum StudentCardAction { profile, evaluate, contactParent, award }
 
 /// Teacher surfaces are shared with escalated supervisors (W6). A CTA is only
 /// offered when [AppRouteAccess] would let the viewer open its destination, so
-/// the router never has to bounce a tap.
+/// the router never has to bounce a tap. Contact parent opens on the viewer's
+/// own chat surface ([contactStudentParent]).
 class TeacherSurfaceNavigation {
   const TeacherSurfaceNavigation._();
 
@@ -36,7 +38,7 @@ class TeacherSurfaceNavigation {
       StudentCardAction.evaluate,
       if (!isAtRisk)
         StudentCardAction.award
-      else if (canOpenTeacherChat(role))
+      else if (staffCanContactStudentParent(role))
         StudentCardAction.contactParent,
     ];
   }

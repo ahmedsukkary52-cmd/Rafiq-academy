@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/error/user_facing_error.dart';
 import '../theme/app_theme.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -404,7 +405,7 @@ class AppErrorWidget extends StatelessWidget {
             const Icon(Icons.error_outline, color: AppColors.error, size: 48),
             const SizedBox(height: 12),
             Text(
-              message,
+              userFacingErrorText(message),
               style: AppTextStyles.bodyMedium,
               textAlign: TextAlign.center,
             ),

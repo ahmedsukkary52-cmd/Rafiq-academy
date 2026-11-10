@@ -28,6 +28,7 @@ class _FakeChatRepository implements ChatRepository {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
+    String? replyToMessageId,
   }) async {
     sendCalls++;
     lastSendConversationId = conversationId;
@@ -35,8 +36,11 @@ class _FakeChatRepository implements ChatRepository {
     lastSendType = type;
     lastSendText = text;
     lastSendMedia = media;
+    lastSendReplyTo = replyToMessageId;
     return sendResult;
   }
+
+  String? lastSendReplyTo;
 
   @override
   Future<Either<Failure, Unit>> markConversationAsRead({
@@ -104,6 +108,20 @@ void main() {
       expect(repo.lastSendMessageId, _id);
       expect(repo.lastSendType, ChatMessageType.text);
       expect(repo.lastSendMedia, isNull);
+      expect(repo.lastSendReplyTo, isNull);
+    });
+
+    test('forwards the quoted message id for replies', () async {
+      final repo = _FakeChatRepository();
+      await SendMessageUseCase(repo)(
+        const SendMessageParams(
+          conversationId: 'c1',
+          messageId: _id,
+          text: 'نعم',
+          replyToMessageId: 'msgQuoted_0001',
+        ),
+      );
+      expect(repo.lastSendReplyTo, 'msgQuoted_0001');
     });
 
     test('media message may have an empty caption', () async {

@@ -369,12 +369,21 @@ export function canCallerMaterialize(params: {
   callerUid: string;
   callerRole: unknown;
   halaqaTeacherId: string;
+  /** Admin-activated temporary cover (`halaqat.coverTeacherId`), if any. */
+  halaqaCoverTeacherId?: string;
 }): boolean {
   const uid = params.callerUid.trim();
   const teacherId = params.halaqaTeacherId.trim();
   if (!uid || !teacherId) return false;
   if (params.callerRole === "admin") return true;
   if (params.callerRole === "teacher" && teacherId === uid) return true;
+  const coverId = (params.halaqaCoverTeacherId ?? "").trim();
+  if (
+    coverId === uid &&
+    (params.callerRole === "teacher" || params.callerRole === "assistant_teacher")
+  ) {
+    return true;
+  }
   return false;
 }
 

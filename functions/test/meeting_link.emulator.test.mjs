@@ -1,7 +1,8 @@
 /**
  * B14 — setHalaqaMeetingLink against the Firestore emulator (real
  * transaction semantics: supervisor add-only under races, the canonical
- * `halaqaMeetingLinks` doc and legacy mirror committed together, atomic audit).
+ * `halaqaMeetingLinks` doc is the only stored link, a legacy
+ * `halaqat.meetingLink` copy is removed in the same transaction, atomic audit).
  * Never touches a real project.
  *
  * Run from repo root (after `npm --prefix functions run build`):
@@ -46,7 +47,11 @@ async function clearFirestore() {
 
 const user = (role, extra = {}) => ({ name: role, role, isActive: true, ...extra });
 
-async function seed(meetingLink = "") {
+/**
+ * `meetingLink` seeds the canonical doc; `legacy` (a string) additionally
+ * seeds a pre-J.9 `halaqat.meetingLink` copy.
+ */
+async function seed(meetingLink = "", { legacy } = {}) {
   const batch = db.batch();
   const docs = {
     "users/admin1": user("admin"),
@@ -61,7 +66,7 @@ async function seed(meetingLink = "") {
       supervisorId: "sup1",
       studentIds: ["student1"],
       schedule: [{ slotId: "s1", day: "saturday", startTime: "16:00", endTime: "17:00" }],
-      meetingLink,
+      ...(legacy === undefined ? {} : { meetingLink: legacy }),
       status: "active",
     },
   };
@@ -81,18 +86,18 @@ async function audits() {
   );
 }
 
-/** The link as stored in both places; throws if the canonical doc and legacy mirror disagree. */
+async function hasLegacyKey(halaqaId = "h1") {
+  return Object.hasOwn((await db.doc(`halaqat/${halaqaId}`).get()).data(), "meetingLink");
+}
+
+/** The canonical link (`""` when none); throws if the halaqa carries a legacy copy. */
 async function storedLink(halaqaId = "h1") {
-  const legacy = (await db.doc(`halaqat/${halaqaId}`).get()).data().meetingLink;
+  assert.equal(await hasLegacyKey(halaqaId), false, "the halaqa must not carry a meetingLink");
   const doc = await db.doc(`halaqaMeetingLinks/${halaqaId}`).get();
-  if (!doc.exists) {
-    assert.equal(legacy, "", "legacy mirror must be empty when no canonical doc exists");
-    return "";
-  }
+  if (!doc.exists) return "";
   const data = doc.data();
   assert.deepEqual(Object.keys(data).sort(), ["meetingLink", "updatedAt"]);
   assert.ok(data.updatedAt instanceof admin.firestore.Timestamp, "updatedAt is a server timestamp");
-  assert.equal(data.meetingLink, legacy, "canonical doc and legacy mirror agree");
   return data.meetingLink;
 }
 
@@ -228,7 +233,33 @@ test("supervisor cannot update or clear; other roles and halaqat are denied with
   assert.equal((await db.collection("auditLogs").get()).size, 0);
 });
 
-test("adminCreateHalaqa with a link writes the canonical doc and mirror atomically; requestId replay writes nothing", async () => {
+test("legacy-era halaqa: a legacy-only copy blocks supervisor adds; admin changes remove the copy", async () => {
+  await seed("", { legacy: LINK_A });
+  const before = (await db.doc("halaqat/h1").get()).updateTime;
+  await expectCode(call("sup1", { halaqaId: "h1", meetingLink: LINK_C }), "permission-denied");
+  assert.ok((await db.doc("halaqat/h1").get()).updateTime.isEqual(before), "a denied add writes nothing");
+  assert.equal(await canonicalExists(), false);
+  assert.equal(await hasLegacyKey(), true);
+
+  assert.equal((await call("admin1", { halaqaId: "h1", meetingLink: LINK_B })).operation, "update");
+  assert.equal(await storedLink(), LINK_B, "canonical set, legacy copy removed in the same transaction");
+
+  await clearFirestore();
+  await seed(LINK_A, { legacy: LINK_A });
+  assert.equal((await call("admin1", { halaqaId: "h1", clear: true })).operation, "clear");
+  assert.equal(await storedLink(), "");
+
+  await clearFirestore();
+  await seed("", { legacy: "" });
+  assert.equal((await call("sup1", { halaqaId: "h1", meetingLink: LINK_C })).operation, "set");
+  assert.equal(await storedLink(), LINK_C, "an empty legacy key is removed by the supervisor's add");
+  const h = (await db.doc("halaqat/h1").get()).data();
+  assert.equal(h.name, "حلقة الفجر");
+  assert.equal(h.supervisorId, "sup1");
+  await assertNoLinkInAudits();
+});
+
+test("adminCreateHalaqa with a link writes only the canonical doc; requestId replay writes nothing", async () => {
   const batch = db.batch();
   batch.set(db.doc("users/admin1"), user("admin"));
   batch.set(db.doc("users/teacher1"), user("teacher"));
@@ -256,7 +287,7 @@ test("adminCreateHalaqa with a link writes the canonical doc and mirror atomical
   assert.equal(h.supervisorId, "sup1");
   assert.deepEqual(h.studentIds, []);
   assert.equal(h.status, "active");
-  assert.equal(await storedLink(requestId), LINK_A, "trimmed link stored in both places");
+  assert.equal(await storedLink(requestId), LINK_A, "trimmed link stored only in the canonical doc");
 
   const creates = (await db.collection("auditLogs").where("action", "==", "halaqa_create").get()).docs;
   assert.equal(creates.length, 1);

@@ -53,12 +53,16 @@ const srcDir = join(functionsDir, "src");
 
 const WRITTEN = "google.cloud.firestore.document.v1.written";
 const CREATED = "google.cloud.firestore.document.v1.created";
+const UPDATED = "google.cloud.firestore.document.v1.updated";
 const firestoreEvent = (eventType, document) => ({ eventType, document, database: "(default)", namespace: "(default)" });
 
 /** Every reviewed Firestore trigger: export name -> event. */
 const PINNED = {
   events: {
+    notifyOnAbsenceRequestCreated: firestoreEvent(CREATED, "absenceRequests/{requestId}"),
+    notifyOnAbsenceRequestReviewed: firestoreEvent(UPDATED, "absenceRequests/{requestId}"),
     notifyOnAssignmentCreated: firestoreEvent(CREATED, "assignments/{assignmentId}"),
+    notifyOnPaymentUpdated: firestoreEvent(UPDATED, "payments/{paymentId}"),
     notifyParentsOnEvaluation: firestoreEvent(WRITTEN, "recitationRecords/{recordId}"),
     projectStudentSearchOnHalaqaWrite: firestoreEvent(WRITTEN, "halaqat/{halaqaId}"),
     projectStudentSearchOnProfileWrite: firestoreEvent(WRITTEN, "studentProfiles/{studentId}"),

@@ -57,6 +57,7 @@ async function assertCanMaterialize(params: {
   db: admin.firestore.Firestore;
   uid: string;
   teacherId: string;
+  coverTeacherId: string;
 }): Promise<{ role: string; createdBy: string }> {
   const snap = await params.db.collection("users").doc(params.uid).get();
   if (!snap.exists) {
@@ -68,6 +69,7 @@ async function assertCanMaterialize(params: {
       callerUid: params.uid,
       callerRole: role,
       halaqaTeacherId: params.teacherId,
+      halaqaCoverTeacherId: params.coverTeacherId,
     })
   ) {
     throw new HttpsError(
@@ -221,7 +223,12 @@ export async function materializeSessionCore(
       throw new HttpsError("failed-precondition", "الحلقة بلا معلّم");
     }
 
-    const authz = await assertCanMaterialize({ db, uid, teacherId });
+    const coverTeacherId =
+      typeof halaqaRaw.coverTeacherId === "string" && typeof halaqaRaw.coverId === "string" &&
+      halaqaRaw.coverId.trim()
+        ? halaqaRaw.coverTeacherId.trim()
+        : "";
+    const authz = await assertCanMaterialize({ db, uid, teacherId, coverTeacherId });
     const requestStudentIds = normalizeStudentIds(halaqaRaw.studentIds);
 
     const identity = { halaqaId, slotId, date };

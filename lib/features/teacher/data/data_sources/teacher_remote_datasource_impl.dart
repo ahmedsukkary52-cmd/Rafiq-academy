@@ -70,16 +70,12 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
 
       if (studentIds.isEmpty) return [];
 
-      // Firestore whereIn max 30 — use studentProfiles (not users) so D16
-      // phone-bearing legacy users docs do not break roster queries (WA-2).
-      final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-      for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
-        final profilesSnap = await firestore
-            .collection(FirestoreCollections.studentProfiles)
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get();
-        docs.addAll(profilesSnap.docs);
-      }
+      // studentProfiles (not users) so D16 phone-bearing legacy users docs do
+      // not break roster queries (WA-2). One get per student: the rules
+      // authorize staff per student, which a list query cannot prove.
+      final docs = (await _studentProfiles(studentIds))
+          .where((doc) => doc.exists)
+          .toList();
 
       final bases = docs
           .map(HalaqaStudentSummaryModel.fromStudentProfile)
@@ -151,18 +147,23 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     List<String> studentIds,
   ) async {
     final out = <String, double>{};
-    for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
-      final snap = await firestore
-          .collection(FirestoreCollections.studentProfiles)
-          .where(FieldPath.documentId, whereIn: chunk)
-          .get();
-      for (final doc in snap.docs) {
-        final raw = doc.data()['overallProgressPercent'];
-        final value = raw is num ? raw.toDouble() : 0.0;
-        out[doc.id] = value;
-      }
+    for (final doc in await _studentProfiles(studentIds)) {
+      if (!doc.exists) continue;
+      final raw = doc.data()?['overallProgressPercent'];
+      final value = raw is num ? raw.toDouble() : 0.0;
+      out[doc.id] = value;
     }
     return out;
+  }
+
+  Future<List<DocumentSnapshot<Map<String, dynamic>>>> _studentProfiles(
+    List<String> studentIds,
+  ) {
+    final profiles = firestore.collection(FirestoreCollections.studentProfiles);
+    return Future.wait([
+      for (final id in FirestoreInQuery.normalizeIds(studentIds))
+        profiles.doc(id).get(),
+    ]);
   }
 
   @override
@@ -480,13 +481,13 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     required DateTime date,
   }) async {
     try {
-      final items = await AbsenceRequestFirestoreReads.forHalaqaOnDate(
+      final items = await AbsenceRequestFirestoreReads.forHalaqaFrom(
         firestore: firestore,
         halaqaId: halaqaId,
-        date: date,
+        from: date,
         pendingOnly: true,
       );
-      AbsenceRequestFirestoreReads.sortTeacherPending(items);
+      AbsenceRequestFirestoreReads.sortUpcoming(items);
       return items;
     } catch (e) {
       throw ServerException(e.toString());
@@ -530,6 +531,7 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
               ? 'approved'
               : 'rejected',
           'reviewedBy': teacherId.trim(),
+          'reviewedAt': FieldValue.serverTimestamp(),
         });
       });
     } catch (e) {

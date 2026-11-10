@@ -4,8 +4,9 @@ import 'package:flutter/services.dart' show appFlavor;
 import '../../firebase_options.dart';
 
 /// Build flavor, from `flutter run/build --flavor <name>` (pubspec
-/// `default-flavor` supplies `dev` when none is given).
-enum AppFlavor { dev, staging, prod }
+/// `default-flavor` supplies `dev` when none is given). `emulator` is an
+/// Android debug build for phone testing against the local Emulator Suite.
+enum AppFlavor { dev, staging, prod, emulator }
 
 /// Firebase project the dev flavor talks to (seed and test data only).
 const String devFirebaseProjectId = 'rafiq-academy';
@@ -21,9 +22,10 @@ AppFlavor parseAppFlavor(String? raw) => switch (raw) {
   'dev' => AppFlavor.dev,
   'staging' => AppFlavor.staging,
   'prod' => AppFlavor.prod,
+  'emulator' => AppFlavor.emulator,
   _ => throw StateError(
     'Unknown app flavor "${raw ?? ''}"; build with --flavor dev, '
-    '--flavor staging or --flavor prod.',
+    '--flavor staging, --flavor prod or --flavor emulator.',
   ),
 };
 
@@ -31,6 +33,8 @@ AppFlavor parseAppFlavor(String? raw) => switch (raw) {
 ///
 /// The staging and production projects are not configured yet, so those
 /// flavors refuse to start instead of falling back to the development project.
+/// The emulator flavor has no real project at all: without
+/// `USE_FIREBASE_EMULATOR=true` it refuses to start.
 FirebaseOptions firebaseOptionsFor(
   AppFlavor flavor, {
   FirebaseOptions Function()? devOptions,
@@ -42,6 +46,10 @@ FirebaseOptions firebaseOptionsFor(
     'staging ($stagingFirebaseProjectId)',
   ),
   AppFlavor.prod => throw _notConfigured('production'),
+  AppFlavor.emulator => throw StateError(
+    'The emulator flavor only runs against the Firebase Emulator Suite; '
+    'build it with --dart-define=USE_FIREBASE_EMULATOR=true.',
+  ),
 };
 
 FirebaseOptions _requireDevProject(FirebaseOptions options) {

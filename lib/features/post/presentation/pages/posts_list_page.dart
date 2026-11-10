@@ -470,13 +470,13 @@ class _PostItem extends StatelessWidget {
   final PostEntity post;
   final String currentUid;
   final VoidCallback onLike;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _PostItem({
     required this.post,
     required this.currentUid,
     required this.onLike,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -641,10 +641,18 @@ class _AttachmentItemState extends State<_AttachmentItem> {
     if (_opening) return;
     if (_isLegacyLink) {
       if (!isAllowedExternalLink(attachment.url)) return;
-      final uri = Uri.parse(attachment.url.trim());
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // launchUrl reports a missing handler as false, so no canLaunchUrl
+      // pre-check; the user is told when nothing could open the link.
+      var opened = false;
+      try {
+        opened = await launchUrl(
+          Uri.parse(attachment.url.trim()),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {
+        opened = false;
       }
+      if (!opened) _showSnack('تعذر فتح الرابط');
       return;
     }
     if (!_isPrivate) {
@@ -788,7 +796,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           ),
                         ),
                       ),
-                      onTap: () {},
                     ),
                     const SizedBox(height: 24),
                     const SectionHeader(title: 'التعليقات'),

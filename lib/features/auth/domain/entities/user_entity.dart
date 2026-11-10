@@ -9,6 +9,9 @@ class UserEntity extends Equatable {
   final bool isActive;
   final DateTime createdAt;
 
+  /// Server-set (`userPrivate`) for Admin-issued temporary passwords.
+  final bool mustChangePassword;
+
   const UserEntity({
     required this.uid,
     required this.name,
@@ -17,6 +20,7 @@ class UserEntity extends Equatable {
     this.profileImageUrl,
     required this.isActive,
     required this.createdAt,
+    this.mustChangePassword = false,
   });
 
   @override
@@ -28,5 +32,6 @@ class UserEntity extends Equatable {
     profileImageUrl,
     isActive,
     createdAt,
+    mustChangePassword,
   ];
 }

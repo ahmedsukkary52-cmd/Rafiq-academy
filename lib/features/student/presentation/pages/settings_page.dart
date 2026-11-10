@@ -28,14 +28,6 @@ class SettingsPage extends StatelessWidget {
             const _SectionLabel('المظهر'),
             _SettingsGroup(
               children: [
-                const _LinkTile(
-                  icon: Icons.language_rounded,
-                  iconBg: AppColors.primaryLight,
-                  iconColor: AppColors.primary,
-                  label: 'اللغة',
-                  trailing: 'العربية',
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
                 ValueListenableBuilder<AppFontSize>(
                   valueListenable: appPreferences.fontSize,
                   builder: (context, size, _) {

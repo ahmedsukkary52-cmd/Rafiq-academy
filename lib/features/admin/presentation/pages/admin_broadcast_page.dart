@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -6,14 +7,32 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../domain/admin_broadcast_form.dart';
+import '../../domain/entities/admin_operations_entities.dart'
+    show newHalaqaRequestId;
 import '../bloc/admin_bloc.dart';
 import '../bloc/admin_event.dart';
 import '../bloc/admin_state.dart';
 import '../widgets/admin_figma_widgets.dart';
 import '../widgets/admin_subpage_scaffold.dart';
 
+typedef BroadcastAudienceCounter = Future<int> Function(String targetRole);
+
+Future<int> countBroadcastAudience(String targetRole) async {
+  Query<Map<String, dynamic>> q = FirebaseFirestore.instance.collection(
+    FirestoreCollections.users,
+  );
+  if (targetRole != 'all') q = q.where('role', isEqualTo: targetRole);
+  final snap = await q.count().get();
+  return snap.count ?? 0;
+}
+
 class AdminBroadcastPage extends StatefulWidget {
-  const AdminBroadcastPage({super.key});
+  final BroadcastAudienceCounter countAudience;
+
+  const AdminBroadcastPage({
+    super.key,
+    this.countAudience = countBroadcastAudience,
+  });
 
   @override
   State<AdminBroadcastPage> createState() => _AdminBroadcastPageState();
@@ -24,6 +43,52 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
   final _bodyCtrl = TextEditingController();
   String _targetRole = 'all';
   String? _fieldError;
+
+  /// Kept across retries of the same message so an unconfirmed send is never
+  /// delivered twice; cleared when the message or audience changes.
+  String? _requestId;
+  final _audienceCounts = <String, int?>{};
+  final _audienceCountFailed = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCount(_targetRole);
+  }
+
+  Future<void> _loadCount(String role) async {
+    if (_audienceCounts.containsKey(role)) return;
+    _audienceCounts[role] = null;
+    _audienceCountFailed.remove(role);
+    try {
+      final n = await widget.countAudience(role);
+      if (!mounted) return;
+      setState(() => _audienceCounts[role] = n);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _audienceCounts.remove(role);
+        _audienceCountFailed.add(role);
+      });
+    }
+  }
+
+  void _selectAudience(String role) {
+    setState(() {
+      _targetRole = role;
+      _requestId = null;
+    });
+    _loadCount(role);
+  }
+
+  String _audienceCountText() {
+    if (_audienceCountFailed.contains(_targetRole)) {
+      return 'تعذر حساب عدد الحسابات المستلمة';
+    }
+    final n = _audienceCounts[_targetRole];
+    if (n == null) return 'جارٍ حساب عدد الحسابات المستلمة…';
+    return 'عدد الحسابات المسجلة في هذه الفئة الآن: $n';
+  }
 
   static const _audienceTiles = [
     (AppRoles.parent, Icons.groups_outlined, 'أولياء الأمور'),
@@ -53,11 +118,13 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
     setState(() => _fieldError = error);
     if (error != null) return;
 
+    final requestId = _requestId ??= newHalaqaRequestId();
     context.read<AdminBloc>().add(
       SendBroadcastNotificationEvent(
         title: _titleCtrl.text.trim(),
         body: _bodyCtrl.text.trim(),
         targetRole: _targetRole,
+        requestId: requestId,
       ),
     );
   }
@@ -75,6 +142,7 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
           setState(() {
             _targetRole = 'all';
             _fieldError = null;
+            _requestId = null;
           });
         } else if (state.broadcastStatus == SubmissionStatus.error) {
           AppSnackBar.showError(
@@ -118,7 +186,7 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
                         selected: _targetRole == t.$1,
                         onTap: submitting
                             ? null
-                            : () => setState(() => _targetRole = t.$1),
+                            : () => _selectAudience(t.$1),
                       ),
                   ],
                 ),
@@ -129,9 +197,43 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
                   selected: _targetRole == 'all',
                   selectedColor: AppColors.secondary,
                   fullWidth: true,
-                  onTap: submitting
-                      ? null
-                      : () => setState(() => _targetRole = 'all'),
+                  onTap: submitting ? null : () => _selectAudience('all'),
+                ),
+                const SizedBox(height: 12),
+                AppCard(
+                  key: const Key('broadcast-audience-explanation'),
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'من سيستلم الرسالة؟',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        AdminBroadcastFormValidation.audienceExplanation(
+                          _targetRole,
+                        ),
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _audienceCountText(),
+                        key: const Key('broadcast-audience-count'),
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        AdminBroadcastFormValidation.deliveryNote,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 AppCard(
@@ -157,7 +259,7 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
                           if (_fieldError != null) {
                             setState(() => _fieldError = null);
                           }
-                          setState(() {});
+                          setState(() => _requestId = null);
                         },
                       ),
                       const SizedBox(height: 12),
@@ -174,7 +276,7 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
                           if (_fieldError != null) {
                             setState(() => _fieldError = null);
                           }
-                          setState(() {});
+                          setState(() => _requestId = null);
                         },
                       ),
                       if (_fieldError != null) ...[

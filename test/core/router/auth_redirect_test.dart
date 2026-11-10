@@ -108,6 +108,63 @@ void main() {
       expect(_go(s, AppRoutes.login), isNull);
     });
 
+    test('a temporary password confines the member to first-login', () {
+      final s = AuthAuthenticated(
+        UserEntity(
+          uid: 'u1',
+          name: 'x',
+          role: 'student',
+          isActive: true,
+          createdAt: DateTime(2026),
+          mustChangePassword: true,
+        ),
+      );
+      for (final path in [
+        AppRoutes.student,
+        '/student/chat/abc',
+        AppRoutes.splash,
+        AppRoutes.login,
+        AppRoutes.admin,
+      ]) {
+        expect(_go(s, path), AppRoutes.firstLogin, reason: path);
+      }
+      expect(_go(s, AppRoutes.firstLogin), isNull);
+      expect(
+        _go(AuthAuthenticated(_user('student')), AppRoutes.firstLogin),
+        AppRoutes.student,
+      );
+    });
+
+    test('a newly provisioned Admin cannot open any Admin route before the '
+        'first-login change', () {
+      final s = AuthAuthenticated(
+        UserEntity(
+          uid: 'a2',
+          name: 'x',
+          role: 'admin',
+          email: 'new-admin@academy.test',
+          isActive: true,
+          createdAt: DateTime(2026),
+          mustChangePassword: true,
+        ),
+      );
+      for (final path in [
+        AppRoutes.admin,
+        AppRoutes.adminPayments,
+        '/admin/students',
+        '/admin/accounts',
+        AppRoutes.splash,
+        AppRoutes.login,
+      ]) {
+        expect(_go(s, path), AppRoutes.firstLogin, reason: path);
+      }
+      expect(_go(s, AppRoutes.firstLogin), isNull);
+      expect(
+        _go(AuthAuthenticated(_user('admin')), AppRoutes.firstLogin),
+        AppRoutes.admin,
+      );
+    });
+
     test('a failed logout keeps role routing', () {
       final s = AuthLogoutFailure(_user('teacher'), 'x');
       expect(_go(s, AppRoutes.teacher), isNull);

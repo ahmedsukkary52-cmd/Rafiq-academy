@@ -15,12 +15,20 @@ import '../../domain/repositories/chat_repository.dart';
 import '../models/chat_models.dart';
 
 abstract class ChatRemoteDatasource {
-  Stream<List<ConversationModel>> watchConversations(String uid);
+  Stream<List<ConversationModel>> watchConversations(String uid, {int? limit});
 
   /// Academy-wide conversation stream for Admin oversight (no participant filter).
   /// Does not add the Admin to [participantIds].
   Stream<List<ConversationModel>> watchAllConversations({
     required String observerUid,
+    int? limit,
+  });
+
+  Future<List<ConversationModel>> fetchConversationsAfter({
+    String? participantUid,
+    required String viewerUid,
+    required String afterConversationId,
+    required int limit,
   });
 
   /// Newest [limit] messages, returned in ascending time order.
@@ -40,6 +48,7 @@ abstract class ChatRemoteDatasource {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
+    String? replyToMessageId,
   });
 
   ChatUploadTask startAttachmentUpload({
@@ -93,26 +102,70 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
       .collection(FirestoreCollections.messagesSubcollection);
 
   @override
-  Stream<List<ConversationModel>> watchConversations(String uid) {
-    return _conversationsRef
+  Stream<List<ConversationModel>> watchConversations(String uid, {int? limit}) {
+    Query query = _conversationsRef
         .where('participantIds', arrayContains: uid)
-        .orderBy('lastMessageAt', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map(
-                (doc) => ConversationModel.fromFirestore(doc, currentUid: uid),
-              )
-              .toList(),
-        );
+        .orderBy('lastMessageAt', descending: true);
+    if (limit != null) query = query.limit(limit);
+    return query.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => ConversationModel.fromFirestore(doc, currentUid: uid))
+          .toList(),
+    );
+  }
+
+  @override
+  Future<List<ConversationModel>> fetchConversationsAfter({
+    String? participantUid,
+    required String viewerUid,
+    required String afterConversationId,
+    required int limit,
+  }) async {
+    try {
+      final cursor = await _conversationsRef.doc(afterConversationId).get();
+      if (!cursor.exists) return const [];
+      Query query = _conversationsRef;
+      if (participantUid != null) {
+        query = query.where('participantIds', arrayContains: participantUid);
+      }
+      final page = await query
+          .orderBy('lastMessageAt', descending: true)
+          .startAfterDocument(cursor)
+          .limit(limit)
+          .get();
+      return page.docs
+          .map((d) => ConversationModel.fromFirestore(d, currentUid: viewerUid))
+          .toList();
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'تعذر تحميل المزيد من المحادثات');
+    }
   }
 
   @override
   Stream<List<ConversationModel>> watchAllConversations({
     required String observerUid,
+    int? limit,
   }) {
-    // No orderBy: docs missing `lastMessageAt` would be excluded from an
-    // ordered query. Sort client-side so Admin oversight sees every thread.
+    // Server-created conversations always carry `lastMessageAt` (null until
+    // the first message, which sorts last when descending).
+    if (limit != null) {
+      return _conversationsRef
+          .orderBy('lastMessageAt', descending: true)
+          .limit(limit)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map(
+                  (doc) => ConversationModel.fromFirestore(
+                    doc,
+                    currentUid: observerUid,
+                  ),
+                )
+                .toList(),
+          );
+    }
+    // Unbounded legacy stream: no orderBy so docs without `lastMessageAt`
+    // are still listed; sorted client-side.
     return _conversationsRef.snapshots().map((snapshot) {
       final list = snapshot.docs
           .map(
@@ -209,6 +262,7 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
+    String? replyToMessageId,
   }) async {
     try {
       final callable = functions.httpsCallable('sendChatMessage');
@@ -217,6 +271,7 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         'messageId': messageId,
         'type': type.name,
         if (text.trim().isNotEmpty) 'text': text.trim(),
+        if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
         if (media != null)
           'media': <String, dynamic>{
             'storagePath': media.storagePath,
@@ -361,7 +416,8 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   @override
   Future<ChatParticipantModel> getParticipant(String uid) async {
     try {
-      // Prefer users when phone-free; fall back to role profiles (WA-2 / D16).
+      // Prefer users when phone-free; fall back to studentProfiles (WA-2 /
+      // D16). teacherProfiles is HR data, readable by Admin and self only.
       final userDoc = await firestore
           .collection(FirestoreCollections.users)
           .doc(uid)
@@ -386,20 +442,6 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
           uid: studentDoc.id,
           name: data['name'] as String? ?? '',
           role: AppRoles.student,
-          profileImageUrl: data['profileImageUrl'] as String?,
-        );
-      }
-
-      final teacherDoc = await firestore
-          .collection(FirestoreCollections.teacherProfiles)
-          .doc(uid)
-          .get();
-      if (teacherDoc.exists) {
-        final data = teacherDoc.data() as Map<String, dynamic>;
-        return ChatParticipantModel(
-          uid: teacherDoc.id,
-          name: data['name'] as String? ?? '',
-          role: AppRoles.teacher,
           profileImageUrl: data['profileImageUrl'] as String?,
         );
       }

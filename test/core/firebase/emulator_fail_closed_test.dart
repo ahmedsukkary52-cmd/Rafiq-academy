@@ -134,13 +134,65 @@ void main() {
 
     test('app_firebase has no non-emulator initializeApp path', () {
       final src = read('lib/core/firebase/app_firebase.dart');
-      expect(RegExp(r'Firebase\.initializeApp\(').allMatches(src).length, 1);
-      expect(src, contains('name: _emulatorAppName'));
+      final calls = RegExp(
+        r'Firebase\.initializeApp\(([^)]*)\)',
+      ).allMatches(src).map((m) => m.group(1)!).toList();
+      expect(calls, hasLength(2));
+      for (final args in calls) {
+        expect(args, contains('options: firebaseEmulatorOptions'));
+      }
+      expect(calls.where((a) => a.contains('name:')).toList(), [
+        contains('name: _emulatorAppName'),
+      ]);
       expect(src, isNot(contains('DefaultFirebaseOptions')));
       expect(
         src.indexOf('assertFirebaseRouting('),
         lessThan(src.indexOf('Firebase.initializeApp(')),
       );
+      expect(
+        src.indexOf('assertLoopbackEmulatorHost(firebaseEmulatorHost)'),
+        lessThan(src.indexOf('Firebase.initializeApp(')),
+      );
+    });
+
+    test('[DEFAULT] app gets the fake options and the emulators before the '
+        'named app is created', () {
+      final src = read('lib/core/firebase/app_firebase.dart');
+      final init = src.substring(
+        src.indexOf('Future<void> initializeAppFirebase() async {'),
+        src.indexOf('Future<void> _useEmulators('),
+      );
+      final ordered = [
+        'final defaultApp = await Firebase.initializeApp(',
+        'assertEmulatorOptions(defaultApp.options);',
+        'await _useEmulators(defaultApp);',
+        'final app = await Firebase.initializeApp(',
+        'assertEmulatorOptions(app.options);',
+        'await _useEmulators(app);',
+        '_emulatorApp = app;',
+      ];
+      var at = -1;
+      for (final step in ordered) {
+        final next = init.indexOf(step);
+        expect(next, greaterThan(at), reason: step);
+        at = next;
+      }
+    });
+
+    test('every service is routed to 127.0.0.1 without host mapping', () {
+      final src = read('lib/core/firebase/app_firebase.dart');
+      final wiring = src.substring(src.indexOf('Future<void> _useEmulators('));
+      for (final call in [
+        'useAuthEmulator(',
+        'useFirestoreEmulator(',
+        'useFunctionsEmulator(',
+        'useStorageEmulator(',
+      ]) {
+        expect(call.allMatches(wiring).length, 1, reason: call);
+      }
+      expect('firebaseEmulatorHost,'.allMatches(wiring).length, 4);
+      expect('automaticHostMapping: false'.allMatches(wiring).length, 4);
+      expect(wiring, isNot(contains('automaticHostMapping: true')));
     });
 
     test('DI never touches FirebaseMessaging.instance in emulator mode', () {

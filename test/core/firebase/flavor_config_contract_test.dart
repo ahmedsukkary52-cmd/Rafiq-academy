@@ -163,6 +163,40 @@ android {
     }
   });
 
+  test('the review build is refused for staging and prod tasks', () {
+    expect(
+      gradle,
+      contains(
+        'if (basmaReviewBuild && allTasks.any { it.name.matches(Regex('
+        '"^(assemble|bundle|package|install)(Staging|Prod).*")) })',
+      ),
+    );
+    expect(
+      gradle,
+      contains('-PbasmaReviewBuild=true applies to the dev debug build only.'),
+    );
+  });
+
+  test('only the fake dev config registers the review application ID', () {
+    final real = File('android/app/google-services.json').readAsStringSync();
+    final staging = File(
+      'android/app/src/staging/google-services.json',
+    ).readAsStringSync();
+    expect(real, isNot(contains(_devReviewApplicationId)));
+    expect(staging, isNot(contains(_devReviewApplicationId)));
+    expect(
+      File('android/app/src/prod/google-services.json').existsSync(),
+      isFalse,
+    );
+    expect(
+      gradle,
+      contains(
+        'if (basmaReviewBuild && flavor == "dev" && '
+        '!text.contains("\\"\$reviewAppId\\""))',
+      ),
+    );
+  });
+
   for (final entry in {
     'dev': [_devApplicationId, _devReviewApplicationId],
     'staging': ['com.basmaacademy.app.staging'],
@@ -209,6 +243,83 @@ android {
       expect(RegExp(r'iid\.Registrar"\s+tools:node').hasMatch(xml), isFalse);
     });
   }
+
+  group('review-only manifest', () {
+    const reviewManifest = 'android/app/src/dev-review/AndroidManifest.xml';
+    final xml = File(reviewManifest).readAsStringSync();
+
+    test('is wired only for -PbasmaReviewBuild=true, on the dev source set', () {
+      expect(
+        gradle,
+        contains(
+          'val reviewManifestPath = "src/dev-review/AndroidManifest.xml"',
+        ),
+      );
+      expect(
+        RegExp(
+          r'if \(basmaReviewBuild\) \{\s*'
+          r'sourceSets\.getByName\("dev"\)\.manifest\.srcFile\(reviewManifestPath\)\s*\}',
+        ).hasMatch(gradle),
+        isTrue,
+      );
+      expect('manifest.srcFile('.allMatches(gradle).length, 1);
+      expect('reviewManifestPath'.allMatches(gradle).length, 2);
+    });
+
+    test('keeps the native [DEFAULT] app out and FCM inert', () {
+      expect(
+        RegExp(
+          r'com\.google\.firebase\.provider\.FirebaseInitProvider"[^>]*'
+          r'tools:node="remove"',
+        ).hasMatch(xml),
+        isTrue,
+      );
+      expect(
+        RegExp(
+          r'android:name="firebase_messaging_notification_delegation_enabled"'
+          r'\s+android:value="false"',
+        ).hasMatch(xml),
+        isTrue,
+      );
+      expect(xml, isNot(contains('firebase_messaging_auto_init_enabled')));
+      expect(xml, isNot(contains('FirebaseMessagingRegistrar')));
+      expect(xml, isNot(contains('android:value="true"')));
+    });
+
+    test('the review build verifies its merged manifest', () {
+      for (final fragment in [
+        'tasks.matching { it.name == "processDevDebugMainManifest" }',
+        'metaFalse("firebase_messaging_auto_init_enabled")',
+        'metaFalse("firebase_messaging_notification_delegation_enabled")',
+        'text.contains("com.google.firebase.provider.FirebaseInitProvider")',
+      ]) {
+        expect(gradle, contains(fragment), reason: fragment);
+      }
+      expect(
+        gradle,
+        contains(
+          'variant.manifestPlaceholders.put("firebaseMessagingAutoInitEnabled", "false")',
+        ),
+      );
+    });
+
+    test('staging and prod do not use it', () {
+      expect(
+        File('android/app/src/prod/AndroidManifest.xml').existsSync(),
+        isFalse,
+      );
+      final staging = File(
+        'android/app/src/staging/AndroidManifest.xml',
+      ).readAsStringSync();
+      expect(staging, isNot(contains('dev-review')));
+      expect(
+        staging,
+        contains(
+          'components:com.google.firebase.messaging.FirebaseMessagingRegistrar',
+        ),
+      );
+    });
+  });
 
   test('no prod-flavor google-services.json override exists', () {
     expect(

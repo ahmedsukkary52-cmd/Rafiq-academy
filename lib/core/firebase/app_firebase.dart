@@ -37,7 +37,10 @@ const FirebaseOptions firebaseEmulatorOptions = FirebaseOptions(
 
 /// Local flavors ship without a native [DEFAULT] app (FirebaseInitProvider is
 /// removed in android/app/src/{dev,staging}/AndroidManifest.xml), so the
-/// emulator always gets its own named app.
+/// emulator always gets its own named app. A Dart-side [DEFAULT] app with the
+/// same fake options is still required: cloud_firestore resolves its platform
+/// delegate through `Firebase.app()` even for `instanceFor(app: ...)`, and a
+/// few call sites use the default instances directly.
 const String _emulatorAppName = 'basma-emulator';
 
 /// Throws unless [host] is the literal IPv4 loopback used for the emulators.
@@ -81,12 +84,24 @@ Future<void> initializeAppFirebase() async {
   );
   assertLoopbackEmulatorHost(firebaseEmulatorHost);
 
+  final defaultApp = await Firebase.initializeApp(
+    options: firebaseEmulatorOptions,
+  );
+  assertEmulatorOptions(defaultApp.options);
+  await _useEmulators(defaultApp);
+
   final app = await Firebase.initializeApp(
     name: _emulatorAppName,
     options: firebaseEmulatorOptions,
   );
   assertEmulatorOptions(app.options);
+  await _useEmulators(app);
 
+  _emulatorApp = app;
+}
+
+/// Routes every service the app uses on [app] to the loopback emulators.
+Future<void> _useEmulators(FirebaseApp app) async {
   // automaticHostMapping would rewrite 127.0.0.1 to 10.0.2.2 on Android,
   // which only exists inside the Android emulator.
   await FirebaseAuth.instanceFor(app: app).useAuthEmulator(
@@ -112,6 +127,4 @@ Future<void> initializeAppFirebase() async {
     storageEmulatorPort,
     automaticHostMapping: false,
   );
-
-  _emulatorApp = app;
 }

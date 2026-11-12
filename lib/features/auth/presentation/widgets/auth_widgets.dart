@@ -70,7 +70,7 @@ class AuthBrandHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: AppTextStyles.fontFamily,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,

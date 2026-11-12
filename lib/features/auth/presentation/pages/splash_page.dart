@@ -56,7 +56,7 @@ class _SplashMark extends StatelessWidget {
       children: [
         const AcademyLogo(size: 120),
         const SizedBox(height: 24),
-        Text(
+        const Text(
           AcademyBranding.shortName,
           style: TextStyle(
             fontFamily: AppTextStyles.fontFamily,
@@ -94,7 +94,7 @@ class _StartupRetry extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: AppTextStyles.fontFamily,
             fontSize: 15,
             color: Colors.white,

@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Personal review build only (-PbasmaReviewBuild=true): replaces
+         src/dev/AndroidManifest.xml for that build; plain dev, staging and
+         prod never read this file. Same isolation as dev (no native
+         [DEFAULT] app from google-services resources), except that the
+         FirebaseMessaging registrars are kept: the firebase_messaging plugin
+         asks for FirebaseMessaging while Dart creates [DEFAULT], and fails
+         without the component. FirebaseMessaging is constructed but inert:
+         auto-init is false (token and topic sync are gated on it), the Dart
+         side never resolves it in emulator mode, and notification delegation
+         to Google Play services is disabled below. -->
+    <application>
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+        <meta-data
+            android:name="firebase_messaging_notification_delegation_enabled"
+            android:value="false" />
+    </application>
+</manifest>

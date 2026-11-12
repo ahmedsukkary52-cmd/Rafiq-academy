@@ -27,6 +27,7 @@ val useFirebaseEmulator: Boolean =
 // different debug key. Everything else about dev is unchanged.
 val basmaReviewBuild: Boolean = project.findProperty("basmaReviewBuild") == "true"
 val reviewApplicationIdSuffix = ".review"
+val reviewManifestPath = "src/dev-review/AndroidManifest.xml"
 
 // Play upload key for prod release builds. Read from android/key.properties
 // (git-ignored; storeFile is relative to android/app or absolute) or, when that
@@ -131,6 +132,10 @@ android {
         }
     }
 
+    if (basmaReviewBuild) {
+        sourceSets.getByName("dev").manifest.srcFile(reviewManifestPath)
+    }
+
     buildTypes {
         debug {
             // Native FCM auto-init runs at process start, before Dart, against
@@ -211,6 +216,31 @@ tasks.configureEach {
             val ids = Regex("name=\"project_id\"[^>]*>([^<]+)<").findAll(xml.readText()).map { it.groupValues[1] }.toList()
             if (ids != listOf(localEmulatorProjectId)) {
                 throw GradleException("$name resolved project_id $ids in ${xml.path}; expected only $localEmulatorProjectId.")
+            }
+        }
+    }
+}
+if (basmaReviewBuild) {
+    tasks.matching { it.name == "processDevDebugMainManifest" }.configureEach {
+        val task = this
+        doLast {
+            val merged = task.outputs.files.asFileTree
+                .matching { include("**/AndroidManifest.xml") }.files
+            if (merged.isEmpty()) throw GradleException("$name produced no merged manifest to verify.")
+            merged.forEach { xml ->
+                val text = xml.readText()
+                fun metaFalse(key: String) = Regex(
+                    "android:name=\"$key\"\\s+android:value=\"false\""
+                ).containsMatchIn(text)
+                if (text.contains("com.google.firebase.provider.FirebaseInitProvider") ||
+                    !metaFalse("firebase_messaging_auto_init_enabled") ||
+                    !metaFalse("firebase_messaging_notification_delegation_enabled")
+                ) {
+                    throw GradleException(
+                        "Review manifest ${xml.path} must drop FirebaseInitProvider and keep FCM " +
+                            "auto-init and notification delegation disabled."
+                    )
+                }
             }
         }
     }

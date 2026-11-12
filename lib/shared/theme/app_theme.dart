@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// الألوان المستخرجة مباشرة من التصميم
 class AppColors {
@@ -124,78 +123,90 @@ class AppSizes {
 class AppTextStyles {
   AppTextStyles._();
 
-  static String get fontFamily => GoogleFonts.cairo().fontFamily!;
+  /// Bundled in pubspec.yaml (assets/fonts/Cairo-*.ttf); never fetched.
+  static const String fontFamily = 'Cairo';
 
-  static TextStyle get displayLarge => GoogleFonts.cairo(
+  static TextStyle get displayLarge => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.3,
   );
 
-  static TextStyle get displayMedium => GoogleFonts.cairo(
+  static TextStyle get displayMedium => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 22,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
     height: 1.3,
   );
 
-  static TextStyle get headlineLarge => GoogleFonts.cairo(
+  static TextStyle get headlineLarge => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 20,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
   );
 
-  static TextStyle get headlineMedium => GoogleFonts.cairo(
+  static TextStyle get headlineMedium => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 18,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.4,
   );
 
-  static TextStyle get titleLarge => GoogleFonts.cairo(
+  static TextStyle get titleLarge => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 16,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static TextStyle get titleMedium => GoogleFonts.cairo(
+  static TextStyle get titleMedium => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static TextStyle get bodyLarge => GoogleFonts.cairo(
+  static TextStyle get bodyLarge => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 15,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.6,
   );
 
-  static TextStyle get bodyMedium => GoogleFonts.cairo(
+  static TextStyle get bodyMedium => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 13,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
     height: 1.6,
   );
 
-  static TextStyle get labelLarge => GoogleFonts.cairo(
+  static TextStyle get labelLarge => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
     letterSpacing: 0.2,
   );
 
-  static TextStyle get labelMedium => GoogleFonts.cairo(
+  static TextStyle get labelMedium => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 12,
     fontWeight: FontWeight.w500,
     color: AppColors.textSecondary,
   );
 
-  static TextStyle get labelSmall => GoogleFonts.cairo(
+  static TextStyle get labelSmall => const TextStyle(
+    fontFamily: fontFamily,
     fontSize: 11,
     fontWeight: FontWeight.w400,
     color: AppColors.textHint,
@@ -207,7 +218,7 @@ class AppTheme {
   AppTheme._();
 
   static TextTheme _cairoTextTheme(TextTheme base) =>
-      GoogleFonts.cairoTextTheme(base);
+      base.apply(fontFamily: AppTextStyles.fontFamily);
 
   static ThemeData get theme {
     final base = ThemeData(

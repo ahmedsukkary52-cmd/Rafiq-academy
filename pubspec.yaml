@@ -95,3 +95,22 @@ flutter:
     - assets/fonts/NotoNaskhArabic-Regular.ttf
     - assets/fonts/NotoNaskhArabic-Bold.ttf
     - assets/fonts/NotoNaskhArabic-OFL.txt
+    - assets/fonts/Cairo-OFL.txt
+  # App typography (SIL OFL 1.1, see Cairo-OFL.txt): the exact static files
+  # google_fonts would download. Their names match google_fonts' asset lookup,
+  # so the remaining GoogleFonts.cairo call sites load these too.
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Cairo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Cairo-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Cairo-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Cairo-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Cairo-Black.ttf
+          weight: 900

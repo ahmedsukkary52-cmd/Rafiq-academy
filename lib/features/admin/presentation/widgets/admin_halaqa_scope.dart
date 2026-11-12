@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/presentation/academy_data_revision.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -22,6 +23,7 @@ class AdminHalaqaScopedPage extends StatefulWidget {
   final String scopeHint;
   final String emptyMessage;
   final Widget Function(String halaqaId) contentBuilder;
+  final List<Widget> actions;
 
   const AdminHalaqaScopedPage({
     super.key,
@@ -30,6 +32,7 @@ class AdminHalaqaScopedPage extends StatefulWidget {
     required this.scopeHint,
     required this.emptyMessage,
     required this.contentBuilder,
+    this.actions = const [],
   });
 
   @override
@@ -37,13 +40,18 @@ class AdminHalaqaScopedPage extends StatefulWidget {
 }
 
 class _AdminHalaqaScopedPageState extends State<AdminHalaqaScopedPage> {
+  /// Structure revision the shared directory was last loaded at.
+  static int? _loadedRevision;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final bloc = context.read<AdminBloc>();
-      if (bloc.state.halaqatDirectory.isEmpty) {
+      final revision = AcademyDataRevision.structure.value;
+      if (bloc.state.halaqatDirectory.isEmpty || _loadedRevision != revision) {
+        _loadedRevision = revision;
         bloc.add(const LoadAdminDirectoryEvent());
       }
     });
@@ -54,6 +62,7 @@ class _AdminHalaqaScopedPageState extends State<AdminHalaqaScopedPage> {
     return AdminSubpageScaffold(
       title: widget.title,
       subtitle: widget.subtitle,
+      actions: widget.actions,
       body: BlocBuilder<AdminBloc, AdminState>(
         buildWhen: (p, c) =>
             p.directoryStatus != c.directoryStatus ||

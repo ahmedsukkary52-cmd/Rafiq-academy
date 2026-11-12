@@ -11,6 +11,9 @@ class AppRoutes {
   static const String login = '/login';
   static const String forgotPassword = '/forgot-password';
 
+  /// Mandatory replacement of an Admin-issued temporary password.
+  static const String firstLogin = '/first-login';
+
   /// D1 / WA-1 — public self-registration removed. Path kept only so deep links
   /// redirect to login (no RegisterPage route).
   static const String register = '/register';
@@ -71,6 +74,12 @@ class AppRoutes {
   static const String teacherNotifs = '/teacher/notifications';
   static const String teacherExcuses = '/teacher/excuses';
 
+  /// Halaqat a teacher covers temporarily (Admin-activated cover).
+  static const String teacherCover = '/teacher/cover';
+
+  /// مساعد مدرس — assigned halaqat and active covers.
+  static const String assistant = '/assistant';
+
   // Other roles
   static const String parent = '/parent';
   static const String parentAbsence = '/parent/absence-requests';
@@ -97,6 +106,9 @@ class AppRoutes {
   static const String adminAccess = '/admin/access';
 
   static const String adminAdmit = '/admin/admit';
+
+  /// Student onboarding wizard (accounts + link + halaqa + credentials).
+  static const String adminOnboardStudent = '/admin/onboard-student';
   static const String adminComplaints = '/admin/complaints';
   static const String adminBroadcast = '/admin/broadcast';
   static const String adminTeachers = '/admin/teachers';
@@ -113,8 +125,6 @@ class AppRoutes {
   static const String adminReports = '/admin/reports';
   static const String adminRewards = '/admin/rewards';
   static const String adminInternalNotes = '/admin/internal-notes';
-  static const String adminCommunicationSettings =
-      '/admin/communication-settings';
 
   /// Academy payment destinations (Vodafone Cash, InstaPay) shown to parents.
   static const String adminPaymentDestinations = '/admin/payment-destinations';
@@ -129,6 +139,16 @@ class AppRoutes {
 
   /// Read-only academy-wide halaqat directory.
   static const String adminHalaqatDirectory = '/admin/halaqat-directory';
+
+  /// Central academy directory (people, halaqat, relationships).
+  static const String adminDirectory = '/admin/directory';
+  static String adminPersonProfile(String uid) =>
+      '/admin/person/${Uri.encodeComponent(uid.trim())}';
+  static String adminHalaqaProfile(String halaqaId) =>
+      '/admin/halaqa/${Uri.encodeComponent(halaqaId.trim())}';
+  static const String adminAddMember = '/admin/add-member';
+  static String adminAddMemberFor(String role) =>
+      '$adminAddMember?role=${Uri.encodeQueryComponent(role)}';
   static const String adminStudent = '/admin/student/:studentId';
 
   /// Admin view of [StudentProfilePage]. Pass [halaqaId] when opening from roster.
@@ -154,6 +174,7 @@ class AppRouteAccess {
     AppRoles.teacher => AppRoutes.teacher,
     AppRoles.supervisor => AppRoutes.supervisor,
     AppRoles.admin => AppRoutes.admin,
+    AppRoles.assistantTeacher => AppRoutes.assistant,
     _ => AppRoutes.login,
   };
 
@@ -199,6 +220,9 @@ class AuthRedirect {
       final home = AppRouteAccess.homeForRole(state.user.role);
       if (home == AppRoutes.login) {
         return path == AppRoutes.login ? null : AppRoutes.login;
+      }
+      if (state.user.mustChangePassword) {
+        return path == AppRoutes.firstLogin ? null : AppRoutes.firstLogin;
       }
       if (path == AppRoutes.splash ||
           path == AppRoutes.register ||

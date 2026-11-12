@@ -33,6 +33,7 @@ class _ProvisionFormState extends State<_ProvisionForm> {
     AppRoles.parent: 'ولي أمر',
     AppRoles.teacher: 'معلم',
     AppRoles.supervisor: 'مشرف',
+    AppRoles.admin: 'مسؤول إدارة (صلاحيات كاملة)',
   };
 
   final _formKey = GlobalKey<FormState>();
@@ -40,6 +41,11 @@ class _ProvisionFormState extends State<_ProvisionForm> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   String _role = AppRoles.student;
+
+  /// Admin access is never implied: it needs this explicit acknowledgement.
+  bool _adminConfirmed = false;
+
+  bool get _isAdminRole => _role == AppRoles.admin;
 
   @override
   void dispose() {
@@ -51,6 +57,7 @@ class _ProvisionFormState extends State<_ProvisionForm> {
 
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_isAdminRole && !_adminConfirmed) return;
     context.read<AdminOperationsBloc>().add(
       ProvisionAccountEvent(
         ProvisionUserParams(
@@ -75,14 +82,47 @@ class _ProvisionFormState extends State<_ProvisionForm> {
             subtitle: 'يُنشأ الحساب على الخادم مع ملف الدور المناسب',
             children: [
               DropdownButtonFormField<String>(
+                key: const Key('provision-role'),
                 initialValue: _role,
                 decoration: const InputDecoration(labelText: 'الدور'),
                 items: [
                   for (final e in _roles.entries)
                     DropdownMenuItem(value: e.key, child: Text(e.value)),
                 ],
-                onChanged: (v) => setState(() => _role = v ?? _role),
+                onChanged: (v) => setState(() {
+                  _role = v ?? _role;
+                  _adminConfirmed = false;
+                }),
               ),
+              if (_isAdminRole) ...[
+                const SizedBox(height: 12),
+                Container(
+                  key: const Key('provision-admin-warning'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
+                  ),
+                  child: Text(
+                    'حساب المسؤول يملك كل صلاحيات الإدارة: الحسابات والمدفوعات '
+                    'والحلقات والرسائل. يُسجَّل إنشاؤه في سجل التدقيق باسمك.',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+                Material(
+                  type: MaterialType.transparency,
+                  child: CheckboxListTile(
+                    key: const Key('provision-admin-confirm'),
+                    contentPadding: EdgeInsets.zero,
+                    value: _adminConfirmed,
+                    onChanged: (v) =>
+                        setState(() => _adminConfirmed = v ?? false),
+                    title: const Text('أؤكد منح هذا الشخص صلاحيات المسؤول'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               TextFormField(
                 controller: _name,
@@ -115,7 +155,10 @@ class _ProvisionFormState extends State<_ProvisionForm> {
                     : null,
               ),
               const SizedBox(height: 16),
-              AdminSubmitButton(label: 'إنشاء الحساب', onPressed: _submit),
+              AdminSubmitButton(
+                label: _isAdminRole ? 'إنشاء حساب المسؤول' : 'إنشاء الحساب',
+                onPressed: _isAdminRole && !_adminConfirmed ? null : _submit,
+              ),
             ],
           ),
         ],

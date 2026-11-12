@@ -126,7 +126,7 @@ class _AdminRegistrationRequestsPageState
                         .map(
                           (s) => DropdownMenuItem(
                             value: s.uid,
-                            child: Text(s.name),
+                            child: Text(s.name.isEmpty ? 'بدون اسم' : s.name),
                           ),
                         )
                         .toList(),
@@ -236,8 +236,10 @@ class _AdminRegistrationRequestsPageState
                   ),
                 const SizedBox(height: 16),
                 AppButton(
-                  label: 'قبول يدوي',
-                  onPressed: () => context.push(AppRoutes.adminAdmit),
+                  key: const Key('registration-open-onboarding'),
+                  label: 'تسجيل طالب جديد',
+                  onPressed: () =>
+                      context.push(AppRoutes.adminOnboardStudent),
                 ),
               ],
             );
@@ -299,7 +301,7 @@ class _RequestCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        request.email ?? request.studentId,
+                        request.email ?? 'بدون بريد إلكتروني',
                         style: AppTextStyles.labelSmall,
                       ),
                     ],

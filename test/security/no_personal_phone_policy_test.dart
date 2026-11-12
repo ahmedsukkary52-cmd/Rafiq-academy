@@ -51,13 +51,17 @@ void main() {
       'contact_info_policy.dart',
       'student_search_contract.dart',
     };
-    // The only app file allowed to touch userPrivate: the Admin email reader.
-    const privateEmailReader = 'admin_private_email_reader.dart';
+    // The only app files allowed to touch userPrivate: the Admin email reader
+    // and the signed-in user's first-login flag reader.
+    const privateReaders = {
+      'admin_private_email_reader.dart',
+      'first_login_flag_reader.dart',
+    };
     for (final file in dartFiles('lib')) {
       final name = file.uri.pathSegments.last;
       if (denyLists.contains(name)) continue;
       final code = withoutComments(file.readAsStringSync());
-      if (name != privateEmailReader) {
+      if (!privateReaders.contains(name)) {
         expect(code, isNot(contains('userPrivate')), reason: file.path);
       }
       expect(
@@ -95,6 +99,23 @@ void main() {
     expect(
       code,
       isNot(matches(RegExp('phone|whatsapp|mobile', caseSensitive: false))),
+    );
+    expect(code, isNot(contains('.set(')));
+    expect(code, isNot(contains('.update(')));
+    expect(code, isNot(contains('.delete(')));
+  });
+
+  test('the first-login reader reads only mustChangePassword, never writes', () {
+    final code = withoutComments(
+      File('lib/features/auth/data/first_login_flag_reader.dart')
+          .readAsStringSync(),
+    );
+    expect(code, contains('userPrivate'));
+    final keys = RegExp(r"\['(\w+)'\]").allMatches(code).map((m) => m[1]);
+    expect(keys.toSet(), {'mustChangePassword'});
+    expect(
+      code,
+      isNot(matches(RegExp('phone|whatsapp|mobile|email', caseSensitive: false))),
     );
     expect(code, isNot(contains('.set(')));
     expect(code, isNot(contains('.update(')));

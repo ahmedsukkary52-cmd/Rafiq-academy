@@ -813,12 +813,14 @@ class _DropdownFilters extends StatelessWidget {
             active: teacherId != null,
             onTap: () => _pickTeacher(context),
           ),
-          const SizedBox(width: 8),
-          _FilterPill(
-            label: levelLabel,
-            active: level != null,
-            onTap: () => _pickLevel(context),
-          ),
+          if (AppCapabilities.streakAndLevelAvailable) ...[
+            const SizedBox(width: 8),
+            _FilterPill(
+              label: levelLabel,
+              active: level != null,
+              onTap: () => _pickLevel(context),
+            ),
+          ],
         ],
       ),
     );
@@ -1106,30 +1108,32 @@ class _StudentCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(99),
-                      child: LinearProgressIndicator(
-                        value: progress / 100,
-                        minHeight: 8,
-                        backgroundColor: accent.withValues(alpha: 0.12),
-                        color: accent,
+              if (AppCapabilities.memorizationProgressAvailable) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: progress / 100,
+                          minHeight: 8,
+                          backgroundColor: accent.withValues(alpha: 0.12),
+                          color: accent,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '${_eastern('${progress.round()}')}%',
-                    style: AppTextStyles.labelLarge.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(width: 10),
+                    Text(
+                      '${_eastern('${progress.round()}')}%',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               if (tone == _StudentTone.atRisk)
                 Row(

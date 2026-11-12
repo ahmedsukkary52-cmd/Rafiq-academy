@@ -15,14 +15,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   CONFIRM_TOKEN,
   EMULATOR_PROJECT,
+  STRIP_CONFIRM_TOKEN,
   SurfaceViolation,
   checkInvocation,
   classifyCanonical,
   classifyLegacy,
   createIdList,
   decide,
+  decideStrip,
   isValidDocumentId,
   readOnlyStore,
+  runLegacyStrip,
   runMeetingLinkMigration,
   safeErrorCode,
   studentEligibility,
@@ -474,20 +477,173 @@ test("the read-only store exposes no write surface and only four collections", a
   await assert.rejects(store.getMany("auditLogs", ["x"]), SurfaceViolation);
 });
 
+// ── legacy strip (J.9) ─────────────────────────────────────────────────────
+
+const stripArgs = [...dryRunArgs, "--strip-legacy"];
+const stripApplyArgs = [...stripArgs, "--apply", "--confirm", STRIP_CONFIRM_TOKEN];
+
+test("strip: dry run by default; apply needs the strip token, never the copy token", () => {
+  assert.notEqual(STRIP_CONFIRM_TOKEN, CONFIRM_TOKEN);
+  const dry = run(stripArgs);
+  assert.equal(dry.mode, "dry-run");
+  assert.equal(dry.config.strip, true);
+  const apply = run(stripApplyArgs);
+  assert.equal(apply.mode, "apply");
+  assert.equal(apply.config.strip, true);
+  assert.equal(run(applyArgs).config.strip, false);
+  for (const argv of [
+    [...stripArgs, "--apply"],
+    [...stripArgs, "--apply", "--confirm", CONFIRM_TOKEN],
+    [...applyArgs.slice(0, 3), "--confirm", STRIP_CONFIRM_TOKEN],
+    [...stripApplyArgs, "--dry-run"],
+    ["--strip-legacy=1", ...dryRunArgs],
+    ["--strip-legacy", "--apply", "--confirm", STRIP_CONFIRM_TOKEN],
+    ["--project", "rafiq-academy", "--strip-legacy"],
+  ]) {
+    const result = run(argv);
+    assert.equal(result.mode, null, JSON.stringify(argv));
+    assert.ok(result.problems.length > 0);
+  }
+  assert.equal(run(stripArgs, {}).mode, null, "strip needs the same pinned emulator environment");
+  assert.deepEqual(checkInvocation({ argv: ["--strip-legacy"], env: {} }).mode, "plan");
+});
+
+test("strip decision: only an empty legacy key or a well-formed canonical doc allows removal", () => {
+  const legacy = (raw) => classifyLegacy(raw === undefined ? {} : { meetingLink: raw }, meetingLinkIssue);
+  const good = classifyCanonical({ meetingLink: LINK_A, updatedAt: TS }, meetingLinkIssue, isTs);
+  const bad = classifyCanonical({ meetingLink: LINK_A, updatedAt: TS, extra: 1 }, meetingLinkIssue, isTs);
+  assert.equal(decideStrip(legacy(undefined), null), "noLegacy");
+  assert.equal(decideStrip(legacy(undefined), good), "noLegacy");
+  assert.equal(decideStrip(legacy(""), null), "strip");
+  assert.equal(decideStrip(legacy("   "), null), "strip");
+  assert.equal(decideStrip(legacy(LINK_A), null), "needsCopy");
+  assert.equal(decideStrip(legacy(PADDED), null), "needsCopy");
+  assert.equal(decideStrip(legacy(INVALID.not_https), null), "invalidLegacy");
+  assert.equal(decideStrip(legacy(42), null), "invalidLegacy");
+  for (const raw of ["", LINK_A, LINK_B, INVALID.not_https, 42]) {
+    assert.equal(decideStrip(legacy(raw), good), "strip", JSON.stringify(raw).slice(0, 12));
+    assert.equal(decideStrip(legacy(raw), bad), "canonicalMalformed");
+  }
+});
+
+function memoryStripper(collections, { failIds = new Set(), before = null } = {}) {
+  return {
+    stripOne: async (id) => {
+      if (before) before(id);
+      if (failIds.has(id)) throw Object.assign(new Error(`strip failed for ${LINK_A}`), { code: 10 });
+      const halaqa = collections.halaqat.get(id);
+      if (!halaqa) return "halaqaGone";
+      const link = collections.halaqaMeetingLinks.get(id);
+      const canonical = link ? classifyCanonical(link, meetingLinkIssue, isTs) : null;
+      const decision = decideStrip(classifyLegacy(halaqa, meetingLinkIssue), canonical);
+      if (decision !== "strip") return decision;
+      delete halaqa.meetingLink;
+      return "stripped";
+    },
+  };
+}
+
+const legacyKeys = (data) => [...data.halaqat].filter(([, h]) => Object.hasOwn(h, "meetingLink")).map(([id]) => id).sort();
+
+test("strip dry run counts and writes nothing", async () => {
+  const data = fixture();
+  const before = JSON.stringify([...data.halaqat]);
+  const report = await runLegacyStrip({
+    store: memoryStore(data),
+    mode: "dry-run",
+    issueOf: meetingLinkIssue,
+    isTimestamp: isTs,
+    pageSize: 3,
+  });
+  assert.equal(JSON.stringify([...data.halaqat]), before);
+  assert.equal(report.operation, "strip-legacy");
+  const h = report.halaqat;
+  assert.equal(h.scanned, 17);
+  assert.equal(h.legacyPresent, 16);
+  // hEmpty, hSame, hConflict, hMirror
+  assert.equal(h.strippable, 4);
+  assert.equal(h.wouldStrip, 4);
+  assert.equal(h.stripped, 0);
+  assert.deepEqual(h.kept, { needsCopy: 2, invalidLegacy: 9, canonicalMalformed: 1 });
+  assert.deepEqual(report.review.needsCopyIds.ids, ["hPadded", "hValid"]);
+  assert.deepEqual(report.review.canonicalMalformedIds.ids, ["hMalformed"]);
+  assert.equal(report.review.invalidLegacyIds.total, 9);
+  // hConflict's legacy value differs from its canonical link: lost on strip.
+  assert.equal(h.supersededLegacy, 1);
+  assert.deepEqual(report.review.supersededLegacyIds.ids, ["hConflict"]);
+  assert.equal(report.summary.legacyKeysRemaining, 16);
+  assert.equal(report.summary.needsReview, true);
+  assert.equal(report.summary.exitCode, 0);
+  assertRedacted(JSON.stringify(report), "strip dry-run report");
+  await assert.rejects(
+    runLegacyStrip({ store: memoryStore(data), mode: "apply", issueOf: meetingLinkIssue, isTimestamp: isTs }),
+    /apply needs a stripper/,
+  );
+});
+
+test("strip apply removes only eligible keys, never touches canonical docs; copy then strip leaves only review items", async () => {
+  const data = fixture();
+  const canonicalBefore = JSON.stringify([...data.halaqaMeetingLinks]);
+  const opts = { mode: "apply", issueOf: meetingLinkIssue, isTimestamp: isTs, pageSize: 4 };
+  const first = await runLegacyStrip({ ...opts, store: memoryStore(data), stripper: memoryStripper(data) });
+  assert.equal(first.halaqat.stripped, 4);
+  assert.equal(JSON.stringify([...data.halaqaMeetingLinks]), canonicalBefore);
+  for (const id of ["hEmpty", "hSame", "hConflict", "hMirror"]) assert.equal(Object.hasOwn(data.halaqat.get(id), "meetingLink"), false, id);
+  assert.equal(data.halaqat.get("hValid").meetingLink, LINK_A, "an uncopied link is kept");
+  assert.equal(data.halaqat.get("hMalformed").meetingLink, LINK_A);
+  assert.equal(first.summary.legacyKeysRemaining, 12);
+
+  const again = await runLegacyStrip({ ...opts, store: memoryStore(data), stripper: memoryStripper(data) });
+  assert.equal(again.halaqat.stripped, 0);
+  assert.equal(again.halaqat.strippable, 0);
+
+  await runMeetingLinkMigration({ ...opts, store: memoryStore(data), writer: memoryWriter(data) });
+  const afterCopy = await runLegacyStrip({ ...opts, store: memoryStore(data), stripper: memoryStripper(data) });
+  assert.equal(afterCopy.halaqat.stripped, 2);
+  assert.deepEqual(legacyKeys(data), ["hMalformed", "hNonString", ...Object.keys(INVALID).map((r) => `hInv_${r}`)].sort());
+  assertRedacted(JSON.stringify([first, again, afterCopy]), "strip apply reports");
+});
+
+test("strip apply: changes between scan and transaction are reported, failures counted, exit code 4", async () => {
+  const data = fixture();
+  const stripper = memoryStripper(data, {
+    failIds: new Set(["hConflict"]),
+    before: (id) => {
+      if (id === "hEmpty") data.halaqat.delete("hEmpty");
+      if (id === "hSame") data.halaqaMeetingLinks.set("hSame", { meetingLink: LINK_A, updatedAt: "not-a-ts" });
+      if (id === "hMirror") delete data.halaqat.get("hMirror").meetingLink;
+    },
+  });
+  const report = await runLegacyStrip({ store: memoryStore(data), stripper, mode: "apply", issueOf: meetingLinkIssue, isTimestamp: isTs });
+  assert.equal(report.halaqat.stripped, 0);
+  assert.equal(report.halaqat.changedDuringRun.halaqaGone, 1);
+  assert.equal(report.halaqat.changedDuringRun.canonicalMalformed, 1);
+  assert.equal(report.halaqat.changedDuringRun.noLegacy, 1);
+  assert.deepEqual(report.review.changedDuringRunIds.ids.sort(), ["hEmpty", "hMirror", "hSame"]);
+  assert.deepEqual(report.failures, { total: 1, byCode: { aborted: 1 } });
+  assert.deepEqual(report.review.failedIds.ids, ["hConflict"]);
+  assert.equal(data.halaqat.get("hSame").meetingLink, LINK_A);
+  assert.equal(report.summary.exitCode, 4);
+  assertRedacted(JSON.stringify(report), "strip race report");
+});
+
 // ── source contracts ───────────────────────────────────────────────────────
 
 const read = (...parts) => readFileSync(join(functionsDir, ...parts), "utf8");
 
-test("every canonical writer also writes the halaqa document in the same transaction", () => {
+test("canonical writers never store a link on the halaqa and delete a legacy copy in the same transaction", () => {
   const links = read("src", "halaqa", "meetingLinkFunctions.ts");
   const core = links.slice(links.indexOf("export async function setHalaqaMeetingLinkCore"));
   assert.match(core, /await tx\.getAll\(halaqaRef, linkRef\)/);
   assert.match(core, /tx\.delete\(linkRef\)/);
   assert.match(core, /tx\.set\(linkRef, canonicalMeetingLinkData\(request\.link\)\)/);
-  assert.match(core, /tx\.update\(halaqaRef, \{\s*meetingLink: request\.link,/);
+  assert.match(core, /if \(stored\.legacyPresent\) \{\s*tx\.update\(halaqaRef, \{\s*meetingLink: FieldValue\.delete\(\),/);
+  assert.doesNotMatch(links, /meetingLink: request\.link/);
 
   const create = read("src", "halaqa", "halaqaScheduleFunctions.ts");
-  assert.match(create, /tx\.create\(halaqaRef, \{[\s\S]*?\bmeetingLink,[\s\S]*?\}\);/);
+  const halaqaCreate = create.match(/tx\.create\(halaqaRef, \{[\s\S]*?\}\);/)?.[0];
+  assert.ok(halaqaCreate, "adminCreateHalaqa creates the halaqa in its transaction");
+  assert.doesNotMatch(halaqaCreate, /meetingLink/);
   assert.match(create, /tx\.set\(linkRef, canonicalMeetingLinkData\(meetingLink\)\)/);
   assert.match(create, /tx\.delete\(linkRef\)/);
 
@@ -508,14 +664,16 @@ test("every canonical writer also writes the halaqa document in the same transac
   assert.deepEqual(writers.sort(), ["halaqa/halaqaScheduleFunctions.ts", "halaqa/meetingLinkFunctions.ts"]);
 });
 
-test("the script uses the compiled B14 validator and has exactly one write call", () => {
+test("the script uses the compiled B14 validator and has exactly one copy write and one strip write", () => {
   const source = read("scripts", "migrate-meeting-links.mjs");
   assert.match(source, /join\(here, "\.\.", "lib", "halaqa", "meetingLinkFunctions\.js"\)/);
   for (const copied of ["PRINTABLE_ASCII", "HOST_LABEL", "WHITESPACE_OR_CONTROL", "googleapis"]) {
     assert.equal(source.includes(copied), false, copied);
   }
   assert.equal(source.match(/tx\.create\(/g)?.length, 1);
-  assert.doesNotMatch(source, /tx\.(set|update|delete)\(|\.batch\(|\.(set|update|delete)\(\s*(linkRef|halaqaRef|doc)/);
+  assert.equal(source.match(/tx\.update\(/g)?.length, 1);
+  assert.match(source, /tx\.update\(halaqaRef, \{ meetingLink: deleteField\(\) \}\)/);
+  assert.doesNotMatch(source, /tx\.(set|delete)\(|\.batch\(|(?<!\btx)\.(set|update|delete)\(\s*(linkRef|halaqaRef|doc)/);
   assert.doesNotMatch(source, /console\.(log|error)\([^)]*\b(raw|legacy\.value|link|meetingLink|data)\b/);
 });
 
@@ -597,7 +755,7 @@ test("CLI: with no emulator on the pinned ports the run stops at the hub check, 
   assert.equal(result.stderr.includes("egress blocked"), false);
 });
 
-// ── test preload: blocks before connecting / loading, on Node 20 and later ─
+// ── test preload: blocks before connecting / loading, on this Node and the runtime ─
 
 const PRELOAD_PROBE = `
   import net from "node:net";
@@ -679,14 +837,18 @@ test("preload (this Node): SDK loading and non-emulator connections are refused 
   assert.equal(version, process.version);
 });
 
-test("preload on Node 20 (B14_NODE20_BIN)", async (t) => {
-  const bin = process.env.B14_NODE20_BIN;
+const RUNTIME_MAJOR = JSON.parse(readFileSync(join(functionsDir, "package.json"), "utf8")).engines.node;
+
+test(`preload on the Functions runtime, Node ${RUNTIME_MAJOR} (B14_RUNTIME_NODE_BIN)`, async (t) => {
+  const bin = process.version.startsWith(`v${RUNTIME_MAJOR}.`)
+    ? process.execPath
+    : process.env.B14_RUNTIME_NODE_BIN;
   if (!bin) {
-    t.skip("Node 20 not available: set B14_NODE20_BIN to a Node 20 executable to run this check");
+    t.skip(`Node ${RUNTIME_MAJOR} not available: set B14_RUNTIME_NODE_BIN to a Node ${RUNTIME_MAJOR} executable`);
     return;
   }
   const version = await assertPreloadBarrier(bin);
-  assert.match(version, /^v20\./);
+  assert.match(version, new RegExp(`^v${RUNTIME_MAJOR}\\.`));
 });
 
 // ── egress proof: the guard stops the real SDK from reaching Google ────────

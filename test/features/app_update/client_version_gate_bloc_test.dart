@@ -128,6 +128,17 @@ void main() {
     expect(state.status, ClientVersionGateStatus.updateRequired);
   });
 
+  test('a stale cached minimum below the build allows (server outage after '
+      'the minimum was raised keeps an old build running)', () async {
+    final state = await check(
+      const ClientVersionFound(
+        ClientVersionConfig(minimumBuildNumber: 1),
+        fromCache: true,
+      ),
+    );
+    expect(state.status, ClientVersionGateStatus.allowed);
+  });
+
   test('requests during an in-flight check are dropped', () async {
     bloc.add(const ClientVersionCheckRequested());
     bloc.add(const ClientVersionCheckRequested());

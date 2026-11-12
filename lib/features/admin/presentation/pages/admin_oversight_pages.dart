@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/error/exception.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../shared/presentation/academy_currency_label.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../domain/entities/admin_directory_entity.dart';
-import '../../domain/entities/admin_payment_entity.dart';
+import '../../data/staff_lifecycle_repository.dart';
 import '../admin_format.dart';
+import 'admin_halaqa_details_page.dart';
+import 'admin_teachers_page.dart' show resolveStaffLifecycleRepository;
+import '../widgets/staff_lifecycle_sheet.dart';
 import '../bloc/admin_bloc.dart';
 import '../bloc/admin_event.dart';
 import '../bloc/admin_state.dart';
@@ -15,265 +18,86 @@ import '../widgets/admin_figma_widgets.dart';
 import '../widgets/admin_loading_skeletons.dart';
 import '../widgets/admin_subpage_scaffold.dart';
 
-/// Read-only review of existing `payments` documents (no new payment system).
-class AdminPaymentsReviewPage extends StatefulWidget {
-  const AdminPaymentsReviewPage({super.key});
-
-  @override
-  State<AdminPaymentsReviewPage> createState() =>
-      _AdminPaymentsReviewPageState();
-}
-
-class _AdminPaymentsReviewPageState extends State<AdminPaymentsReviewPage> {
-  String _filter = 'all';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AdminBloc>().add(const LoadPaymentsEvent());
-    });
-  }
-
-  Future<void> _refresh() async {
-    final bloc = context.read<AdminBloc>();
-    bloc.add(const LoadPaymentsEvent());
-    await bloc.stream.firstWhere(
-      (s) => s.paymentsStatus != SectionStatus.loading,
-    );
-  }
-
-  List<AdminPaymentEntity> _filtered(List<AdminPaymentEntity> all) {
-    return switch (_filter) {
-      'paid' => all.where((p) => p.isPaid).toList(),
-      'due' => all.where((p) => p.isDue).toList(),
-      'overdue' => all.where((p) => p.isOverdue).toList(),
-      _ => all,
-    };
-  }
-
-  String _statusLabel(AdminPaymentEntity p) {
-    if (p.isPaid) return 'مدفوع';
-    if (p.isOverdue) return 'متأخر';
-    return 'مستحق';
-  }
-
-  Color _statusColor(AdminPaymentEntity p) {
-    if (p.isPaid) return AppColors.success;
-    if (p.isOverdue) return AppColors.error;
-    return AppColors.warning;
-  }
-
-  String _shortId(String id) {
-    if (id.isEmpty) return '—';
-    if (id.length <= 10) return id;
-    return '${id.substring(0, 6)}…';
-  }
-
-  String _dateLabel(DateTime? d) {
-    if (d == null) return '—';
-    return '${d.day}/${d.month}/${d.year}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AdminSubpageScaffold(
-      title: 'مراجعة المدفوعات',
-      subtitle: 'قراءة من مجموعة payments الحالية',
-      body: BlocBuilder<AdminBloc, AdminState>(
-        buildWhen: (p, c) =>
-            p.paymentsStatus != c.paymentsStatus || p.payments != c.payments,
-        builder: (context, state) {
-          if (state.paymentsStatus == SectionStatus.loading &&
-              state.payments.isEmpty) {
-            return const AdminTeachersListSkeleton();
-          }
-          if (state.paymentsStatus == SectionStatus.error &&
-              state.payments.isEmpty) {
-            return AppErrorWidget(
-              message: state.paymentsError ?? 'تعذر التحميل',
-              onRetry: _refresh,
-            );
-          }
-
-          final items = _filtered(state.payments);
-          if (state.payments.isEmpty) {
-            return RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: _refresh,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(24),
-                children: const [
-                  AdminPlaceholderCard(
-                    icon: Icons.payments_outlined,
-                    title: 'لا مدفوعات',
-                    message: 'لا توجد سجلات في مجموعة المدفوعات حالياً.',
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: _refresh,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final entry in const [
-                      ('all', 'الكل'),
-                      ('paid', 'مدفوع'),
-                      ('due', 'مستحق'),
-                      ('overdue', 'متأخر'),
-                    ])
-                      AdminFilterChip(
-                        label: entry.$2,
-                        selected: _filter == entry.$1,
-                        onTap: () => setState(() => _filter = entry.$1),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  '${formatAdminCount(items.length)} سجل',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (items.isEmpty)
-                  const AdminPlaceholderCard(
-                    icon: Icons.filter_alt_outlined,
-                    title: 'لا نتائج',
-                    message: 'لا توجد مدفوعات ضمن هذا التصفية.',
-                  )
-                else
-                  ...items.map((p) {
-                    final color = _statusColor(p);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: AppCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    academyMoneyLabel(p.amount),
-                                    style: AppTextStyles.titleMedium.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: color.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(
-                                      AppSizes.radiusFull,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _statusLabel(p),
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: color,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'طالب: ${_shortId(p.studentId)} · ولي أمر: ${_shortId(p.parentId)}',
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              p.isPaid
-                                  ? 'تاريخ الدفع: ${_dateLabel(p.paidAt)}'
-                                  : 'الاستحقاق: ${_dateLabel(p.dueDate)}',
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                            if (p.method != null && p.method!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'الطريقة: ${p.method}',
-                                style: AppTextStyles.bodyMedium,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Academy-wide supervisors directory (read-only).
+/// Academy supervisors with their halaqat and account management.
 class AdminSupervisorsPage extends StatefulWidget {
-  const AdminSupervisorsPage({super.key});
+  const AdminSupervisorsPage({super.key, this.staffRepository});
+
+  /// Test seam; defaults to the Firebase-backed repository.
+  final StaffLifecycleRepository? staffRepository;
 
   @override
   State<AdminSupervisorsPage> createState() => _AdminSupervisorsPageState();
 }
 
 class _AdminSupervisorsPageState extends State<AdminSupervisorsPage> {
+  late final StaffLifecycleRepository _staff =
+      widget.staffRepository ?? resolveStaffLifecycleRepository();
+  List<StaffMember>? _members;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminBloc>().add(const LoadAdminDirectoryEvent());
     });
+    _loadMembers();
+  }
+
+  Future<void> _loadMembers() async {
+    try {
+      final list = await _staff.listStaff(AppRoles.supervisor);
+      if (mounted) {
+        setState(() {
+          _members = list;
+          _error = null;
+        });
+      }
+    } on ServerException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
   }
 
   Future<void> _refresh() async {
     final bloc = context.read<AdminBloc>();
     bloc.add(const LoadAdminDirectoryEvent());
-    await bloc.stream.firstWhere(
-      (s) => s.directoryStatus != SectionStatus.loading,
+    await Future.wait([
+      _loadMembers(),
+      bloc.stream.firstWhere((s) => s.directoryStatus != SectionStatus.loading),
+    ]);
+  }
+
+  Future<void> _manage(StaffMember member) async {
+    final changed = await showStaffLifecycleSheet(
+      context,
+      member: member,
+      repository: _staff,
     );
+    if (!mounted || !changed) return;
+    AppSnackBar.showSuccess(context, 'تم تحديث الحساب');
+    context.read<AdminBloc>().add(const LoadAdminDirectoryEvent());
+    await _loadMembers();
   }
 
   @override
   Widget build(BuildContext context) {
     return AdminSubpageScaffold(
       title: 'المشرفون',
-      subtitle: 'دليل مشرفي الأكاديمية',
+      subtitle: 'مشرفو الأكاديمية وحلقاتهم',
       body: BlocBuilder<AdminBloc, AdminState>(
         buildWhen: (p, c) =>
             p.directoryStatus != c.directoryStatus ||
-            p.supervisorsDirectory != c.supervisorsDirectory,
+            p.halaqatDirectory != c.halaqatDirectory,
         builder: (context, state) {
-          if (state.directoryStatus == SectionStatus.loading &&
-              state.supervisorsDirectory.isEmpty) {
+          final members = _members;
+          if (members == null && _error == null) {
             return const AdminTeachersListSkeleton();
           }
-          if (state.directoryStatus == SectionStatus.error &&
-              state.supervisorsDirectory.isEmpty) {
-            return AppErrorWidget(
-              message: state.directoryError ?? 'تعذر التحميل',
-              onRetry: _refresh,
-            );
+          if (members == null) {
+            return AppErrorWidget(message: _error!, onRetry: _refresh);
           }
 
-          final list = state.supervisorsDirectory;
+          final list = members;
           if (list.isEmpty) {
             return RefreshIndicator(
               color: AppColors.primary,
@@ -301,9 +125,19 @@ class _AdminSupervisorsPageState extends State<AdminSupervisorsPage> {
               itemCount: list.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
+                final staff = list[index];
+                final halaqat = state.halaqatDirectory
+                    .where((h) => h.supervisorId == staff.uid)
+                    .map((h) => h.name)
+                    .where((n) => n.isNotEmpty)
+                    .toList();
                 return _StaffTile(
-                  staff: list[index],
+                  name: staff.name,
                   icon: Icons.supervisor_account,
+                  halaqat: halaqat,
+                  status: staff.status,
+                  onTap: () => _manage(staff),
+                  tileKey: Key('supervisor-${staff.uid}'),
                 );
               },
             ),
@@ -314,7 +148,7 @@ class _AdminSupervisorsPageState extends State<AdminSupervisorsPage> {
   }
 }
 
-/// Academy-wide halaqat directory (read-only).
+/// Academy-wide halaqat directory; each entry opens [AdminHalaqaDetailsPage].
 class AdminHalaqatDirectoryPage extends StatefulWidget {
   const AdminHalaqatDirectoryPage({super.key});
 
@@ -340,10 +174,9 @@ class _AdminHalaqatDirectoryPageState extends State<AdminHalaqatDirectoryPage> {
     );
   }
 
-  String _shortId(String id) {
-    if (id.isEmpty) return '—';
-    if (id.length <= 10) return id;
-    return '${id.substring(0, 6)}…';
+  static String _person(String id, String name) {
+    if (id.isEmpty) return 'غير معيّن';
+    return name.isEmpty ? 'بدون اسم' : name;
   }
 
   @override
@@ -398,6 +231,12 @@ class _AdminHalaqatDirectoryPageState extends State<AdminHalaqatDirectoryPage> {
               itemBuilder: (context, index) {
                 final h = list[index];
                 return AppCard(
+                  key: Key('halaqa-directory-${h.id}'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminHalaqaDetailsPage(halaqa: h),
+                    ),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -433,7 +272,12 @@ class _AdminHalaqatDirectoryPageState extends State<AdminHalaqatDirectoryPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'معلم: ${_shortId(h.teacherId)} · مشرف: ${_shortId(h.supervisorId)}',
+                        'المعلم: ${_person(h.teacherId, h.teacherName)}',
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'المشرف: ${_person(h.supervisorId, h.supervisorName)}',
                         style: AppTextStyles.bodyMedium,
                       ),
                     ],
@@ -449,14 +293,27 @@ class _AdminHalaqatDirectoryPageState extends State<AdminHalaqatDirectoryPage> {
 }
 
 class _StaffTile extends StatelessWidget {
-  final AdminStaffSummaryEntity staff;
+  final String name;
   final IconData icon;
+  final List<String> halaqat;
+  final StaffStatus status;
+  final VoidCallback onTap;
+  final Key tileKey;
 
-  const _StaffTile({required this.staff, required this.icon});
+  const _StaffTile({
+    required this.name,
+    required this.icon,
+    required this.status,
+    required this.onTap,
+    required this.tileKey,
+    this.halaqat = const [],
+  });
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
+      key: tileKey,
+      onTap: onTap,
       child: Row(
         children: [
           Container(
@@ -474,21 +331,25 @@ class _StaffTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  staff.name.isEmpty ? 'بدون اسم' : staff.name,
+                  name.isEmpty ? 'بدون اسم' : name,
                   style: AppTextStyles.titleLarge.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  staff.uid.length <= 12
-                      ? staff.uid
-                      : '${staff.uid.substring(0, 8)}…',
+                  halaqat.isEmpty
+                      ? 'لا حلقات مسندة'
+                      : '${formatAdminCount(halaqat.length)} حلقة: ${halaqat.join('، ')}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.bodyMedium,
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          StaffStatusBadge(status: status),
         ],
       ),
     );

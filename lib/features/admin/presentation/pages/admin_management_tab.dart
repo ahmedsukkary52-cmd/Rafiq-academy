@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../widgets/admin_figma_widgets.dart';
+import 'admin_academy_import_page.dart';
 import 'admin_home_page.dart';
 
 class AdminManagementTab extends StatelessWidget {
@@ -68,14 +69,8 @@ class AdminManagementTab extends StatelessWidget {
         ),
         _HubTile(
           icon: Icons.chat_bubble_outline,
-          label: 'مركز الشكاوى',
+          label: 'الشكاوى',
           route: AppRoutes.adminComplaints,
-          wired: true,
-        ),
-        _HubTile(
-          icon: Icons.flag_outlined,
-          label: 'مراجعة الشكاوى',
-          route: AppRoutes.adminComplaintsReview,
           wired: true,
         ),
         _HubTile(
@@ -90,22 +85,33 @@ class AdminManagementTab extends StatelessWidget {
           route: AppRoutes.adminChat,
           wired: true,
         ),
+        const _HubTile(
+          icon: Icons.admin_panel_settings_outlined,
+          label: 'مجموعة الإدارة',
+          route: AppRoutes.adminInternalNotes,
+          wired: true,
+        ),
         _HubTile(
           icon: Icons.notifications_none_rounded,
           label: 'صندوق الإشعارات',
           route: AppRoutes.adminNotifications,
           wired: true,
         ),
+      ],
+    ),
+    _HubSection(
+      title: 'الأكاديمية',
+      tiles: [
         _HubTile(
-          icon: Icons.analytics_outlined,
-          label: 'تحليلات التواصل',
-          route: AppRoutes.adminCommunicationAnalytics,
+          icon: Icons.account_tree_outlined,
+          label: 'دليل الأكاديمية',
+          route: AppRoutes.adminDirectory,
           wired: true,
         ),
         _HubTile(
-          icon: Icons.settings_outlined,
-          label: 'إعدادات التواصل',
-          route: AppRoutes.adminCommunicationSettings,
+          icon: Icons.person_add_outlined,
+          label: 'إضافة فرد',
+          route: AppRoutes.adminAddMember,
           wired: true,
         ),
       ],
@@ -155,7 +161,12 @@ class AdminManagementTab extends StatelessWidget {
           route: AppRoutes.adminRewards,
           wired: true,
         ),
-        _HubTile(icon: Icons.note_alt_outlined, label: 'مجموعة الإدارة'),
+        _HubTile(
+          icon: Icons.upload_file_rounded,
+          label: 'استيراد بيانات الأكاديمية',
+          page: (_) => const AdminAcademyImportPage(),
+          wired: true,
+        ),
       ],
     ),
     _HubSection(
@@ -176,6 +187,10 @@ class AdminManagementTab extends StatelessWidget {
       ],
     ),
   ];
+
+  @visibleForTesting
+  static Iterable<String> get hubRoutes =>
+      _sections.expand((s) => s.tiles).map((t) => t.route).whereType<String>();
 
   @override
   Widget build(BuildContext context) {
@@ -215,9 +230,13 @@ class AdminManagementTab extends StatelessWidget {
                                   icon: t.icon,
                                   label: t.label,
                                   wired: t.wired,
-                                  onTap: t.route == null
-                                      ? null
-                                      : () => context.push(t.route!),
+                                  onTap: t.route != null
+                                      ? () => context.push(t.route!)
+                                      : t.page != null
+                                      ? () => Navigator.of(context).push(
+                                          MaterialPageRoute(builder: t.page!),
+                                        )
+                                      : null,
                                 ),
                               )
                               .toList(),
@@ -246,12 +265,14 @@ class _HubTile {
   final IconData icon;
   final String label;
   final String? route;
+  final WidgetBuilder? page;
   final bool wired;
 
   const _HubTile({
     required this.icon,
     required this.label,
     this.route,
+    this.page,
     this.wired = false,
   });
 }

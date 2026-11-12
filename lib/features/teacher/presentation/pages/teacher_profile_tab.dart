@@ -7,6 +7,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../complaints/presentation/complaints_entry.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/teacher_bloc.dart';
@@ -471,21 +472,20 @@ class _SettingsCard extends StatelessWidget {
             onTap: onNotificationsTap,
           ),
           const _SettingsDivider(),
-          const _NavRow(
-            icon: Icons.language_rounded,
-            iconBg: Color(0xFFFEF3C7),
-            iconColor: AppColors.secondary,
-            label: 'اللغة',
-            trailing: 'العربية',
-            onTap: null,
-          ),
-          const _SettingsDivider(),
           _NavRow(
             icon: Icons.event_busy_outlined,
             iconBg: AppColors.primaryLight,
             iconColor: AppColors.primaryDark,
             label: 'طلبات الاستئذان',
             onTap: onExcusesTap,
+          ),
+          const _SettingsDivider(),
+          _NavRow(
+            icon: Icons.support_agent_rounded,
+            iconBg: AppColors.primaryLight,
+            iconColor: AppColors.primaryDark,
+            label: 'الشكاوى',
+            onTap: () => openMyComplaints(context),
           ),
           const _SettingsDivider(),
           _LogoutRow(onTap: onLogoutTap),
@@ -530,7 +530,6 @@ class _NavRow extends StatelessWidget {
   final Color iconBg;
   final Color iconColor;
   final String label;
-  final String? trailing;
   final VoidCallback? onTap;
 
   const _NavRow({
@@ -538,7 +537,6 @@ class _NavRow extends StatelessWidget {
     required this.iconBg,
     required this.iconColor,
     required this.label,
-    this.trailing,
     this.onTap,
   });
 
@@ -564,17 +562,7 @@ class _NavRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailing != null) ...[
-                Text(
-                  trailing!,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textHint,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-              if (onTap != null || trailing != null)
+              if (onTap != null)
                 const Icon(
                   Icons.chevron_left_rounded,
                   size: 18,

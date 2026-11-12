@@ -158,5 +158,57 @@ void main() {
       expect(src, contains('useFirebaseEmulator'));
       expect(src, contains('const OfflineNotificationOpenPort()'));
     });
+
+    test('main wires FCM sign-out and the foreground presenter only behind '
+        'the same non-emulator guard', () {
+      final src = read('lib/main.dart');
+      const guard = 'if (!useFirebaseEmulator) {';
+      final mainStart = src.indexOf('Future<void> main() async {');
+      expect(mainStart, isNonNegative);
+      final guardStart = src.indexOf(guard, mainStart);
+      expect(guardStart, isNonNegative);
+      final block = _braceBlock(src, guardStart + guard.length - 1);
+
+      const signOut = 'sl<AuthBloc>().attachSignOutPreparation(';
+      const fcmPrep = 'FcmSignOutPreparation(() => sl<FcmTokenRegistrar>())';
+      const presenter = 'await sl<ForegroundPushPresenter>().start();';
+      for (final call in [signOut, fcmPrep, presenter]) {
+        expect(block, contains(call), reason: call);
+        expect(call.allMatches(src).length, 1, reason: call);
+      }
+
+      expect(
+        RegExp(
+          r'useFirebaseEmulator\s*\?\s*const OfflineNotificationOpenPort\(\)\s*'
+          r':\s*sl<NotificationOpenPort>\(\)',
+        ).hasMatch(src),
+        isTrue,
+      );
+    });
+
+    test('generated DI does not register sign-out preparation or a pending '
+        'revocation store (wired from main instead)', () {
+      final src = read('lib/core/di/injection_container.config.dart');
+      expect(src, isNot(contains('SignOutPreparation')));
+      expect(src, isNot(contains('FcmPendingRevocationStore')));
+      expect(src, isNot(contains('signOutPreparation:')));
+      expect(src, isNot(contains('pendingRevocations:')));
+      expect(src, contains('ForegroundPushPresenter'));
+      expect(
+        read('lib/core/di/di_module.dart'),
+        isNot(contains('SignOutPreparation')),
+      );
+    });
   });
+}
+
+/// Text of the `{ ... }` block whose opening brace is at [open].
+String _braceBlock(String src, int open) {
+  expect(src[open], '{');
+  var depth = 0;
+  for (var i = open; i < src.length; i++) {
+    if (src[i] == '{') depth++;
+    if (src[i] == '}' && --depth == 0) return src.substring(open, i + 1);
+  }
+  fail('unbalanced braces from offset $open');
 }

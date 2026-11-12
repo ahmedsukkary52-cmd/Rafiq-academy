@@ -1,4 +1,7 @@
 // dev flavor: Firebase project rafiq-academy. Keeps the bundle ID that is
 // registered there (lib/firebase_options.dart iosBundleId).
 PRODUCT_BUNDLE_IDENTIFIER = com.example.rafiqAcademy
+// Push Notifications capability. Xcode switches aps-environment to
+// production when an App Store build is exported.
+CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements
 APP_DISPLAY_NAME = بصمة (تطوير)

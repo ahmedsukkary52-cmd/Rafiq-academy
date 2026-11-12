@@ -77,7 +77,8 @@ class NotificationDeepLinks {
           _ => null,
         },
         AppRoles.parent => switch (type) {
-          NotificationTypes.attendance => AppRoutes.parentAbsence,
+          NotificationTypes.attendance ||
+          NotificationTypes.absenceRequest => AppRoutes.parentAbsence,
           NotificationTypes.payment ||
           NotificationTypes.assignment ||
           NotificationTypes.achievement ||
@@ -85,7 +86,8 @@ class NotificationDeepLinks {
           _ => null,
         },
         AppRoles.teacher => switch (type) {
-          NotificationTypes.attendance => AppRoutes.teacherExcuses,
+          NotificationTypes.attendance ||
+          NotificationTypes.absenceRequest => AppRoutes.teacherExcuses,
           NotificationTypes.sessionReminder ||
           NotificationTypes.assignment => AppRoutes.teacher,
           _ => null,
@@ -96,6 +98,7 @@ class NotificationDeepLinks {
         },
         AppRoles.admin => switch (type) {
           NotificationTypes.payment => AppRoutes.adminPayments,
+          NotificationTypes.complaint => AppRoutes.adminComplaints,
           _ => null,
         },
         _ => null,

@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/contact_info_policy.dart';
-import '../../../../shared/domain/current_student_profile.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/app_back_button.dart';
@@ -17,15 +16,12 @@ import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import '../../../student/presentation/pages/student_recitation_page.dart';
 import '../../../../shared/widgets/student_page_skeletons.dart';
 import '../../domain/entities/homework_entity.dart';
 import '../bloc/homework_bloc.dart';
 
 class StudentHomeworkPage extends StatelessWidget {
-  final CurrentStudentProfile currentStudent;
-
-  const StudentHomeworkPage({super.key, required this.currentStudent});
+  const StudentHomeworkPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -34,15 +30,13 @@ class StudentHomeworkPage extends StatelessWidget {
 
     return BlocProvider(
       create: (_) => sl<HomeworkBloc>()..add(LoadHomeworkEvent(uid)),
-      child: _HomeworkView(currentStudent: currentStudent),
+      child: const _HomeworkView(),
     );
   }
 }
 
 class _HomeworkView extends StatelessWidget {
-  final CurrentStudentProfile currentStudent;
-
-  const _HomeworkView({required this.currentStudent});
+  const _HomeworkView();
 
   @override
   Widget build(BuildContext context) {
@@ -238,24 +232,17 @@ class _HomeworkView extends StatelessWidget {
                             child: _TaskTile(
                               task: task,
                               readOnly: hw.isSubmitted,
-                              subtitle: _taskSubtitle(task),
+                              subtitle: task.isDeferredRecitation
+                                  ? 'غير مطلوب لإنهاء الواجب'
+                                  : null,
                               deferred: task.isDeferredRecitation,
-                              onToggle: hw.isSubmitted
+                              onToggle:
+                                  hw.isSubmitted ||
+                                      task.kind == HomeworkTaskKind.recitation
                                   ? null
-                                  : () {
-                                      if (task.isDeferredRecitation) {
-                                        _showDeferredRecitationInfo(context);
-                                        return;
-                                      }
-                                      if (task.kind ==
-                                          HomeworkTaskKind.recitation) {
-                                        _openRecitation(context, task, hw);
-                                      } else {
-                                        context.read<HomeworkBloc>().add(
-                                          ToggleTaskEvent(task.id),
-                                        );
-                                      }
-                                    },
+                                  : () => context.read<HomeworkBloc>().add(
+                                      ToggleTaskEvent(task.id),
+                                    ),
                             ),
                           ),
                         ),
@@ -349,199 +336,6 @@ class _HomeworkView extends StatelessWidget {
     );
   }
 
-  Future<void> _openRecitation(
-    BuildContext context,
-    HomeworkTaskEntity task,
-    HomeworkEntity hw,
-  ) async {
-    if (hw.isSubmitted) return;
-
-    if (task.isDeferredRecitation) {
-      _showDeferredRecitationInfo(context);
-      return;
-    }
-
-    // الأبسط: بعد الإرسال الناجح لا نفتح التسجيل تاني — نعرض حالة الانتظار فقط
-    if (task.isCompleted && (task.recitationRecordId ?? '').isNotEmpty) {
-      AppSnackBar.showInfo(
-        context,
-        'تم إرسال التسميع — راجع صفحة التقييمات بعد مراجعة المعلم',
-      );
-      return;
-    }
-
-    final auth = context.read<AuthBloc>().state;
-    if (auth is! AuthAuthenticated) {
-      AppSnackBar.showError(context, 'يجب تسجيل الدخول أولاً');
-      return;
-    }
-    final studentName = currentStudent.name;
-    final profileHalaqaId = currentStudent.halaqaId;
-    final verses = hw.reviewRange.isNotEmpty
-        ? hw.reviewRange
-        : hw.newMemorizationRange;
-    final nav = _resolveRecitationNavParams(
-      versesRange: verses,
-      fallbackTitle: hw.title,
-    );
-
-    final success = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => StudentRecitationPage(
-          surahName: nav.surahName,
-          pageNumber: nav.pageNumber,
-          startAyah: nav.startAyah,
-          endAyah: nav.endAyah,
-          homeworkContext: HomeworkRecitationContext(
-            studentId: auth.user.uid,
-            studentName: studentName ?? auth.user.name,
-            teacherId: hw.assignedBy,
-            halaqaId: hw.halaqaId.isNotEmpty
-                ? hw.halaqaId
-                : (profileHalaqaId ?? ''),
-            assignmentId: hw.id,
-            taskId: task.id,
-            versesRange: verses,
-          ),
-        ),
-      ),
-    );
-
-    // الـ stream هيحدّث المهام تلقائياً بعد الرفع؛ مفيش Toggle يدوي
-    if (success == true && context.mounted) {
-      // لا شيء — HomeworkBloc watch يحدّث الواجهة
-    }
-  }
-
-  String? _taskSubtitle(HomeworkTaskEntity task) {
-    if (task.isDeferredRecitation) {
-      return 'اختياري مؤجل — سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات';
-    }
-    if (task.kind == HomeworkTaskKind.recitation &&
-        task.isCompleted &&
-        (task.recitationRecordId ?? '').isNotEmpty) {
-      return 'تم إرسال التسميع — النتيجة تظهر في التقييمات بعد مراجعة المعلم';
-    }
-    return null;
-  }
-
-  void _showDeferredRecitationInfo(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('التسميع الصوتي', textAlign: TextAlign.right),
-        content: const Text(
-          'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
-          textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Navigation labels for [StudentRecitationPage] derived from assignment
-/// free-text ranges (`reviewRange` / `newMemorizationRange`).
-class _RecitationNavParams {
-  final String surahName;
-  final int pageNumber;
-  final int startAyah;
-  final int endAyah;
-
-  const _RecitationNavParams({
-    required this.surahName,
-    required this.pageNumber,
-    required this.startAyah,
-    required this.endAyah,
-  });
-}
-
-_RecitationNavParams _resolveRecitationNavParams({
-  required String versesRange,
-  required String fallbackTitle,
-}) {
-  final ayahs = _parseAyahRange(versesRange);
-  final page = _parsePageNumber(versesRange);
-  final surahFromRange = _parseSurahName(versesRange);
-  final surahName = (surahFromRange != null && surahFromRange.isNotEmpty)
-      ? surahFromRange
-      : (fallbackTitle.isNotEmpty ? fallbackTitle : 'الورد اليومي');
-
-  return _RecitationNavParams(
-    surahName: surahName,
-    pageNumber: page ?? 1,
-    startAyah: ayahs?.$1 ?? 1,
-    endAyah: ayahs?.$2 ?? 10,
-  );
-}
-
-String _normalizeIndicDigits(String input) {
-  const eastern = '٠١٢٣٤٥٦٧٨٩';
-  const persian = '۰۱۲۳۴۵۶۷۸۹';
-  final buffer = StringBuffer();
-  for (final unit in input.runes) {
-    final ch = String.fromCharCode(unit);
-    final e = eastern.indexOf(ch);
-    if (e >= 0) {
-      buffer.write(e);
-      continue;
-    }
-    final p = persian.indexOf(ch);
-    if (p >= 0) {
-      buffer.write(p);
-      continue;
-    }
-    buffer.write(ch);
-  }
-  return buffer.toString();
-}
-
-(int, int)? _parseAyahRange(String raw) {
-  final text = _normalizeIndicDigits(raw.trim());
-  if (text.isEmpty) return null;
-
-  final range = RegExp(
-    r'(\d+)\s*(?:[-–—]|إلى|الى|to)\s*(\d+)',
-    caseSensitive: false,
-  ).firstMatch(text);
-  if (range != null) {
-    final a = int.tryParse(range.group(1)!);
-    final b = int.tryParse(range.group(2)!);
-    if (a == null || b == null || a <= 0 || b <= 0) return null;
-    return a <= b ? (a, b) : (b, a);
-  }
-
-  final single = RegExp(r'(\d+)').firstMatch(text);
-  if (single != null) {
-    final n = int.tryParse(single.group(1)!);
-    if (n != null && n > 0) return (n, n);
-  }
-  return null;
-}
-
-int? _parsePageNumber(String raw) {
-  final text = _normalizeIndicDigits(raw.trim());
-  if (text.isEmpty) return null;
-  final match = RegExp(r'صفح[ةه]\s*(\d+)').firstMatch(text);
-  if (match == null) return null;
-  final page = int.tryParse(match.group(1)!);
-  if (page == null || page <= 0) return null;
-  return page;
-}
-
-String? _parseSurahName(String raw) {
-  final match = RegExp(
-    r'سورة\s+([^\d\-–—]+?)(?:\s*(?:الآيات|آيات|آية|من|صفح)|$)',
-  ).firstMatch(raw.trim());
-  final name = match?.group(1)?.trim();
-  if (name == null || name.isEmpty) return null;
-  return name;
 }
 
 class _HomeworkHeroCard extends StatelessWidget {
@@ -636,7 +430,7 @@ class _TaskTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppSizes.radiusFull),
               ),
               child: Text(
-                deferred ? 'مؤجل' : '${task.points}+',
+                deferred ? 'تسميع' : '${task.points}+',
                 style: AppTextStyles.labelSmall.copyWith(
                   color: muted ? AppColors.textSecondary : AppColors.secondary,
                   fontWeight: FontWeight.w700,
@@ -693,12 +487,6 @@ class _TaskTile extends StatelessWidget {
               ),
               child: task.isCompleted && !deferred
                   ? const Icon(Icons.check, color: Colors.white, size: 16)
-                  : deferred
-                  ? const Icon(
-                      Icons.schedule,
-                      color: AppColors.textHint,
-                      size: 16,
-                    )
                   : null,
             ),
           ],

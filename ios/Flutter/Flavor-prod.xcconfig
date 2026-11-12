@@ -2,4 +2,7 @@
 // applicationId: confirm it before creating the App Store Connect record,
 // after which it cannot change. The prod Firebase project does not exist yet.
 PRODUCT_BUNDLE_IDENTIFIER = com.basmaacademy.app
+// Push Notifications capability. Xcode switches aps-environment to
+// production when an App Store build is exported.
+CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements
 APP_DISPLAY_NAME = بصمة

@@ -71,6 +71,9 @@ function fakeDb(seed) {
         where(field, op, value) {
           return query(col, [{ field, op, value }]);
         },
+        select() {
+          return { get: async () => query(col, []).run() };
+        },
       };
     },
     async runTransaction(fn) {
@@ -116,7 +119,13 @@ function fakeDb(seed) {
         if (kind === "update" && before === undefined) throw new Error(`update missing ${path}`);
         if (kind === "create" && before !== undefined) throw new Error(`create exists ${path}`);
         if (kind === "delete") store.delete(path);
-        else store.set(path, kind === "update" || kind === "merge" ? { ...(before ?? {}), ...data } : data);
+        else if (kind === "update" || kind === "merge") {
+          const merged = { ...(before ?? {}), ...data };
+          for (const [key, value] of Object.entries(data)) {
+            if (value?.isEqual?.(FieldValue.delete())) delete merged[key];
+          }
+          store.set(path, merged);
+        } else store.set(path, data);
         writes.push({ kind, path, data });
       }
       return result;
@@ -176,15 +185,16 @@ const call = (db, uid, data) => link.setHalaqaMeetingLinkCore(db, uid, data);
 const auditWrites = (db) => db.writes.filter((w) => w.path.startsWith("auditLogs/"));
 const canonical = (db, id) => db.store.get(`halaqaMeetingLinks/${id}`);
 const legacy = (db, id) => db.store.get(`halaqat/${id}`).meetingLink;
+const hasLegacyKey = (db, id) => Object.prototype.hasOwnProperty.call(db.store.get(`halaqat/${id}`), "meetingLink");
 
-/** Canonical doc holds exactly { meetingLink, updatedAt } and the legacy mirror agrees. */
+/** Canonical doc holds exactly { meetingLink, updatedAt }; the halaqa carries no copy. */
 function assertLinked(db, id, value) {
   const doc = canonical(db, id);
   assert.ok(doc, `canonical doc for ${id}`);
   assert.deepEqual(Object.keys(doc).sort(), ["meetingLink", "updatedAt"]);
   assert.equal(doc.meetingLink, value);
   assert.ok(doc.updatedAt?.isEqual?.(FieldValue.serverTimestamp()), "updatedAt is server-generated");
-  assert.equal(legacy(db, id), value);
+  assert.equal(hasLegacyKey(db, id), false, `halaqat/${id} carries no meetingLink`);
 }
 
 /** The seeded h2 state (canonical doc and legacy field) was not rewritten. */
@@ -195,7 +205,15 @@ function assertSeededH2Untouched(db) {
 
 function assertUnlinked(db, id) {
   assert.equal(canonical(db, id), undefined, `no canonical doc for ${id}`);
-  assert.equal(legacy(db, id), "");
+  assert.equal(hasLegacyKey(db, id), false, `halaqat/${id} carries no meetingLink`);
+}
+
+/** No write to a halaqa document ever stores a link value (J.9). */
+function assertNoHalaqaLinkWrites(db) {
+  for (const w of db.writes.filter((x) => x.path.startsWith("halaqat/"))) {
+    if (!w.data || !Object.prototype.hasOwnProperty.call(w.data, "meetingLink")) continue;
+    assert.ok(w.data.meetingLink?.isEqual?.(FieldValue.delete()), `${w.kind} ${w.path} stores a meetingLink value`);
+  }
 }
 
 async function rejectsWith(promise, code, reason) {
@@ -302,9 +320,10 @@ test("admin sets, updates and explicitly clears a link; each change is audited o
     assert.equal(a.data.targetId, "h1");
     assert.equal(a.data.source, "setHalaqaMeetingLink");
   }
+  assertNoHalaqaLinkWrites(db);
 });
 
-test("set/update writes the canonical doc and legacy mirror in one transaction", async () => {
+test("set/update writes the canonical doc and removes a legacy copy in one transaction", async () => {
   const db = fakeDb(dataset());
   await call(db, "admin1", { halaqaId: "h2", meetingLink: ` ${VALID_2} ` });
   assertLinked(db, "h2", VALID_2);
@@ -313,6 +332,18 @@ test("set/update writes the canonical doc and legacy mirror in one transaction",
     nonAudit.map((w) => [w.kind, w.path]),
     [["set", "halaqaMeetingLinks/h2"], ["update", "halaqat/h2"]],
   );
+  assertNoHalaqaLinkWrites(db);
+});
+
+test("a halaqa without a legacy copy is never written by a link change", async () => {
+  const d = dataset();
+  delete d.halaqat.h1.meetingLink;
+  const db = fakeDb(d);
+  assert.equal((await call(db, "admin1", { halaqaId: "h1", meetingLink: VALID })).operation, "set");
+  assert.equal((await call(db, "admin1", { halaqaId: "h1", meetingLink: VALID_2 })).operation, "update");
+  assert.equal((await call(db, "admin1", { halaqaId: "h1", clear: true })).operation, "clear");
+  assert.deepEqual(db.writes.filter((w) => w.path.startsWith("halaqat/")), []);
+  assertUnlinked(db, "h1");
 });
 
 test("re-sending the same link or clearing an empty link writes nothing", async () => {
@@ -333,7 +364,7 @@ test("legacy-only link (before migration): same link backfills the canonical doc
   assert.equal(auditWrites(db).length, 1);
 });
 
-test("legacy-only link: admin update and clear write both stores", async () => {
+test("legacy-only link: admin update and clear remove the legacy copy", async () => {
   const db = fakeDb(datasetWith(VALID, undefined));
   assert.equal((await call(db, "admin1", { halaqaId: "h2", meetingLink: VALID_2 })).operation, "update");
   assertLinked(db, "h2", VALID_2);
@@ -344,16 +375,16 @@ test("legacy-only link: admin update and clear write both stores", async () => {
   assert.equal(auditWrites(db2)[0].data.metadata.operation, "meeting_link_clear");
 });
 
-test("canonical equals the request but the legacy mirror differs: mirror repaired, one audit", async () => {
+test("canonical equals the request: unchanged and no writes, whatever the legacy copy holds", async () => {
   for (const staleLegacy of ["", VALID_2, null, 7]) {
     const db = fakeDb(datasetWith(staleLegacy, { meetingLink: VALID, updatedAt: "seeded" }));
-    assert.equal((await call(db, "admin1", { halaqaId: "h2", meetingLink: VALID })).operation, "update");
-    assertLinked(db, "h2", VALID);
-    assert.equal(auditWrites(db).length, 1, String(staleLegacy));
+    assert.equal((await call(db, "admin1", { halaqaId: "h2", meetingLink: VALID })).operation, "unchanged");
+    assert.equal(db.writes.length, 0, String(staleLegacy));
+    assert.equal(legacy(db, "h2"), staleLegacy, "the copy is left for the strip step");
   }
 });
 
-test("stores disagree and the request equals the legacy value: both become the request", async () => {
+test("stores disagree and the request equals the legacy value: canonical becomes the request, copy removed", async () => {
   const db = fakeDb(datasetWith(VALID_2, { meetingLink: VALID, updatedAt: "seeded" }));
   assert.equal((await call(db, "admin1", { halaqaId: "h2", meetingLink: VALID_2 })).operation, "update");
   assertLinked(db, "h2", VALID_2);
@@ -399,10 +430,11 @@ test("missing halaqa with a stray canonical doc: no writes for admin or supervis
 });
 
 test("classifyMeetingLinkChange covers every stored state", () => {
-  const s = (canonicalExists, canonicalValue, legacyValue) => ({
+  const s = (canonicalExists, canonicalValue, legacyValue, legacyPresent = legacyValue !== "") => ({
     canonicalExists,
     canonical: canonicalValue,
     legacy: legacyValue,
+    legacyPresent,
   });
   const set = { clear: false, link: VALID };
   const clear = { clear: true, link: "" };
@@ -413,7 +445,8 @@ test("classifyMeetingLinkChange covers every stored state", () => {
     [s(false, "", VALID_2), set, "update"],
     [s(false, "", VALID), clear, "clear"],
     [s(true, VALID, VALID), set, "unchanged"],
-    [s(true, VALID, ""), set, "update"],
+    [s(true, VALID, ""), set, "unchanged"],
+    [s(true, VALID, VALID_2), set, "unchanged"],
     [s(true, VALID_2, VALID), set, "update"],
     [s(true, "", ""), set, "update"],
     [s(true, "", ""), clear, "clear"],
@@ -425,6 +458,8 @@ test("classifyMeetingLinkChange covers every stored state", () => {
   assert.deepEqual(link.resolveStoredMeetingLink(undefined, { meetingLink: ` ${VALID} ` }), s(false, "", VALID));
   assert.deepEqual(link.resolveStoredMeetingLink({ meetingLink: 5 }, { meetingLink: VALID }), s(true, "", VALID));
   assert.deepEqual(link.resolveStoredMeetingLink({ meetingLink: ` ${VALID_2}` }, {}), s(true, VALID_2, ""));
+  assert.deepEqual(link.resolveStoredMeetingLink(undefined, { meetingLink: "" }), s(false, "", "", true));
+  assert.deepEqual(link.resolveStoredMeetingLink(undefined, { meetingLink: 7 }), s(false, "", "", true));
 });
 
 test("only meetingLink and updatedAt change; other halaqa fields are preserved", async () => {
@@ -435,6 +470,7 @@ test("only meetingLink and updatedAt change; other halaqa fields are preserved",
   assert.equal(halaqaWrites.length, 1);
   assert.equal(halaqaWrites[0].kind, "update");
   assert.deepEqual(Object.keys(halaqaWrites[0].data).sort(), ["meetingLink", "updatedAt"]);
+  assert.ok(halaqaWrites[0].data.meetingLink.isEqual(FieldValue.delete()), "the legacy key is deleted, not rewritten");
   const after = db.store.get("halaqat/h1");
   for (const key of ["name", "teacherId", "supervisorId", "studentIds", "schedule", "status", "createdBy"]) {
     assert.deepEqual(after[key], before[key], key);
@@ -584,7 +620,7 @@ test("firestore.rules freeze meetingLink for client halaqa updates", () => {
   const block = rules.slice(rules.indexOf("match /halaqat/{halaqaId}"));
   const start = block.indexOf("allow update");
   const update = block.slice(start, block.indexOf("}", start));
-  assert.match(update, /'meetingLink'/);
+  assert.match(update, /^allow update: if false;\s*$/);
   assert.match(block, /allow create: if false;/);
 });
 
@@ -614,6 +650,7 @@ test("adminCreateHalaqa stores a valid link, stores empty when omitted, and reje
   const blank = fakeDb(dataset());
   const b = await schedule.adminCreateHalaqaCore(blank, "admin1", createPayload({ meetingLink: "   " }), ids);
   assertUnlinked(blank, b.halaqaId);
+  for (const db of [withLink, without, blank]) assertNoHalaqaLinkWrites(db);
 
   for (const [bad, reason] of [
     ["http://meet.example.test/room", "not_https"],

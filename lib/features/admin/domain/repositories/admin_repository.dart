@@ -50,6 +50,7 @@ abstract class AdminRepository {
     required String title,
     required String body,
     required String targetRole,
+    String? requestId,
   });
 
   Future<Either<Failure, List<TeacherManagementEntity>>> getAllTeachers();
@@ -211,15 +212,17 @@ class BroadcastParams extends Equatable {
   final String title;
   final String body;
   final String targetRole;
+  final String? requestId;
 
   const BroadcastParams({
     required this.title,
     required this.body,
     required this.targetRole,
+    this.requestId,
   });
 
   @override
-  List<Object?> get props => [title, body, targetRole];
+  List<Object?> get props => [title, body, targetRole, requestId];
 }
 
 class UpdateTeacherPerformanceParams extends Equatable {

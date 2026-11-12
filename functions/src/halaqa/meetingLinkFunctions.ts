@@ -1,11 +1,13 @@
 /**
  * B14 — per-Halaqa meeting link.
  *
- * Canonical storage is `halaqaMeetingLinks/{halaqaId}` =
- * `{ meetingLink, updatedAt }`; no link means no document. During the
- * compatibility phase every change is also mirrored to the legacy
- * `halaqat/{halaqaId}.meetingLink` field (`""` when cleared) in the same
- * transaction, so clients that still read the halaqa keep working.
+ * The only storage is `halaqaMeetingLinks/{halaqaId}` =
+ * `{ meetingLink, updatedAt }`; no link means no document. No link value is
+ * ever written to `halaqat/{halaqaId}` (J.9: halaqa metadata is readable by
+ * roles that must not see the link). A legacy `halaqat.meetingLink` copy left
+ * from before J.9 still counts as "a link is stored" for the supervisor
+ * add-only check, and any change to that halaqa's link deletes the copy in the
+ * same transaction, so the copy migration can never resurrect a cleared link.
  *
  * `validateMeetingLink` is the single authoritative URL policy; it is used by
  * `adminCreateHalaqa` and `setHalaqaMeetingLink`, and mirrored by the client
@@ -214,6 +216,8 @@ export type StoredMeetingLink = {
   canonical: string;
   /** Trimmed legacy `halaqat.meetingLink`; `""` when missing or not a string. */
   legacy: string;
+  /** Whether the halaqa still carries a legacy `meetingLink` key (any value). */
+  legacyPresent: boolean;
 };
 
 export function resolveStoredMeetingLink(
@@ -224,14 +228,14 @@ export function resolveStoredMeetingLink(
     canonicalExists: canonicalDoc !== undefined,
     canonical: canonicalDoc === undefined ? "" : text(canonicalDoc.meetingLink),
     legacy: text(halaqa.meetingLink),
+    legacyPresent: Object.prototype.hasOwnProperty.call(halaqa, "meetingLink"),
   };
 }
 
 /**
- * The canonical doc is authoritative whenever it exists; the legacy field is
- * only consulted when it does not. A request is `unchanged` only when both
- * stores already hold the requested state; otherwise the change rewrites both,
- * which also repairs a legacy mirror that disagrees with the canonical doc.
+ * The canonical doc is the link whenever it exists; a legacy copy only counts
+ * as "a link is stored" when there is no canonical doc. A request is
+ * `unchanged` when the canonical doc already holds the requested state.
  */
 export function classifyMeetingLinkChange(
   stored: StoredMeetingLink,
@@ -239,20 +243,15 @@ export function classifyMeetingLinkChange(
 ): MeetingLinkOperation {
   const anythingStored = stored.canonicalExists || stored.legacy !== "";
   if (request.clear) return anythingStored ? "clear" : "unchanged";
-  if (
-    stored.canonicalExists &&
-    stored.canonical === request.link &&
-    stored.legacy === request.link
-  ) {
-    return "unchanged";
-  }
+  if (stored.canonicalExists && stored.canonical === request.link) return "unchanged";
   return anythingStored ? "update" : "set";
 }
 
 /**
  * Sets, updates or clears one Halaqa's meeting link. The canonical doc, the
- * legacy mirror (only `meetingLink` and `updatedAt` on the halaqa) and the
- * audit entry are written in one transaction.
+ * removal of a legacy `halaqat.meetingLink` copy (only that key and
+ * `updatedAt` on the halaqa, and only when the copy exists) and the audit
+ * entry are written in one transaction.
  */
 export async function setHalaqaMeetingLinkCore(
   db: admin.firestore.Firestore,
@@ -296,11 +295,12 @@ export async function setHalaqaMeetingLinkCore(
     } else {
       tx.set(linkRef, canonicalMeetingLinkData(request.link));
     }
-    // Legacy mirror, kept until the client cutover and strip phases ship.
-    tx.update(halaqaRef, {
-      meetingLink: request.link,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    if (stored.legacyPresent) {
+      tx.update(halaqaRef, {
+        meetingLink: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
     tx.set(
       db.collection(AUDIT_LOGS_COLLECTION).doc(),
       buildAuditLogEntry(

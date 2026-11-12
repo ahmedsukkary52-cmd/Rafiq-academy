@@ -134,7 +134,9 @@ class _ResetRequestFormState extends State<_ResetRequestForm> {
         children: [
           Text(
             'أدخل البريد الإلكتروني المسجّل لدى الأكاديمية، وسنرسل إليك رابطاً '
-            'لتعيين كلمة مرور جديدة.',
+            'لتعيين كلمة مرور جديدة.\n'
+            'إن كنت تدخل باسم مستخدم من الأكاديمية فاطلب كلمة مرور مؤقتة '
+            'جديدة من إدارة الأكاديمية.',
             textAlign: TextAlign.right,
             style: AppTextStyles.bodyMedium,
           ),

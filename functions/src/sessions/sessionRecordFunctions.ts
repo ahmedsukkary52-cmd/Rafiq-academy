@@ -37,6 +37,7 @@ import {
   writeInAppNotifications,
 } from "../notifications/academyNotificationStore";
 import { assertBackendAllowed } from "../productionGate";
+import { ASSISTANT_TEACHER_ROLE, isActiveCoverOf } from "../staff/halaqaAssistantFunctions";
 import { materializeSessionCore } from "./materializeSession";
 import {
   attendanceDocId,
@@ -152,7 +153,8 @@ export async function recordSessionAttendanceCore(
   const halaqa = halaqaSnap.data() ?? {};
   const isAdmin = role === "admin";
   const isHalaqaTeacher = role === "teacher" && text(halaqa.teacherId) === uid;
-  if (!isAdmin && !isHalaqaTeacher) {
+  const isCover = !isHalaqaTeacher && isActiveCoverOf(halaqa, uid, role);
+  if (!isAdmin && !isHalaqaTeacher && !isCover) {
     throw new HttpsError("permission-denied", "تسجيل الحضور متاح لمعلّم الحلقة فقط");
   }
 
@@ -212,7 +214,8 @@ export async function recordSessionAttendanceCore(
     }
 
     const fresh = (await tx.get(halaqaRef)).data() ?? {};
-    if (!isAdmin && text(fresh.teacherId) !== uid) {
+    const freshCover = isCover && isActiveCoverOf(fresh, uid, role);
+    if (!isAdmin && !freshCover && text(fresh.teacherId) !== uid) {
       throw new HttpsError("permission-denied", "تسجيل الحضور متاح لمعلّم الحلقة فقط");
     }
     const roster = new Set(stringList(fresh.studentIds));
@@ -269,6 +272,15 @@ export async function recordSessionAttendanceCore(
         },
         { merge: true },
       );
+    }
+    if (freshCover) {
+      // The session keeps the primary teacherId; this records who taught it.
+      tx.update(sessionRef, {
+        handledBy: uid,
+        handledAs: "cover",
+        coverId: text(fresh.coverId),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
 
     // Same-day legacy duplicates of re-marked students are superseded by the
@@ -426,7 +438,7 @@ export async function upsertSessionEvaluationCore(
 
   const role = await loadCallerRole(db, uid);
   const isAdmin = role === "admin";
-  if (role !== "teacher" && !isAdmin) {
+  if (role !== "teacher" && role !== ASSISTANT_TEACHER_ROLE && !isAdmin) {
     throw new HttpsError(
       "permission-denied",
       "التقييم متاح لمعلّم الحلقة، والتصحيح للمسؤول فقط",
@@ -466,7 +478,9 @@ export async function upsertSessionEvaluationCore(
       throw new HttpsError("not-found", "الحلقة غير موجودة");
     }
     const halaqa = halaqaSnap.data() ?? {};
-    if (!isAdmin && text(halaqa.teacherId) !== uid) {
+    const isPrimary = role === "teacher" && text(halaqa.teacherId) === uid;
+    const isCover = !isPrimary && isActiveCoverOf(halaqa, uid, role);
+    if (!isAdmin && !isPrimary && !isCover) {
       throw new HttpsError("permission-denied", "التقييم متاح لمعلّم الحلقة فقط");
     }
     if (!stringList(halaqa.studentIds).includes(studentId)) {
@@ -543,6 +557,7 @@ export async function upsertSessionEvaluationCore(
         behaviorGrade,
         notes: notes ? notes : FieldValue.delete(),
         reviewStatus: "reviewed",
+        ...(isCover ? { handledAs: "cover", coverId: text(halaqa.coverId) } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },

@@ -1,8 +1,6 @@
 import 'package:equatable/equatable.dart';
 
 import '../../domain/admin_grant_reward_params.dart';
-import '../../domain/entities/communication_settings_entity.dart';
-
 abstract class AdminEvent extends Equatable {
   const AdminEvent();
 
@@ -89,14 +87,16 @@ class SendBroadcastNotificationEvent extends AdminEvent {
   final String title;
   final String body;
   final String targetRole;
+  final String? requestId;
   const SendBroadcastNotificationEvent({
     required this.title,
     required this.body,
     required this.targetRole,
+    this.requestId,
   });
 
   @override
-  List<Object?> get props => [title, body, targetRole];
+  List<Object?> get props => [title, body, targetRole, requestId];
 }
 
 class ResetBroadcastEvent extends AdminEvent {
@@ -236,22 +236,6 @@ class UpdateComplaintEvent extends AdminEvent {
 
 class ResetUpdateComplaintEvent extends AdminEvent {
   const ResetUpdateComplaintEvent();
-}
-
-class LoadCommunicationSettingsEvent extends AdminEvent {
-  const LoadCommunicationSettingsEvent();
-}
-
-class SaveCommunicationSettingsEvent extends AdminEvent {
-  final CommunicationSettingsEntity settings;
-  const SaveCommunicationSettingsEvent({required this.settings});
-
-  @override
-  List<Object?> get props => [settings];
-}
-
-class ResetCommunicationSettingsEvent extends AdminEvent {
-  const ResetCommunicationSettingsEvent();
 }
 
 class GrantAdminRewardEvent extends AdminEvent {

@@ -26,6 +26,9 @@ import '../../../../shared/domain/parent_payment_proof.dart';
 import '../../domain/services/parent_recipient_resolver.dart';
 import '../models/parent_model.dart';
 import '../parent_achievements_response.dart';
+import '../parent_child_halaqat_response.dart';
+import '../parent_child_schedule_response.dart';
+import '../../../schedule/domain/entities/halaqa_schedule_source.dart';
 
 @LazySingleton(as: ParentRemoteDatasource)
 class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
@@ -304,22 +307,47 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   Future<List<({String id, String name})>> getHalaqatForStudent(
     String studentId,
   ) async {
+    final sid = studentId.trim();
+    if (sid.isEmpty) return const [];
+    final rows = await _childHalaqat(sid);
+    return [
+      for (final row in rows)
+        (id: row.id, name: row.name.isEmpty ? row.id : row.name),
+    ];
+  }
+
+  /// Parents never read halaqat (roster + legacy link); the callable returns
+  /// name and staff ids of the linked child's Halaqat only.
+  Future<List<ParentChildHalaqaRow>> _childHalaqat(String studentId) async {
     try {
-      final sid = studentId.trim();
-      if (sid.isEmpty) return const [];
+      final response = await functions
+          .httpsCallable(kParentChildHalaqatCallable)
+          .call(<String, dynamic>{'studentId': studentId});
+      return parseParentChildHalaqatResponse(response.data);
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(parentChildHalaqatErrorMessage(e.code, e.message));
+    } catch (_) {
+      throw const ServerException(kParentChildHalaqatLoadFailedMessage);
+    }
+  }
 
-      final snap = await firestore
-          .collection(FirestoreCollections.halaqat)
-          .where('studentIds', arrayContains: sid)
-          .get();
-
-      return snap.docs.map((doc) {
-        final data = doc.data();
-        final name = (data['name'] as String?)?.trim() ?? '';
-        return (id: doc.id, name: name.isEmpty ? doc.id : name);
-      }).toList();
-    } catch (e) {
-      throw ServerException(e.toString());
+  @override
+  Future<HalaqaScheduleSource> getChildHalaqaSchedule({
+    required String studentId,
+    required String halaqaId,
+  }) async {
+    try {
+      final response = await functions
+          .httpsCallable(kParentChildScheduleCallable)
+          .call(<String, dynamic>{'studentId': studentId, 'halaqaId': halaqaId});
+      return parseParentChildScheduleResponse(
+        response.data,
+        expectedHalaqaId: halaqaId,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(parentChildScheduleErrorMessage(e.code, e.message));
+    } catch (_) {
+      throw const ServerException(kParentChildScheduleLoadFailedMessage);
     }
   }
 
@@ -562,11 +590,6 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     final imageUrl = userData?['profileImageUrl'] as String?;
 
     var halaqaId = (profileData?['halaqaId'] as String?)?.trim() ?? '';
-    if (halaqaId.isEmpty) {
-      final halaqat = await getHalaqatForStudent(studentId);
-      if (halaqat.isNotEmpty) halaqaId = halaqat.first.id;
-    }
-
     String halaqaName = (profileData?['halaqaName'] as String?)?.trim() ?? '';
     String? teacherId;
     String teacherName = '';
@@ -575,18 +598,22 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
     String supervisorName = '';
     String? supervisorImageUrl;
 
-    if (halaqaId.isNotEmpty) {
-      final halaqaDoc = await firestore
-          .collection(FirestoreCollections.halaqat)
-          .doc(halaqaId)
-          .get();
-      final hdata = halaqaDoc.data();
-      if (hdata != null) {
-        final hn = (hdata['name'] as String?)?.trim() ?? '';
-        if (hn.isNotEmpty) halaqaName = hn;
-        teacherId = (hdata['teacherId'] as String?)?.trim();
-        supervisorId = (hdata['supervisorId'] as String?)?.trim();
-      }
+    // A failed projection keeps the household usable: the profile's
+    // halaqaName stays and staff contacts are omitted.
+    var childHalaqat = const <ParentChildHalaqaRow>[];
+    try {
+      childHalaqat = await _childHalaqat(studentId);
+    } on ServerException {
+      childHalaqat = const [];
+    }
+    if (halaqaId.isEmpty && childHalaqat.isNotEmpty) {
+      halaqaId = childHalaqat.first.id;
+    }
+    for (final row in childHalaqat) {
+      if (row.id != halaqaId) continue;
+      if (row.name.isNotEmpty) halaqaName = row.name;
+      teacherId = row.teacherId;
+      supervisorId = row.supervisorId;
     }
 
     final staffIds = [

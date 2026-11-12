@@ -54,8 +54,6 @@ const _studentHomeworkPage =
     'features/homework/presentation/pages/student_homework_page.dart';
 const _studentSchedulePage =
     'features/schedule/presentation/pages/student_schedule_page.dart';
-const _studentRecitationPage =
-    'features/student/presentation/pages/student_recitation_page.dart';
 const _halaqaMeetingJoin =
     'features/student/presentation/widgets/halaqa_meeting_join.dart';
 const _currentStudentProfile = 'shared/domain/current_student_profile.dart';
@@ -72,8 +70,6 @@ const _studentHomePage =
 /// Non-role, non-core files (features, shared, staff, main.dart) that import
 /// a role module.
 const _featureToRoleAllowlist = {
-  '$_studentHomeworkPage -> $_studentRecitationPage':
-      'Student homework opens the student recitation page.',
   'features/progress_report/presentation/bloc/progress_report_bloc.dart -> '
           'features/student/domain/usecases/get_student_profile_usecase.dart':
       'Progress report reads overallProgressPercent from the student '
@@ -387,8 +383,8 @@ void main() {
   });
 
   group('B: feature -> role imports', () {
-    test('are exactly the 3 approved edges plus 6 in main.dart', () {
-      expect(_featureToRoleAllowlist, hasLength(9));
+    test('are exactly the 2 approved edges plus 6 in main.dart', () {
+      expect(_featureToRoleAllowlist, hasLength(8));
       final diff = exactEdgeDiff(
         nonRoleToRoleEdges(graph),
         _featureToRoleAllowlist.keys,
@@ -804,16 +800,13 @@ void main() {
   });
 
   group('K: current student profile (homework, schedule)', () {
-    test('homework enters the student module only through the recitation '
-        'page', () {
+    test('homework does not enter the student module', () {
       final entries = roleEntryEdges(
         graph,
         graph.files.where((f) => moduleOf(f) == 'homework'),
         stop: (f) => f == _diContainer,
       );
-      final diff = exactEdgeDiff(entries, {
-        '$_studentHomeworkPage -> $_studentRecitationPage',
-      });
+      final diff = exactEdgeDiff(entries, const <String>{});
       expect(diff, isNull, reason: diff);
     });
 
@@ -830,18 +823,26 @@ void main() {
       expect(diff, isNull, reason: diff);
     });
 
-    test('both pages read the profile through CurrentStudentProfile', () {
-      for (final page in [_studentHomeworkPage, _studentSchedulePage]) {
-        final source = _lib(page);
-        expect(
-          referencedNames(source, ['StudentBloc', 'StudentState']),
-          isEmpty,
-          reason: page,
-        );
-        expect(referencedNames(source, ['CurrentStudentProfile']), {
+    test('schedule reads the profile through CurrentStudentProfile', () {
+      final source = _lib(_studentSchedulePage);
+      expect(
+        referencedNames(source, ['StudentBloc', 'StudentState']),
+        isEmpty,
+      );
+      expect(referencedNames(source, ['CurrentStudentProfile']), {
+        'CurrentStudentProfile',
+      });
+    });
+
+    test('homework reads no student profile', () {
+      expect(
+        referencedNames(_lib(_studentHomeworkPage), [
+          'StudentBloc',
+          'StudentState',
           'CurrentStudentProfile',
-        }, reason: page);
-      }
+        ]),
+        isEmpty,
+      );
     });
 
     test('the current student profile contract has no imports', () {

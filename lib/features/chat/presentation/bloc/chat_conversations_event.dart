@@ -12,19 +12,28 @@ abstract class ChatConversationsEvent extends Equatable {
 /// بدء مراقبة قائمة المحادثات الخاصة بالمستخدم الحالي real-time
 class StartWatchingConversationsEvent extends ChatConversationsEvent {
   final String uid;
-  const StartWatchingConversationsEvent(this.uid);
+
+  /// Live window size; null = unbounded (no paging).
+  final int? pageSize;
+  const StartWatchingConversationsEvent(this.uid, {this.pageSize});
 
   @override
-  List<Object?> get props => [uid];
+  List<Object?> get props => [uid, pageSize];
 }
 
 /// Admin oversight: watch every conversation without joining as a participant.
 class StartWatchingAllConversationsEvent extends ChatConversationsEvent {
   final String observerUid;
-  const StartWatchingAllConversationsEvent(this.observerUid);
+  final int? pageSize;
+  const StartWatchingAllConversationsEvent(this.observerUid, {this.pageSize});
 
   @override
-  List<Object?> get props => [observerUid];
+  List<Object?> get props => [observerUid, pageSize];
+}
+
+/// Next page older than the last listed conversation (document cursor).
+class LoadMoreConversationsEvent extends ChatConversationsEvent {
+  const LoadMoreConversationsEvent();
 }
 
 /// بدء (أو استكمال) محادثة مع طرف معيّن - بيُستخدم لما المستخدم يضغط

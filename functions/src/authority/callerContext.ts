@@ -30,10 +30,11 @@ export async function loadCallerRole(
  * Effective academy role of a `users/{uid}` profile. A deactivated profile
  * (`isActive == false`) has no role, so a still-valid Auth token grants
  * nothing. Missing `isActive` is treated as active (legacy profiles), the
- * same default as the client and the security rules.
+ * same default as the client and the security rules. A newly provisioned
+ * Admin (`passwordChangeRequired`) has no role until completeFirstLogin.
  */
 export function activeRoleOf(data: Record<string, unknown> | undefined): string {
-  if (!data || data.isActive === false) return "";
+  if (!data || data.isActive === false || data.passwordChangeRequired === true) return "";
   return typeof data.role === "string" ? data.role : "";
 }
 

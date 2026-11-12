@@ -36,7 +36,6 @@ class IssueAchievementDialog extends StatefulWidget {
 
 class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
   final _titleCtrl = TextEditingController();
-  final _manualStudentCtrl = TextEditingController();
   final _submission = AwardSubmissionId();
   String? _studentId;
   late String _type;
@@ -59,27 +58,22 @@ class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
       final names = await load(widget.studentIds);
       if (mounted) setState(() => _studentNames = names);
     } catch (_) {
-      // Names are cosmetic; the dropdown falls back to the raw id.
+      // Names are cosmetic; the dropdown keeps a neutral label (never an id).
     }
   }
 
   String _studentLabel(String id) {
     final name = _studentNames[id]?.trim() ?? '';
-    return name.isEmpty ? id : name;
+    return name.isEmpty ? 'طالب بدون اسم' : name;
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _manualStudentCtrl.dispose();
     super.dispose();
   }
 
-  String? get _resolvedStudentId {
-    if (widget.studentIds.isNotEmpty) return _studentId;
-    final manual = _manualStudentCtrl.text.trim();
-    return manual.isEmpty ? null : manual;
-  }
+  String? get _resolvedStudentId => _studentId;
 
   void _submit() {
     final studentId = _resolvedStudentId;
@@ -136,21 +130,15 @@ class _IssueAchievementDialogState extends State<IssueAchievementDialog> {
                 children: [
                   Text('الطالب', style: AppTextStyles.labelLarge),
                   const SizedBox(height: 6),
-                  if (widget.studentIds.isEmpty) ...[
+                  if (widget.studentIds.isEmpty)
                     Text(
-                      'لا يوجد طلاب في هذه الحلقة — أدخل معرّف الطالب يدوياً',
+                      'لا يوجد طلاب في هذه الحلقة بعد',
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textHint,
                       ),
                       textAlign: TextAlign.right,
-                    ),
-                    const SizedBox(height: 8),
-                    AppTextField(
-                      hint: 'معرّف الطالب',
-                      controller: _manualStudentCtrl,
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ] else
+                    )
+                  else
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(

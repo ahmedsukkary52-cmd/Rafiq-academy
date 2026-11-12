@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/academy_branding.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../domain/academy_login_identifier.dart';
 
 /// Rounded primary-colour backdrop shared by the Auth pages.
 class AuthHeaderBackdrop extends StatelessWidget {
@@ -30,27 +31,29 @@ class AuthHeaderBackdrop extends StatelessWidget {
 /// Academy mark + page title on the backdrop.
 class AuthBrandHeader extends StatelessWidget {
   final String title;
-  final IconData icon;
 
-  const AuthBrandHeader({
-    super.key,
-    required this.title,
-    this.icon = Icons.menu_book_rounded,
-  });
+  /// Task icon (password pages); null shows the academy logo.
+  final IconData? icon;
+
+  const AuthBrandHeader({super.key, required this.title, this.icon});
 
   @override
   Widget build(BuildContext context) {
+    final icon = this.icon;
     return Row(
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(16),
+        if (icon == null)
+          const AcademyLogo(size: 52)
+        else
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: Colors.white, size: 28),
           ),
-          child: Icon(icon, color: Colors.white, size: 28),
-        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -59,7 +62,7 @@ class AuthBrandHeader extends StatelessWidget {
               Text(
                 AcademyBranding.displayName,
                 style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
+                  fontFamily: AppTextStyles.fontFamily,
                   fontSize: 12,
                   color: Colors.white.withValues(alpha: 0.85),
                 ),
@@ -67,8 +70,8 @@ class AuthBrandHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 title,
-                style: const TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFamily,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -79,6 +82,31 @@ class AuthBrandHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The academy logo tile; same artwork as the launcher icon and native splash.
+class AcademyLogo extends StatelessWidget {
+  final double size;
+
+  const AcademyLogo({super.key, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      AcademyBranding.logoAsset,
+      key: const Key('academy-logo'),
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      semanticLabel: AcademyBranding.displayName,
+      errorBuilder: (_, __, ___) => Icon(
+        Icons.menu_book_rounded,
+        color: Colors.white,
+        size: size * 0.55,
+      ),
     );
   }
 }
@@ -157,6 +185,15 @@ abstract final class AuthValidators {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'أدخل البريد الإلكتروني';
     if (!_email.hasMatch(v)) return 'البريد الإلكتروني غير صالح';
+    return null;
+  }
+
+  static String? loginIdentifier(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) return 'أدخل اسم المستخدم أو البريد الإلكتروني';
+    if (AcademyLoginIdentifier.toAuthEmail(v) == null) {
+      return 'اسم المستخدم أو البريد الإلكتروني غير صالح';
+    }
     return null;
   }
 

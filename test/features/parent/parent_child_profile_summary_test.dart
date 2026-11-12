@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:rafiq_academy/core/constants/app_constants.dart';
 import 'package:rafiq_academy/core/di/injection_container.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations_bloc.dart';
@@ -128,7 +129,7 @@ void main() {
     );
   }
 
-  testWidgets('shows the trimmed name, halaqa and level from the summary', (
+  testWidgets('shows the trimmed name and halaqa; level stays quarantined', (
     tester,
   ) async {
     await pumpProfile(tester);
@@ -136,7 +137,9 @@ void main() {
 
     expect(summaries.requested, ['s2']);
     expect(find.text('سارة'), findsWidgets);
-    expect(find.text('حلقة النور - المستوى ٣'), findsOneWidget);
+    expect(AppCapabilities.streakAndLevelAvailable, isFalse);
+    expect(find.text('حلقة النور'), findsOneWidget);
+    expect(find.textContaining('المستوى'), findsNothing);
   });
 
   testWidgets('a profile failure shows the error with retry', (tester) async {

@@ -5,15 +5,12 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
-import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -158,7 +155,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   AudioRecorder? _audioRecorderInstance;
   bool _isRecording = false;
-  String? _recordedFilePath;
   int _recordDurationSeconds = 0;
   Timer? _recordTimer;
   bool _hasRecorded = false;
@@ -607,7 +603,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
             '${tempDir.path}/recitation_${currentAyah.surahNumber}_${currentAyah.numberInSurah}_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
         setState(() {
-          _recordedFilePath = path;
           _isRecording = true;
           _recordDurationSeconds = 0;
           _hasRecorded = false;
@@ -637,7 +632,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     final path = await _audioRecorder.stop();
     setState(() {
       _isRecording = false;
-      _recordedFilePath = path;
       _hasRecorded = path != null;
     });
     if (path != null) {
@@ -650,37 +644,6 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
       _recordingPlayer.pause();
     } else {
       _recordingPlayer.play();
-    }
-  }
-
-  void _submitRecitation() {
-    if (_recordedFilePath == null) return;
-    if (!AppCapabilities.audioUploadsEnabled) {
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('إرسال التسميع', textAlign: TextAlign.right),
-          content: const Text(
-            'إرسال التسجيل من المصحف غير مفعّل حالياً. استخدم واجب التسميع من صفحة واجباتي عندما يكون متاحاً.',
-            textAlign: TextAlign.right,
-            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                context.push(AppRoutes.studentHomework);
-              },
-              child: const Text('فتح واجباتي'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
-      );
-      return;
     }
   }
 
@@ -1222,34 +1185,24 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                 ],
               ),
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      label: AppCapabilities.audioUploadsEnabled
-                          ? 'رفع التسجيل'
-                          : 'إرسال عبر الواجبات',
-                      onPressed: _submitRecitation,
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                      horizontal: 16,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                    ),
-                    onPressed: _startRecording,
-                    child: const Text(
-                      'إعادة التسجيل',
-                      style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-                    ),
+                  onPressed: _startRecording,
+                  child: const Text(
+                    'إعادة التسجيل',
+                    style: TextStyle(fontFamily: 'NotoNaskhArabic'),
                   ),
-                ],
+                ),
               ),
             ] else ...[
               const Text(

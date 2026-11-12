@@ -26,8 +26,10 @@ class GrantedAwardModel extends GrantedAwardEntity {
     super.recipientCount,
   });
 
-  factory GrantedAwardModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory GrantedAwardModel.fromFirestore(DocumentSnapshot doc) =>
+      GrantedAwardModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+
+  factory GrantedAwardModel.fromMap(String id, Map<String, dynamic> data) {
     final title = AchievementsFirestoreContract.resolveTitle(data);
     final noteRaw = data[AchievementsFirestoreContract.noteField] as String?;
     final recipients =
@@ -37,7 +39,7 @@ class GrantedAwardModel extends GrantedAwardEntity {
         (recipients.isNotEmpty ? recipients.first : '');
 
     return GrantedAwardModel(
-      id: doc.id,
+      id: id,
       studentId: studentId,
       studentName:
           data[AchievementsFirestoreContract.studentNameField] ?? '',

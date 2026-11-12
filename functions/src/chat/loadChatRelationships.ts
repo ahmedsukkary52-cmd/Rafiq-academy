@@ -85,14 +85,14 @@ export async function loadParticipantProfile(
   const userSnap = await db.collection("users").doc(uid).get();
   if (userSnap.exists) {
     const data = userSnap.data() ?? {};
+    // Firestore rejects `undefined` field values, so absent photos are omitted.
     return {
       uid,
       name: typeof data.name === "string" ? data.name : "",
       role: typeof data.role === "string" ? data.role : "",
-      profileImageUrl:
-        typeof data.profileImageUrl === "string"
-          ? data.profileImageUrl
-          : undefined,
+      ...(typeof data.profileImageUrl === "string"
+        ? { profileImageUrl: data.profileImageUrl }
+        : {}),
     };
   }
   return { uid, name: "", role: "" };

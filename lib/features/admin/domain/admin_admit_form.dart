@@ -6,8 +6,8 @@ class AdminAdmitFormValidation {
   const AdminAdmitFormValidation._();
 
   static String? error({required String studentId, required String halaqaId}) {
-    if (studentId.trim().isEmpty) return 'أدخل معرّف الطالب';
-    if (halaqaId.trim().isEmpty) return 'أدخل معرّف الحلقة';
+    if (studentId.trim().isEmpty) return 'اختر الطالب';
+    if (halaqaId.trim().isEmpty) return 'اختر الحلقة';
     return null;
   }
 }

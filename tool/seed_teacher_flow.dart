@@ -194,9 +194,18 @@ Future<_SeedResult> _seedTeacherFlow(
     'supervisorId': '',
     'studentIds': [_student1Id, _student2Id],
     'schedule': [schedule.toMap()],
-    'meetingLink': args.meetingLink,
     'status': 'active',
   }, SetOptions(merge: true));
+  final meetingLink = args.meetingLink.trim();
+  if (meetingLink.isNotEmpty) {
+    await db
+        .collection(FirestoreCollections.halaqaMeetingLinks)
+        .doc(_halaqaId)
+        .set({
+      'meetingLink': meetingLink,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   // 5) Attendance today — present + late (session-scoped ids)
   final sessionId = AttendancePolicy.sessionIdForDay(

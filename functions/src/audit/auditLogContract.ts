@@ -43,6 +43,8 @@ export const ACTOR_ROLE_SYSTEM = "system";
 export const ACTOR_ROLE_SUPERVISOR = "supervisor";
 /** Live-evaluation author (spec §20.1 `evaluation_create_or_correct`). */
 export const ACTOR_ROLE_TEACHER = "teacher";
+/** Assistant teacher evaluating during an Admin-activated cover period. */
+export const ACTOR_ROLE_ASSISTANT_TEACHER = "assistant_teacher";
 export const SYSTEM_ACTOR_ID = "system";
 
 /** Canonical product actions (NEW emissions). */
@@ -66,6 +68,21 @@ export const AUDIT_ACTION = {
   halaqaCreate: "halaqa_create",
   halaqaScheduleChange: "halaqa_schedule_change",
   halaqaMeetingLinkChange: "halaqa_meeting_link_change",
+  // Admin milestone — account onboarding and credential recovery.
+  studentOnboard: "student_onboard",
+  userCredentialReset: "user_credential_reset",
+  userNameBackfill: "user_name_backfill",
+  chatGroupCreate: "chat_group_create",
+  chatGroupMembersChange: "chat_group_members_change",
+  staffStatusChange: "staff_status_change",
+  halaqaStaffReassign: "halaqa_staff_reassign",
+  academyImport: "academy_import",
+  // Academy relationships — assistant teachers, temporary cover, accounts.
+  halaqaAssistantChange: "halaqa_assistant_change",
+  halaqaCoverStart: "halaqa_cover_start",
+  halaqaCoverEnd: "halaqa_cover_end",
+  memberAccountCreate: "member_account_create",
+  accountActiveChange: "account_active_change",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
@@ -90,6 +107,7 @@ export const AUDIT_TARGET_TYPE = {
   halaqa: "halaqa",
   evaluation: "evaluation",
   parentProfile: "parentProfile",
+  conversation: "conversation",
 } as const;
 
 export type AuditTargetType =
@@ -152,6 +170,12 @@ export const AUDIT_METADATA_ALLOWLIST = new Set([
   "supervisorId",
   "slotId",
   "slotCount",
+  "previousStaffId",
+  "newStaffId",
+  "previousParentId",
+  "coverId",
+  "assistantId",
+  "academyRef",
 ]);
 
 /** Privacy deny-list — must never appear as metadata keys or nested content probes. */
@@ -181,7 +205,8 @@ export type AuditActor = {
     | typeof ACTOR_ROLE_ADMIN
     | typeof ACTOR_ROLE_SYSTEM
     | typeof ACTOR_ROLE_SUPERVISOR
-    | typeof ACTOR_ROLE_TEACHER;
+    | typeof ACTOR_ROLE_TEACHER
+    | typeof ACTOR_ROLE_ASSISTANT_TEACHER;
 };
 
 export type AuditLogInput = {

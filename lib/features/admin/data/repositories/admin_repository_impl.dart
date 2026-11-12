@@ -113,11 +113,13 @@ class AdminRepositoryImpl implements AdminRepository {
     required String title,
     required String body,
     required String targetRole,
+    String? requestId,
   }) => _guardUnit(
     () => remoteDatasource.sendBroadcastNotification(
       title: title,
       body: body,
       targetRole: targetRole,
+      requestId: requestId,
     ),
   );
 

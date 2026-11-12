@@ -10,8 +10,6 @@ import 'package:rafiq_academy/features/auth/presentation/bloc/auth_state.dart';
 import 'package:rafiq_academy/features/homework/domain/entities/homework_entity.dart';
 import 'package:rafiq_academy/features/homework/presentation/bloc/homework_bloc.dart';
 import 'package:rafiq_academy/features/homework/presentation/pages/student_homework_page.dart';
-import 'package:rafiq_academy/features/student/presentation/pages/student_recitation_page.dart';
-import 'package:rafiq_academy/shared/domain/current_student_profile.dart';
 
 class _AuthBlocStub extends Cubit<AuthState> implements AuthBloc {
   _AuthBlocStub(super.initialState);
@@ -34,22 +32,6 @@ class _HomeworkBlocStub extends Cubit<HomeworkState> implements HomeworkBloc {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _CountingProfile implements CurrentStudentProfile {
-  int reads = 0;
-
-  @override
-  String? get name {
-    reads++;
-    return 'أحمد';
-  }
-
-  @override
-  String? get halaqaId {
-    reads++;
-    return 'h1';
-  }
-}
-
 final _student = UserEntity(
   uid: 's1',
   name: 'أحمد',
@@ -67,8 +49,15 @@ final _homework = HomeworkEntity(
   tasks: const [
     HomeworkTaskEntity(
       id: 't1',
+      title: 'قراءة: سورة الملك',
+      points: 20,
+      isCompleted: false,
+      kind: HomeworkTaskKind.reading,
+    ),
+    HomeworkTaskEntity(
+      id: 't3',
       title: 'تسميع سورة الملك',
-      points: 10,
+      points: 30,
       isCompleted: false,
       kind: HomeworkTaskKind.recitation,
     ),
@@ -77,17 +66,26 @@ final _homework = HomeworkEntity(
 
 late _HomeworkBlocStub _bloc;
 
-Future<void> _pump(
-  WidgetTester tester,
-  CurrentStudentProfile profile, {
-  AuthState? auth,
-}) async {
+Future<void> _pump(WidgetTester tester, {AuthState? auth}) async {
   await tester.pumpWidget(
     BlocProvider<AuthBloc>.value(
       value: _AuthBlocStub(auth ?? AuthAuthenticated(_student)),
-      child: MaterialApp(home: StudentHomeworkPage(currentStudent: profile)),
+      child: const MaterialApp(home: StudentHomeworkPage()),
     ),
   );
+  await tester.pump();
+}
+
+Future<void> _pumpLoaded(WidgetTester tester) async {
+  await _pump(tester);
+  _bloc.push(
+    HomeworkState(
+      status: SectionStatus.loaded,
+      studentId: 's1',
+      homework: _homework,
+    ),
+  );
+  await tester.pump();
   await tester.pump();
 }
 
@@ -101,43 +99,46 @@ void main() {
     await sl.reset();
   });
 
-  testWidgets('loads homework for the signed-in uid without reading the '
-      'student profile', (tester) async {
-    final profile = _CountingProfile();
-    await _pump(tester, profile);
+  testWidgets('loads homework for the signed-in uid', (tester) async {
+    await _pump(tester);
     expect(_bloc.events, [const LoadHomeworkEvent('s1')]);
-    expect(profile.reads, 0);
   });
 
   testWidgets('signed-out users load with an empty uid', (tester) async {
-    await _pump(tester, _CountingProfile(), auth: const AuthUnauthenticated());
+    await _pump(tester, auth: const AuthUnauthenticated());
     expect(_bloc.events, [const LoadHomeworkEvent('')]);
   });
 
-  testWidgets('a deferred recitation task shows the info dialog without '
-      'opening recitation or reading the profile', (tester) async {
+  testWidgets('a recitation task is display-only: no audio-send entry, '
+      'dialog, or toggle', (tester) async {
     expect(AppCapabilities.audioUploadsEnabled, isFalse);
-    final profile = _CountingProfile();
-    await _pump(tester, profile);
-
-    _bloc.push(
-      HomeworkState(
-        status: SectionStatus.loaded,
-        studentId: 's1',
-        homework: _homework,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+    await _pumpLoaded(tester);
 
     final task = find.text('تسميع سورة الملك');
     await tester.ensureVisible(task);
+    expect(find.text('غير مطلوب لإنهاء الواجب'), findsOneWidget);
+
     await tester.tap(task);
     await tester.pumpAndSettle();
 
-    expect(find.text('التسميع الصوتي'), findsOneWidget);
-    expect(find.byType(StudentRecitationPage), findsNothing);
-    expect(profile.reads, 0);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.textContaining('سيتوفر'), findsNothing);
+    expect(find.textContaining('التسجيل الصوتي'), findsNothing);
+    expect(find.text('مؤجل'), findsNothing);
     expect(_bloc.events, [const LoadHomeworkEvent('s1')]);
+  });
+
+  testWidgets('non-recitation tasks still toggle', (tester) async {
+    await _pumpLoaded(tester);
+
+    final task = find.text('قراءة: سورة الملك');
+    await tester.ensureVisible(task);
+    await tester.tap(task);
+    await tester.pump();
+
+    expect(_bloc.events, [
+      const LoadHomeworkEvent('s1'),
+      const ToggleTaskEvent('t1'),
+    ]);
   });
 }

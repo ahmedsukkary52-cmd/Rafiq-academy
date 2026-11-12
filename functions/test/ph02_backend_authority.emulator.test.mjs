@@ -1322,6 +1322,111 @@ test("PH02 membership: concurrent admissions cannot exceed the cap", async () =>
   assert.equal(joined, 2);
 });
 
+test("P1-5 getHalaqaAwards: only the halaqa's teacher/supervisor or Admin; multi-halaqa grants included", async () => {
+  const halaqaAwards = require("../lib/awards/halaqaAwardsFunctions.js");
+  const at = (ms) => Timestamp.fromMillis(ms);
+  await seed({
+    "achievements/g1": {
+      studentId: "student1", recipientStudentIds: ["student1"], halaqaId: "h1", halaqaIds: ["h1"],
+      type: "star", title: "نجمة", grantedBy: "teacher1", date: at(1_790_000_000_000), internalNote: "x",
+    },
+    "achievements/g2": {
+      studentId: "student3", recipientStudentIds: ["student3"], halaqaId: "h2", halaqaIds: ["h2", "h1"],
+      type: "star", title: "مشتركة", grantedBy: "admin1", date: at(1_790_000_100_000),
+    },
+    "achievements/g3": {
+      studentId: "student2", recipientStudentIds: ["student2"], halaqaId: "h3", halaqaIds: ["h3"],
+      type: "star", title: "أخرى", grantedBy: "teacher2", date: at(1_790_000_200_000),
+    },
+  });
+  for (const uid of ["teacher1", "sup1", "admin1"]) {
+    const { awards } = await halaqaAwards.getHalaqaAwardsCore(db, uid, { halaqaId: "h1" });
+    assert.deepEqual(awards.map((a) => a.id), ["g2", "g1"], uid);
+    assert.equal(awards[1].dateMillis, 1_790_000_000_000);
+    assert.equal(awards[1].title, "نجمة");
+    assert.equal(awards[1].internalNote, undefined, "projection only");
+  }
+  for (const uid of ["teacher2", "sup2", "parent1", "student1"]) {
+    await expectCode(halaqaAwards.getHalaqaAwardsCore(db, uid, { halaqaId: "h1" }), "permission-denied");
+  }
+  await expectCode(halaqaAwards.getHalaqaAwardsCore(db, "teacher1", { halaqaId: "ghost" }), "not-found");
+  await expectCode(halaqaAwards.getHalaqaAwardsCore(db, undefined, { halaqaId: "h1" }), "unauthenticated");
+  await seed({ "users/teacher1": { ...user("teacher"), isActive: false } });
+  await expectCode(halaqaAwards.getHalaqaAwardsCore(db, "teacher1", { halaqaId: "h1" }), "permission-denied");
+});
+
+test("P1-4 membership: Supervisor never pulls a student out of another supervisor's scope", async () => {
+  // student3 already sits in h2 (sup2). sup1 supervises h1 only.
+  await membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId: "h2" });
+  await expectCode(
+    membership.admitStudentToHalaqaCore(db, "sup1", { studentId: "student3", halaqaId: "h1" }),
+    "permission-denied",
+  );
+  assert.deepEqual((await data("halaqat/h1")).studentIds, ["student1", "student2"]);
+  assert.equal(await auditCount("student_admit"), 1);
+
+  // sup2 admits the same student into a second halaqa of their own.
+  const own = await membership.admitStudentToHalaqaCore(db, "sup2", {
+    studentId: "student3",
+    halaqaId: "h3",
+  });
+  assert.equal(own.membershipCount, 2);
+});
+
+test("P1-4 membership: Admin keeps cross-scope admission", async () => {
+  await membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId: "h2" });
+  const byAdmin = await membership.admitStudentToHalaqaCore(db, "admin1", {
+    studentId: "student3",
+    halaqaId: "h1",
+  });
+  assert.equal(byAdmin.membershipCount, 2);
+});
+
+test("P1-4 membership: Supervisor cannot admit an inactive student; Admin admission reactivates", async () => {
+  await seed({ "users/student3": { ...user("student", "Student Three"), isActive: false } });
+  await expectCode(
+    membership.admitStudentToHalaqaCore(db, "sup1", { studentId: "student3", halaqaId: "h1" }),
+    "failed-precondition",
+  );
+  assert.equal((await data("users/student3")).isActive, false);
+  assert.deepEqual((await data("halaqat/h1")).studentIds, ["student1", "student2"]);
+
+  await membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId: "h1" });
+  assert.equal((await data("users/student3")).isActive, true);
+});
+
+test("P2-1 membership: archived lifecycle on studentProfiles blocks admit and transfer for every role", async () => {
+  await seed({
+    "studentProfiles/student3": { uid: "student3", points: 0, lifecycle: "archived" },
+    "studentProfiles/student1": { uid: "student1", halaqaId: "h1", points: 0, lifecycle: "archived" },
+    // users.lifecycle is not the SSOT and must not unlock anything.
+    "users/student3": { ...user("student", "Student Three"), lifecycle: "active" },
+  });
+  for (const uid of ["admin1", "sup1"]) {
+    await expectCode(
+      membership.admitStudentToHalaqaCore(db, uid, { studentId: "student3", halaqaId: "h1" }),
+      "failed-precondition",
+    );
+  }
+  await expectCode(
+    membership.adminTransferStudentCore(db, "admin1", {
+      studentId: "student1",
+      fromHalaqaId: "h1",
+      toHalaqaId: "h2",
+    }),
+    "failed-precondition",
+  );
+  assert.deepEqual((await data("halaqat/h1")).studentIds, ["student1", "student2"]);
+  assert.deepEqual((await data("halaqat/h2")).studentIds, []);
+  assert.equal(await auditCount("student_admit"), 0);
+  assert.equal(await auditCount("student_transfer"), 0);
+
+  // Unarchived (explicit active) admits normally.
+  await seed({ "studentProfiles/student3": { uid: "student3", points: 0, lifecycle: "active" } });
+  const ok = await membership.admitStudentToHalaqaCore(db, "sup1", { studentId: "student3", halaqaId: "h1" });
+  assert.equal(ok.membershipCount, 1);
+});
+
 test("PH02 membership: Admin transfer is atomic; unscoped Supervisor denied", async () => {
   // h2 is supervised by sup2, so sup1 cannot move a student into it.
   await expectCode(

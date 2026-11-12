@@ -20,6 +20,8 @@ const GATE_CALLS = [
   /resolveProjectionRunMode\(\)/,
   /!isProductionBackendEnabled\(\) && !isEmulatorBackendAllowed\(\)/,
   /gateOpen: isProductionBackendEnabled\(\) \|\| isEmulatorBackendAllowed\(\)/,
+  // Ownership reconcile only writes server-owned records and never sends.
+  /gateOpen: isOwnershipReconcileEnabled\(\)/,
 ];
 
 /** [name, module] for every live (not commented-out) export of src/index.ts. */

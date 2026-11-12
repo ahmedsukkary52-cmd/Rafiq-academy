@@ -6,7 +6,9 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../domain/academy_login_identifier.dart';
 import '../../domain/auth_error_messages.dart';
+import '../first_login_flag_reader.dart';
 import '../models/user_model.dart';
 import 'auth_remote_datasource.dart';
 
@@ -30,9 +32,10 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
     required String password,
   }) async {
     final String uid;
+    final authEmail = AcademyLoginIdentifier.toAuthEmail(email) ?? email.trim();
     try {
       final credential = await firebaseAuth
-          .signInWithEmailAndPassword(email: email, password: password)
+          .signInWithEmailAndPassword(email: authEmail, password: password)
           .timeout(_authRequestTimeout);
       final signedIn = credential.user?.uid;
       if (signedIn == null) {
@@ -163,7 +166,32 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
       );
     }
     final authUser = firebaseAuth.currentUser;
-    return user.withAuthEmail(authUser?.uid == uid ? authUser?.email : null);
+    final authEmail = authUser?.uid == uid ? authUser?.email : null;
+    final withEmail = user.withAuthEmail(authEmail);
+    if (withEmail.mustChangePassword ||
+        !AcademyLoginIdentifier.isInternalEmail(authEmail)) {
+      return withEmail;
+    }
+    return withEmail.withMustChangePassword(await _mustChangePassword(uid));
+  }
+
+  /// Admin-issued username accounts keep their temporary-password flag in
+  /// userPrivate; newly provisioned Admins carry it on the profile itself.
+  Future<bool> _mustChangePassword(String uid) async {
+    try {
+      return await readMustChangePassword(
+        firestore,
+        uid,
+        timeout: _firestoreTimeout,
+      );
+    } on TimeoutException {
+      throw const AuthException(
+        AuthErrorMessages.network,
+        reason: AuthErrorReason.network,
+      );
+    } on FirebaseException catch (e) {
+      throw AuthErrorMessages.fromFirestoreCode(e.code);
+    }
   }
 
   Future<void> _signOutQuietly() async {

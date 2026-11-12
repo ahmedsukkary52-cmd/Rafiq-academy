@@ -55,6 +55,8 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
   final GetAllHalaqatUseCase getAllHalaqat;
   final GetAllSupervisorsUseCase getAllSupervisors;
   final UpdateComplaintUseCase updateComplaint;
+  /// No Admin screen uses these any more; the generated DI config still
+  /// passes them, so the constructor keeps both parameters.
   final GetCommunicationSettingsUseCase getCommunicationSettings;
   final SaveCommunicationSettingsUseCase saveCommunicationSettings;
   final GrantAdminRewardUseCase grantAdminReward;
@@ -112,12 +114,6 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<ResetRegistrationActionEvent>(_onResetRegistrationAction);
     on<UpdateComplaintEvent>(_onUpdateComplaint);
     on<ResetUpdateComplaintEvent>(_onResetUpdateComplaint);
-    on<LoadCommunicationSettingsEvent>(_onLoadCommunicationSettings);
-    on<SaveCommunicationSettingsEvent>(
-      _onSaveCommunicationSettings,
-      transformer: droppable(),
-    );
-    on<ResetCommunicationSettingsEvent>(_onResetCommunicationSettings);
     on<GrantAdminRewardEvent>(_onGrantReward, transformer: droppable());
     on<ResetGrantRewardEvent>(_onResetGrantReward);
     on<EnsureAdminInternalChatEvent>(_onEnsureAdminInternalChat);
@@ -437,6 +433,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         title: event.title,
         body: event.body,
         targetRole: event.targetRole,
+        requestId: event.requestId,
       ),
     );
 
@@ -889,72 +886,6 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       state.copyWith(
         updateComplaintStatus: SubmissionStatus.idle,
         updateComplaintError: null,
-      ),
-    );
-  }
-
-  Future<void> _onLoadCommunicationSettings(
-    LoadCommunicationSettingsEvent event,
-    Emitter<AdminState> emit,
-  ) async {
-    emit(
-      state.copyWith(
-        communicationSettingsStatus: SectionStatus.loading,
-        communicationSettingsError: null,
-      ),
-    );
-    final result = await getCommunicationSettings(const NoParams());
-    result.fold(
-      (f) => emit(
-        state.copyWith(
-          communicationSettingsStatus: SectionStatus.error,
-          communicationSettingsError: f.message,
-        ),
-      ),
-      (settings) => emit(
-        state.copyWith(
-          communicationSettingsStatus: SectionStatus.loaded,
-          communicationSettings: settings,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _onSaveCommunicationSettings(
-    SaveCommunicationSettingsEvent event,
-    Emitter<AdminState> emit,
-  ) async {
-    emit(
-      state.copyWith(
-        saveCommunicationSettingsStatus: SubmissionStatus.submitting,
-        saveCommunicationSettingsError: null,
-      ),
-    );
-    final result = await saveCommunicationSettings(event.settings);
-    result.fold(
-      (f) => emit(
-        state.copyWith(
-          saveCommunicationSettingsStatus: SubmissionStatus.error,
-          saveCommunicationSettingsError: f.message,
-        ),
-      ),
-      (_) => emit(
-        state.copyWith(
-          saveCommunicationSettingsStatus: SubmissionStatus.success,
-          communicationSettings: event.settings,
-        ),
-      ),
-    );
-  }
-
-  void _onResetCommunicationSettings(
-    ResetCommunicationSettingsEvent event,
-    Emitter<AdminState> emit,
-  ) {
-    emit(
-      state.copyWith(
-        saveCommunicationSettingsStatus: SubmissionStatus.idle,
-        saveCommunicationSettingsError: null,
       ),
     );
   }

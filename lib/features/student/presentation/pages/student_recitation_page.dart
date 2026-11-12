@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,34 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/di/injection_container.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
-import '../../../homework/domain/repositories/homework_repository.dart';
-import '../../../homework/domain/usecases/homework_usecases.dart';
-
-/// سياق إرسال التسميع لواجب حقيقي (Firebase Storage + recitationRecords).
-class HomeworkRecitationContext {
-  final String studentId;
-  final String studentName;
-  final String teacherId;
-  final String halaqaId;
-  final String assignmentId;
-  final String taskId;
-  final String versesRange;
-
-  const HomeworkRecitationContext({
-    required this.studentId,
-    required this.studentName,
-    required this.teacherId,
-    required this.halaqaId,
-    required this.assignmentId,
-    required this.taskId,
-    required this.versesRange,
-  });
-}
 
 class Recording {
   final String path;
@@ -77,19 +51,11 @@ class Recording {
 class StudentRecitationPage extends StatefulWidget {
   final String surahName;
   final int pageNumber;
-  final int startAyah;
-  final int endAyah;
-
-  /// لو موجود → رفع حقيقي للمعلم بدل snackbar وهمي
-  final HomeworkRecitationContext? homeworkContext;
 
   const StudentRecitationPage({
     super.key,
     required this.surahName,
     required this.pageNumber,
-    this.startAyah = 1,
-    this.endAyah = 10,
-    this.homeworkContext,
   });
 
   @override
@@ -199,17 +165,15 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
       _hasRecorded = path != null;
     });
     if (path != null) {
-      // حفظ محلي اختياري فقط لمسار المصحف — واجب التسميع يعتمد على الرفع السحابي
-      if (widget.homeworkContext == null) {
-        final newRecording = Recording(
+      await _saveRecording(
+        Recording(
           path: path,
           surahName: widget.surahName,
           pageNumber: widget.pageNumber,
           durationSeconds: _recordDurationSeconds,
           dateTime: DateTime.now(),
-        );
-        await _saveRecording(newRecording);
-      }
+        ),
+      );
       await _recordingPlayer.setFilePath(path);
     }
   }
@@ -220,194 +184,6 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
     } else {
       _recordingPlayer.play();
     }
-  }
-
-  void _submitRecitation() {
-    if (_recordedFilePath == null) return;
-    final isHomework = widget.homeworkContext != null;
-
-    if (isHomework && !AppCapabilities.audioUploadsEnabled) {
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('إرسال التسميع', textAlign: TextAlign.right),
-          content: const Text(
-            'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
-            textAlign: TextAlign.right,
-            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('حسناً'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          isHomework ? 'إرسال التسميع' : 'حفظ التسجيل',
-          textAlign: TextAlign.right,
-        ),
-        content: Text(
-          isHomework
-              ? 'سيتم رفع التسجيل للمعلم عبر الإنترنت. هل تريد المتابعة؟'
-              : 'سيتم حفظ التسجيل على جهازك فقط. رفع التسجيل للمعلم غير متاح حالياً.',
-          textAlign: TextAlign.right,
-          style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _performSubmit();
-            },
-            child: Text(
-              isHomework ? 'إرسال' : 'حفظ',
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _performSubmit() async {
-    final path = _recordedFilePath;
-    if (path == null) return;
-
-    final ctx = widget.homeworkContext;
-    if (ctx == null) {
-      // مسار المصحف القديم: بدون رفع سحابي بعد
-      if (mounted) {
-        AppSnackBar.showSuccess(context, 'تم حفظ التسجيل محلياً');
-        setState(() {
-          _hasRecorded = false;
-          _recordedFilePath = null;
-        });
-      }
-      return;
-    }
-
-    if (!AppCapabilities.audioUploadsEnabled) {
-      if (mounted) {
-        AppSnackBar.showInfo(
-          context,
-          'سيتوفر إرسال التسجيل الصوتي عند تفعيل رفع الملفات.',
-        );
-      }
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 8,
-                child: LinearProgressIndicator(
-                  borderRadius: BorderRadius.circular(8),
-                  color: AppColors.primary,
-                  backgroundColor: AppColors.primaryLight,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'جاري رفع التسجيل للمعلم...',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    final result = await sl<SubmitHomeworkRecitationUseCase>()(
-      SubmitRecitationParams(
-        localFilePath: path,
-        studentId: ctx.studentId,
-        studentName: ctx.studentName,
-        teacherId: ctx.teacherId,
-        halaqaId: ctx.halaqaId,
-        assignmentId: ctx.assignmentId,
-        taskId: ctx.taskId,
-        versesRange: ctx.versesRange,
-        durationSeconds: _recordDurationSeconds,
-      ),
-    );
-
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop(); // close progress
-
-    final failure = result.fold((f) => f, (_) => null);
-    if (failure != null) {
-      // المهمة تبقى غير مكتملة — الملف المحلي يبقى لإعادة المحاولة
-      final retry = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text(
-            'فشل الرفع',
-            textAlign: TextAlign.right,
-            style: TextStyle(fontFamily: 'NotoNaskhArabic'),
-          ),
-          content: Text(
-            failure.message.isNotEmpty
-                ? failure.message
-                : 'فشل الرفع، حاول تاني',
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontFamily: 'NotoNaskhArabic'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('إعادة محاولة'),
-            ),
-          ],
-        ),
-      );
-      if (retry == true && mounted) {
-        await _performSubmit();
-      }
-      return;
-    }
-
-    // احذف الملف المحلي بعد نجاح الرفع — مش نخزنه في SharedPreferences
-    try {
-      final f = File(path);
-      if (f.existsSync()) f.deleteSync();
-    } catch (_) {}
-    AppSnackBar.showSuccess(
-      context,
-      'تم إرسال التسجيل للمعلم — في انتظار المراجعة 🎉',
-    );
-    Navigator.pop(context, true);
   }
 
   @override
@@ -469,40 +245,6 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F7FA),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'المطلوب تسميعه 📖',
-                            style: GoogleFonts.amiri(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF006064),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'سورة ${widget.surahName} — من آية ${_toArabicDigits(widget.startAyah)} إلى ${_toArabicDigits(widget.endAyah)}',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.amiri(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                     const SizedBox(height: 40),
 
                     // Mic Button Area
@@ -655,34 +397,6 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                             ),
                           ),
                         ],
-                      ),
-
-                    const SizedBox(height: 40),
-
-                    // Send Button
-                    if (_hasRecorded)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFD54F),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                          ),
-                          onPressed: _submitRecitation,
-                          child: Text(
-                            widget.homeworkContext != null
-                                ? 'إرسال التسميع للمعلمة'
-                                : 'حفظ التسجيل محلياً',
-                            style: GoogleFonts.amiri(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF3E2723),
-                            ),
-                          ),
-                        ),
                       ),
 
                     const SizedBox(height: 30),

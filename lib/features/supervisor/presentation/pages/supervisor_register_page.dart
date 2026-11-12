@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/academy_membership_invariant.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -8,6 +12,8 @@ import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../student_search/data/datasources/student_search_remote_datasource.dart';
+import '../../../student_search/domain/entities/student_search_entry.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
@@ -26,9 +32,40 @@ class SupervisorRegisterPage extends StatefulWidget {
 }
 
 class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
+  /// Holds the selected student's id for validation; never typed by the user.
   final _studentIdCtrl = TextEditingController();
+  final _queryCtrl = TextEditingController();
+  Timer? _debounce;
+  bool _searching = false;
+  List<StudentSearchEntry> _hits = const [];
+  StudentSearchEntry? _selected;
   String? _halaqaId;
   String? _fieldError;
+
+  void _onQuery(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final query = value.trim();
+      final auth = context.read<AuthBloc>().state;
+      if (query.length < 2 || auth is! AuthAuthenticated) {
+        setState(() => _hits = const []);
+        return;
+      }
+      setState(() => _searching = true);
+      try {
+        final hits = await StudentSearchRemoteDatasourceImpl(
+          firestore: sl<FirebaseFirestore>(),
+        ).searchInViewerScope(viewerUid: auth.user.uid, query: query);
+        if (mounted && _queryCtrl.text.trim() == query) {
+          setState(() => _hits = hits);
+        }
+      } catch (_) {
+        if (mounted) setState(() => _hits = const []);
+      } finally {
+        if (mounted) setState(() => _searching = false);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -39,7 +76,9 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _studentIdCtrl.dispose();
+    _queryCtrl.dispose();
     super.dispose();
   }
 
@@ -116,7 +155,7 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'أدخل معرّف الطالب الحالي واختر حلقة ضمن نطاق إشرافك. '
+                        'ابحث عن الطالب باسمه من طلاب حلقاتك واختر حلقة ضمن نطاق إشرافك. '
                         'لا يتم إنشاء حساب جديد من هذه الشاشة. '
                         'الحد الأقصى ${_eastern('${AcademyMembershipInvariant.maxHalaqatPerStudent}')} حلقات للطالب.',
                         style: AppTextStyles.bodyMedium.copyWith(
@@ -128,21 +167,69 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: _studentIdCtrl,
-                  textAlign: TextAlign.right,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'معرّف الطالب',
-                    hintText: 'أدخل معرّف الطالب الموجود',
-                    prefixIcon: Icon(Icons.badge_outlined),
+                if (_selected != null)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.check_circle,
+                        color: AppColors.primary,
+                      ),
+                      title: Text(_selected!.fullName),
+                      subtitle: Text(
+                        _selected!.halaqaName.isEmpty
+                            ? 'الطالب المختار'
+                            : 'الحلقة الحالية: ${_selected!.halaqaName}',
+                      ),
+                      trailing: TextButton(
+                        onPressed: submitting
+                            ? null
+                            : () => setState(() {
+                                _selected = null;
+                                _studentIdCtrl.clear();
+                              }),
+                        child: const Text('تغيير'),
+                      ),
+                    ),
+                  )
+                else ...[
+                  TextField(
+                    key: const Key('supervisor-admit-search'),
+                    controller: _queryCtrl,
+                    textAlign: TextAlign.right,
+                    textInputAction: TextInputAction.search,
+                    decoration: const InputDecoration(
+                      labelText: 'ابحث باسم الطالب',
+                      hintText: 'من طلاب حلقاتك',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: _onQuery,
                   ),
-                  onChanged: (_) {
-                    if (_fieldError != null) {
-                      setState(() => _fieldError = null);
-                    }
-                  },
-                ),
+                  if (_searching) const LinearProgressIndicator(),
+                  if (!_searching &&
+                      _queryCtrl.text.trim().length >= 2 &&
+                      _hits.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'لا نتائج ضمن طلاب حلقاتك. الطلاب الجدد يسجّلهم مسؤول الأكاديمية.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  for (final hit in _hits)
+                    ListTile(
+                      key: Key('supervisor-admit-${hit.studentId}'),
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(hit.fullName),
+                      subtitle: hit.halaqaName.isEmpty
+                          ? null
+                          : Text(hit.halaqaName),
+                      onTap: () => setState(() {
+                        _selected = hit;
+                        _studentIdCtrl.text = hit.studentId;
+                        _fieldError = null;
+                      }),
+                    ),
+                ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   key: ValueKey(_halaqaId ?? 'none'),

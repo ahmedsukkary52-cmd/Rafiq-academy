@@ -633,9 +633,10 @@ test('PH01 halaqa: Supervisor admits one, never removes or restaffs', async () =
 });
 
 // P0-04: teacherId / schedule changes bypass the weekly conflict engine, so
-// they are server-only; Admin keeps supervisor / name / link edits.
-test('PH01 halaqa: Admin edits non-conflict fields; roster/teacher/schedule are callable-only', async () => {
-  await assertSucceeds(
+// they are server-only; supervisor and name are callable-only too (audited
+// staff reassignment, halaqaNameIndex claim).
+test('PH01 halaqa: every halaqa field is callable-only, Admin included', async () => {
+  await assertFails(
     authed('admin1').doc('halaqat/h1').update({ supervisorId: 'supervisor1', name: 'y' }),
   );
   await assertFails(
@@ -1377,7 +1378,11 @@ test('PH01 privacy: studentProfiles are not readable student-to-student', async 
   await assertSucceeds(authed('parent1').doc('studentProfiles/student1').get());
   await assertFails(authed('parent2').doc('studentProfiles/student1').get());
   await assertFails(authed('parent1').doc('studentProfiles/student2').get());
-  await assertSucceeds(authed('teacher1').doc('studentProfiles/student2').get());
+  // P1-5: staff read only students they serve, one profile at a time.
+  await assertSucceeds(authed('teacher1').doc('studentProfiles/student1').get());
+  await assertFails(authed('teacher1').doc('studentProfiles/student2').get());
+  await assertFails(authed('supervisor1').doc('studentProfiles/student2').get());
+  await assertFails(authed('teacher1').collection('studentProfiles').get());
   await assertFails(authed('student1').collection('studentProfiles').get());
 });
 
@@ -1452,11 +1457,23 @@ test('PH01 privacy: achievements are own/linked/staff scoped', async () => {
       .where('studentId', '==', 'student1')
       .get(),
   );
+  // P1-5: staff list their own halaqa's grants by halaqaId; multi-halaqa
+  // lookups go through getHalaqaAwards, so halaqaIds lists are denied.
   await assertSucceeds(
+    authed('teacher1')
+      .collection('achievements')
+      .where('halaqaId', '==', 'h1')
+      .get(),
+  );
+  await assertFails(
     authed('teacher1')
       .collection('achievements')
       .where('halaqaIds', 'array-contains', 'h1')
       .get(),
+  );
+  await assertFails(authed('teacher2').doc('achievements/a1').get());
+  await assertFails(
+    authed('teacher2').collection('achievements').where('halaqaId', '==', 'h1').get(),
   );
 });
 

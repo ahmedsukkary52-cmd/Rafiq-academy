@@ -1,7 +1,7 @@
 name: rafiq_academy
 description: "أكاديمية رفيق لتحفيظ القرآن الكريم"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.11.1
@@ -72,6 +72,7 @@ dependencies:
   file_picker: ^8.1.2
   url_launcher: ^6.3.0
   open_filex: ^4.5.0
+  flutter_local_notifications: ^22.3.2
 
 dev_dependencies:
   flutter_test:
@@ -89,3 +90,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/data/audio_durations.json
+    # Report PDFs embed these (SIL OFL 1.1, see NotoNaskhArabic-OFL.txt);
+    # bundled so PDF export never needs a font download.
+    - assets/fonts/NotoNaskhArabic-Regular.ttf
+    - assets/fonts/NotoNaskhArabic-Bold.ttf
+    - assets/fonts/NotoNaskhArabic-OFL.txt

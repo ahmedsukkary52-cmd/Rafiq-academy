@@ -22,7 +22,9 @@ void main() {
 
       expect(find.text('الوضع الليلي'), findsNothing);
       expect(find.byIcon(Icons.dark_mode_rounded), findsNothing);
-      expect(find.text('العربية'), findsOneWidget);
+      // D15 is Arabic-only; the dead language row is removed (OA-27).
+      expect(find.text('اللغة'), findsNothing);
+      expect(find.text('حجم الخط'), findsOneWidget);
     });
 
     test('preferences always report light / not dark', () async {

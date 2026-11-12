@@ -6,8 +6,9 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../schedule/domain/entities/class_session_entity.dart';
-import '../../../schedule/domain/usecases/get_weekly_sessions_usecase.dart';
 import '../../domain/parent_household.dart';
+import '../../domain/repositories/parent_repositories.dart';
+import '../../domain/usecases/get_child_weekly_sessions_usecase.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_child_access.dart';
 import '../widgets/parent_loading_skeletons.dart';
@@ -86,8 +87,8 @@ class _ParentSchedulePageState extends State<ParentSchedulePage> {
       _loading = true;
       _error = null;
     });
-    final result = await sl<GetWeeklySessionsUseCase>()(
-      WeeklySessionsParams(halaqaId),
+    final result = await GetChildWeeklySessionsUseCase(sl<ParentRepository>())(
+      ChildWeeklySessionsParams(studentId: studentId, halaqaId: halaqaId),
     );
     if (!mounted) return;
     result.fold(

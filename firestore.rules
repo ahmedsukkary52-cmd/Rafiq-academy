@@ -24,10 +24,17 @@ service cloud.firestore {
 
     // A deactivated profile (isActive == false) holds no role: a valid Auth
     // token alone never grants privileges. Missing isActive = legacy active.
-    function hasActiveProfile() {
+    function hasLiveProfile() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(uid()))
         && userDoc().get('isActive', true) != false;
+    }
+
+    // A newly provisioned Admin holds no role until completeFirstLogin
+    // replaces the provisioning password; only the server sets or clears it.
+    function hasActiveProfile() {
+      return hasLiveProfile()
+        && userDoc().get('passwordChangeRequired', false) != true;
     }
 
     function hasRole(role) {
@@ -133,6 +140,16 @@ service cloud.firestore {
       return isTeacherOfHalaqa(halaqaId) || isSupervisorOfHalaqa(halaqaId);
     }
 
+    // Admin-activated temporary cover (adminStartHalaqaCover): a teacher or an
+    // assigned assistant teacher, only while the cover period is active.
+    // Grants record reads for that halaqa; writes stay callable-only.
+    function isCoverOfHalaqa(halaqaId) {
+      return (isTeacher() || hasRole('assistant_teacher'))
+        && halaqaExists(halaqaId)
+        && halaqaData(halaqaId).get('coverId', '') != ''
+        && halaqaData(halaqaId).get('coverTeacherId', '') == uid();
+    }
+
     function isStudentOnRoster(halaqaId, studentId) {
       return halaqaExists(halaqaId)
         && studentId is string
@@ -191,6 +208,7 @@ service cloud.firestore {
       return isAdmin()
         || (hasActiveProfile() && data.studentId == uid())
         || isStaffOfHalaqa(data.halaqaId)
+        || isCoverOfHalaqa(data.halaqaId)
         || isLinkedParentOf(data.studentId)
         || isRosterStaffOf(data.studentId);
     }
@@ -244,15 +262,19 @@ service cloud.firestore {
           && roleUnchanged()
           && isActiveUnchanged()
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'isActive', 'phone', 'createdAt', 'lifecycle', 'email'])
+              .hasAny(['role', 'isActive', 'phone', 'createdAt', 'lifecycle', 'email', 'staffStatus', 'deletedAt', 'passwordChangeRequired', 'academyRef'])
           && !hasExposedPhone(request.resource.data)
           && !writesContactField()
         )
         || (
+          // Login state is server-owned for every role: staff through
+          // adminSetStaffStatus (refuses while the member holds active
+          // halaqat), parents and students through adminSetMemberActive
+          // (audited, never an Admin account).
           isAdmin()
           && roleUnchanged()
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['email'])
+              .hasAny(['email', 'staffStatus', 'deletedAt', 'passwordChangeRequired', 'academyRef', 'lifecycle', 'isActive'])
           && !hasExposedPhone(request.resource.data)
           && !writesContactField()
         )
@@ -265,19 +287,19 @@ service cloud.firestore {
     // contact field stays unreadable until the server-side phone cleanup
     // strips that field.
     match /userPrivate/{userId} {
-      allow get: if (isAdmin() || (isSelf(userId) && hasActiveProfile()))
+      allow get: if (isAdmin() || (isSelf(userId) && hasLiveProfile()))
         && (resource == null || !hasContactField(resource.data));
       allow list: if false;
       allow write: if false;
     }
 
     // ── Profiles ───────────────────────────────────────────────────────
-    // childrenIds is the D12 relationship graph: parents and students never
-    // list other families' links. PH-02 moved academy fan-out to CFs; the
-    // remaining Teacher/Supervisor read serves teacher→parent contact (the
-    // doc carries no phone — D16).
+    // childrenIds is the D12 relationship graph of minors and their
+    // families: only the parent and Admin read it. Staff reach parents
+    // through callables (createDirectConversation, getParentChildHalaqat),
+    // never by reading or listing family links.
     match /parentProfiles/{parentId} {
-      allow read: if isAdmin() || isSelf(parentId) || isStaffRole();
+      allow read: if isAdmin() || isSelf(parentId);
       allow create, delete: if false;
       allow update: if (isSelf(parentId) || isAdmin())
         && !request.resource.data.diff(resource.data).affectedKeys()
@@ -299,12 +321,21 @@ service cloud.firestore {
       }
 
       // Student A never reads student B unless they share B's primary halaqa
-      // roster (group chat display names). Staff roles keep directory reads.
-      allow read: if isAdmin()
-        || isStaffRole()
+      // roster (group chat display names). Staff read only students they
+      // actually serve: the primary halaqa's teacher/supervisor, the
+      // roster-derived scope of every halaqa (studentSearch.visibleTo), or
+      // the active cover of the primary halaqa. These checks need the
+      // document id, so everyone but Admin reads one profile at a time.
+      allow list: if isAdmin();
+      allow get: if isAdmin()
         || isSelf(studentId)
         || isLinkedParentOf(studentId)
-        || isActiveSelfOnRoster(resource.data.get('halaqaId', ''));
+        || isActiveSelfOnRoster(resource.data.get('halaqaId', ''))
+        || (isStaffOfHalaqa(resource.data.get('halaqaId', ''))
+            && isStudentOnRoster(resource.data.get('halaqaId', ''), studentId))
+        || isRosterStaffOf(studentId)
+        || (isCoverOfHalaqa(resource.data.get('halaqaId', ''))
+            && isStudentOnRoster(resource.data.get('halaqaId', ''), studentId));
       allow create: if false;
       allow delete: if false;
       // D16: never allow phone on profile projections via client writes.
@@ -336,8 +367,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // HR data (weeklyQuota, performanceRating): Admin and the Teacher only.
+    // Display names come from users/{uid}, never from this collection.
     match /teacherProfiles/{teacherId} {
-      allow read: if signedIn();
+      allow read: if isAdmin() || (hasActiveProfile() && isSelf(teacherId));
       allow create: if false;
       allow delete: if false;
       allow update: if signedIn()
@@ -371,42 +404,69 @@ service cloud.firestore {
     // adminAddHalaqaSlot (D8 ≥1 slot, D9 conflict engine, teacher lock). No
     // client — not even Admin — creates a Halaqa or edits schedule/teacher.
     match /halaqat/{halaqaId} {
-      // A linked parent's children on this Halaqa's roster. Written against
-      // resource.data so the parent's `studentIds array-contains` query is
-      // provable.
-      function isLinkedParentOfThisHalaqa() {
-        return isParent()
-          && exists(/databases/$(database)/documents/parentProfiles/$(uid()))
-          && resource.data.studentIds.hasAny(
-              get(/databases/$(database)/documents/parentProfiles/$(uid()))
-                .data.get('childrenIds', []));
+      // J.9: an active profile is required for every role. Admin reads all;
+      // otherwise only the assigned Teacher/Supervisor or a rostered Student.
+      // Rules cannot hide fields (studentIds, legacy meetingLink), so Parents
+      // never read halaqat: getParentChildHalaqat returns name/teacherId/
+      // supervisorId of their linked children's Halaqat.
+      // Assistant teachers read the halaqat they are assigned to; an active
+      // temporary cover reads the halaqa it covers.
+      function isScopedReader() {
+        return (isTeacher() && resource.data.get('teacherId', '') == uid())
+          || (isSupervisor() && resource.data.get('supervisorId', '') == uid())
+          || (hasRole('student') && uid() in resource.data.get('studentIds', []))
+          || (hasRole('assistant_teacher')
+              && uid() in resource.data.get('assistantTeacherIds', []))
+          || ((isTeacher() || hasRole('assistant_teacher'))
+              && resource.data.get('coverId', '') != ''
+              && resource.data.get('coverTeacherId', '') == uid());
       }
 
-      // The document still carries the legacy meetingLink mirror, so reads
-      // need an active profile and a relationship: Admin and staff keep their
-      // directory reads, a student reads only Halaqat whose roster lists them,
-      // a parent only Halaqat of a linked child. Deactivated accounts, users
-      // without a profile and unknown roles read nothing.
-      allow read: if hasActiveProfile()
-        && (
-          isAdmin()
-          || isStaffRole()
-          || (hasRole('student') && uid() in resource.data.get('studentIds', []))
-          || isLinkedParentOfThisHalaqa()
-        );
+      // The meeting link lives only in halaqaMeetingLinks. A document still
+      // carrying a legacy link is unreadable except by Admin. Lists cannot
+      // prove field absence, so for queries only stripping the legacy key
+      // (migrate-meeting-links.mjs --strip-legacy) closes the leak.
+      function hasLegacyMeetingLink() {
+        return 'meetingLink' in resource.data && resource.data.meetingLink != '';
+      }
+
+      allow get: if isAdmin() || (isScopedReader() && !hasLegacyMeetingLink());
+      allow list: if isAdmin() || isScopedReader();
       allow create: if false;
       allow delete: if false;
-      // meetingLink is written only by adminCreateHalaqa / setHalaqaMeetingLink
-      // (shared URL validation, supervisor scope, audit).
-      allow update: if isAdmin()
-        && !changedKeys().hasAny(['studentIds', 'schedule', 'teacherId', 'createdBy', 'createdAt', 'meetingLink']);
+      // Every halaqa field is server-owned, Admin included: the name is
+      // bound to the halaqaNameIndex claim taken by adminCreateHalaqa, status
+      // drives open-halaqa checks (staff lifecycle, conflicts), and staff,
+      // assistant, cover, roster, schedule and meeting link each have their
+      // audited callable (adminReassignHalaqaStaff, adminSetHalaqaAssistant,
+      // adminStartHalaqaCover / adminEndHalaqaCover, admitStudentToHalaqa,
+      // adminAddHalaqaSlot, setHalaqaMeetingLink).
+      allow update: if false;
+    }
+
+    // Temporary cover periods (active → completed), never deleted.
+    match /halaqaCoverPeriods/{coverId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Append-only relationship history written inside each trusted
+    // relationship transaction (link, admit, transfer, reassign, assistant,
+    // cover).
+    match /relationshipHistory/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /academyRefCounters/{kind} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // B14 — canonical meeting link { meetingLink, updatedAt }, written only by
     // setHalaqaMeetingLink / adminCreateHalaqa. Rules cannot hide fields, so
-    // access is per document; listing is Admin-only. The legacy
-    // halaqat.meetingLink field stays readable through halaqat (active staff
-    // and linked parents included) until it is stripped.
+    // access is per document; listing is Admin-only. Teachers and Parents
+    // never read the link (see the legacy guard on halaqat).
     match /halaqaMeetingLinks/{halaqaId} {
       function ownStudentProfilePath() {
         return /databases/$(database)/documents/studentProfiles/$(uid());
@@ -648,8 +708,11 @@ service cloud.firestore {
               .hasAny(resource.data.recipientStudentIds);
       }
 
+      // Staff: the grant's primary halaqa, or roster-derived scope of its
+      // student. Halaqa award lists for staff go through getHalaqaAwards.
       allow get: if isAdmin()
-        || isStaffRole()
+        || isStaffOfHalaqa(resource.data.get('halaqaId', ''))
+        || isRosterStaffOf(resource.data.get('studentId', ''))
         || (hasActiveProfile() && resource.data.get('studentId', '') == uid())
         || (hasActiveProfile()
             && resource.data.keys().hasAll(['recipientStudentIds'])
@@ -661,7 +724,7 @@ service cloud.firestore {
       // Same student/staff constraints as before the parent-get fix — no
       // get(parentProfiles), or student/staff list queries break.
       allow list: if isAdmin()
-        || isStaffRole()
+        || isStaffOfHalaqa(resource.data.get('halaqaId', ''))
         || (hasActiveProfile() && resource.data.get('studentId', '') == uid())
         || (hasActiveProfile() && uid() in resource.data.recipientStudentIds);
 
@@ -769,7 +832,13 @@ service cloud.firestore {
 
       function isNotificationAudience() {
         return signedIn()
-          && resource.data.audience in [uid(), userDoc().role, 'all'];
+          && (
+            resource.data.audience in [uid(), 'all']
+            || (
+              resource.data.audience == userDoc().role
+              && userDoc().get('passwordChangeRequired', false) != true
+            )
+          );
       }
 
       allow read: if isAdmin() || isNotificationAudience();
@@ -778,6 +847,7 @@ service cloud.firestore {
             .hasAny(serverOwnedNotificationFields())
         && request.resource.data.get('readBy', []) == []
         && request.resource.data.get('audience', '') in broadcastAudiences()
+        && request.resource.data.get('senderId', uid()) == uid()
         && !hasContactField(request.resource.data);
       // Readers may only add themselves to readBy.
       allow update: if isNotificationAudience()
@@ -790,9 +860,45 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Complaints are created and answered only through submitComplaint /
+    // respondToComplaint. The complainant reads their own thread; replies
+    // and status changes are append-only history entries.
     match /complaints/{complaintId} {
-      allow read, update: if isAdmin();
-      allow create, delete: if false;
+      allow read: if isAdmin()
+        || (hasActiveProfile() && resource.data.get('senderId', '') == uid());
+      allow create, update, delete: if false;
+
+      match /history/{entryId} {
+        allow read: if isAdmin()
+          || (hasActiveProfile()
+            && get(/databases/$(database)/documents/complaints/$(complaintId))
+              .data.get('senderId', '') == uid());
+        allow write: if false;
+      }
+    }
+
+    // CF-only uniqueness locks for normalized halaqa names.
+    match /halaqaNameIndex/{key} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // CF-only: academy username → uid, and resumable onboarding progress
+    // (no passwords are ever stored in either).
+    match /loginUsernames/{username} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /onboardingRequests/{requestId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Bulk import ledger (adminImportAcademyRow). Holds no passwords.
+    match /importRows/{ref} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /supervisorReports/{reportId} {
@@ -878,11 +984,25 @@ service cloud.firestore {
       }
     }
 
+    // An event with a halaqaId belongs to that Halaqa's community; an event
+    // without one is academy-wide (any active profile) and only Admin
+    // creates it. Queries must filter on halaqaId (== id, or == null).
+    // list reads resource.data.halaqaId without a default: a defaulted
+    // get('halaqaId', null) lets an unfiltered query pass as "general".
     match /calendarEvents/{eventId} {
-      allow read: if signedIn();
-      allow create: if (isAdmin() || isStaffRole())
-        && request.resource.data.get('createdBy', '') == uid()
-        && !hasContactField(request.resource.data);
+      function calendarAudience(halaqaId) {
+        return hasActiveProfile()
+          && (halaqaId == null || canAccessHalaqaCommunity(halaqaId));
+      }
+
+      allow get: if isAdmin()
+        || calendarAudience(resource.data.get('halaqaId', null));
+      allow list: if isAdmin() || calendarAudience(resource.data.halaqaId);
+      allow create: if request.resource.data.get('createdBy', '') == uid()
+        && !hasContactField(request.resource.data)
+        && (isAdmin()
+          || (request.resource.data.get('halaqaId', null) is string
+            && isStaffOfHalaqa(request.resource.data.halaqaId)));
       allow update: if false;
       allow delete: if isAdmin()
         || (isStaffRole() && resource.data.get('createdBy', '') == uid());
@@ -914,7 +1034,8 @@ service cloud.firestore {
         || isStaffOfHalaqa(resource.data.get('halaqaId', ''));
     }
 
-    // Reference catalogues: readable, Admin-managed.
+    // Reference catalogues: readable, Admin-managed. Public Quran audio
+    // catalogue with no personal data, so any signed-in caller may read it.
     match /reciters/{reciterId} {
       allow read: if signedIn();
       allow write: if isAdmin();
@@ -1045,7 +1166,11 @@ service cloud.firestore {
               ]);
       }
 
-      allow read: if signedIn();
+      // J.9: no client reads sessions; scoped to the session's Halaqa community.
+      allow read: if isAdmin()
+        || sessionTeacher()
+        || (hasActiveProfile() && canAccessHalaqaCommunity(resource.data.get('halaqaId', '')))
+        || isCoverOfHalaqa(resource.data.get('halaqaId', ''));
       allow create: if false;
       allow delete: if false;
       allow update: if signedIn()

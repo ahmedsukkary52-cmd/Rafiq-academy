@@ -1,17 +1,27 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/error/exception.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../data/chat_groups_repository.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../../domain/policies/chat_media_policy.dart';
+import '../chat_groups_provider.dart';
+import 'chat_group_info_page.dart';
 import '../bloc/chat_conversations_bloc.dart';
 import '../bloc/chat_conversations_state.dart';
 import '../bloc/chat_room_bloc.dart';
@@ -40,6 +50,13 @@ class ChatRoomPage extends StatefulWidget {
   /// Silent oversight: hide composer; do not join as participant.
   final bool readOnly;
 
+  /// Group metadata, reactions and group info (test seam; production builds
+  /// one from the registered Firebase singletons).
+  final ChatGroupsRepository? groups;
+
+  /// Viewer role when [bloc] is injected (tests); otherwise from [AuthBloc].
+  final String? viewerRole;
+
   const ChatRoomPage({
     super.key,
     required this.conversationId,
@@ -50,6 +67,8 @@ class ChatRoomPage extends StatefulWidget {
     this.recorderFactory,
     this.pickAttachment,
     this.readOnly = false,
+    this.groups,
+    this.viewerRole,
   });
 
   @override
@@ -62,17 +81,26 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   late final ChatRoomBloc _chatBloc;
   late final ChatMediaLoader _loader;
   String _currentUid = '';
+  String _role = '';
+  ChatGroupsRepository? _groups;
+  StreamSubscription<ConversationEntity?>? _metaSub;
+  ConversationEntity? _meta;
+  MessageEntity? _replyTo;
 
   @override
   void initState() {
     super.initState();
     final injected = widget.bloc;
+    _role = widget.viewerRole ?? '';
     if (injected != null) {
       _chatBloc = injected;
       _currentUid = injected.currentUserId;
     } else {
       final authState = context.read<AuthBloc>().state;
-      if (authState is AuthAuthenticated) _currentUid = authState.user.uid;
+      if (authState is AuthAuthenticated) {
+        _currentUid = authState.user.uid;
+        _role = authState.user.role;
+      }
       _chatBloc = sl<ChatRoomBloc>(
         param1: widget.conversationId,
         param2: _currentUid,
@@ -80,14 +108,78 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     }
     _loader = widget.mediaLoader ?? sl<ChatMediaLoader>();
     _scrollCtrl.addListener(_onScroll);
+    _groups = widget.groups ??
+        (sl.isRegistered<FirebaseFirestore>() &&
+                sl.isRegistered<FirebaseFunctions>() &&
+                sl.isRegistered<FirebaseStorage>()
+            ? resolveChatGroupsRepository()
+            : null);
+    _metaSub = _groups
+        ?.watchConversation(widget.conversationId, viewerUid: _currentUid)
+        .listen((c) {
+          if (mounted) setState(() => _meta = c);
+        }, onError: (Object _) {});
   }
 
   @override
   void dispose() {
+    _metaSub?.cancel();
     _messageCtrl.dispose();
     _scrollCtrl.dispose();
     _chatBloc.close();
     super.dispose();
+  }
+
+  bool get _isAdmin => _role == AppRoles.admin;
+
+  /// "أنت" for own messages; member name from the conversation otherwise.
+  String? _nameOf(String uid) {
+    if (uid.isEmpty) return null;
+    if (uid == _currentUid) return 'أنت';
+    return _meta?.participantName(uid);
+  }
+
+  static String _previewOf(MessageEntity m) {
+    if (m.deleted) return 'تم حذف هذه الرسالة';
+    final text = m.text.trim();
+    if (text.isNotEmpty) return text;
+    return switch (m.type) {
+      ChatMessageType.image => 'صورة',
+      ChatMessageType.voice => 'رسالة صوتية',
+      ChatMessageType.file => m.media?.fileName ?? 'ملف',
+      ChatMessageType.text => '',
+    };
+  }
+
+  Future<void> _react(MessageEntity msg, ChatReaction reaction) async {
+    final groups = _groups;
+    if (groups == null) return;
+    final current = msg.reactions[_currentUid];
+    try {
+      await groups.react(
+        conversationId: widget.conversationId,
+        messageId: msg.id,
+        reaction: current == reaction ? null : reaction,
+      );
+    } on ServerException catch (e) {
+      if (mounted) AppSnackBar.showError(context, e.message);
+    }
+  }
+
+  void _openGroupInfo() {
+    final groups = _groups;
+    if (groups == null || _meta?.isGroup != true) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatGroupInfoPage(
+          conversationId: widget.conversationId,
+          viewerUid: _currentUid,
+          viewerRole: _role,
+          repository: groups,
+          loader: _loader,
+        ),
+      ),
+    );
   }
 
   /// List is reversed: offset 0 is the newest message, max extent is history.
@@ -114,7 +206,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   }
 
   void _sendText(String text) {
-    _chatBloc.add(SendMessageRequestedEvent(text));
+    _chatBloc.add(
+      SendMessageRequestedEvent(text, replyToMessageId: _replyTo?.id),
+    );
+    if (_replyTo != null) setState(() => _replyTo = null);
     _scrollToNewest();
   }
 
@@ -142,11 +237,17 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   }
 
   Future<void> _showMessageActions(MessageEntity msg) async {
-    final isMine = msg.isMine(_currentUid);
     final canCopy = !msg.deleted && msg.text.trim().isNotEmpty;
-    final canEdit = ChatMediaPolicy.canEdit(msg, _currentUid);
-    final canDelete = isMine && !msg.deleted;
-    if (!canCopy && !canEdit && !canDelete) return;
+    final canEdit = !widget.readOnly && ChatMediaPolicy.canEdit(msg, _currentUid);
+    final canDelete = ChatMediaPolicy.canDelete(
+      msg,
+      _currentUid,
+      isAdmin: _isAdmin,
+    );
+    final canInteract = !widget.readOnly && !msg.deleted;
+    final canReact = canInteract && _groups != null;
+    if (!canCopy && !canEdit && !canDelete && !canInteract) return;
+    final myReaction = msg.reactions[_currentUid];
 
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -157,6 +258,41 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (canReact)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (final r in ChatReaction.values)
+                        InkWell(
+                          key: Key('react-${r.name}'),
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () => Navigator.pop(ctx, 'react:${r.name}'),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: myReaction == r
+                                  ? AppColors.primaryLight
+                                  : null,
+                            ),
+                            child: Text(
+                              r.emoji,
+                              style: const TextStyle(fontSize: 26),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (canInteract)
+                ListTile(
+                  key: const Key('action-reply'),
+                  leading: const Icon(Icons.reply_rounded),
+                  title: const Text('رد'),
+                  onTap: () => Navigator.pop(ctx, 'reply'),
+                ),
               if (canCopy)
                 ListTile(
                   leading: const Icon(Icons.copy_rounded),
@@ -172,6 +308,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                 ),
               if (canDelete)
                 ListTile(
+                  key: const Key('action-delete'),
                   leading: const Icon(
                     Icons.delete_outline_rounded,
                     color: AppColors.error,
@@ -180,6 +317,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     'حذف',
                     style: TextStyle(color: AppColors.error),
                   ),
+                  subtitle: _isAdmin && !msg.isMine(_currentUid)
+                      ? const Text('حذف إداري')
+                      : const Text('متاح خلال ساعة من الإرسال'),
                   onTap: () => Navigator.pop(ctx, 'delete'),
                 ),
             ],
@@ -188,7 +328,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       ),
     );
     if (!mounted || action == null) return;
+    if (action.startsWith('react:')) {
+      final reaction = ChatReaction.fromWire(action.substring(6));
+      if (reaction != null) await _react(msg, reaction);
+      return;
+    }
     switch (action) {
+      case 'reply':
+        setState(() => _replyTo = msg);
       case 'copy':
         await Clipboard.setData(ClipboardData(text: msg.text));
         if (!mounted) return;
@@ -243,15 +390,29 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   }
 
   Widget _header() {
+    void back() {
+      if (context.canPop()) context.pop();
+    }
+
+    final meta = _meta;
+    if (meta != null && meta.isGroup) {
+      return _ChatRoomHeader(
+        name: meta.displayTitle(_currentUid),
+        imageUrl: null,
+        isGroup: true,
+        subtitle: '${meta.participants.length} عضو · اضغط لمعلومات المجموعة',
+        onTap: _openGroupInfo,
+        onBack: back,
+      );
+    }
+
     Widget build(ChatParticipantEntity? peer) {
       final (name, imageUrl) = _resolvePeer(peer);
-      return _ChatRoomHeader(
-        name: name,
-        imageUrl: imageUrl,
-        onBack: () {
-          if (context.canPop()) context.pop();
-        },
-      );
+      return _ChatRoomHeader(name: name, imageUrl: imageUrl, onBack: back);
+    }
+
+    if (meta != null && _currentUid.isNotEmpty) {
+      return build(meta.otherParticipant(_currentUid));
     }
 
     if (!sl.isRegistered<ChatConversationsBloc>()) return build(null);
@@ -310,7 +471,13 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       ),
                     ),
                   )
-                else
+                else ...[
+                  if (_replyTo != null)
+                    _ReplyBar(
+                      senderName: _nameOf(_replyTo!.senderId),
+                      preview: _previewOf(_replyTo!),
+                      onCancel: () => setState(() => _replyTo = null),
+                    ),
                   ChatComposer(
                     controller: _messageCtrl,
                     onSendText: _sendText,
@@ -319,6 +486,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         widget.recorderFactory ?? RecordChatVoiceRecorder.new,
                     pickAttachment: widget.pickAttachment ?? pickChatAttachment,
                   ),
+                ],
               ],
             ),
           ),
@@ -405,6 +573,12 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                         message: msg,
                         isMine: msg.isMine(_currentUid),
                         loader: _loader,
+                        senderName: _meta?.isGroup == true
+                            ? _nameOf(msg.senderId)
+                            : null,
+                        replySenderName: msg.replyTo == null
+                            ? null
+                            : _nameOf(msg.replyTo!.senderId),
                         onLongPress: msg.deleted
                             ? null
                             : () => _showMessageActions(msg),
@@ -482,15 +656,83 @@ class _EditMessageDialogState extends State<_EditMessageDialog> {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
+class _ReplyBar extends StatelessWidget {
+  final String? senderName;
+  final String preview;
+  final VoidCallback onCancel;
+
+  const _ReplyBar({
+    required this.senderName,
+    required this.preview,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('reply-bar'),
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(10),
+          border: const BorderDirectional(
+            start: BorderSide(color: AppColors.primary, width: 3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    senderName == null ? 'رد على رسالة' : 'رد على $senderName',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.labelSmall,
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              key: const Key('reply-cancel'),
+              tooltip: 'إلغاء الرد',
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: onCancel,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatRoomHeader extends StatelessWidget {
   final String name;
   final String? imageUrl;
   final VoidCallback onBack;
+  final bool isGroup;
+  final String? subtitle;
+  final VoidCallback? onTap;
 
   const _ChatRoomHeader({
     required this.name,
     required this.imageUrl,
     required this.onBack,
+    this.isGroup = false,
+    this.subtitle,
+    this.onTap,
   });
 
   @override
@@ -513,17 +755,52 @@ class _ChatRoomHeader extends StatelessWidget {
             onPressed: onBack,
           ),
           const SizedBox(width: 10),
-          _HeaderAvatar(name: name, imageUrl: imageUrl),
-          const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-              style: AppTextStyles.titleLarge.copyWith(
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
+            child: InkWell(
+              key: const Key('chat-header'),
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  isGroup
+                      ? const CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AppColors.primaryLight,
+                          child: Icon(
+                            Icons.groups_rounded,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : _HeaderAvatar(name: name, imageUrl: imageUrl),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (subtitle != null)
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

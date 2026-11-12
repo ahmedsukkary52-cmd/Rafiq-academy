@@ -42,6 +42,7 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
   /// Library uploads are a staff operation (Firestore/Storage Rules deny
   /// students and parents).
   bool _canUpload = false;
+  String _query = '';
 
   static const Set<String> _uploaderRoles = {
     AppRoles.teacher,
@@ -132,6 +133,41 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
     }
   }
 
+  Future<void> _confirmDelete(ContentFileEntity file) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف الملف'),
+        content: Text('سيُحذف "${file.title}" من مكتبة الحلقة لكل الأعضاء.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            key: const Key('content-delete-confirm'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) _bloc.add(DeleteFileEvent(file));
+  }
+
+  List<ContentFileEntity> _visible(ContentLibraryState state) {
+    final q = _query.trim().toLowerCase();
+    final files = state.filteredFiles;
+    if (q.isEmpty) return files;
+    return files
+        .where(
+          (f) =>
+              f.title.toLowerCase().contains(q) ||
+              f.uploaderName.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
   Future<void> _openFile(ContentFileEntity file) async {
     // No canLaunchUrl precheck: without an https <queries> entry it reports
     // false on Android 11+ even when a browser can open the link.
@@ -166,17 +202,21 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
     return BlocProvider.value(
       value: _bloc,
       child: BlocListener<ContentLibraryBloc, ContentLibraryState>(
-        listenWhen: (p, c) => p.uploadStatus != c.uploadStatus,
+        listenWhen: (p, c) =>
+            p.uploadStatus != c.uploadStatus || p.deleteError != c.deleteError,
         listener: (context, state) {
           if (state.uploadStatus == SubmissionStatus.success) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('تم رفع الملف')));
             _bloc
               ..add(const ResetUploadEvent())
               ..add(LoadFilesEvent(halaqaId: _halaqaId));
-          } else if (state.uploadStatus == SubmissionStatus.error) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.uploadError ?? 'تعذر رفع الملف')),
-            );
-            _bloc.add(const ResetUploadEvent());
+          }
+          if (state.deleteError != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.deleteError!)));
           }
         },
         child: _buildScaffold(),
@@ -225,18 +265,31 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
             previous.activeFilter != current.activeFilter ||
             previous.filesError != current.filesError,
         builder: (context, state) {
-          final files = state.filteredFiles;
+          final files = _visible(state);
+          // Video is not an accepted upload type (§8); its tab only appears
+          // for older items that still exist.
+          final hasVideo = state.allFiles.any(
+            (f) => f.type == ContentFileType.video,
+          );
+          final tabs = <ContentFileType?>[
+            null, // الكل
+            ...ContentFileType.values.where(
+              (t) => t != ContentFileType.video || hasVideo,
+            ),
+          ];
           return Column(
             children: [
               // ── بحث ─────────────────────────────────────────
-              const Padding(
-                padding: EdgeInsets.all(AppSizes.paddingM),
+              Padding(
+                padding: const EdgeInsets.all(AppSizes.paddingM),
                 child: AppTextField(
-                  hint: 'بحث في المكتبة...',
-                  prefixIcon: Icon(
+                  key: const Key('content-search'),
+                  hint: 'بحث بالاسم أو الرافع...',
+                  prefixIcon: const Icon(
                     Icons.search_rounded,
                     color: AppColors.textHint,
                   ),
+                  onChanged: (v) => setState(() => _query = v),
                 ),
               ),
 
@@ -244,19 +297,16 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
               SizedBox(
                 height: 36,
                 child: ListView(
+                  key: const Key('content-type-tabs'),
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSizes.paddingM,
                   ),
-                  reverse: true,
-                  children:
-                      [
-                        null, // الكل
-                        ...ContentFileType.values,
-                      ].map((type) {
+                  children: tabs.map((type) {
                         final selected = state.activeFilter == type;
                         final label = type?.label ?? 'الكل';
                         return GestureDetector(
+                          key: Key('content-tab-${type?.name ?? 'all'}'),
                           onTap: () => _bloc.add(FilterFilesEvent(type)),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
@@ -296,10 +346,23 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
 
               const SizedBox(height: 12),
 
-              // ── upload progress (isolated from file list rebuilds) ──
-              BlocSelector<ContentLibraryBloc, ContentLibraryState, double?>(
-                selector: (s) => s.uploadProgress,
-                builder: (context, progress) {
+              // ── upload progress / failure (isolated from list rebuilds) ──
+              BlocBuilder<ContentLibraryBloc, ContentLibraryState>(
+                buildWhen: (p, c) =>
+                    p.uploadProgress != c.uploadProgress ||
+                    p.uploadStatus != c.uploadStatus ||
+                    p.uploadError != c.uploadError ||
+                    p.canRetryUpload != c.canRetryUpload,
+                builder: (context, s) {
+                  if (s.uploadStatus == SubmissionStatus.error) {
+                    return _UploadFailureCard(
+                      message: s.uploadError ?? ContentUploadErrors.generic,
+                      canRetry: s.canRetryUpload,
+                      onRetry: () => _bloc.add(const RetryUploadEvent()),
+                      onDismiss: () => _bloc.add(const ResetUploadEvent()),
+                    );
+                  }
+                  final progress = s.uploadProgress;
                   if (progress == null) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.symmetric(
@@ -309,6 +372,7 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
+                          key: const Key('content-upload-progress'),
                           'جارٍ الرفع... ${(progress * 100).toInt()}%',
                           style: AppTextStyles.labelMedium.copyWith(
                             color: AppColors.primary,
@@ -350,13 +414,17 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'لا يوجد محتوى متاح حالياً',
+                              _query.trim().isNotEmpty
+                                  ? 'لا توجد نتائج مطابقة'
+                                  : 'لا يوجد محتوى متاح حالياً',
                               style: AppTextStyles.bodyMedium,
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'ستظهر هنا الملفات التعليمية عند إضافتها',
+                              _query.trim().isNotEmpty
+                                  ? 'جرّب كلمة أخرى أو اختر "الكل"'
+                                  : 'ستظهر هنا الملفات التعليمية عند إضافتها',
                               style: AppTextStyles.labelSmall.copyWith(
                                 color: AppColors.textHint,
                               ),
@@ -380,6 +448,9 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                         itemBuilder: (context, i) => _FileCard(
                           file: files[i],
                           onTap: () => _openFile(files[i]),
+                          onDelete: _canUpload
+                              ? () => _confirmDelete(files[i])
+                              : null,
                         ),
                       ),
               ),
@@ -400,7 +471,6 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
                   height: 56,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    reverse: true,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSizes.paddingM,
                       vertical: 8,
@@ -461,6 +531,63 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
   };
 }
 
+class _UploadFailureCard extends StatelessWidget {
+  final String message;
+  final bool canRetry;
+  final VoidCallback onRetry;
+  final VoidCallback onDismiss;
+
+  const _UploadFailureCard({
+    required this.message,
+    required this.canRetry,
+    required this.onRetry,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('content-upload-failed'),
+      margin: const EdgeInsets.fromLTRB(
+        AppSizes.paddingM,
+        0,
+        AppSizes.paddingM,
+        8,
+      ),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppSizes.radiusM),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'لم يُرفع الملف: $message',
+              style: AppTextStyles.labelMedium.copyWith(color: AppColors.error),
+            ),
+          ),
+          if (canRetry)
+            TextButton(
+              key: const Key('content-upload-retry'),
+              onPressed: onRetry,
+              child: const Text('إعادة المحاولة'),
+            ),
+          IconButton(
+            key: const Key('content-upload-dismiss'),
+            tooltip: 'إغلاق',
+            icon: const Icon(Icons.close_rounded, size: 18),
+            onPressed: onDismiss,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // _FileCard
 // ══════════════════════════════════════════════════════════════════════════════
@@ -468,8 +595,9 @@ class _ContentLibraryPageState extends State<ContentLibraryPage> {
 class _FileCard extends StatelessWidget {
   final ContentFileEntity file;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
-  const _FileCard({required this.file, required this.onTap});
+  const _FileCard({required this.file, required this.onTap, this.onDelete});
 
   Color get _color => switch (file.type) {
     ContentFileType.pdf => AppColors.error,
@@ -496,14 +624,30 @@ class _FileCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // أيقونة النوع
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: _color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(AppSizes.radiusL),
-            ),
-            child: Icon(_icon, color: _color, size: 28),
+          Row(
+            children: [
+              if (onDelete != null)
+                IconButton(
+                  key: Key('content-delete-${file.id}'),
+                  tooltip: 'حذف',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: AppColors.textHint,
+                  ),
+                  onPressed: onDelete,
+                ),
+              const Spacer(),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                ),
+                child: Icon(_icon, color: _color, size: 28),
+              ),
+            ],
           ),
 
           const Spacer(),

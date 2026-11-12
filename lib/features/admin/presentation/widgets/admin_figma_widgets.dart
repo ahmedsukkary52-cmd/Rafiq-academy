@@ -279,12 +279,16 @@ class AdminGradientHeroCard extends StatelessWidget {
   final String eyebrow;
   final String headline;
   final List<AdminHeroMetric> metrics;
+  final IconData? statusIcon;
+  final bool centered;
 
   const AdminGradientHeroCard({
     super.key,
     required this.eyebrow,
     required this.headline,
     required this.metrics,
+    this.statusIcon,
+    this.centered = false,
   });
 
   @override
@@ -306,8 +310,13 @@ class AdminGradientHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (statusIcon != null) ...[
+            Icon(statusIcon, color: AppColors.onPrimary, size: 28),
+            const SizedBox(height: 6),
+          ],
           Text(
             eyebrow,
+            textAlign: centered ? TextAlign.center : null,
             style: AppTextStyles.labelMedium.copyWith(
               color: AppColors.onPrimaryMuted,
             ),
@@ -315,6 +324,7 @@ class AdminGradientHeroCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             headline,
+            textAlign: centered ? TextAlign.center : null,
             style: AppTextStyles.displayMedium.copyWith(
               color: AppColors.onPrimary,
               fontWeight: FontWeight.w800,
@@ -506,60 +516,6 @@ class AdminSectionHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class AdminFilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-  final bool disabled;
-
-  const AdminFilterChip({
-    super.key,
-    required this.label,
-    required this.selected,
-    this.onTap,
-    this.disabled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: Opacity(
-        opacity: disabled ? 0.45 : 1,
-        child: GestureDetector(
-          onTap: disabled ? null : onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.surface : AppColors.surfaceGrey,
-              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-              border: Border.all(
-                color: selected ? AppColors.primary : AppColors.border,
-              ),
-              boxShadow: selected
-                  ? const [
-                      BoxShadow(
-                        color: AppColors.softShadow,
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Text(
-              label,
-              style: AppTextStyles.labelMedium.copyWith(
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

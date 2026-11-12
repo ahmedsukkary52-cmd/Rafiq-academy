@@ -11,6 +11,7 @@ import '../../../../shared/domain/contact_info_policy.dart';
 import '../../../../shared/domain/payment_access_entity.dart';
 import '../../../../shared/domain/achievement_entity.dart';
 import '../../../../shared/domain/merge_student_achievements.dart';
+import '../../../schedule/domain/entities/halaqa_schedule_source.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/repositories/parent_repositories.dart';
@@ -260,6 +261,24 @@ class ParentRepositoryImpl implements ParentRepository {
     try {
       final items = await remoteDatasource.getChildAchievements(studentId);
       return Right(mergeStudentAchievements(items, const []));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, HalaqaScheduleSource>> getChildHalaqaSchedule({
+    required String studentId,
+    required String halaqaId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      return Right(
+        await remoteDatasource.getChildHalaqaSchedule(
+          studentId: studentId,
+          halaqaId: halaqaId,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

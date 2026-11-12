@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../../../../shared/data/models/achievement_model.dart';
+import '../../../schedule/domain/entities/halaqa_schedule_source.dart';
 import '../../domain/parent_household.dart';
 import '../models/parent_model.dart';
 import '../../../../shared/domain/academy_billing_entities.dart';
@@ -41,6 +42,13 @@ abstract class ParentRemoteDatasource {
   Future<List<({String id, String name})>> getHalaqatForStudent(
     String studentId,
   );
+
+  /// Weekly schedule of [halaqaId] for linked child [studentId], served by
+  /// the parent-scoped callable (parents never read halaqat).
+  Future<HalaqaScheduleSource> getChildHalaqaSchedule({
+    required String studentId,
+    required String halaqaId,
+  });
 
   /// Upload screenshot proof for external payment. Does **not** mark paid.
   Future<void> submitPaymentProof({

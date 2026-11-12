@@ -279,6 +279,8 @@ import 'package:rafiq_academy/features/notifications/data/services/firebase_mess
     as _i615;
 import 'package:rafiq_academy/features/notifications/data/services/firebase_notification_open_adapter.dart'
     as _i999;
+import 'package:rafiq_academy/features/notifications/data/services/foreground_push_presenter.dart'
+    as _i541;
 import 'package:rafiq_academy/features/notifications/data/sinks/in_app_academy_event_handler.dart'
     as _i815;
 import 'package:rafiq_academy/features/notifications/domain/repositories/fcm_token_repository.dart'
@@ -583,11 +585,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i761.FcmDeviceIdProvider>(
       () => _i761.SharedPreferencesFcmDeviceIdProvider(),
     );
-    gh.lazySingleton<_i542.NotificationOpenPort>(
-      () => _i999.FirebaseNotificationOpenAdapter(
-        messaging: gh<_i892.FirebaseMessaging>(),
-      ),
-    );
     gh.lazySingleton<_i115.MushafAudioEngine>(
       () => _i567.JustAudioMushafEngine(),
     );
@@ -648,6 +645,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.lazySingleton<_i696.NetworkInfo>(
       () => diModule.networkInfo(gh<_i161.InternetConnection>()),
+    );
+    gh.lazySingleton<_i541.ForegroundPushPresenter>(
+      () => _i541.ForegroundPushPresenter(gh<_i892.FirebaseMessaging>()),
     );
     gh.lazySingleton<_i444.AwardsRemoteDatasource>(
       () => _i982.AwardsRemoteDatasourceImpl(
@@ -868,6 +868,12 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i964.ParentRepositoryImpl(
         remoteDatasource: gh<_i892.ParentRemoteDatasource>(),
         networkInfo: gh<_i696.NetworkInfo>(),
+      ),
+    );
+    gh.lazySingleton<_i542.NotificationOpenPort>(
+      () => _i999.FirebaseNotificationOpenAdapter(
+        messaging: gh<_i892.FirebaseMessaging>(),
+        foreground: gh<_i541.ForegroundPushPresenter>(),
       ),
     );
     gh.lazySingleton<_i605.AuthRepository>(

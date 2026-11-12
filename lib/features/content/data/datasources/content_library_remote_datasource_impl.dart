@@ -77,59 +77,83 @@ class ContentLibraryRemoteDatasourceImpl
     if (file.lengthSync() > ContentUploadPolicy.maxBytes) {
       throw const ServerException('حجم الملف أكبر من الحد المسموح (50 ميجا)');
     }
+    final bytes = file.lengthSync();
+    final storagePath = ContentUploadPolicy.storagePath(
+      halaqaId: scoped,
+      uploadedBy: uploadedBy,
+      fileName: fileName,
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    final ref = storage.ref(storagePath);
+    yield 0.0;
     try {
-      final storagePath = ContentUploadPolicy.storagePath(
-        halaqaId: scoped,
-        uploadedBy: uploadedBy,
-        fileName: fileName,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      final ref = storage.ref(storagePath);
-      final task = ref.putFile(
-        file,
-        SettableMetadata(contentType: contentType),
-      );
-
+      final task = ref.putFile(file, SettableMetadata(contentType: contentType));
       await for (final snapshot in task.snapshotEvents) {
-        final total = snapshot.totalBytes;
-        final progress = total == 0 ? 0.0 : snapshot.bytesTransferred / total;
-
-        if (snapshot.state == TaskState.success) {
-          final url = await ref.getDownloadURL();
-          final fileSizeMb = file.lengthSync() / (1024 * 1024);
-
-          await _filesRef.add(
-            ContentFileModel(
-              id: '',
-              title: title,
-              type: type,
-              downloadUrl: url,
-              storagePath: storagePath,
-              fileSizeMb: double.parse(fileSizeMb.toStringAsFixed(1)),
-              uploadedBy: uploadedBy,
-              uploaderName: uploaderName,
-              uploadedAt: DateTime.now(),
-              halaqaId: scoped,
-            ).toFirestore(),
-          );
-          yield 1.0;
-        } else {
-          yield progress >= 1.0 ? 0.99 : progress;
+        if (snapshot.state != TaskState.running) continue;
+        final total = snapshot.totalBytes > 0 ? snapshot.totalBytes : bytes;
+        if (total > 0) {
+          yield (snapshot.bytesTransferred / total).clamp(0.0, 0.99);
         }
       }
-    } catch (e) {
-      throw ServerException(e.toString());
+      // Throws on error/cancel; a stream that merely ends is not success.
+      final done = await task;
+      if (done.state != TaskState.success) {
+        throw const ServerException(ContentUploadErrors.canceled);
+      }
+    } on FirebaseException catch (e) {
+      throw ServerException(ContentUploadErrors.forCode(e.code));
     }
+
+    try {
+      final stored = await ref.getMetadata();
+      if ((stored.size ?? -1) != bytes) {
+        throw const ServerException(ContentUploadErrors.incomplete);
+      }
+      final url = await ref.getDownloadURL();
+      await _filesRef.add(
+        ContentFileModel(
+          id: '',
+          title: title.trim().isEmpty ? fileName : title.trim(),
+          type: type,
+          downloadUrl: url,
+          storagePath: storagePath,
+          fileSizeMb: double.parse((bytes / (1024 * 1024)).toStringAsFixed(1)),
+          uploadedBy: uploadedBy,
+          uploaderName: uploaderName,
+          uploadedAt: DateTime.now(),
+          halaqaId: scoped,
+        ).toFirestore(),
+      );
+    } catch (e) {
+      // Without its library record the object is unreachable: remove it.
+      await ref.delete().catchError((_) {});
+      if (e is ServerException) rethrow;
+      throw ServerException(
+        e is FirebaseException
+            ? ContentUploadErrors.forCode(e.code)
+            : ContentUploadErrors.generic,
+      );
+    }
+    yield 1.0;
   }
 
   @override
   Future<void> deleteFile(ContentFileEntity file) async {
     try {
       // حذف من Storage أولاً ثم من Firestore
-      await storage.ref(file.storagePath).delete();
+      await storage.ref(file.storagePath).delete().catchError((Object e) {
+        if (e is FirebaseException && e.code == 'object-not-found') return;
+        throw e;
+      });
       await _filesRef.doc(file.id).delete();
-    } catch (e) {
-      throw ServerException(e.toString());
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        e.code == 'unauthorized' || e.code == 'permission-denied'
+            ? 'لا تملك صلاحية حذف هذا الملف'
+            : 'تعذر حذف الملف، حاول مرة أخرى',
+      );
+    } catch (_) {
+      throw const ServerException('تعذر حذف الملف، حاول مرة أخرى');
     }
   }
 }

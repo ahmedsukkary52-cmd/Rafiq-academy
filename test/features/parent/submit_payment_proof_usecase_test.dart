@@ -7,6 +7,7 @@ import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.da
 import 'package:rafiq_academy/features/parent/domain/parent_household.dart';
 import 'package:rafiq_academy/shared/domain/parent_payment_proof.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
+import 'package:rafiq_academy/features/schedule/domain/entities/halaqa_schedule_source.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/submit_payment_proof_usecase.dart';
 import 'package:rafiq_academy/shared/domain/payment_proof_reader.dart';
 import 'package:rafiq_academy/shared/domain/achievement_entity.dart';
@@ -109,6 +110,12 @@ class _FakeParentRepository implements ParentRepository {
   Future<Either<Failure, List<AchievementEntity>>> getChildAchievements(
     String studentId,
   ) => throw UnimplementedError();
+
+  @override
+  Future<Either<Failure, HalaqaScheduleSource>> getChildHalaqaSchedule({
+    required String studentId,
+    required String halaqaId,
+  }) => throw UnimplementedError();
 }
 
 void main() {

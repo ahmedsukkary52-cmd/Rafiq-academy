@@ -77,16 +77,33 @@ void main() {
 
       await tester.tap(find.text('تسجيل الدخول'));
       await tester.pump();
-      expect(find.text('أدخل البريد الإلكتروني'), findsOneWidget);
+      expect(find.text('أدخل اسم المستخدم أو البريد الإلكتروني'), findsOneWidget);
+      expect(bloc.events, isEmpty);
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'بريد خطأ');
+      await tester.enterText(find.byType(TextFormField).at(1), 'secret1');
+      await tester.tap(find.text('تسجيل الدخول'));
+      await tester.pump();
+      expect(
+        find.text('اسم المستخدم أو البريد الإلكتروني غير صالح'),
+        findsOneWidget,
+      );
       expect(bloc.events, isEmpty);
 
       await tester.enterText(find.byType(TextFormField).at(0), 'a@x.test');
-      await tester.enterText(find.byType(TextFormField).at(1), 'secret1');
       await tester.tap(find.text('تسجيل الدخول'));
       await tester.pump();
       expect(
         bloc.events.single,
         const LoginWithEmailEvent(email: 'a@x.test', password: 'secret1'),
+      );
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'st123456');
+      await tester.tap(find.text('تسجيل الدخول'));
+      await tester.pump();
+      expect(
+        bloc.events.last,
+        const LoginWithEmailEvent(email: 'st123456', password: 'secret1'),
       );
 
       expect(find.textContaining('إنشاء حساب'), findsNothing);

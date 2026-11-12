@@ -739,11 +739,23 @@ Future<void> seedDemoAcademyDataset(
           endTime: '18:00',
         ).toMap(),
       ],
-      'meetingLink': 'https://meet.google.com/seed-demo-halaqa',
       'status': 'active',
     },
     SetOptions(merge: true),
   );
+  await _putMeetingLink(
+    db,
+    'seed_demo_halaqa',
+    'https://meet.google.com/seed-demo-halaqa',
+  );
+}
+
+/// The link lives only in halaqaMeetingLinks/{halaqaId}, never on halaqat.
+Future<void> _putMeetingLink(FirebaseFirestore db, String halaqaId, String link) {
+  return db.collection(FirestoreCollections.halaqaMeetingLinks).doc(halaqaId).set({
+    'meetingLink': link,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 }
 
 Future<void> _putHalaqa(
@@ -754,16 +766,16 @@ Future<void> _putHalaqa(
   required String supervisorId,
   required List<String> studentIds,
   required List<HalaqaScheduleModel> schedule,
-}) {
-  return db.collection(FirestoreCollections.halaqat).doc(id).set({
+}) async {
+  await db.collection(FirestoreCollections.halaqat).doc(id).set({
     'name': name,
     'teacherId': teacherId,
     'supervisorId': supervisorId,
     'studentIds': studentIds,
     'schedule': schedule.map((s) => s.toMap()).toList(),
-    'meetingLink': 'https://meet.google.com/$id',
     'status': 'active',
   }, SetOptions(merge: true));
+  await _putMeetingLink(db, id, 'https://meet.google.com/$id');
 }
 
 Future<void> _seedAttendanceHistory(

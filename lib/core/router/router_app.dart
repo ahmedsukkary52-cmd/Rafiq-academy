@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/admin_onboarding_halaqat.dart';
 import '../../features/admin/presentation/pages/admin_access_page.dart';
 import '../../features/admin/presentation/pages/admin_accounts_page.dart';
 import '../../features/admin/presentation/pages/admin_admit_page.dart';
@@ -8,8 +10,6 @@ import '../../features/admin/presentation/pages/admin_announcements_page.dart';
 import '../../features/admin/presentation/pages/admin_broadcast_page.dart';
 import '../../features/admin/presentation/pages/admin_chat_inbox_page.dart';
 import '../../features/admin/presentation/pages/admin_communication_hub_page.dart';
-import '../../features/admin/presentation/pages/admin_complaints_page.dart';
-import '../../features/admin/presentation/pages/admin_complaints_review_page.dart';
 import '../../features/admin/presentation/pages/admin_embedded_pages.dart';
 import '../../features/admin/presentation/pages/admin_halaqat_page.dart';
 import '../../features/admin/presentation/pages/admin_home_page.dart';
@@ -17,6 +17,7 @@ import '../../features/admin/presentation/pages/admin_internal_chat_page.dart';
 import '../../features/admin/presentation/pages/admin_membership_page.dart';
 import '../../features/admin/presentation/pages/admin_misc_pages.dart';
 import '../../features/admin/presentation/pages/admin_oversight_pages.dart';
+import '../../features/admin/presentation/pages/admin_payments_ledger_page.dart';
 import '../../features/admin/presentation/pages/admin_parent_links_page.dart';
 import '../../features/admin/presentation/pages/admin_payment_destinations_page.dart';
 import '../../features/admin/presentation/pages/admin_registration_requests_page.dart';
@@ -27,6 +28,16 @@ import '../../features/app_update/presentation/bloc/client_version_gate_bloc.dar
 import '../../features/app_update/presentation/pages/update_required_page.dart';
 import '../../features/app_update/presentation/version_gate_redirect.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/accounts/domain/onboarding_models.dart';
+import '../../features/accounts/presentation/admin_account_access_card.dart';
+import '../../features/accounts/presentation/admin_onboard_student_page.dart';
+import '../../features/assistant/presentation/assistant_home_page.dart';
+import '../../features/directory/domain/directory_models.dart';
+import '../../features/directory/presentation/admin_add_member_page.dart';
+import '../../features/directory/presentation/admin_directory_page.dart';
+import '../../features/directory/presentation/admin_halaqa_profile_page.dart';
+import '../../features/directory/presentation/admin_person_profile_page.dart';
+import '../../features/auth/presentation/pages/first_login_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
@@ -35,6 +46,7 @@ import '../../features/awards/presentation/pages/awards_page.dart';
 import '../../features/chat/presentation/chat_route_extra.dart';
 import '../../features/chat/presentation/pages/chat_room.dart';
 import '../../features/chat/presentation/pages/student_chat_page.dart';
+import '../../features/complaints/presentation/complaints_entry.dart';
 import '../../features/content/presentation/pages/content_library_page.dart';
 import '../../features/homework/presentation/pages/student_homework_page.dart';
 import '../../features/notifications/presentation/pages/notification_page.dart';
@@ -70,6 +82,7 @@ import '../../features/teacher/presentation/pages/teacher_excuses_page.dart';
 // Teacher
 import '../../features/teacher/presentation/pages/teacher_home_page.dart';
 import 'app_routes.dart';
+import 'route_not_found_page.dart';
 
 class AppRouter {
   final AuthBloc authBloc;
@@ -84,7 +97,7 @@ class AppRouter {
 
   late final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: kDebugMode,
     refreshListenable: Listenable.merge([
       _BlocListenable(authBloc.stream),
       _BlocListenable(versionGate.stream),
@@ -118,6 +131,10 @@ class AppRouter {
         path: AppRoutes.forgotPassword,
         builder: (_, __) => const ForgotPasswordPage(),
       ),
+      GoRoute(
+        path: AppRoutes.firstLogin,
+        builder: (_, __) => const FirstLoginPage(),
+      ),
       // WA-1: /register intentionally omitted — redirects to login above.
 
       // ── Student ───────────────────────────────────────────────
@@ -145,9 +162,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'homework',
-            builder: (_, __) => const StudentHomeworkPage(
-              currentStudent: StudentBlocCurrentProfile(),
-            ),
+            builder: (_, __) => const StudentHomeworkPage(),
           ),
           GoRoute(
             path: 'progress-report',
@@ -307,7 +322,17 @@ class AppRouter {
             path: 'excuses',
             builder: (_, __) => const TeacherExcusesPage(),
           ),
+          GoRoute(
+            path: 'cover',
+            builder: (_, __) => const AssistantHomePage(assistant: false),
+          ),
         ],
+      ),
+
+      // ── Assistant teacher ─────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.assistant,
+        builder: (_, __) => const AssistantHomePage(),
       ),
 
       // ── Parent ────────────────────────────────────────────────
@@ -368,8 +393,40 @@ class AppRouter {
           GoRoute(path: 'access', builder: (_, __) => const AdminAccessPage()),
           GoRoute(path: 'admit', builder: (_, __) => const AdminAdmitPage()),
           GoRoute(
+            path: 'onboard-student',
+            builder: (_, state) => AdminOnboardStudentPage(
+              loadHalaqat: loadOnboardingHalaqat,
+              initialParent: state.extra is MemberSearchHit
+                  ? state.extra as MemberSearchHit
+                  : null,
+            ),
+          ),
+          GoRoute(
+            path: 'directory',
+            builder: (_, __) => const AdminDirectoryPage(),
+          ),
+          GoRoute(
+            path: 'person/:uid',
+            builder: (_, state) =>
+                AdminPersonProfilePage(uid: state.pathParameters['uid']!),
+          ),
+          GoRoute(
+            path: 'halaqa/:halaqaId',
+            builder: (_, state) => AdminHalaqaProfilePage(
+              halaqaId: state.pathParameters['halaqaId']!,
+            ),
+          ),
+          GoRoute(
+            path: 'add-member',
+            builder: (_, state) => AdminAddMemberPage(
+              initialRole: DirectoryRole.fromWire(
+                state.uri.queryParameters['role'],
+              ),
+            ),
+          ),
+          GoRoute(
             path: 'complaints',
-            builder: (_, __) => const AdminComplaintsPage(),
+            builder: (context, __) => buildComplaintsPage(context),
           ),
           GoRoute(
             path: 'broadcast',
@@ -393,7 +450,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'communication-analytics',
-            builder: (_, __) => const AdminCommunicationAnalyticsPage(),
+            redirect: (_, __) => AppRoutes.adminCommunication,
           ),
           GoRoute(
             path: 'chat',
@@ -415,7 +472,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'complaints-review',
-            builder: (_, __) => const AdminComplaintsReviewPage(),
+            redirect: (_, __) => AppRoutes.adminComplaints,
           ),
           GoRoute(
             path: 'registration-requests',
@@ -423,11 +480,18 @@ class AppRouter {
           ),
           GoRoute(
             path: 'student/:studentId',
-            builder: (_, state) => StudentProfilePage(
-              studentId: state.pathParameters['studentId']!,
-              halaqaId: state.uri.queryParameters['halaqaId'],
-              viewer: StudentProfileViewer.admin,
-            ),
+            builder: (_, state) {
+              final studentId = state.pathParameters['studentId']!;
+              return StudentProfilePage(
+                studentId: studentId,
+                halaqaId: state.uri.queryParameters['halaqaId'],
+                viewer: StudentProfileViewer.admin,
+                adminPanelBuilder: (name) => AdminAccountAccessCard(
+                  studentId: studentId,
+                  studentName: name,
+                ),
+              );
+            },
           ),
           GoRoute(
             path: 'announcements',
@@ -446,10 +510,6 @@ class AppRouter {
             builder: (_, __) => const AdminInternalChatPage(),
           ),
           GoRoute(
-            path: 'communication-settings',
-            builder: (_, __) => const AdminCommunicationSettingsPage(),
-          ),
-          GoRoute(
             path: 'payment-destinations',
             builder: (_, __) => const AdminPaymentDestinationsRoute(),
           ),
@@ -459,11 +519,11 @@ class AppRouter {
           ),
           GoRoute(
             path: 'finance-detail',
-            builder: (_, __) => const AdminFinanceDetailPage(),
+            redirect: (_, __) => AppRoutes.adminPaymentsOverview,
           ),
           GoRoute(
             path: 'payments-overview',
-            builder: (_, __) => const AdminPaymentsReviewPage(),
+            builder: (_, __) => const AdminPaymentsLedgerPage(),
           ),
           GoRoute(
             path: 'supervisors',
@@ -481,10 +541,7 @@ class AppRouter {
       ),
     ],
 
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('خطأ')),
-      body: Center(child: Text('الصفحة غير موجودة: ${state.error}')),
-    ),
+    errorBuilder: (context, state) => const RouteNotFoundPage(),
   );
 
   String? _onboardingThenAuth(String currentPath) {

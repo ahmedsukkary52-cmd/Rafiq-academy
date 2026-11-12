@@ -5,6 +5,7 @@ import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
 import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
 import { findContactFieldKey } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
+import { normalizeArabicSearchText } from "../search/arabicNormalization";
 import { assertCallerIsAdmin, parseProvisionRole, ProvisionRole } from "./assertAdmin";
 
 interface AdminProvisionUserRequest {
@@ -26,7 +27,7 @@ function requireNonEmptyString(value: unknown, field: string): string {
   return value.trim();
 }
 
-async function writeRoleProfile(
+export async function writeRoleProfile(
   db: admin.firestore.Firestore,
   uid: string,
   role: ProvisionRole,
@@ -78,8 +79,10 @@ async function writeRoleProfile(
       );
       break;
     case "supervisor":
+    case "assistant_teacher":
     case "admin":
-      // No dedicated supervisorProfiles SSOT (D24). Admin has no extra profile.
+      // No dedicated supervisorProfiles SSOT (D24). Assistant assignments live
+      // on halaqat.assistantTeacherIds; Admin has no extra profile.
       break;
   }
 }
@@ -139,11 +142,21 @@ export const adminProvisionUser = onCall<
       isActive,
       createdAt: FieldValue.serverTimestamp(),
     });
+    // Admin directory search key (memberDirectory.ts).
+    batch.update(db.collection("users").doc(uid), {
+      nameNormalized: normalizeArabicSearchText(name),
+    });
     batch.set(db.collection("userPrivate").doc(uid), {
       email,
       emailSource: "auth",
       emailUpdatedAt: FieldValue.serverTimestamp(),
     });
+    if (role === "admin") {
+      // The provisioning password is known to the issuing Admin: the new
+      // Admin holds no authority until completeFirstLogin replaces it.
+      batch.update(db.collection("users").doc(uid), { passwordChangeRequired: true });
+      batch.update(db.collection("userPrivate").doc(uid), { mustChangePassword: true });
+    }
     await batch.commit();
 
     await writeRoleProfile(db, uid, role, name);

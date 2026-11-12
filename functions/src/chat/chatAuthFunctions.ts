@@ -83,20 +83,29 @@ export const createDirectConversation = onCall(
   { region: "europe-west1" },
   async (request) => {
     assertBackendAllowed("createDirectConversation");
-    const callerUid = requireUid(request.auth?.uid);
-    const otherUid = requireOtherUid(request.data?.otherUid);
+    return createDirectConversationCore(
+      admin.firestore(),
+      requireUid(request.auth?.uid),
+      request.data,
+    );
+  },
+);
 
-    if (
-      request.data?.participantIds !== undefined
-      || request.data?.participants !== undefined
-    ) {
+export async function createDirectConversationCore(
+  db: admin.firestore.Firestore,
+  callerUid: string,
+  rawData: unknown,
+) {
+    const data = (rawData ?? {}) as Record<string, unknown>;
+    const otherUid = requireOtherUid(data.otherUid);
+
+    if (data.participantIds !== undefined || data.participants !== undefined) {
       throw new HttpsError(
         "invalid-argument",
         "لا يمكن تمرير participantIds من العميل",
       );
     }
 
-    const db = admin.firestore();
     await assertDirectRelationship(db, callerUid, otherUid);
 
     const conversationId = directConversationId(callerUid, otherUid);
@@ -141,8 +150,7 @@ export const createDirectConversation = onCall(
       created: true,
       participantIds: [callerUid, otherUid].sort(),
     };
-  },
-);
+}
 
 /**
  * Soft-delete a message (C9). Admin may moderate-delete; sender may delete own.
@@ -151,11 +159,23 @@ export const softDeleteChatMessage = onCall(
   { region: "europe-west1" },
   async (request) => {
     assertBackendAllowed("softDeleteChatMessage");
-    const callerUid = requireUid(request.auth?.uid);
-    const conversationId = requireOtherUid(request.data?.conversationId);
-    const messageId = requireOtherUid(request.data?.messageId);
+    return softDeleteChatMessageCore(
+      admin.firestore(),
+      requireUid(request.auth?.uid),
+      request.data,
+    );
+  },
+);
 
-    const db = admin.firestore();
+export async function softDeleteChatMessageCore(
+  db: admin.firestore.Firestore,
+  callerUid: string,
+  rawData: unknown,
+) {
+    const data = (rawData ?? {}) as Record<string, unknown>;
+    const conversationId = requireOtherUid(data.conversationId);
+    const messageId = requireOtherUid(data.messageId);
+
     const role = await loadUserRole(db, callerUid);
     if (!role) {
       throw new HttpsError("permission-denied", "ملف المستخدم غير موجود");
@@ -186,12 +206,16 @@ export const softDeleteChatMessage = onCall(
       const senderId =
         typeof msg.senderId === "string" ? msg.senderId : "";
       const alreadyDeleted = msg.deleted === true;
+      const sentAt = msg.sentAt instanceof Timestamp
+        ? msg.sentAt.toDate()
+        : new Date(0);
       if (
         !canSoftDeleteMessage({
           senderId,
           callerUid,
           callerRole: role,
           alreadyDeleted,
+          sentAt,
         })
       ) {
         throw new HttpsError(
@@ -220,8 +244,7 @@ export const softDeleteChatMessage = onCall(
     });
 
     return { conversationId, messageId, deleted: true };
-  },
-);
+}
 
 /**
  * Edit own message within the C9 time window.

@@ -1,5 +1,33 @@
 import 'entities/content_file_entity.dart';
 
+/// User-facing upload failures (no Firebase or billing internals).
+class ContentUploadErrors {
+  const ContentUploadErrors._();
+
+  static const generic = 'تعذر رفع الملف، حاول مرة أخرى';
+  static const canceled = 'تم إلغاء الرفع';
+  static const incomplete = 'لم يكتمل رفع الملف، أعد المحاولة';
+  static const network = 'انقطع الاتصال أثناء الرفع، أعد المحاولة';
+  static const denied = 'لا تملك صلاحية الرفع في هذه الحلقة';
+  static const unavailable =
+      'الرفع غير متاح حالياً. أعد المحاولة لاحقاً أو تواصل مع إدارة الأكاديمية';
+
+  static String forCode(String code) => switch (code) {
+    'canceled' => canceled,
+    'unauthorized' || 'unauthenticated' || 'permission-denied' => denied,
+    'retry-limit-exceeded' || 'unavailable' || 'network-request-failed' =>
+      network,
+    'quota-exceeded' || 'bucket-not-found' || 'project-not-found' =>
+      unavailable,
+    _ => generic,
+  };
+
+  /// Worth a one-tap retry (transient), as opposed to a permission problem.
+  static bool isRetryable(String message) =>
+      message == network || message == incomplete || message == generic ||
+      message == canceled;
+}
+
 /// Halaqa shared content (P0 §8): PDF, audio, images and documents only.
 ///
 /// Mirrors `storage.rules` `content_library/{halaqaId}/{uploadedBy}/{file}`

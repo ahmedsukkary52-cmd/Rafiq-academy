@@ -1,11 +1,19 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/presentation/academy_data_revision.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../../shared/domain/arabic_search_normalizer.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../student_search/data/datasources/student_search_remote_datasource.dart';
+import '../../../student_search/domain/entities/student_search_entry.dart';
 import '../../domain/entities/admin_halaqa_roster_entity.dart';
 import '../admin_format.dart';
 import '../bloc/admin_bloc.dart';
@@ -14,8 +22,14 @@ import '../bloc/admin_state.dart';
 import '../widgets/admin_figma_widgets.dart';
 import '../widgets/admin_loading_skeletons.dart';
 
+typedef AdminStudentDirectorySearch =
+    Future<List<StudentSearchEntry>> Function(String query);
+
 class AdminStudentsTab extends StatefulWidget {
-  const AdminStudentsTab({super.key});
+  const AdminStudentsTab({super.key, this.search});
+
+  /// Server prefix search over the normalized `studentSearch` projection.
+  final AdminStudentDirectorySearch? search;
 
   @override
   State<AdminStudentsTab> createState() => _AdminStudentsTabState();
@@ -25,16 +39,30 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
   String _query = '';
   final _expanded = <String>{};
   final _searchCtrl = TextEditingController();
+  Timer? _debounce;
+  int _searchGeneration = 0;
+  bool _searching = false;
+  List<StudentSearchEntry> _directory = const [];
 
   @override
   void dispose() {
+    AcademyDataRevision.structure.removeListener(_onStructureChanged);
+    _debounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onStructureChanged() {
+    if (!mounted) return;
+    context.read<AdminBloc>()
+      ..add(const LoadStudentRosterEvent())
+      ..add(const LoadAcademyStatsEvent());
   }
 
   @override
   void initState() {
     super.initState();
+    AcademyDataRevision.structure.addListener(_onStructureChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final bloc = context.read<AdminBloc>();
       bloc.add(const LoadStudentRosterEvent());
@@ -48,20 +76,55 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
     return roster.fold(0, (sum, h) => sum + h.students.length);
   }
 
+  void _onQueryChanged(String value) {
+    setState(() => _query = value);
+    _debounce?.cancel();
+    final q = value.trim();
+    if (ArabicSearchNormalizer.normalize(q).length < 2) {
+      setState(() {
+        _directory = const [];
+        _searching = false;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(q));
+  }
+
+  Future<void> _search(String q) async {
+    final generation = ++_searchGeneration;
+    setState(() => _searching = true);
+    try {
+      final results = await (widget.search ?? _defaultSearch)(q);
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _directory = results;
+        _searching = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _directory = const [];
+        _searching = false;
+      });
+    }
+  }
+
+  static Future<List<StudentSearchEntry>> _defaultSearch(String q) =>
+      StudentSearchRemoteDatasourceImpl(
+        firestore: sl<FirebaseFirestore>(),
+      ).searchAll(query: q);
+
   List<AdminHalaqaRosterEntity> _filtered(
     List<AdminHalaqaRosterEntity> roster,
   ) {
-    if (_query.trim().isEmpty) return roster;
-    final q = _query.trim().toLowerCase();
+    final q = ArabicSearchNormalizer.normalize(_query);
+    if (q.isEmpty) return roster;
+    bool matches(String text) =>
+        ArabicSearchNormalizer.normalize(text).contains(q);
     return roster
         .map((h) {
-          final students = h.students
-              .where(
-                (s) =>
-                    s.name.toLowerCase().contains(q) || s.uid.contains(q),
-              )
-              .toList();
-          if (students.isEmpty && !h.name.toLowerCase().contains(q)) {
+          final students = h.students.where((s) => matches(s.name)).toList();
+          if (students.isEmpty && !matches(h.name)) {
             return null;
           }
           return AdminHalaqaRosterEntity(
@@ -75,6 +138,84 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
         })
         .whereType<AdminHalaqaRosterEntity>()
         .toList();
+  }
+
+  /// Academy-wide matches the halaqa roster above does not already show
+  /// (e.g. students not yet assigned to a halaqa).
+  List<Widget> _directorySection(List<AdminHalaqaRosterEntity> roster) {
+    if (ArabicSearchNormalizer.normalize(_query).length < 2) return const [];
+    final shown = {
+      for (final h in _filtered(roster))
+        for (final s in h.students) s.uid,
+    };
+    final extra = _directory
+        .where((e) => !shown.contains(e.studentId))
+        .toList();
+    if (_searching) {
+      return const [
+        Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: LinearProgressIndicator(minHeight: 2),
+        ),
+      ];
+    }
+    if (extra.isEmpty) return const [];
+    return [
+      Text(
+        'نتائج أخرى في الأكاديمية',
+        style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 8),
+      for (final e in extra)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: AppCard(
+            key: Key('directory-${e.studentId}'),
+            onTap: () => context.push(
+              AppRoutes.adminStudentProfile(e.studentId, halaqaId: e.halaqaId),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.primaryLight,
+                  child: Text(
+                    e.fullName.isNotEmpty ? e.fullName.characters.first : '?',
+                    style: const TextStyle(color: AppColors.primary),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        e.fullName.isEmpty ? 'طالب' : e.fullName,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        e.halaqaName.isNotEmpty
+                            ? e.halaqaName
+                            : 'غير مسجّل في حلقة',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_left_rounded,
+                  color: AppColors.textHint,
+                ),
+              ],
+            ),
+          ),
+        ),
+      const SizedBox(height: 8),
+    ];
   }
 
   @override
@@ -135,9 +276,10 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
                           ),
                           const SizedBox(height: 16),
                           AdminSearchField(
+                            key: const Key('admin-students-search'),
                             controller: _searchCtrl,
-                            hint: 'ابحث باسم الطالب أو رقم الجوال',
-                            onChanged: (v) => setState(() => _query = v),
+                            hint: 'ابحث باسم الطالب أو الحلقة',
+                            onChanged: _onQueryChanged,
                           ),
                           const SizedBox(height: 12),
                           Row(
@@ -152,14 +294,17 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: AppButton(
-                                  label: 'قبول طالب',
-                                  onPressed: () =>
-                                      context.push('${AppRoutes.admin}/admit'),
+                                  key: const Key('students-open-onboarding'),
+                                  label: 'تسجيل طالب جديد',
+                                  onPressed: () => context.push(
+                                    AppRoutes.adminOnboardStudent,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
+                          ..._directorySection(state.studentRoster),
                         ],
                       ),
                     ),
@@ -265,9 +410,15 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
                                         AdminStatusBadge(
                                           label: h.status == 'active'
                                               ? 'نشطة'
-                                              : h.status,
-                                          color: AppColors.success,
-                                          bg: AppColors.successBg,
+                                              : 'غير نشطة',
+                                          color: h.status == 'active'
+                                              ? AppColors.success
+                                              : AppColors.warning,
+                                          bg: h.status == 'active'
+                                              ? AppColors.successBg
+                                              : AppColors.warning.withValues(
+                                                  alpha: 0.12,
+                                                ),
                                         ),
                                         Icon(
                                           expanded

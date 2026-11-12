@@ -470,13 +470,13 @@ class _PostItem extends StatelessWidget {
   final PostEntity post;
   final String currentUid;
   final VoidCallback onLike;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _PostItem({
     required this.post,
     required this.currentUid,
     required this.onLike,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -796,7 +796,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           ),
                         ),
                       ),
-                      onTap: () {},
                     ),
                     const SizedBox(height: 24),
                     const SectionHeader(title: 'التعليقات'),

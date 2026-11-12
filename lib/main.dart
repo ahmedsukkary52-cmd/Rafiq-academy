@@ -22,6 +22,7 @@ import 'features/supervisor/presentation/bloc/supervisor_bloc.dart';
 import 'features/admin/presentation/bloc/admin_bloc.dart';
 import 'features/notifications/data/services/fcm_sign_out_preparation.dart';
 import 'features/notifications/data/services/fcm_token_registrar.dart';
+import 'features/notifications/data/services/foreground_push_presenter.dart';
 import 'features/notifications/data/services/offline_notification_open_port.dart';
 import 'features/notifications/domain/services/notification_open_port.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
@@ -47,6 +48,7 @@ Future<void> main() async {
     sl<AuthBloc>().attachSignOutPreparation(
       FcmSignOutPreparation(() => sl<FcmTokenRegistrar>()),
     );
+    await sl<ForegroundPushPresenter>().start();
   }
 
   final prefs = await SharedPreferences.getInstance();

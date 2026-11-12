@@ -9,6 +9,7 @@ import '../../../../shared/domain/payment_access_entity.dart';
 import '../../../../shared/domain/payment_proof_reader.dart';
 import '../../../../shared/domain/student_parent_links.dart';
 import '../../../../shared/domain/achievement_entity.dart';
+import '../../../schedule/domain/entities/halaqa_schedule_source.dart';
 import '../entities/parent_entities.dart';
 import '../parent_household.dart';
 
@@ -94,6 +95,13 @@ abstract class ParentRepository
   Future<Either<Failure, List<AchievementEntity>>> getChildAchievements(
     String studentId,
   );
+
+  /// Weekly schedule of one linked child's Halaqa, served by the
+  /// parent-scoped callable (name and slot times only).
+  Future<Either<Failure, HalaqaScheduleSource>> getChildHalaqaSchedule({
+    required String studentId,
+    required String halaqaId,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

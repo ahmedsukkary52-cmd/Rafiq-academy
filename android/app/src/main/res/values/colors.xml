@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches AppColors.primary so the native launch screen hands over to
+         the Flutter SplashPage without a colour flash. -->
+    <color name="rafiq_launch_background">#2DC4B2</color>
+    <!-- Mid tone of the logo tile gradient. -->
+    <color name="ic_launcher_background">#1D5FA6</color>
+</resources>

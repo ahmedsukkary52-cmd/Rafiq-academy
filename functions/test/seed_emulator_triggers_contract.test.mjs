@@ -53,17 +53,22 @@ const srcDir = join(functionsDir, "src");
 
 const WRITTEN = "google.cloud.firestore.document.v1.written";
 const CREATED = "google.cloud.firestore.document.v1.created";
+const UPDATED = "google.cloud.firestore.document.v1.updated";
 const firestoreEvent = (eventType, document) => ({ eventType, document, database: "(default)", namespace: "(default)" });
 
 /** Every reviewed Firestore trigger: export name -> event. */
 const PINNED = {
   events: {
+    notifyOnAbsenceRequestCreated: firestoreEvent(CREATED, "absenceRequests/{requestId}"),
+    notifyOnAbsenceRequestReviewed: firestoreEvent(UPDATED, "absenceRequests/{requestId}"),
     notifyOnAssignmentCreated: firestoreEvent(CREATED, "assignments/{assignmentId}"),
+    notifyOnPaymentUpdated: firestoreEvent(UPDATED, "payments/{paymentId}"),
     notifyParentsOnEvaluation: firestoreEvent(WRITTEN, "recitationRecords/{recordId}"),
     projectStudentSearchOnHalaqaWrite: firestoreEvent(WRITTEN, "halaqat/{halaqaId}"),
     projectStudentSearchOnProfileWrite: firestoreEvent(WRITTEN, "studentProfiles/{studentId}"),
     projectStudentSearchOnUserWrite: firestoreEvent(WRITTEN, "users/{uid}"),
     reconcileFcmTokenOwnership: firestoreEvent(WRITTEN, "fcmTokens/{uid}/devices/{deviceId}"),
+    syncAdminGroupOnUserWrite: firestoreEvent(WRITTEN, "users/{uid}"),
     syncHalaqaGroupOnWrite: firestoreEvent(WRITTEN, "halaqat/{halaqaId}"),
   },
   /** Time-based only; never fired by a write. */
@@ -73,9 +78,15 @@ const PINNED = {
 /**
  * Reviewed: they run on seeded users / studentProfiles and only upsert or
  * delete studentSearch/{id}, a derived projection the seeder neither writes
- * nor checks after writing.
+ * nor checks after writing. syncAdminGroupOnUserWrite only updates an
+ * already existing conversations/admin_internal_group (never creates it), so
+ * a seed run into a fresh emulator writes nothing.
  */
-const TRIGGERS_ON_SEEDED_DATA = ["projectStudentSearchOnProfileWrite", "projectStudentSearchOnUserWrite"];
+const TRIGGERS_ON_SEEDED_DATA = [
+  "projectStudentSearchOnProfileWrite",
+  "projectStudentSearchOnUserWrite",
+  "syncAdminGroupOnUserWrite",
+];
 const DERIVED_COLLECTIONS = ["studentSearch"];
 
 function tsFiles(dir) {
@@ -159,6 +170,15 @@ test("the reviewed seeded-data triggers write only the derived projection", () =
   assert.match(file, /const ref = db\.collection\(STUDENT_SEARCH_COLLECTION\)\.doc\(id\);/);
   assert.match(file, /\.collection\(STUDENT_SEARCH_COLLECTION\)[\s\S]{0,200}const batch = db\.batch\(\);/);
   assert.doesNotMatch(file, /\.collection\([^)]*\)\.add\(|\b(recursiveDelete|bulkWriter)\(/);
+});
+
+test("the admin group trigger writes only the existing admin group conversation", () => {
+  const file = sources.find((s) => s.file === "chat/adminGroupFunctions.ts").text;
+  const targets = [...file.matchAll(/\.(set|update|delete|create)\(\s*([A-Za-z_][\w.]*)/g)].map((m) => m[2]);
+  assert.deepEqual([...new Set(targets)].sort(), ["conversationRef"]);
+  assert.match(file, /const conversationRef = db\.collection\("conversations"\)\.doc\(ADMIN_GROUP_CONVERSATION_ID\);/);
+  assert.match(file, /syncAdminGroupConversation\(\{ db, createdBy: "system", allowCreate: false \}\)/);
+  assert.doesNotMatch(file, /\.add\(|\b(recursiveDelete|bulkWriter|batch)\(/);
 });
 
 // ── Layer 2 detects every evasion form (synthetic sources) ──────────────────

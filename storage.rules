@@ -19,9 +19,11 @@ service firebase.storage {
       );
     }
 
-    // Deactivated profiles (isActive == false) hold no role (fail closed).
+    // Deactivated profiles (isActive == false) and Admins still on their
+    // provisioning password (passwordChangeRequired) hold no role.
     function activeRole() {
       return userDoc().data.get('isActive', true) != false
+          && userDoc().data.get('passwordChangeRequired', false) != true
         ? userDoc().data.get('role', '')
         : '';
     }
@@ -303,6 +305,21 @@ service firebase.storage {
 
       allow update: if false;
       allow delete: if canDeleteOrphanChatObject(conversationId, messageId);
+    }
+
+    // ── Admin-managed group image: members read; Admin uploads (no URLs
+    //    are shared, so removal from the group revokes access). ──────────────
+    match /chat_group_images/{conversationId}/{fileName} {
+      allow read: if isAdmin() || isConversationParticipant(conversationId);
+
+      allow create, update: if isAdmin()
+        && conversationExists(conversationId)
+        && conversationDoc(conversationId).data.get('kind', '') == 'custom_group'
+        && fileName.matches('^[A-Za-z0-9._-]{1,80}$')
+        && isChatImageType()
+        && underChatImageSize();
+
+      allow delete: if isAdmin();
     }
 
     // ── C10 awards/{teacherId}/{file} — grantor staff path lock ─────────────

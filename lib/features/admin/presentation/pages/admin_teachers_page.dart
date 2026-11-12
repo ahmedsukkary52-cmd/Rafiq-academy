@@ -1,9 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../data/staff_lifecycle_repository.dart';
 import '../../domain/entities/teacher_management_entity.dart';
 import '../bloc/admin_bloc.dart';
 import '../bloc/admin_event.dart';
@@ -11,9 +16,22 @@ import '../bloc/admin_state.dart';
 import '../widgets/admin_figma_widgets.dart';
 import '../widgets/admin_subpage_scaffold.dart';
 import '../widgets/admin_loading_skeletons.dart';
+import '../widgets/staff_lifecycle_sheet.dart';
+
+StaffLifecycleRepository resolveStaffLifecycleRepository() =>
+    StaffLifecycleRepository(
+      firestore: sl<FirebaseFirestore>(),
+      functions: sl<FirebaseFunctions>(),
+    );
+
+StaffStatus _statusOf(TeacherManagementEntity t) =>
+    StaffStatus.fromUser({'staffStatus': t.staffStatus, 'isActive': t.isActive});
 
 class AdminTeachersPage extends StatefulWidget {
-  const AdminTeachersPage({super.key});
+  const AdminTeachersPage({super.key, this.staffRepository});
+
+  /// Test seam; defaults to the Firebase-backed repository.
+  final StaffLifecycleRepository? staffRepository;
 
   @override
   State<AdminTeachersPage> createState() => _AdminTeachersPageState();
@@ -106,33 +124,27 @@ class _AdminTeachersPageState extends State<AdminTeachersPage> {
     );
   }
 
-  Future<void> _toggleAccount(TeacherManagementEntity teacher) async {
-    final activate = !teacher.isActive;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(activate ? 'تفعيل الحساب' : 'تعطيل الحساب'),
-        content: Text(
-          activate
-              ? 'هل تريد تفعيل حساب ${teacher.name}؟'
-              : 'هل تريد تعطيل حساب ${teacher.name}؟ لن يتمكن من تسجيل الدخول.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(activate ? 'تفعيل' : 'تعطيل'),
-          ),
-        ],
+  late final StaffLifecycleRepository _staff =
+      widget.staffRepository ?? resolveStaffLifecycleRepository();
+
+  Future<void> _manageAccount(TeacherManagementEntity teacher) async {
+    final changed = await showStaffLifecycleSheet(
+      context,
+      member: StaffMember(
+        uid: teacher.uid,
+        name: teacher.name,
+        role: AppRoles.teacher,
+        status: _statusOf(teacher),
+        profileImageUrl: teacher.profileImageUrl,
       ),
+      repository: _staff,
     );
-    if (!mounted || confirmed != true) return;
-    context.read<AdminBloc>().add(
-      ToggleAccountStatusEvent(uid: teacher.uid, isActive: activate),
-    );
+    if (!mounted || !changed) return;
+    AppSnackBar.showSuccess(context, 'تم تحديث الحساب');
+    final bloc = context.read<AdminBloc>();
+    bloc.add(const LoadAllTeachersEvent());
+    bloc.add(const LoadAdminDirectoryEvent());
+    bloc.add(const RefreshAdminDashboardEvent());
   }
 
   Future<void> _showActivity(TeacherManagementEntity teacher) async {
@@ -345,7 +357,7 @@ class _AdminTeachersPageState extends State<AdminTeachersPage> {
                       busy: toggling,
                       onEditRating: () => _editRating(t),
                       onEditQuota: () => _editQuota(t),
-                      onToggleAccount: () => _toggleAccount(t),
+                      onManageAccount: () => _manageAccount(t),
                       onShowActivity: () => _showActivity(t),
                     ),
                   );
@@ -364,7 +376,7 @@ class _TeacherCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onEditRating;
   final VoidCallback onEditQuota;
-  final VoidCallback onToggleAccount;
+  final VoidCallback onManageAccount;
   final VoidCallback onShowActivity;
 
   const _TeacherCard({
@@ -372,7 +384,7 @@ class _TeacherCard extends StatelessWidget {
     required this.busy,
     required this.onEditRating,
     required this.onEditQuota,
-    required this.onToggleAccount,
+    required this.onManageAccount,
     required this.onShowActivity,
   });
 
@@ -423,12 +435,7 @@ class _TeacherCard extends StatelessWidget {
                   ],
                 ),
               ),
-              AdminStatusBadge(
-                label: teacher.isActive ? 'نشط' : 'معطّل',
-                color: teacher.isActive ? AppColors.success : AppColors.error,
-                bg: (teacher.isActive ? AppColors.success : AppColors.error)
-                    .withValues(alpha: 0.12),
-              ),
+              StaffStatusBadge(status: _statusOf(teacher)),
             ],
           ),
           const SizedBox(height: 12),
@@ -438,7 +445,9 @@ class _TeacherCard extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: busy ? null : onEditRating,
                   child: Text(
-                    'تقييم: ${teacher.performanceRating?.toStringAsFixed(1) ?? '—'}',
+                    teacher.performanceRating == null
+                        ? 'تقييم الأداء: لم يُحدد'
+                        : 'تقييم الأداء: ${teacher.performanceRating!.toStringAsFixed(1)} / 5',
                   ),
                 ),
               ),
@@ -446,7 +455,7 @@ class _TeacherCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: busy ? null : onEditQuota,
-                  child: Text('نصاب: ${teacher.weeklyQuota}'),
+                  child: Text('الحصص الأسبوعية: ${teacher.weeklyQuota}'),
                 ),
               ),
             ],
@@ -464,14 +473,10 @@ class _TeacherCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: busy ? null : onToggleAccount,
-                  icon: Icon(
-                    teacher.isActive
-                        ? Icons.block_outlined
-                        : Icons.check_circle_outline,
-                    size: 18,
-                  ),
-                  label: Text(teacher.isActive ? 'تعطيل' : 'تفعيل'),
+                  key: Key('manage-${teacher.uid}'),
+                  onPressed: busy ? null : onManageAccount,
+                  icon: const Icon(Icons.manage_accounts_outlined, size: 18),
+                  label: const Text('إدارة الحساب'),
                 ),
               ),
             ],

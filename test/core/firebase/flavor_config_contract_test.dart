@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/firebase/app_flavor.dart';
 
 const _devApplicationId = 'com.example.rafiq_academy';
+const _devReviewApplicationId = 'com.example.rafiq_academy.review';
 const _stagingApplicationId = 'com.basmaacademy.app.staging';
 const _prodApplicationId = 'com.basmaacademy.app';
 
@@ -144,9 +145,27 @@ android {
     },
   );
 
+  test('the review application ID is a dev-only, property-gated suffix', () {
+    final dev = flavors['dev']!;
+    expect(
+      dev,
+      contains(
+        'if (basmaReviewBuild) applicationIdSuffix = reviewApplicationIdSuffix',
+      ),
+    );
+    expect(gradle, contains('val reviewApplicationIdSuffix = ".review"'));
+    expect(
+      gradle,
+      contains('project.findProperty("basmaReviewBuild") == "true"'),
+    );
+    for (final name in ['staging', 'prod']) {
+      expect(flavors[name], isNot(contains('applicationIdSuffix')));
+    }
+  });
+
   for (final entry in {
-    'dev': _devApplicationId,
-    'staging': 'com.basmaacademy.app.staging',
+    'dev': [_devApplicationId, _devReviewApplicationId],
+    'staging': ['com.basmaacademy.app.staging'],
   }.entries) {
     test('${entry.key} has its own fake emulator google-services.json', () {
       final json = readJson(
@@ -156,7 +175,13 @@ android {
         (json['project_info'] as Map<String, dynamic>)['project_id'],
         localEmulatorProjectId,
       );
-      expect(packagesOf(json), [entry.value]);
+      expect(packagesOf(json), entry.value);
+      for (final client in json['client'] as List<dynamic>) {
+        final key =
+            ((client as Map<String, dynamic>)['api_key'] as List<dynamic>)
+                .single['current_key'];
+        expect(key, 'fake-emulator-api-key');
+      }
     });
 
     test('${entry.key} manifest removes the native FirebaseInitProvider', () {

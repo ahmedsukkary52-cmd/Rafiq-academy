@@ -9,6 +9,9 @@ class TeacherManagementEntity extends Equatable {
   final int weeklyQuota;
   final bool isActive;
 
+  /// Server staff lifecycle wire value (`active`, `deactivated`, `archived`).
+  final String staffStatus;
+
   const TeacherManagementEntity({
     required this.uid,
     required this.name,
@@ -17,6 +20,7 @@ class TeacherManagementEntity extends Equatable {
     this.performanceRating,
     required this.weeklyQuota,
     this.isActive = true,
+    this.staffStatus = 'active',
   });
 
   @override
@@ -28,5 +32,6 @@ class TeacherManagementEntity extends Equatable {
     performanceRating,
     weeklyQuota,
     isActive,
+    staffStatus,
   ];
 }

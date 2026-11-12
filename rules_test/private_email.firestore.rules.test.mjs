@@ -136,9 +136,11 @@ test('users/{uid}: no client may add, change or remove email', async () => {
 });
 
 test('users/{uid}: unrelated profile writes and public reads still work', async () => {
-  // Owner edits their name; Admin toggles status on a doc that still has a legacy email.
+  // Owner edits their name; Admin edits a doc that still has a legacy email.
+  // Login state goes through adminSetMemberActive, never a client write.
   await assertSucceeds(authed('owner1').doc('users/owner1').update({ name: 'renamed' }));
-  await assertSucceeds(authed('admin1').doc('users/owner1').update({ isActive: false }));
+  await assertSucceeds(authed('admin1').doc('users/owner1').update({ name: 'renamed by admin' }));
+  await assertFails(authed('admin1').doc('users/owner1').update({ isActive: false }));
   // Public profile reads used by chat, rosters and parent pages.
   await assertSucceeds(authed('parent1').doc('users/teacher1').get());
   await assertSucceeds(authed('teacher1').doc('users/student2').get());

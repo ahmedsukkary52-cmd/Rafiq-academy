@@ -113,14 +113,17 @@ void main() {
     expect(find.text('uid_b'), findsNothing);
   });
 
-  testWidgets('unresolved names fall back to the id', (tester) async {
+  testWidgets('unresolved names show a neutral label, never the id', (
+    tester,
+  ) async {
     await _pump(
       tester,
       studentIds: const ['uid_a'],
       loadNames: (_) async => const {},
     );
 
-    expect(find.text('uid_a'), findsOneWidget);
+    expect(find.text('طالب بدون اسم'), findsOneWidget);
+    expect(find.text('uid_a'), findsNothing);
   });
 
   testWidgets('lookup failure keeps the dialog usable', (tester) async {
@@ -130,7 +133,7 @@ void main() {
       loadNames: (_) async => throw Exception('denied'),
     );
 
-    expect(find.text('uid_a'), findsOneWidget);
+    expect(find.text('طالب بدون اسم'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

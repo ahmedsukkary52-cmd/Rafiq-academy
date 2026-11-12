@@ -22,6 +22,12 @@ val useFirebaseEmulator: Boolean =
         ?.contains("USE_FIREBASE_EMULATOR=true")
         ?: false
 
+// Personal review APK (-PbasmaReviewBuild=true): the dev debug build gets its
+// own application ID so it installs beside an older dev build signed with a
+// different debug key. Everything else about dev is unchanged.
+val basmaReviewBuild: Boolean = project.findProperty("basmaReviewBuild") == "true"
+val reviewApplicationIdSuffix = ".review"
+
 // Play upload key for prod release builds. Read from android/key.properties
 // (git-ignored; storeFile is relative to android/app or absolute) or, when that
 // file is absent, from the CM_KEYSTORE_PATH / CM_KEYSTORE_PASSWORD /
@@ -67,6 +73,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -104,6 +112,7 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "com.example.rafiq_academy"
+            if (basmaReviewBuild) applicationIdSuffix = reviewApplicationIdSuffix
             resValue("string", "app_name", "بصمة (تطوير)")
             // Local and test builds only; never uploaded to a store.
             signingConfig = signingConfigs.getByName("debug")
@@ -168,6 +177,9 @@ gradle.taskGraph.whenReady {
             )
         }
     }
+    if (basmaReviewBuild && allTasks.any { it.name.matches(Regex("^(assemble|bundle|package|install)(Staging|Prod).*")) }) {
+        throw GradleException("-PbasmaReviewBuild=true applies to the dev debug build only.")
+    }
 }
 val googleServicesTask = Regex("^process(Dev|Staging)(Debug|Profile|Release)GoogleServices$")
 tasks.configureEach {
@@ -186,6 +198,10 @@ tasks.configureEach {
         }
         if (!text.contains("\"${localFlavorAppIds.getValue(flavor)}\"")) {
             throw GradleException("${file.path} does not register ${localFlavorAppIds.getValue(flavor)}.")
+        }
+        val reviewAppId = localFlavorAppIds.getValue(flavor) + reviewApplicationIdSuffix
+        if (basmaReviewBuild && flavor == "dev" && !text.contains("\"$reviewAppId\"")) {
+            throw GradleException("${file.path} does not register $reviewAppId.")
         }
     }
     doLast {
@@ -208,3 +224,7 @@ androidComponents {
     }
 }
 // ---- end Basma local-flavor isolation ----
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}

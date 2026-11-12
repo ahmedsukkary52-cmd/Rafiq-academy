@@ -15,6 +15,9 @@ import '../widgets/admin_subpage_scaffold.dart';
 import '../widgets/admin_loading_skeletons.dart';
 
 /// Admin internal group chat — replaces standalone internal notes (Q5).
+///
+/// The backend creates the group once and keeps its members equal to the
+/// active Admins; this page only asks for it and opens the chat room.
 class AdminInternalChatPage extends StatefulWidget {
   const AdminInternalChatPage({super.key});
 
@@ -23,22 +26,29 @@ class AdminInternalChatPage extends StatefulWidget {
 }
 
 class _AdminInternalChatPageState extends State<AdminInternalChatPage> {
+  bool _signedOut = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthBloc>().state;
-      if (auth is AuthAuthenticated) {
-        context.read<AdminBloc>().add(
-          EnsureAdminInternalChatEvent(adminUid: auth.user.uid),
-        );
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensure());
+  }
+
+  void _ensure() {
+    if (!mounted) return;
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) {
+      setState(() => _signedOut = true);
+      return;
+    }
+    context.read<AdminBloc>().add(
+      EnsureAdminInternalChatEvent(adminUid: auth.user.uid),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<AdminBloc, AdminState>(
+    return BlocConsumer<AdminBloc, AdminState>(
       listenWhen: (p, c) =>
           p.adminInternalChatStatus != c.adminInternalChatStatus,
       listener: (context, state) {
@@ -48,18 +58,30 @@ class _AdminInternalChatPageState extends State<AdminInternalChatPage> {
             '${AppRoutes.admin}/chat/${state.adminInternalChatId}',
             extra: {ChatRouteExtra.nameKey: 'مجموعة الإدارة'},
           );
-        } else if (state.adminInternalChatStatus == SubmissionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.adminInternalChatError ?? 'تعذر فتح المجموعة',
-          );
         }
       },
-      child: const AdminSubpageScaffold(
-        title: 'مجموعة الإدارة',
-        subtitle: 'تواصل داخلي بين فريق الإدارة',
-        body: AdminFlowBootstrapSkeleton(),
-      ),
+      builder: (context, state) {
+        final Widget body;
+        if (_signedOut) {
+          body = const AppErrorWidget(
+            key: Key('admin-group-error'),
+            message: 'سجّل الدخول بحساب مدير لفتح مجموعة الإدارة',
+          );
+        } else if (state.adminInternalChatStatus == SubmissionStatus.error) {
+          body = AppErrorWidget(
+            key: const Key('admin-group-error'),
+            message: state.adminInternalChatError ?? 'تعذر فتح مجموعة الإدارة',
+            onRetry: _ensure,
+          );
+        } else {
+          body = const AdminFlowBootstrapSkeleton();
+        }
+        return AdminSubpageScaffold(
+          title: 'مجموعة الإدارة',
+          subtitle: 'تواصل داخلي بين فريق الإدارة',
+          body: body,
+        );
+      },
     );
   }
 }

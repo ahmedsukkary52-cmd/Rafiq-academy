@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/presentation/halaqa_activities/activity_thread_widgets.dart';
 import '../../../../shared/domain/upload_file_policy.dart';
@@ -262,7 +261,6 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
   HalaqaActivityUi? _activity;
 
   File? _pendingImageFile;
-  File? _pendingAudioFile;
   bool _sending = false;
 
   @override
@@ -329,10 +327,7 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
     final imageOk =
         a.allowedResponseTypes.contains(ActivityResponseTypeUi.image) &&
             _pendingImageFile != null;
-    final audioOk =
-        a.allowedResponseTypes.contains(ActivityResponseTypeUi.audio) &&
-            _pendingAudioFile != null;
-    return textOk || imageOk || audioOk;
+    return textOk || imageOk;
   }
 
   Future<void> _pickImage() async {
@@ -362,29 +357,6 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
     setState(() => _pendingImageFile = File(path));
   }
 
-  Future<void> _pickAudio() async {
-    if (!_activity!.allowedResponseTypes
-        .contains(ActivityResponseTypeUi.audio)) {
-      AppSnackBar.showInfo(context, 'هذه المهمة لا تقبل صوتاً');
-      return;
-    }
-    if (!AppCapabilities.audioUploadsEnabled) {
-      AppSnackBar.showError(
-        context,
-        'رفع الصوت غير مفعّل حالياً',
-      );
-      return;
-    }
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['mp3', 'wav', 'm4a', 'aac'],
-      allowMultiple: false,
-    );
-    final path = result?.files.single.path;
-    if (path == null || !mounted) return;
-    setState(() => _pendingAudioFile = File(path));
-  }
-
   Future<void> _send() async {
     final a = _activity;
     if (a == null || !_canSend) return;
@@ -405,7 +377,6 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
             ? _textCtrl.text
             : null,
         imageFile: _pendingImageFile,
-        audioFile: _pendingAudioFile,
       ),
     );
     if (!mounted) return;
@@ -418,7 +389,6 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
       (_) async {
         _textCtrl.clear();
         _pendingImageFile = null;
-        _pendingAudioFile = null;
         setState(() => _sending = false);
         AppSnackBar.showSuccess(context, 'تم إرسال ردك');
         await _load();
@@ -482,7 +452,6 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
                 activity: _activity!,
                 textController: _textCtrl,
                 pendingImage: _pendingImageFile != null,
-                pendingAudio: _pendingAudioFile != null,
                 sending: _sending,
                 canSend: _canSend,
                 onTextChanged: (_) => setState(() {}),
@@ -492,13 +461,6 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
                     return;
                   }
                   _pickImage();
-                },
-                onToggleAudio: () {
-                  if (_pendingAudioFile != null) {
-                    setState(() => _pendingAudioFile = null);
-                    return;
-                  }
-                  _pickAudio();
                 },
                 onSend: _send,
               ),
@@ -567,6 +529,7 @@ class _PromptHeader extends StatelessWidget {
             runSpacing: 6,
             alignment: WrapAlignment.end,
             children: activity.allowedResponseTypes
+                .where((t) => t != ActivityResponseTypeUi.audio)
                 .map(
                   (t) => Container(
                     padding:
@@ -596,24 +559,20 @@ class _ComposerBar extends StatelessWidget {
   final HalaqaActivityUi activity;
   final TextEditingController textController;
   final bool pendingImage;
-  final bool pendingAudio;
   final bool sending;
   final bool canSend;
   final ValueChanged<String> onTextChanged;
   final VoidCallback onToggleImage;
-  final VoidCallback onToggleAudio;
   final VoidCallback onSend;
 
   const _ComposerBar({
     required this.activity,
     required this.textController,
     required this.pendingImage,
-    required this.pendingAudio,
     required this.sending,
     required this.canSend,
     required this.onTextChanged,
     required this.onToggleImage,
-    required this.onToggleAudio,
     required this.onSend,
   });
 
@@ -623,8 +582,6 @@ class _ComposerBar extends StatelessWidget {
         activity.allowedResponseTypes.contains(ActivityResponseTypeUi.text);
     final allowImage =
         activity.allowedResponseTypes.contains(ActivityResponseTypeUi.image);
-    final allowAudio =
-        activity.allowedResponseTypes.contains(ActivityResponseTypeUi.audio);
 
     return Material(
       elevation: 8,
@@ -636,30 +593,13 @@ class _ComposerBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (pendingImage || pendingAudio)
+              if (pendingImage)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      if (pendingImage)
-                        Expanded(
-                          child: _PendingChip(
-                            icon: Icons.image_outlined,
-                            label: 'صورة جاهزة للإرسال',
-                            onClear: onToggleImage,
-                          ),
-                        ),
-                      if (pendingImage && pendingAudio)
-                        const SizedBox(width: 8),
-                      if (pendingAudio)
-                        Expanded(
-                          child: _PendingChip(
-                            icon: Icons.mic_none_rounded,
-                            label: 'تسجيل جاهز للإرسال',
-                            onClear: onToggleAudio,
-                          ),
-                        ),
-                    ],
+                  child: _PendingChip(
+                    icon: Icons.image_outlined,
+                    label: 'صورة جاهزة للإرسال',
+                    onClear: onToggleImage,
                   ),
                 ),
               Row(
@@ -681,19 +621,6 @@ class _ComposerBar extends StatelessWidget {
                                 : AppColors.textHint,
                           ),
                   ),
-                  if (allowAudio)
-                    IconButton(
-                      tooltip: AppCapabilities.audioUploadsEnabled
-                          ? 'صوت'
-                          : 'صوت (غير مفعّل)',
-                      onPressed: onToggleAudio,
-                      icon: Icon(
-                        Icons.mic_none_rounded,
-                        color: pendingAudio
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                      ),
-                    ),
                   if (allowImage)
                     IconButton(
                       tooltip: 'صورة',

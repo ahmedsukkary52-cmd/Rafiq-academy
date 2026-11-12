@@ -360,6 +360,31 @@ void main() {
       });
     });
 
+    test('P2-2: account activation goes through adminSetMemberActive only', () async {
+      functions.handlers['adminSetMemberActive'] = (_) => null;
+
+      await ds.toggleAccountStatus(uid: ' p1 ', isActive: false);
+      expect(functions.payloadOf('adminSetMemberActive'), {
+        'uid': 'p1',
+        'isActive': false,
+      });
+
+      await ds.rejectRegistrationRequest(studentId: ' s9 ');
+      expect(functions.payloadOf('adminSetMemberActive'), {
+        'uid': 's9',
+        'isActive': false,
+      });
+    });
+
+    test('P2-2: a refused activation is surfaced', () async {
+      functions.handlers['adminSetMemberActive'] = (_) =>
+          throw FakeFunctionsError('failed-precondition', 'الطالب مؤرشف؛ ألغِ الأرشفة أولاً');
+      await expectLater(
+        ds.toggleAccountStatus(uid: 's1', isActive: true),
+        serverError('الطالب مؤرشف؛ ألغِ الأرشفة أولاً'),
+      );
+    });
+
     test('reinstate access forwards an optional reason', () async {
       functions.handlers['adminReinstatePaymentAccess'] = (_) => null;
 

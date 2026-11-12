@@ -23,10 +23,13 @@ class LoadOlderMessagesRequestedEvent extends ChatRoomEvent {
 /// إرسال رسالة نصية جديدة
 class SendMessageRequestedEvent extends ChatRoomEvent {
   final String text;
-  const SendMessageRequestedEvent(this.text);
+
+  /// Message being quoted (server copies its preview into `replyTo`).
+  final String? replyToMessageId;
+  const SendMessageRequestedEvent(this.text, {this.replyToMessageId});
 
   @override
-  List<Object?> get props => [text];
+  List<Object?> get props => [text, replyToMessageId];
 }
 
 /// Upload [draft] then send it as an image / voice / file message.

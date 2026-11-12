@@ -54,6 +54,11 @@ class ResetUploadEvent extends ContentLibraryEvent {
   const ResetUploadEvent();
 }
 
+/// Re-sends the last failed upload (same file, title and halaqa).
+class RetryUploadEvent extends ContentLibraryEvent {
+  const RetryUploadEvent();
+}
+
 class DeleteFileEvent extends ContentLibraryEvent {
   final ContentFileEntity file;
 

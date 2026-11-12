@@ -30,12 +30,14 @@ class CalendarEventModel extends CalendarEventEntity {
 
   /// [creatorUid] is the signed-in Firebase user; firestore.rules reject any
   /// other value, so the entity's own [createdBy] is never written.
+  /// `halaqaId` is always written: a general event stores `null`, because the
+  /// month query's `isNull` filter does not match a missing field.
   Map<String, dynamic> toCreateData({required String creatorUid}) => {
     'title': title,
     'type': _typeToString(type),
     'date': Timestamp.fromDate(date),
     if (description != null) 'description': description,
-    if (halaqaId != null) 'halaqaId': halaqaId,
+    'halaqaId': halaqaId,
     if (halaqaName != null) 'halaqaName': halaqaName,
     'createdBy': creatorUid,
     'createdAt': FieldValue.serverTimestamp(),

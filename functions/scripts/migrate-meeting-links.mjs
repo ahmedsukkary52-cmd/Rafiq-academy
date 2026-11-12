@@ -1,11 +1,15 @@
 // B14 — copies legacy `halaqat/{id}.meetingLink` values into the canonical
-// `halaqaMeetingLinks/{id}` documents. Milestone 1: the isolated Firestore
+// `halaqaMeetingLinks/{id}` documents, and (J.9, `--strip-legacy`) later
+// removes the legacy key from `halaqat`. Milestone 1: the isolated Firestore
 // emulator for `demo-rafiq-rules` only; there is no mode for a real project.
 //
 //   node scripts/migrate-meeting-links.mjs                          (plan only)
 //   node scripts/migrate-meeting-links.mjs --project demo-rafiq-rules       (dry run)
 //   node scripts/migrate-meeting-links.mjs --project demo-rafiq-rules --apply \
 //     --confirm meeting-link-migration:demo-rafiq-rules
+//   node scripts/migrate-meeting-links.mjs --project demo-rafiq-rules --strip-legacy  (strip dry run)
+//   node scripts/migrate-meeting-links.mjs --project demo-rafiq-rules --strip-legacy --apply \
+//     --confirm meeting-link-strip:demo-rafiq-rules
 //
 // Required for a dry run or apply:
 //   MEETING_LINK_MIGRATION_EMULATOR=1
@@ -21,12 +25,20 @@
 // (a read-only store, plus in apply mode a writer whose only operation is the
 // per-halaqa transaction below).
 //
-// Writes: only `tx.create` of a missing canonical document, decided from a
-// transactional re-read of the halaqa and its canonical document. Nothing is
-// ever overwritten, repaired or deleted, and `halaqat` is never written.
-// The race argument relies on every canonical writer (setHalaqaMeetingLink,
-// adminCreateHalaqa) also writing the halaqa document in the same
-// transaction; run this only while that holds.
+// Writes (copy): only `tx.create` of a missing canonical document, decided
+// from a transactional re-read of the halaqa and its canonical document.
+// Nothing is ever overwritten, repaired or deleted, and `halaqat` is never
+// written. The race argument relies on every canonical writer that runs while
+// a legacy copy exists also writing the halaqa document in the same
+// transaction (setHalaqaMeetingLink deletes the copy; adminCreateHalaqa
+// creates a halaqa without one); run this only while that holds.
+//
+// Writes (strip): only a transactional update deleting `halaqat/{id}.meetingLink`, decided
+// from the same transactional re-read, and only when the legacy key carries
+// no link ("") or a well-formed canonical document exists. A valid legacy
+// link without a canonical document, an invalid legacy value and a malformed
+// canonical document are reported for review and never stripped. Run the
+// copy first; the strip never creates or changes a canonical document.
 //
 // Output: one JSON report of counts, reason codes and capped halaqa ids.
 // Link values, any part of a URL, student/supervisor ids and raw error
@@ -55,6 +67,7 @@ export const KNOWN_REAL_PROJECTS = Object.freeze([
 export const OPT_IN_ENV = "MEETING_LINK_MIGRATION_EMULATOR";
 export const PORTS_ENV = "MEETING_LINK_MIGRATION_PORTS";
 export const CONFIRM_TOKEN = `${SCRIPT_ID}:${EMULATOR_PROJECT}`;
+export const STRIP_CONFIRM_TOKEN = `meeting-link-strip:${EMULATOR_PROJECT}`;
 export const PAGE_SIZE = 200;
 export const ID_CAP = 50;
 
@@ -133,10 +146,13 @@ function zeroCounts(keys) {
 
 // ── invocation gate (pure) ─────────────────────────────────────────────────
 
-/** Returns { problems, mode: "plan" | "dry-run" | "apply" | null, config }. Never echoes values. */
+/**
+ * Returns { problems, mode: "plan" | "dry-run" | "apply" | null, config }.
+ * `config.strip` selects the legacy strip instead of the copy. Never echoes values.
+ */
 export function checkInvocation({ argv, env }) {
   const problems = [];
-  const opts = { project: null, apply: false, dryRun: false, confirm: null };
+  const opts = { project: null, apply: false, dryRun: false, confirm: null, strip: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith("--")) {
@@ -168,6 +184,10 @@ export function checkInvocation({ argv, env }) {
         if (flag === "--apply") opts.apply = true;
         else opts.dryRun = true;
         break;
+      case "--strip-legacy":
+        if (inline !== undefined) problems.push(`${flag} takes no value.`);
+        opts.strip = true;
+        break;
       default:
         problems.push(/^--[a-z-]{1,30}$/.test(flag) ? `Unknown flag ${flag}.` : "Unknown flag.");
     }
@@ -188,8 +208,9 @@ export function checkInvocation({ argv, env }) {
         : `--project is not supported; only ${EMULATOR_PROJECT} on the local emulator.`,
     );
   }
-  if (opts.apply && opts.confirm !== CONFIRM_TOKEN) {
-    problems.push(`--apply needs --confirm ${CONFIRM_TOKEN}`);
+  const token = opts.strip ? STRIP_CONFIRM_TOKEN : CONFIRM_TOKEN;
+  if (opts.apply && opts.confirm !== token) {
+    problems.push(`--apply needs --confirm ${token}`);
   }
   problems.push(...environmentProblems(env, opts));
   const mode = problems.length ? null : opts.apply ? "apply" : "dry-run";
@@ -258,6 +279,7 @@ export function buildPlan() {
     scope: {
       reads: [HALAQAT, LINKS, "users", "studentProfiles"],
       writes: `apply only: create missing ${LINKS}/{halaqaId} from a valid legacy value; never overwrite, repair or delete; never write ${HALAQAT}`,
+      stripWrites: `--strip-legacy apply only: delete the legacy ${HALAQAT}/{halaqaId}.meetingLink key when it is empty or a well-formed ${LINKS} doc exists; nothing else`,
       realProjects: "not supported in this milestone",
     },
     requiredForDryRunOrApply: [
@@ -266,6 +288,7 @@ export function buildPlan() {
       `${PORTS_ENV}=<firestorePort>,<hubPort> matching FIRESTORE_EMULATOR_HOST and FIREBASE_EMULATOR_HUB on 127.0.0.1`,
     ],
     requiredForApply: [`--apply --confirm ${CONFIRM_TOKEN}`],
+    requiredForStripApply: [`--strip-legacy --apply --confirm ${STRIP_CONFIRM_TOKEN}`],
   };
 }
 
@@ -381,6 +404,52 @@ export function canonicalWriter(db, { canonicalData, issueOf, afterRead = null }
         ),
     },
     "writer",
+  );
+}
+
+/**
+ * "noLegacy" | "strip" | "needsCopy" | "invalidLegacy" | "canonicalMalformed".
+ * The legacy key is removed only when it carries no link ("") or a
+ * well-formed canonical document exists (the canonical document is the link).
+ * A valid legacy link without a canonical document has not been copied yet.
+ */
+export function decideStrip(legacy, canonical) {
+  if (legacy.category === "missing") return "noLegacy";
+  if (canonical === null) {
+    if (legacy.category === "empty") return "strip";
+    return legacy.category === "valid" ? "needsCopy" : "invalidLegacy";
+  }
+  return canonical.malformed ? "canonicalMalformed" : "strip";
+}
+
+/**
+ * Strip-mode writer. Its only operation re-reads the halaqa and its canonical
+ * document in one transaction and deletes the halaqa's `meetingLink` key only
+ * when decideStrip still says "strip". `afterRead` is a test hook (not
+ * reachable from the CLI).
+ */
+export function legacyStripper(db, { deleteField, issueOf, isTimestamp, afterRead = null }) {
+  return locked(
+    {
+      stripOne: (halaqaId) =>
+        db.runTransaction(
+          async (tx) => {
+            const halaqaRef = db.collection(HALAQAT).doc(halaqaId);
+            const linkRef = db.collection(LINKS).doc(halaqaId);
+            const [halaqa, link] = await tx.getAll(halaqaRef, linkRef);
+            if (afterRead) await afterRead(halaqaId);
+            if (!halaqa.exists) return "halaqaGone";
+            const legacy = classifyLegacy(halaqa.data() ?? {}, issueOf);
+            const canonical = link.exists ? classifyCanonical(link.data() ?? {}, issueOf, isTimestamp) : null;
+            const decision = decideStrip(legacy, canonical);
+            if (decision !== "strip") return decision;
+            tx.update(halaqaRef, { meetingLink: deleteField() });
+            return "stripped";
+          },
+          { maxAttempts: 5 },
+        ),
+    },
+    "stripper",
   );
 }
 
@@ -573,6 +642,111 @@ export async function runMeetingLinkMigration({ store, writer = null, mode, issu
   return JSON.parse(JSON.stringify(report));
 }
 
+// ── legacy strip (J.9) ─────────────────────────────────────────────────────
+
+const STRIP_KEPT = Object.freeze(["needsCopy", "invalidLegacy", "canonicalMalformed"]);
+const STRIP_CHANGED = Object.freeze(["halaqaGone", "noLegacy", ...STRIP_KEPT]);
+
+function emptyStripReport(mode) {
+  return {
+    script: SCRIPT_ID,
+    project: EMULATOR_PROJECT,
+    mode,
+    operation: "strip-legacy",
+    halaqat: {
+      scanned: 0,
+      legacyPresent: 0,
+      strippable: 0,
+      supersededLegacy: 0,
+      wouldStrip: 0,
+      stripped: 0,
+      kept: zeroCounts(STRIP_KEPT),
+      changedDuringRun: zeroCounts(STRIP_CHANGED),
+    },
+    failures: { total: 0, byCode: {} },
+    review: {
+      needsCopyIds: createIdList(),
+      invalidLegacyIds: createIdList(),
+      canonicalMalformedIds: createIdList(),
+      supersededLegacyIds: createIdList(),
+      changedDuringRunIds: createIdList(),
+      failedIds: createIdList(),
+    },
+    summary: { legacyKeysRemaining: 0, needsReview: false, exitCode: 0 },
+  };
+}
+
+/**
+ * Scans every halaqa and removes (apply) or counts (dry run) legacy
+ * `meetingLink` keys that decideStrip allows. Returns the JSON-safe report.
+ */
+export async function runLegacyStrip({ store, stripper = null, mode, issueOf, isTimestamp, pageSize = PAGE_SIZE }) {
+  if (mode !== "dry-run" && mode !== "apply") throw new Error("mode must be dry-run or apply");
+  if (mode === "apply" && stripper === null) throw new Error("apply needs a stripper");
+  const report = emptyStripReport(mode);
+  const h = report.halaqat;
+  const keptIds = {
+    needsCopy: report.review.needsCopyIds,
+    invalidLegacy: report.review.invalidLegacyIds,
+    canonicalMalformed: report.review.canonicalMalformedIds,
+  };
+
+  let afterId = null;
+  for (;;) {
+    const page = await store.page(HALAQAT, afterId, pageSize);
+    if (page.length === 0) break;
+    const canonicalById = new Map((await store.getMany(LINKS, page.map((doc) => doc.id))).map((view) => [view.id, view]));
+    for (const doc of page) {
+      h.scanned += 1;
+      const legacy = classifyLegacy(doc.data ?? {}, issueOf);
+      if (legacy.category === "missing") continue;
+      h.legacyPresent += 1;
+      const view = canonicalById.get(doc.id);
+      const canonical = view?.exists ? classifyCanonical(view.data, issueOf, isTimestamp) : null;
+      const decision = decideStrip(legacy, canonical);
+      if (decision !== "strip") {
+        h.kept[decision] += 1;
+        keptIds[decision].add(doc.id);
+        continue;
+      }
+      h.strippable += 1;
+      // A non-empty legacy value that differs from the canonical link is lost
+      // on strip (recoverable only from a backup); it was also exposed.
+      if (legacy.category !== "empty" && !(legacy.category === "valid" && legacy.value === canonical.value)) {
+        h.supersededLegacy += 1;
+        report.review.supersededLegacyIds.add(doc.id);
+      }
+      if (mode === "dry-run") {
+        h.wouldStrip += 1;
+        continue;
+      }
+      try {
+        const outcome = await stripper.stripOne(doc.id);
+        if (outcome === "stripped") {
+          h.stripped += 1;
+        } else {
+          h.changedDuringRun[STRIP_CHANGED.includes(outcome) ? outcome : "halaqaGone"] += 1;
+          report.review.changedDuringRunIds.add(doc.id);
+        }
+      } catch (error) {
+        const code = safeErrorCode(error);
+        report.failures.total += 1;
+        report.failures.byCode[code] = (report.failures.byCode[code] ?? 0) + 1;
+        report.review.failedIds.add(doc.id);
+      }
+    }
+    if (page.length < pageSize) break;
+    afterId = page[page.length - 1].id;
+  }
+
+  const sum = (counts) => Object.values(counts).reduce((a, b) => a + b, 0);
+  const gone = h.changedDuringRun.noLegacy + h.changedDuringRun.halaqaGone;
+  report.summary.legacyKeysRemaining = h.legacyPresent - h.stripped - gone;
+  report.summary.needsReview = sum(h.kept) + sum(h.changedDuringRun) + h.supersededLegacy > 0;
+  report.summary.exitCode = report.failures.total > 0 ? 4 : 0;
+  return JSON.parse(JSON.stringify(report));
+}
+
 // ── CLI ────────────────────────────────────────────────────────────────────
 
 /** Installs the process-wide egress allowlist and proves it is active. */
@@ -581,7 +755,7 @@ export async function startEgressGuard(ports) {
   return (await guard.selfTest()) ? guard : null;
 }
 
-async function verifyHub(config) {
+export async function verifyHub(config) {
   const res = await fetch(`http://127.0.0.1:${config.hubPort}/emulators`);
   if (!res.ok) return "the emulator hub did not answer on the pinned port.";
   const listing = await res.json();
@@ -630,18 +804,29 @@ async function main() {
   }
 
   const { initializeApp, deleteApp } = await import("firebase-admin/app");
-  const { getFirestore, FieldPath, Timestamp } = await import("firebase-admin/firestore");
+  const { getFirestore, FieldPath, FieldValue, Timestamp } = await import("firebase-admin/firestore");
   const app = initializeApp({ projectId: EMULATOR_PROJECT }, SCRIPT_ID);
   if (app.options.projectId !== EMULATOR_PROJECT) refuse("firebase-admin resolved a different project.");
   const db = getFirestore(app);
+  const isTimestamp = (value) => value instanceof Timestamp;
+  const store = readOnlyStore(db, FieldPath.documentId());
 
-  const report = await runMeetingLinkMigration({
-    store: readOnlyStore(db, FieldPath.documentId()),
-    writer: mode === "apply" ? canonicalWriter(db, { canonicalData, issueOf }) : null,
-    mode,
-    issueOf,
-    isTimestamp: (value) => value instanceof Timestamp,
-  });
+  const report = config.strip
+    ? await runLegacyStrip({
+      store,
+      stripper:
+        mode === "apply" ? legacyStripper(db, { deleteField: () => FieldValue.delete(), issueOf, isTimestamp }) : null,
+      mode,
+      issueOf,
+      isTimestamp,
+    })
+    : await runMeetingLinkMigration({
+      store,
+      writer: mode === "apply" ? canonicalWriter(db, { canonicalData, issueOf }) : null,
+      mode,
+      issueOf,
+      isTimestamp,
+    });
   await deleteApp(app);
 
   const blocked = guard.blockedAttempts().length;

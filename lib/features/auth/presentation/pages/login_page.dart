@@ -97,19 +97,19 @@ class _LoginFormState extends State<_LoginForm> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _LoginStatusBanner(state: state),
-                const AuthFieldLabel('البريد الإلكتروني'),
+                const AuthFieldLabel('اسم المستخدم أو البريد الإلكتروني'),
                 const SizedBox(height: 6),
                 AppTextField(
-                  hint: 'name@example.com',
+                  hint: 'st123456',
                   controller: _emailCtrl,
                   enabled: !isLoading,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: const Icon(
-                    Icons.email_outlined,
+                    Icons.person_outline,
                     color: AppColors.textHint,
                     size: AppSizes.iconM,
                   ),
-                  validator: AuthValidators.email,
+                  validator: AuthValidators.loginIdentifier,
                 ),
                 const SizedBox(height: 16),
                 const AuthFieldLabel('كلمة المرور'),

@@ -21,13 +21,26 @@ abstract class ChatUploadTask {
 
 abstract class ChatRepository {
   /// Stream لقائمة كل محادثات المستخدم الحالي، مرتبة بآخر رسالة (الأحدث أولاً)
+  /// [limit] bounds the live window (newest first); older pages come from
+  /// [fetchConversationsAfter].
   Stream<Either<Failure, List<ConversationEntity>>> watchConversations(
-    String uid,
-  );
+    String uid, {
+    int? limit,
+  });
 
   /// Admin oversight: all academy conversations without joining as participant.
   Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
     required String observerUid,
+    int? limit,
+  });
+
+  /// One page older than [afterConversationId] (document cursor), newest
+  /// first. [participantUid] null = academy-wide (Admin oversight).
+  Future<Either<Failure, List<ConversationEntity>>> fetchConversationsAfter({
+    String? participantUid,
+    required String viewerUid,
+    required String afterConversationId,
+    required int limit,
   });
 
   /// Newest [limit] messages, in ascending time order.
@@ -52,6 +65,7 @@ abstract class ChatRepository {
     required ChatMessageType type,
     required String text,
     ChatSendMedia? media,
+    String? replyToMessageId,
   });
 
   /// Starts uploading [draft] to the message's own Storage folder.

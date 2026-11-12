@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/presentation/bloc_status.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../domain/admin_admit_form.dart';
@@ -13,7 +15,8 @@ import '../widgets/admin_figma_widgets.dart';
 import '../widgets/admin_subpage_scaffold.dart';
 import '../widgets/admin_loading_skeletons.dart';
 
-/// Staff admit form — pick from registration queue or enter IDs manually.
+/// Staff admit form — assign a waiting student to a halaqa. New students
+/// (accounts + parent link) go through the onboarding wizard instead.
 class AdminAdmitPage extends StatefulWidget {
   const AdminAdmitPage({super.key});
 
@@ -22,11 +25,8 @@ class AdminAdmitPage extends StatefulWidget {
 }
 
 class _AdminAdmitPageState extends State<AdminAdmitPage> {
-  final _studentIdCtrl = TextEditingController();
-  final _halaqaIdCtrl = TextEditingController();
   String? _selectedStudentId;
   String? _selectedHalaqaId;
-  bool _manualEntry = false;
   String? _fieldError;
 
   @override
@@ -39,26 +39,9 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
     });
   }
 
-  @override
-  void dispose() {
-    _studentIdCtrl.dispose();
-    _halaqaIdCtrl.dispose();
-    super.dispose();
-  }
-
   void _clearFieldError() {
     if (_fieldError == null) return;
     setState(() => _fieldError = null);
-  }
-
-  String? _resolveStudentId() {
-    if (_manualEntry) return _studentIdCtrl.text.trim();
-    return _selectedStudentId;
-  }
-
-  String? _resolveHalaqaId() {
-    if (_manualEntry) return _halaqaIdCtrl.text.trim();
-    return _selectedHalaqaId;
   }
 
   void _submit() {
@@ -67,8 +50,8 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
         SubmissionStatus.submitting;
     if (submitting) return;
 
-    final studentId = _resolveStudentId() ?? '';
-    final halaqaId = _resolveHalaqaId() ?? '';
+    final studentId = _selectedStudentId ?? '';
+    final halaqaId = _selectedHalaqaId ?? '';
     final error = AdminAdmitFormValidation.error(
       studentId: studentId,
       halaqaId: halaqaId,
@@ -89,8 +72,6 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
         if (state.approveStudentStatus == SubmissionStatus.success) {
           AppSnackBar.showSuccess(context, 'تم قبول الطالب في الحلقة');
           context.read<AdminBloc>().add(const ResetApproveStudentEvent());
-          _studentIdCtrl.clear();
-          _halaqaIdCtrl.clear();
           setState(() {
             _selectedStudentId = null;
             _selectedHalaqaId = null;
@@ -131,101 +112,90 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
                 Text(
-                  'اختر طالباً من قائمة الانتظار وحلقة للتعيين، أو استخدم الإدخال اليدوي.',
+                  'اختر طالباً من قائمة الانتظار وحلقة للتعيين. لتسجيل طالب '
+                  'جديد بحساب وولي أمر استخدم "تسجيل طالب جديد".',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const Key('admit-open-onboarding'),
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                  label: const Text('تسجيل طالب جديد'),
+                  onPressed: () => context.push(AppRoutes.adminOnboardStudent),
                 ),
                 const SizedBox(height: 20),
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (!_manualEntry) ...[
-                        DropdownButtonFormField<String>(
-                          value: _selectedStudentId,
-                          decoration: const InputDecoration(
-                            labelText: 'الطالب',
-                          ),
-                          hint: const Text('اختر طالباً'),
-                          items: requests
-                              .map(
-                                (RegistrationRequestEntity r) =>
-                                    DropdownMenuItem(
-                                      value: r.studentId,
-                                      child: Text(r.name),
-                                    ),
-                              )
-                              .toList(),
-                          onChanged: submitting
-                              ? null
-                              : (v) => setState(() {
-                                  _selectedStudentId = v;
-                                  _clearFieldError();
-                                }),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedStudentId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'الطالب',
                         ),
-                        if (requests.isEmpty) ...[
-                          const SizedBox(height: 8),
-                          const AdminPlaceholderCard(
-                            icon: Icons.person_off_outlined,
-                            title: 'لا طلاب في الانتظار',
-                            message:
-                                'يمكنك استخدام الإدخال اليدوي إذا كان لديك معرّفات صحيحة.',
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          value: _selectedHalaqaId,
-                          decoration: const InputDecoration(
-                            labelText: 'الحلقة',
-                          ),
-                          hint: const Text('اختر حلقة'),
-                          items: halaqat
-                              .map(
-                                (h) => DropdownMenuItem(
-                                  value: h.id,
-                                  child: Text(h.name),
+                        hint: const Text('اختر طالباً'),
+                        items: requests
+                            .map(
+                              (RegistrationRequestEntity r) => DropdownMenuItem(
+                                value: r.studentId,
+                                child: Text(
+                                  r.name,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              )
-                              .toList(),
-                          onChanged: submitting
-                              ? null
-                              : (v) => setState(() {
-                                  _selectedHalaqaId = v;
-                                  _clearFieldError();
-                                }),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: submitting
+                            ? null
+                            : (v) => setState(() {
+                                _selectedStudentId = v;
+                                _clearFieldError();
+                              }),
+                      ),
+                      if (requests.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        const AdminPlaceholderCard(
+                          icon: Icons.person_off_outlined,
+                          title: 'لا طلاب في الانتظار',
+                          message:
+                              'لتسجيل طالب جديد استخدم زر "تسجيل طالب جديد" أعلاه.',
                         ),
-                        if (halaqat.isEmpty) ...[
-                          const SizedBox(height: 8),
-                          const AdminPlaceholderCard(
-                            icon: Icons.menu_book_outlined,
-                            title: 'لا حلقات',
-                            message: 'أنشئ حلقة أولاً من مركز الإدارة.',
-                          ),
-                        ],
-                      ] else ...[
-                        TextField(
-                          controller: _studentIdCtrl,
-                          enabled: !submitting,
-                          textDirection: TextDirection.ltr,
-                          textAlign: TextAlign.left,
-                          decoration: const InputDecoration(
-                            labelText: 'معرّف الطالب',
-                            hintText: 'studentId',
-                          ),
-                          onChanged: (_) => _clearFieldError(),
+                      ],
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedHalaqaId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'الحلقة',
                         ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _halaqaIdCtrl,
-                          enabled: !submitting,
-                          textDirection: TextDirection.ltr,
-                          textAlign: TextAlign.left,
-                          decoration: const InputDecoration(
-                            labelText: 'معرّف الحلقة',
-                            hintText: 'halaqaId',
-                          ),
-                          onChanged: (_) => _clearFieldError(),
+                        hint: const Text('اختر حلقة'),
+                        items: halaqat
+                            .map(
+                              (h) => DropdownMenuItem(
+                                value: h.id,
+                                child: Text(
+                                  h.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: submitting
+                            ? null
+                            : (v) => setState(() {
+                                _selectedHalaqaId = v;
+                                _clearFieldError();
+                              }),
+                      ),
+                      if (halaqat.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        const AdminPlaceholderCard(
+                          icon: Icons.menu_book_outlined,
+                          title: 'لا حلقات',
+                          message: 'أنشئ حلقة أولاً من مركز الإدارة.',
                         ),
                       ],
                       if (_fieldError != null) ...[
@@ -238,20 +208,6 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
                         ),
                       ],
                       const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: submitting
-                            ? null
-                            : () => setState(() {
-                                _manualEntry = !_manualEntry;
-                                _clearFieldError();
-                              }),
-                        child: Text(
-                          _manualEntry
-                              ? 'العودة لقائمة الانتظار'
-                              : 'إدخال يدوي بالمعرّفات',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
                       AppButton(
                         label: 'قبول وتعيين',
                         isLoading: submitting,

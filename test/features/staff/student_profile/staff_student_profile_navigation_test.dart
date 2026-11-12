@@ -433,7 +433,9 @@ void main() {
       );
 
       expect(_reads, ['profile s1', 'roster h1', 'recitations s1']);
-      expect(find.text('المستوى ١ - حلقة النور'), findsOneWidget);
+      expect(AppCapabilities.streakAndLevelAvailable, isFalse);
+      expect(find.text('حلقة النور'), findsOneWidget);
+      expect(find.textContaining('المستوى'), findsNothing);
       expect(find.text('جزء عم'), findsOneWidget);
       expect(find.text('ولي الأمر'), findsWidgets);
     });
@@ -457,7 +459,8 @@ void main() {
           'halaqa h1',
           'recitations s1',
         ]);
-        expect(find.text('المستوى ١ - حلقة الفجر'), findsOneWidget);
+        expect(find.text('حلقة الفجر'), findsOneWidget);
+        expect(find.textContaining('المستوى'), findsNothing);
       },
     );
 
@@ -490,7 +493,8 @@ void main() {
         'roster h1',
         'recitations s1',
       ]);
-      expect(find.text('المستوى ١ - حلقة النور'), findsOneWidget);
+      expect(find.text('حلقة النور'), findsOneWidget);
+      expect(find.textContaining('المستوى'), findsNothing);
     });
   });
 

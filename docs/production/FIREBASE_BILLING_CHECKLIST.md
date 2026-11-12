@@ -8,7 +8,7 @@
 - Complete this checklist before enabling billing / migrating to the academy Firebase project.
 - Linked from `PRODUCT_DECISIONS_LOCKED.md` (D19, D20) and `IMPLEMENTATION_PLAN.md` Wave H.
 
-**Status:** **B-BILLING UNRESOLVED (2026-09-10)** — Verified columns empty. Production Functions / scheduled jobs / production FCM send remain gated. Emulator-only backend work is allowed. Values below are capability requirements, not cost quotes.
+**Status:** **B-BILLING UNRESOLVED (2026-09-10; re-checked 2026-10-28)** — Verified columns empty. Production Functions / scheduled jobs / production FCM send remain gated. Emulator-only backend work is allowed. Values below are capability requirements, not cost quotes. The repository facts and the evidence still needed are listed under "Repository evidence" and "Evidence required to close B-BILLING" below; nothing there is a billing verification.
 
 ---
 
@@ -63,15 +63,53 @@ For each row:
 
 ---
 
+## Repository evidence (2026-10-28)
+
+What the repository shows about billable usage. It narrows the rows above; it
+does not verify any plan, price or console setting.
+
+| Item | Evidence in the repository |
+|---|---|
+| Deployable Functions | 37 exports in `functions/src/index.ts` (callables, Firestore triggers, one scheduler), region `europe-west1` (`callable_region_contract.test.mjs`) |
+| Scheduled jobs | One: `processPaymentOverdueGrace`, `every day 01:15` (`functions/src/billing/processOverdueGrace.ts`) — needs Cloud Scheduler |
+| Paymob | `createPaymentIntention` and `paymobWebhook` are commented out of `index.ts`; `wa1`, `wa3_wa5`, `wa7`, `wa8` and `wa10` tests in `functions/test` fail if they are exported again |
+| Secret Manager | Only the quarantined Paymob files use `defineSecret`; no deployable function needs a secret |
+| Backend switch | Every gated callable and job stays closed until `PRODUCTION_BACKEND_ENABLED=true` is deployed (`functions/src/productionGate.ts`; `RELEASE_RUNBOOK_J10.md` §2) |
+| Cloud Storage paths | `storage.rules`: `payment_proofs`, `profile_images`, `chat_media`, `chat_voice`, `chat_attachments`, `awards`, `posts`, `content`, `content_library`, `halaqa_activities`; `recitations` denies all access |
+| Client SDKs | `firebase_core`, `firebase_auth`, `cloud_firestore`, `firebase_storage`, `firebase_messaging` only: no App Check, Crashlytics, Analytics or Performance in the client |
+| Hosting | No `hosting` section in `firebase.json` |
+| Backups | Managed Firestore exports (`RELEASE_RUNBOOK_J10.md` §3) need Blaze |
+
+## Evidence required to close B-BILLING
+
+Each item needs the evidence named, recorded with a date in this file (a
+console screenshot or exported setting kept outside the repo is enough). The
+repository cannot supply any of them.
+
+| # | Item | Evidence |
+|---|---|---|
+| 1 | Target project | Which project the release uses (`rafiq-academy` for J.10 testing; the prod project once created, `RELEASE_PLATFORM_SETUP.md` §7) |
+| 2 | Plan | Console → Usage and billing shows **Blaze** for that project, with the billing account owner named |
+| 3 | Budget alerts | Billing → Budgets & alerts: a budget on that billing account with alert thresholds and recipients |
+| 4 | Doc check per row | For each row still used (Firestore, Storage, Functions, FCM, Auth, indexes, Cloud Scheduler, managed export): the current Firebase/Google Cloud doc URL and the date read, in the Verified column |
+| 5 | Paymob in the console | Functions list of the target project shows no `createPaymentIntention` / `paymobWebhook`, and no Paymob webhook points at it |
+| 6 | Live rules diff | Live Firestore and Storage rules compared with the repo before the first deploy (`RELEASE_RUNBOOK_J10.md` §4 step 7) |
+| 7 | FCM platforms | Android and iOS apps registered in the target project; APNs key uploaded for iOS |
+| 8 | Owner sign-off | `PRODUCT_DECISIONS_LOCKED.md` reviewed against the deployable set above |
+
+Only after 1–8 may the status line change to Verified and the backend
+switch be enabled.
+
 ## Pre-Blaze gate (must pass before enabling pay-as-you-go)
 
 - [ ] `PRODUCT_DECISIONS_LOCKED.md` reviewed
 - [ ] Each row above has a **Verified** Firebase doc URL and date
 - [ ] Console project for academy identified
 - [ ] Diff Console rules vs repo planned (do not deploy open rules)
-- [ ] Paymob functions confirmed disabled/removed (D2)
+- [x] Paymob functions removed from the deployable source (D2) — repository evidence above
+- [ ] Paymob functions confirmed absent from the target project's console (D2)
 - [ ] Budget alerts configured after verification (no invented $)
-- [ ] Storage path layout for chat media drafted (Infrastructure TBD → then fill)
+- [x] Storage path layout for chat media drafted — `chat_media`, `chat_voice`, `chat_attachments` in `storage.rules`
 - [ ] FCM platforms (Android/iOS) registered on academy project
 
 ---

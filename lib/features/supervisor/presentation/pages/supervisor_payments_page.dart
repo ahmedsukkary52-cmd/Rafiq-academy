@@ -136,8 +136,8 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
           value: context.read<SupervisorBloc>(),
           child: _PaymentReviewPage(
             payment: payment,
-            studentName: _names[payment.studentId] ?? payment.studentId,
-            parentName: _names[payment.parentId] ?? payment.parentId,
+            studentName: _names[payment.studentId] ?? 'طالب',
+            parentName: _names[payment.parentId] ?? 'ولي أمر',
           ),
         ),
       ),
@@ -308,7 +308,7 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
                     )
                   else
                     ...visible.map((p) {
-                      final name = _names[p.studentId] ?? p.studentId;
+                      final name = _names[p.studentId] ?? 'طالب';
                       final color = _reviewColor(p);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -860,7 +860,7 @@ class _PaymentsReportPage extends StatelessWidget {
             const AppCard(child: Text('لا توجد مراجعات بعد'))
           else
             ...reviewed.map((p) {
-              final name = names[p.studentId] ?? p.studentId;
+              final name = names[p.studentId] ?? 'طالب';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: AppCard(

@@ -75,7 +75,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                       )
                     else if (summary != null) ...[
                       AdminGradientHeroCard(
-                        eyebrow: 'إجمالي الإيرادات',
+                        eyebrow: 'إجمالي المحصّل',
                         headline: academyMoneyText(
                           fmt(summary.totalRevenue.round()),
                         ),
@@ -86,7 +86,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                           ),
                           AdminHeroMetric(
                             value: fmt(summary.dueCount),
-                            label: 'معلقة',
+                            label: 'مستحقة',
                           ),
                           AdminHeroMetric(
                             value: fmt(summary.overdueCount),
@@ -107,7 +107,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                             value: academyMoneyText(
                               fmt(summary.totalPending.round()),
                             ),
-                            label: 'مدفوعات معلقة',
+                            label: 'مستحقات قائمة',
                             icon: Icons.schedule_outlined,
                             iconBg: const Color(0xFFFFF8E1),
                             iconColor: AppColors.warning,
@@ -133,20 +133,18 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                       ),
                       const SizedBox(height: 16),
                       AppButton(
-                        label: 'مراجعة المدفوعات',
-                        onPressed: () => context.push(AppRoutes.adminPayments),
-                      ),
-                      const SizedBox(height: 10),
-                      AppButton(
-                        label: 'سجل المدفوعات',
+                        key: const Key('finance-open-ledger'),
+                        label: 'سجل المدفوعات والتفاصيل',
                         onPressed: () =>
                             context.push(AppRoutes.adminPaymentsOverview),
                       ),
                       const SizedBox(height: 10),
                       AppButton(
-                        label: 'لوحة مالية تفصيلية',
-                        onPressed: () =>
-                            context.push(AppRoutes.adminFinanceDetail),
+                        key: const Key('finance-open-review'),
+                        label: summary.awaitingReviewCount > 0
+                            ? 'إيصالات بانتظار المراجعة (${fmt(summary.awaitingReviewCount)})'
+                            : 'إيصالات بانتظار المراجعة',
+                        onPressed: () => context.push(AppRoutes.adminPayments),
                       ),
                     ],
                   ],

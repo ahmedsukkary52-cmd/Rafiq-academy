@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/confirm_logout.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../complaints/presentation/complaints_entry.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/parent_household.dart';
 import '../bloc/parent_bloc.dart';
@@ -267,13 +269,15 @@ class _StatsCard extends StatelessWidget {
               label: 'حضور',
             ),
           ),
-          Container(width: 0.8, height: 36, color: const Color(0xFFE8EEF0)),
-          Expanded(
-            child: _StatCell(
-              value: parentEasternDigits('$verses'),
-              label: 'آية',
+          if (AppCapabilities.memorizationProgressAvailable) ...[
+            Container(width: 0.8, height: 36, color: const Color(0xFFE8EEF0)),
+            Expanded(
+              child: _StatCell(
+                value: parentEasternDigits('$verses'),
+                label: 'آية',
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -531,6 +535,14 @@ class _SettingsCard extends StatelessWidget {
             iconColor: AppColors.error,
             label: 'الاستئذان',
             onTap: onAbsenceRequests,
+          ),
+          const _SettingsDivider(),
+          _NavRow(
+            icon: Icons.support_agent_rounded,
+            iconBg: AppColors.primaryLight,
+            iconColor: AppColors.primaryDark,
+            label: 'الشكاوى',
+            onTap: () => openMyComplaints(context),
           ),
           const _SettingsDivider(),
           _LogoutRow(onTap: onLogout),

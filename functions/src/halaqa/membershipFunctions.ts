@@ -29,7 +29,9 @@ import {
   requireCallerUid,
   requireText,
 } from "../authority/callerContext";
+import { LIFECYCLE_ARCHIVED, normalizeLifecycle } from "../lifecycle/studentLifecycleContract";
 import { assertBackendAllowed } from "../productionGate";
+import { appendRelationshipHistory, RELATIONSHIP_KIND } from "../relationships/relationshipHistory";
 
 export const MAX_HALAQAT_PER_STUDENT = 2;
 export const MEMBERSHIP_LOCKS_COLLECTION = "studentMembershipLocks";
@@ -45,6 +47,32 @@ export function shouldSetPrimaryOnEstablish(params: {
 }): boolean {
   if (params.otherMembershipIds.length > 0) return false;
   return params.currentPrimary.trim() === "";
+}
+
+/**
+ * Who may bring this student into a halaqa. The lifecycle SSOT is
+ * `studentProfiles.lifecycle`: an archived student joins nothing until
+ * adminSetStudentLifecycle unarchives them. A supervisor only reaches
+ * students already in their own scope or in no halaqa at all, and never
+ * reactivates an account (admission by Admin does).
+ */
+function assertStudentAdmissible(params: {
+  role: string;
+  callerUid: string;
+  userData: admin.firestore.DocumentData | undefined;
+  profileData: admin.firestore.DocumentData | undefined;
+  otherMemberships: readonly admin.firestore.QueryDocumentSnapshot[];
+}): void {
+  if (normalizeLifecycle(params.profileData?.lifecycle) === LIFECYCLE_ARCHIVED) {
+    throw new HttpsError("failed-precondition", "لا يمكن إضافة طالب مؤرشف إلى حلقة");
+  }
+  if (params.role !== "supervisor") return;
+  if (params.userData?.isActive === false) {
+    throw new HttpsError("failed-precondition", "حساب الطالب غير نشط؛ تفعيله من صلاحيات المسؤول");
+  }
+  if (params.otherMemberships.some((d) => text(d.data()?.supervisorId) !== params.callerUid)) {
+    throw new HttpsError("permission-denied", "الطالب مسجّل في حلقة خارج نطاق إشرافك");
+  }
 }
 
 /** primaryAfterTransfer + primaryAfterMembershipsChanged. */
@@ -123,6 +151,13 @@ export async function admitStudentToHalaqaCore(
     if (memberships.length >= MAX_HALAQAT_PER_STUDENT) {
       throw new HttpsError("failed-precondition", "الطالب وصل للحد الأقصى (حلقتان)");
     }
+    assertStudentAdmissible({
+      role,
+      callerUid: uid,
+      userData: userSnap.data(),
+      profileData: profileSnap.data(),
+      otherMemberships: membershipSnap.docs,
+    });
 
     const currentPrimary = text(profileSnap.data()?.halaqaId);
     const setPrimary = shouldSetPrimaryOnEstablish({
@@ -156,6 +191,14 @@ export async function admitStudentToHalaqaCore(
         FieldValue.serverTimestamp(),
       ),
     );
+    appendRelationshipHistory(db, tx, {
+      kind: RELATIONSHIP_KIND.halaqaMembership,
+      operation: "admit",
+      actorId: uid,
+      actorRole: role,
+      halaqaId,
+      studentId,
+    });
 
     return {
       studentId,
@@ -245,6 +288,15 @@ export async function adminTransferStudentCore(
     if (remaining.length > MAX_HALAQAT_PER_STUDENT) {
       throw new HttpsError("failed-precondition", "الطالب وصل للحد الأقصى (حلقتان)");
     }
+    // Source and target are already checked for a supervisor; the student's
+    // other halaqa may belong to someone else and does not change hands.
+    assertStudentAdmissible({
+      role,
+      callerUid: uid,
+      userData: userSnap.data(),
+      profileData: profileSnap.data(),
+      otherMemberships: [],
+    });
 
     const primary = primaryAfterTransfer({
       currentPrimary: text(profileSnap.data()?.halaqaId),
@@ -281,6 +333,15 @@ export async function adminTransferStudentCore(
         FieldValue.serverTimestamp(),
       ),
     );
+    appendRelationshipHistory(db, tx, {
+      kind: RELATIONSHIP_KIND.halaqaMembership,
+      operation: "transfer",
+      actorId: uid,
+      actorRole: role,
+      fromHalaqaId: source,
+      toHalaqaId: target,
+      studentId,
+    });
 
     return { studentId, fromHalaqaId: source, toHalaqaId: target, primaryHalaqaId: primary };
   });

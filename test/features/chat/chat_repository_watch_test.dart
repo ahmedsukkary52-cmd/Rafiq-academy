@@ -17,9 +17,13 @@ class _FakeChatRemoteDatasource implements ChatRemoteDatasource {
   Stream<List<MessageModel>> messages = const Stream.empty();
   int? lastLimit;
 
+  int? lastConversationLimit;
+
   @override
-  Stream<List<ConversationModel>> watchConversations(String uid) =>
-      conversations;
+  Stream<List<ConversationModel>> watchConversations(String uid, {int? limit}) {
+    lastConversationLimit = limit;
+    return conversations;
+  }
 
   @override
   Stream<List<MessageModel>> watchMessages(

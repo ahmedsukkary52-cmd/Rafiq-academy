@@ -6,14 +6,14 @@ void main() {
     test('rejects empty student id', () {
       expect(
         AdminAdmitFormValidation.error(studentId: '  ', halaqaId: 'h1'),
-        'أدخل معرّف الطالب',
+        'اختر الطالب',
       );
     });
 
     test('rejects empty halaqa id', () {
       expect(
         AdminAdmitFormValidation.error(studentId: 's1', halaqaId: ''),
-        'أدخل معرّف الحلقة',
+        'اختر الحلقة',
       );
     });
 

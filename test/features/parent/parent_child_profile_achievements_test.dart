@@ -251,6 +251,21 @@ void main() {
     expect(find.text(_emptyText), findsOneWidget);
   });
 
+  testWidgets('unwired progress, verses and level are not shown as real data', (
+    tester,
+  ) async {
+    await pumpProfile(tester);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('parent-child-progress-unavailable')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('٤٠'), findsNothing);
+    expect(find.text('آية محفوظة'), findsNothing);
+    expect(find.text('آية'), findsNothing);
+    expect(find.textContaining('المستوى'), findsNothing);
+  });
+
   testWidgets(
     'retry for a child no longer linked is denied without a request',
     (tester) async {

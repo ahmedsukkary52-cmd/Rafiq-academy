@@ -11,12 +11,15 @@ class UserModel extends UserEntity {
     super.profileImageUrl,
     required super.isActive,
     required super.createdAt,
+    super.mustChangePassword,
   });
 
   /// من Firestore document لـ UserModel
   ///
   /// `users.email` is read only as a transition fallback for legacy profiles;
   /// the signed-in user's email comes from Firebase Auth ([withAuthEmail]).
+  /// `passwordChangeRequired` is server-written (newly provisioned Admins)
+  /// and is never part of [toFirestore].
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return UserModel(
@@ -27,6 +30,7 @@ class UserModel extends UserEntity {
       profileImageUrl: data['profileImageUrl'] as String?,
       isActive: data['isActive'] as bool? ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      mustChangePassword: data['passwordChangeRequired'] == true,
     );
   }
 
@@ -54,6 +58,21 @@ class UserModel extends UserEntity {
       profileImageUrl: profileImageUrl,
       isActive: isActive,
       createdAt: createdAt,
+      mustChangePassword: mustChangePassword,
+    );
+  }
+
+  UserModel withMustChangePassword(bool value) {
+    if (value == mustChangePassword) return this;
+    return UserModel(
+      uid: uid,
+      name: name,
+      role: role,
+      email: email,
+      profileImageUrl: profileImageUrl,
+      isActive: isActive,
+      createdAt: createdAt,
+      mustChangePassword: value,
     );
   }
 
@@ -66,6 +85,7 @@ class UserModel extends UserEntity {
       profileImageUrl: entity.profileImageUrl,
       isActive: entity.isActive,
       createdAt: entity.createdAt,
+      mustChangePassword: entity.mustChangePassword,
     );
   }
 }

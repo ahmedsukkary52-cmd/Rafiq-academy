@@ -5,15 +5,12 @@ import { FieldPath, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import {
-  isEmulatorBackendAllowed,
-  isProductionBackendEnabled,
-} from "../productionGate";
-import {
   FCM_DEVICES_SUBCOLLECTION,
   FCM_TOKENS_COLLECTION,
   isUsableToken,
   SendableToken,
 } from "./fcmTokenContract";
+import { isOwnershipReconcileEnabled } from "./ownershipGate";
 
 /**
  * H2 — one active account per FCM token (server-owned).
@@ -344,7 +341,7 @@ export async function runOwnershipTrigger(params: {
 }): Promise<OwnershipTriggerResult> {
   if (!params.gateOpen) {
     console.warn(
-      "[H2] reconcileFcmTokenOwnership skipped — backend gate closed.",
+      "[H2] reconcileFcmTokenOwnership skipped — ownership gate closed.",
     );
     return "gate_closed";
   }
@@ -375,7 +372,7 @@ export const reconcileFcmTokenOwnership = onDocumentWritten(
   },
   async (event) => {
     await runOwnershipTrigger({
-      gateOpen: isProductionBackendEnabled() || isEmulatorBackendAllowed(),
+      gateOpen: isOwnershipReconcileEnabled(),
       eventTime: event.time,
       reconcile: () =>
         reconcileDeviceTokenOwnership(admin.firestore(), {

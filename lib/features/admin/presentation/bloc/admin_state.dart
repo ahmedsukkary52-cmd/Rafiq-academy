@@ -5,7 +5,6 @@ import '../../domain/entities/academy_stats_entity.dart';
 import '../../domain/entities/admin_directory_entity.dart';
 import '../../domain/entities/admin_halaqa_roster_entity.dart';
 import '../../domain/entities/admin_payment_entity.dart';
-import '../../domain/entities/communication_settings_entity.dart';
 import '../../domain/entities/complaint_entity.dart';
 import '../../domain/entities/financial_summary_entity.dart';
 import '../../domain/entities/registration_request_entity.dart';
@@ -85,12 +84,6 @@ class AdminState extends Equatable {
   final SubmissionStatus updateComplaintStatus;
   final String? updateComplaintError;
 
-  final SectionStatus communicationSettingsStatus;
-  final CommunicationSettingsEntity? communicationSettings;
-  final String? communicationSettingsError;
-  final SubmissionStatus saveCommunicationSettingsStatus;
-  final String? saveCommunicationSettingsError;
-
   final SubmissionStatus grantRewardStatus;
   final String? grantRewardError;
 
@@ -147,11 +140,6 @@ class AdminState extends Equatable {
     this.directoryError,
     this.updateComplaintStatus = SubmissionStatus.idle,
     this.updateComplaintError,
-    this.communicationSettingsStatus = SectionStatus.initial,
-    this.communicationSettings,
-    this.communicationSettingsError,
-    this.saveCommunicationSettingsStatus = SubmissionStatus.idle,
-    this.saveCommunicationSettingsError,
     this.grantRewardStatus = SubmissionStatus.idle,
     this.grantRewardError,
     this.createHalaqaStatus = SubmissionStatus.idle,
@@ -209,11 +197,6 @@ class AdminState extends Equatable {
     Object? directoryError = _unset,
     SubmissionStatus? updateComplaintStatus,
     Object? updateComplaintError = _unset,
-    SectionStatus? communicationSettingsStatus,
-    Object? communicationSettings = _unset,
-    Object? communicationSettingsError = _unset,
-    SubmissionStatus? saveCommunicationSettingsStatus,
-    Object? saveCommunicationSettingsError = _unset,
     SubmissionStatus? grantRewardStatus,
     Object? grantRewardError = _unset,
     SubmissionStatus? createHalaqaStatus,
@@ -313,21 +296,6 @@ class AdminState extends Equatable {
       updateComplaintError: identical(updateComplaintError, _unset)
           ? this.updateComplaintError
           : updateComplaintError as String?,
-      communicationSettingsStatus:
-          communicationSettingsStatus ?? this.communicationSettingsStatus,
-      communicationSettings: identical(communicationSettings, _unset)
-          ? this.communicationSettings
-          : communicationSettings as CommunicationSettingsEntity?,
-      communicationSettingsError: identical(communicationSettingsError, _unset)
-          ? this.communicationSettingsError
-          : communicationSettingsError as String?,
-      saveCommunicationSettingsStatus:
-          saveCommunicationSettingsStatus ??
-          this.saveCommunicationSettingsStatus,
-      saveCommunicationSettingsError:
-          identical(saveCommunicationSettingsError, _unset)
-          ? this.saveCommunicationSettingsError
-          : saveCommunicationSettingsError as String?,
       grantRewardStatus: grantRewardStatus ?? this.grantRewardStatus,
       grantRewardError: identical(grantRewardError, _unset)
           ? this.grantRewardError
@@ -396,11 +364,6 @@ class AdminState extends Equatable {
     directoryError,
     updateComplaintStatus,
     updateComplaintError,
-    communicationSettingsStatus,
-    communicationSettings,
-    communicationSettingsError,
-    saveCommunicationSettingsStatus,
-    saveCommunicationSettingsError,
     grantRewardStatus,
     grantRewardError,
     createHalaqaStatus,

@@ -426,6 +426,7 @@ test("P0-04 hard conflicts: same Halaqa, same Teacher; adjacent and Supervisor o
   assert.ok(adjacent.halaqaId);
   // sup1 supervises h1 at the same time — Supervisor overlap is not a conflict.
   const supOverlap = await create("admin1", newHalaqa({
+    name: "حلقة المغرب",
     teacherId: "teacher2",
     supervisorId: "sup1",
     schedule: [{ day: "الاثنين", startTime: "16:00", endTime: "17:00" }],

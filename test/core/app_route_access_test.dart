@@ -160,4 +160,76 @@ void main() {
       );
     });
   });
+
+  group('Assistant teacher and academy directory routes', () {
+    test('assistant teacher has its own shell and nothing else', () {
+      expect(AppRoles.all, contains(AppRoles.assistantTeacher));
+      expect(
+        AppRouteAccess.homeForRole(AppRoles.assistantTeacher),
+        AppRoutes.assistant,
+      );
+      expect(
+        AppRouteAccess.isAllowed(
+          path: AppRoutes.assistant,
+          role: AppRoles.assistantTeacher,
+        ),
+        isTrue,
+      );
+      for (final path in [
+        AppRoutes.admin,
+        AppRoutes.adminDirectory,
+        AppRoutes.teacher,
+        AppRoutes.teacherCover,
+        '/teacher/attendance/h1',
+        AppRoutes.supervisor,
+      ]) {
+        expect(
+          AppRouteAccess.isAllowed(path: path, role: AppRoles.assistantTeacher),
+          isFalse,
+          reason: path,
+        );
+      }
+    });
+
+    test('directory and profiles are admin-only', () {
+      for (final path in [
+        AppRoutes.adminDirectory,
+        AppRoutes.adminPersonProfile('u1'),
+        AppRoutes.adminHalaqaProfile('h1'),
+        AppRoutes.adminAddMemberFor(AppRoles.assistantTeacher),
+      ]) {
+        expect(AppRouteAccess.isAllowed(path: path, role: AppRoles.admin), isTrue);
+        for (final role in [
+          AppRoles.teacher,
+          AppRoles.supervisor,
+          AppRoles.assistantTeacher,
+          AppRoles.parent,
+          AppRoles.student,
+        ]) {
+          expect(
+            AppRouteAccess.isAllowed(path: path, role: role),
+            isFalse,
+            reason: '$role → $path',
+          );
+        }
+      }
+      expect(AppRoutes.adminPersonProfile('u1'), '/admin/person/u1');
+      expect(AppRoutes.adminHalaqaProfile('h1'), '/admin/halaqa/h1');
+      expect(
+        AppRoutes.adminAddMemberFor('assistant_teacher'),
+        '/admin/add-member?role=assistant_teacher',
+      );
+    });
+
+    test('teacher cover screen stays under the teacher shell', () {
+      expect(
+        AppRouteAccess.isAllowed(path: AppRoutes.teacherCover, role: AppRoles.teacher),
+        isTrue,
+      );
+      expect(
+        AppRouteAccess.isAllowed(path: AppRoutes.teacherCover, role: AppRoles.supervisor),
+        isFalse,
+      );
+    });
+  });
 }

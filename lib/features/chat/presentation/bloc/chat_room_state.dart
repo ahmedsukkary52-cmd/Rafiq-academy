@@ -26,6 +26,7 @@ class ChatOutgoingMessage extends Equatable {
   final ChatOutgoingStatus status;
   final String? error;
   final DateTime createdAt;
+  final String? replyToMessageId;
 
   const ChatOutgoingMessage({
     required this.messageId,
@@ -37,6 +38,7 @@ class ChatOutgoingMessage extends Equatable {
     required this.status,
     this.error,
     required this.createdAt,
+    this.replyToMessageId,
   });
 
   bool get canRetry => status == ChatOutgoingStatus.failed;
@@ -62,6 +64,7 @@ class ChatOutgoingMessage extends Equatable {
       status: status ?? this.status,
       error: identical(error, _unset) ? this.error : error as String?,
       createdAt: createdAt,
+      replyToMessageId: replyToMessageId,
     );
   }
 
@@ -76,6 +79,7 @@ class ChatOutgoingMessage extends Equatable {
     status,
     error,
     createdAt,
+    replyToMessageId,
   ];
 }
 

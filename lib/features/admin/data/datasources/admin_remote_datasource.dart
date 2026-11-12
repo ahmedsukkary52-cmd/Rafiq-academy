@@ -42,10 +42,12 @@ abstract class AdminRemoteDatasource {
     String? response,
   });
 
+  /// The same [requestId] never creates a second notification.
   Future<void> sendBroadcastNotification({
     required String title,
     required String body,
     required String targetRole,
+    String? requestId,
   });
 
   Future<List<TeacherManagementEntity>> getAllTeachers();

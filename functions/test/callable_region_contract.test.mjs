@@ -45,6 +45,9 @@ function clientCallableNames() {
   const patterns = [
     /httpsCallable\(\s*'([A-Za-z0-9_]+)'/g,
     /_call\(\s*'([A-Za-z0-9_]+)'/g,
+    // Names held in constants, e.g. `const String kParentChildHalaqatCallable = '...'`
+    // or `static const String submitCallable = '...'`, passed to httpsCallable.
+    /const\s+String\s+\w*Callable\s*=\s*'([A-Za-z0-9_]+)'/g,
   ];
   for (const file of dartFiles(flutterLib)) {
     const src = readFileSync(file, "utf8");
@@ -96,6 +99,18 @@ test("every callable invoked by the client is exported, callable, and in the cli
     }
   }
   assert.deepEqual(problems, []);
+});
+
+test("callable names held in Dart constants are part of the checked client set", () => {
+  const names = clientCallableNames();
+  for (const name of [
+    "getParentChildHalaqat",
+    "getParentChildSchedule",
+    "submitPaymentProof",
+    "materializeSession",
+  ]) {
+    assert.ok(names.includes(name), `${name} missing from the client callable set`);
+  }
 });
 
 test("admin billing callables (invoice + reinstatement) are reachable from the client region", () => {

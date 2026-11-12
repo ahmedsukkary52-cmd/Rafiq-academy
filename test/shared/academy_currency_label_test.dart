@@ -40,7 +40,7 @@ void main() {
 
   test('admin payment rows show the exact amount, not a rounded one', () {
     final source = File(
-      'lib/features/admin/presentation/pages/admin_oversight_pages.dart',
+      'lib/features/admin/presentation/pages/admin_payments_ledger_page.dart',
     ).readAsStringSync();
     expect(source, contains('academyMoneyLabel(p.amount)'));
     expect(source, isNot(contains('p.amount.round()')));

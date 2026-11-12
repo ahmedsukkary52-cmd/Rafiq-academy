@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/notifications/data/services/fcm_device_id_provider.dart';
+import 'package:rafiq_academy/features/notifications/data/services/fcm_pending_revocation_store.dart';
 import 'package:rafiq_academy/features/notifications/data/services/fcm_token_registrar.dart';
 import 'package:rafiq_academy/features/notifications/domain/entities/fcm_device_registration.dart';
 import 'package:rafiq_academy/features/notifications/domain/repositories/fcm_token_repository.dart';
@@ -15,12 +16,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _FakeMessagingPort implements FcmMessagingPort {
   bool permission = true;
   String? token = 'tok-1';
+  Object? tokenError;
   int permissionCalls = 0;
   final StreamController<String> refreshes =
       StreamController<String>.broadcast();
 
   @override
-  Future<String?> currentToken() async => token;
+  Future<String?> currentToken() async {
+    if (tokenError != null) throw tokenError!;
+    return token;
+  }
 
   @override
   String platformKey() => FcmTokenContract.platformAndroid;
@@ -49,6 +54,16 @@ class _FakeDeviceIdProvider implements FcmDeviceIdProvider {
     calls += 1;
     return id;
   }
+}
+
+class _MemoryPendingStore implements FcmPendingRevocationStore {
+  Set<String> uids = {};
+
+  @override
+  Future<Set<String>> read() async => Set.of(uids);
+
+  @override
+  Future<void> write(Set<String> next) async => uids = Set.of(next);
 }
 
 class _RecordingTokenRepository implements FcmTokenRepository {
@@ -195,6 +210,7 @@ void main() {
         messaging: messaging,
         deviceIdProvider: deviceIds,
         repository: repository,
+        pendingRevocations: _MemoryPendingStore(),
       );
     });
 
@@ -232,6 +248,23 @@ void main() {
       expect(repository.upserts.last.registration.token, 'tok-2');
       expect(repository.upserts.last.registration.deviceId, 'dev_stable');
     });
+
+    test(
+      'a token read that fails (iOS before APNs) still registers the '
+      'token delivered by refresh',
+      () async {
+        messaging.tokenError = StateError('apns-token-not-set');
+        await registrar.onSignedIn('parent1');
+        expect(repository.upserts, isEmpty);
+
+        messaging.refreshes.add('tok-apns');
+        await Future<void>.delayed(Duration.zero);
+
+        expect(repository.upserts, hasLength(1));
+        expect(repository.upserts.single.uid, 'parent1');
+        expect(repository.upserts.single.registration.token, 'tok-apns');
+      },
+    );
 
     test('denied permission registers nothing', () async {
       messaging.permission = false;

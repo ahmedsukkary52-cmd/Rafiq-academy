@@ -27,6 +27,17 @@ These decisions supersede open questions in `FULL_PRODUCT_AUDIT.md` §8 and the 
 - Payment remains `pending_review` until authorized review.
 - Becoming `paid` is **not** a Parent client write.
 
+> **Amendment D2-A1 (2026-10-16, approved by the academy; the original text
+> above is kept as the record of the 2026-09-10 decision).** The external rail
+> is widened from "Vodafone Cash only" to **Vodafone Cash or InstaPay**, each
+> with its own admin-configured academy destination (never derived from the
+> other). Everything else in D2 stands: screenshot proof submitted in the
+> app, `pending_review` until authorized review, `paid` never a Parent client
+> write, Paymob OUT, Wallet OUT, no receipt submission by external phone or
+> WhatsApp. The InstaPay destination type (mobile number, InstaPay address or
+> HTTPS link) is chosen by the admin and validated for that type. Contract:
+> `BILLING_PAYMENT_CONTRACT.md`.
+
 ## D3 — Invoice Ownership
 
 - **Admin** owns pricing rules / defaults / overrides.
@@ -66,6 +77,7 @@ These decisions supersede open questions in `FULL_PRODUCT_AUDIT.md` §8 and the 
 - Admin can edit it.
 - Parent reads the **current** value.
 - Never hard-code an invented number (freeze `transferDestination = ''` must be replaced by settings read).
+- Since D2-A1 the same rules apply to the separate InstaPay destination.
 
 ## D7 — Evaluation Attendance Gate
 
@@ -318,6 +330,12 @@ Implementation and evidence: `P0_COMPLETION_REPORT.md`.
   > **Amendment (B14).** `meetingLink` is no longer client-editable. It is
   > written only by `adminCreateHalaqa` and `setHalaqaMeetingLink`; see
   > `B14_MEETING_LINKS.md`. Clients may still edit `name` and `supervisorId`.
+
+  > **Amendment P9-A1 (2026-10-18, approved; the original P9 text above is
+  > kept as the record of the 2026-10-04 decision).** `meetingLink` is written
+  > only by `adminCreateHalaqa` and `setHalaqaMeetingLink` (Admin
+  > set/update/clear; the assigned Supervisor may add a link only while none
+  > is stored). Clients may still edit `name` and `supervisorId`.
 - **P10 — Notification deep links.** Destinations are deterministic by type and role. Payloads carry the type only, and the role allowlist is re-checked on open. A type with no destination for the role shows «هذا الإشعار لا يرتبط بصفحة متاحة لحسابك».
 
 ### Deferred (documented, not implemented)

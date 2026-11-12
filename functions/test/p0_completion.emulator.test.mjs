@@ -88,7 +88,7 @@ test.beforeEach(async () => {
     "studentProfiles/student1": { uid: "student1", halaqaId: "h1", points: 0, coins: 0 },
     "studentProfiles/student2": { uid: "student2", halaqaId: "h1", points: 0, coins: 0 },
     "studentProfiles/student3": { uid: "student3", coins: 0 },
-    "studentProfiles/archived1": { uid: "archived1" },
+    "studentProfiles/archived1": { uid: "archived1", lifecycle: "archived" },
     "parentProfiles/parent1": { uid: "parent1", childrenIds: [] },
     "parentProfiles/parent2": { uid: "parent2", childrenIds: ["student2"] },
   });
@@ -262,7 +262,7 @@ test("P0-05 foreign student / other roles are denied", async () => {
 
 const link = (uid, payload) => parentLink.adminLinkParentChildCore(db, uid, payload);
 
-test("P0-01 Admin links a child: childrenIds updated + one audit; relink is a no-op", async () => {
+test("P0-01 Admin links a child: childrenIds updated + one audit; relink is a no-op; the sole guardian cannot be unlinked", async () => {
   const result = await link("admin1", { parentId: "parent1", studentId: "student1" });
   assert.equal(result.changed, true);
   assert.deepEqual((await data("parentProfiles/parent1")).childrenIds, ["student1"]);
@@ -272,14 +272,55 @@ test("P0-01 Admin links a child: childrenIds updated + one audit; relink is a no
   assert.equal(again.changed, false);
   assert.equal(await auditCount("relationship_children_change"), 1);
 
-  const unlink = await link("admin1", {
-    parentId: "parent1",
-    studentId: "student1",
-    operation: "unlink",
+  // Approved rule (F4): a student always keeps a guardian. Unlinking the only
+  // one is refused and changes nothing; replacement is the path.
+  const unlinkSole = (parentId) => link("admin1", { parentId, studentId: "student1", operation: "unlink" });
+  await assert.rejects(unlinkSole("parent1"), (err) => {
+    assert.equal(err.code, "failed-precondition");
+    assert.match(err.message, /الوحيد/);
+    return true;
   });
+  assert.deepEqual((await data("parentProfiles/parent1")).childrenIds, ["student1"]);
+  assert.equal(await auditCount("relationship_children_change"), 1);
+
+  // With a second active guardian, unlinking one of them succeeds and is audited.
+  assert.equal((await link("admin1", { parentId: "parent2", studentId: "student1" })).changed, true);
+  const unlink = await unlinkSole("parent1");
   assert.equal(unlink.changed, true);
   assert.deepEqual((await data("parentProfiles/parent1")).childrenIds, []);
-  assert.equal(await auditCount("relationship_children_change"), 2);
+  assert.deepEqual((await data("parentProfiles/parent2")).childrenIds, ["student2", "student1"]);
+  assert.equal(await auditCount("relationship_children_change"), 3);
+
+  // The remaining guardian is now the only one and is protected in turn.
+  await expectCode(unlinkSole("parent2"), "failed-precondition");
+  assert.deepEqual((await data("parentProfiles/parent2")).childrenIds, ["student2", "student1"]);
+});
+
+test("P0-01 a wrong sole-guardian link is corrected atomically by replacement, audited", async () => {
+  await link("admin1", { parentId: "parent1", studentId: "student1" });
+  const replaced = await parentLink.adminReplaceParentLinkCore(db, "admin1", {
+    studentId: "student1",
+    fromParentId: "parent1",
+    toParentId: "parent2",
+  });
+  assert.equal(replaced.changed, true);
+  assert.deepEqual((await data("parentProfiles/parent1")).childrenIds, []);
+  assert.deepEqual((await data("parentProfiles/parent2")).childrenIds, ["student2", "student1"]);
+  const audits = (await db.collection("auditLogs").where("action", "==", "relationship_children_change").get()).docs
+    .map((d) => d.data())
+    .filter((a) => a.metadata?.operation === "replace");
+  assert.equal(audits.length, 1);
+  assert.deepEqual(
+    [audits[0].metadata.previousParentId, audits[0].metadata.parentId, audits[0].metadata.studentId],
+    ["parent1", "parent2", "student1"],
+  );
+  const history = (await db.collection("relationshipHistory").get()).docs.map((d) => d.data());
+  assert.ok(history.some((h) => h.operation === "replace" && h.previousParentId === "parent1" && h.parentId === "parent2"));
+  // Only an Admin may replace.
+  await expectCode(
+    parentLink.adminReplaceParentLinkCore(db, "sup1", { studentId: "student1", fromParentId: "parent2", toParentId: "parent1" }),
+    "permission-denied",
+  );
 });
 
 test("P0-01 unauthorized roles cannot link", async () => {

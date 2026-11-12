@@ -176,6 +176,9 @@ export const AUDIT_METADATA_ALLOWLIST = new Set([
   "coverId",
   "assistantId",
   "academyRef",
+  // adminSetMemberActive: users.isActive before and after the change (booleans).
+  "previousActive",
+  "newActive",
 ]);
 
 /** Privacy deny-list — must never appear as metadata keys or nested content probes. */

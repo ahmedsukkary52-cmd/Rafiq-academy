@@ -192,8 +192,10 @@ test("an account created just before a crash is finished on retry with a fresh c
   const [teacher] = ROSTER;
   const first = await run([teacher]);
   const uid = (await db.doc("importRows/T001").get()).get("id");
-  // Simulate a crash after account creation but before the row was marked done.
-  await db.doc("importRows/T001").update({ status: "in_progress" });
+  // Simulate a crash after account creation but before the row was marked done,
+  // retried once the attempt's claim lease has expired (the lease stays 2 min).
+  const expired = admin.firestore.Timestamp.fromMillis(Date.now() - importer.IMPORT_LEASE_MS - 1000);
+  await db.doc("importRows/T001").update({ status: "in_progress", leaseUntil: expired, updatedAt: expired });
 
   const retry = await run([teacher]);
   assert.equal(retry.T001.status, "created");
@@ -203,6 +205,22 @@ test("an account created just before a crash is finished on retry with a fresh c
   assert.equal((await counts()).teachers, 1);
   assert.equal(await signIn(retry.T001.credential.username, retry.T001.credential.temporaryPassword), true);
   assert.equal(await signIn(first.T001.credential.username, first.T001.credential.temporaryPassword), false);
+});
+
+test("a live claim blocks a retry by the same admin until its lease expires", async () => {
+  const [teacher] = ROSTER;
+  const first = await run([teacher]);
+  assert.equal(importer.IMPORT_LEASE_MS, 2 * 60 * 1000, "the claim lease stays two minutes");
+  const live = admin.firestore.Timestamp.fromMillis(Date.now() + importer.IMPORT_LEASE_MS);
+  await db.doc("importRows/T001").update({ status: "in_progress", leaseUntil: live });
+  await assert.rejects(
+    importer.adminImportAcademyRowCore(deps, ADMIN, { importId: IMPORT_ID, row: teacher }),
+    (e) => e.code === "aborted" && /انتظر النتيجة/.test(e.message),
+  );
+  // Nothing ran: one account, the row is untouched and the first credential still signs in.
+  assert.equal((await counts()).teachers, 1);
+  assert.equal((await db.doc("importRows/T001").get()).get("status"), "in_progress");
+  assert.equal(await signIn(first.T001.credential.username, first.T001.credential.temporaryPassword), true);
 });
 
 test("a row being processed by another admin is not run twice", async () => {

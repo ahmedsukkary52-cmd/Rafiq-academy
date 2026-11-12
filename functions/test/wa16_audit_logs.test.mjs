@@ -152,6 +152,50 @@ test("WA-16 rejects forbidden and unknown metadata keys", () => {
   );
 });
 
+test("WA-16 account activation audit (adminSetMemberActive): previousActive/newActive are allowlisted booleans", () => {
+  for (const key of ["previousActive", "newActive"]) {
+    assert.ok(contract.AUDIT_METADATA_ALLOWLIST.has(key), `${key} must be auditable`);
+    assert.ok(!contract.AUDIT_METADATA_FORBIDDEN_KEYS.includes(key));
+  }
+  const entry = write.buildAuditLogEntry(
+    {
+      actor: write.adminActor("a1"),
+      action: contract.AUDIT_ACTION.accountActiveChange,
+      targetType: contract.AUDIT_TARGET_TYPE.user,
+      targetId: "u1",
+      metadata: { role: "student", previousActive: true, newActive: false },
+      source: "adminSetMemberActive",
+    },
+    "TS",
+  );
+  assert.deepEqual(entry.metadata, { role: "student", previousActive: true, newActive: false });
+  assert.equal(typeof entry.metadata.previousActive, "boolean");
+  assert.equal(typeof entry.metadata.newActive, "boolean");
+  // The allowlist stays strict: a near-miss key is still rejected.
+  assert.throws(
+    () =>
+      write.buildAuditLogEntry(
+        {
+          actor: write.adminActor("a1"),
+          action: contract.AUDIT_ACTION.accountActiveChange,
+          targetType: contract.AUDIT_TARGET_TYPE.user,
+          targetId: "u1",
+          metadata: { role: "student", previousActive: true, isActiveBefore: true },
+          source: "adminSetMemberActive",
+        },
+        "TS",
+      ),
+    /allowlisted/,
+  );
+  // Source contract: every metadata key the writer emits is allowlisted.
+  const statusSrc = readFileSync(join(srcDir, "accounts", "memberStatusFunctions.ts"), "utf8");
+  const literal = /metadata:\s*\{([^}]*)\}/.exec(statusSrc);
+  assert.ok(literal, "memberStatusFunctions.ts writes an audit metadata literal");
+  const keys = literal[1].split(",").map((part) => part.split(":")[0].trim()).filter(Boolean);
+  assert.deepEqual([...keys].sort(), ["newActive", "previousActive", "role"]);
+  for (const key of keys) assert.ok(contract.AUDIT_METADATA_ALLOWLIST.has(key), `${key} must be auditable`);
+});
+
 test("WA-16 migration target ids are deterministic", () => {
   assert.equal(
     write.migrationTargetId("lifecycle_bf", "start"),

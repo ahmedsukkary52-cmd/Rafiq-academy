@@ -203,6 +203,7 @@ test("halaqat created in the app get the next free H-code from the shared ledger
   const slot = (day) => [{ day, startTime: "18:00", endTime: "19:00" }];
   const counter = async () => (await data("academyRefCounters/halaqa"))?.last;
   const halaqaCount = async () => (await db.collection("halaqat").get()).size;
+  assert.equal(await counter(), 2, "the imported roster codes H-001/H-002 moved the counter past them");
 
   // Imported H-001 / H-002 are skipped; the code is stamped in the create transaction.
   const rid = requestId();
@@ -255,11 +256,14 @@ test("halaqat created in the app get the next free H-code from the shared ledger
   ]);
   assert.equal(imported["H-008"].status, "created");
   assert.equal((await data(`halaqat/${await idOf("H-008")}`)).academyRef, "H-008");
-  assert.equal(await counter(), 7, "import does not draw from the counter");
+  // Approved behaviour (F2): an app-format roster code moves the counter past
+  // it (7 -> 8), so app codes continue after the roster's highest code.
+  assert.equal(await counter(), 8, "an imported app-format roster code moves the counter past it");
   const next = await halaqat.adminCreateHalaqaCore(db, ADMIN, {
     name: "حلقة العشاء", teacherId: t1, schedule: slot("الأحد"), requestId: requestId(),
   });
   assert.equal(next.academyRef, "H-009");
+  assert.equal(await counter(), 9);
 
   // A later import repeating an app-created code for the same halaqa adopts it.
   const countBefore = await halaqaCount();
@@ -268,6 +272,7 @@ test("halaqat created in the app get the next free H-code from the shared ledger
   ]);
   assert.equal(adopt["H-003"].status, "existing");
   assert.equal(await halaqaCount(), countBefore);
+  assert.equal(await counter(), 9, "adopting a lower code never moves the counter");
 
   // Existing codes are untouched.
   assert.equal((await data(`halaqat/${await idOf("H-001")}`)).academyRef, "H-001");
@@ -275,6 +280,80 @@ test("halaqat created in the app get the next free H-code from the shared ledger
   const codes = (await db.collection("halaqat").get()).docs.map((d) => d.get("academyRef"));
   assert.equal(new Set(codes).size, codes.length, "every halaqa code is unique");
   assert.ok(codes.every((c) => /^H-\d{3}$/.test(c)));
+});
+
+test("F2: roster codes advance the counter once; codes are never reused; concurrent allocation stays unique", async () => {
+  const counter = async () => (await data("academyRefCounters/parent"))?.last;
+  const newParent = async (name) =>
+    (await accounts.adminCreateMemberAccountCore(deps, ADMIN, { role: "parent", name })).uid;
+  const refOf = async (uid) => (await data(`users/${uid}`)).academyRef;
+  const parentDocs = async () => (await db.collection("users").where("role", "==", "parent").get()).docs;
+  const past = () => admin.firestore.Timestamp.fromMillis(Date.now() - importer.IMPORT_LEASE_MS - 1000);
+  assert.equal(await counter(), 1, "the imported P-001 moved the counter");
+
+  // (a) A roster code moves the counter past it; app codes continue after it.
+  const imported = await runImport([{ kind: "parent", ref: "P-005", name: "ولي أمر مستورد" }]);
+  assert.equal(imported["P-005"].status, "created");
+  assert.equal(await counter(), 5);
+  assert.equal(await refOf(await newParent("ولي أمر أول")), "P-006");
+  // A code already held in the shared ledger (written before imports moved the
+  // counter) is skipped and never overwritten.
+  await db.doc("importRows/P-007").set({ kind: "parent", status: "done", id: "legacy_parent_007", name: "سجل سابق" });
+  assert.equal(await refOf(await newParent("ولي أمر ثان")), "P-008");
+  assert.equal((await data("importRows/P-007")).id, "legacy_parent_007");
+  assert.equal(await counter(), 8);
+  // A lower roster code imported later keeps its code and never moves the counter back.
+  const lower = await runImport([{ kind: "parent", ref: "P-003", name: "ولي أمر ثالث" }]);
+  assert.equal(lower["P-003"].status, "created");
+  assert.equal(await counter(), 8);
+  assert.equal(await refOf(await newParent("ولي أمر رابع")), "P-009");
+
+  // (b) Retrying the same import row never advances the counter again ...
+  await runImport([{ kind: "parent", ref: "P-020", name: "ولي أمر عشرون" }]);
+  assert.equal(await counter(), 20);
+  const again = await runImport([{ kind: "parent", ref: "P-020", name: "ولي أمر عشرون" }]);
+  assert.equal(again["P-020"].status, "existing");
+  assert.equal(await counter(), 20);
+  // ... nor after a crash once its claim lease has expired (account already created) ...
+  await db.doc("importRows/P-020").update({ status: "in_progress", leaseUntil: past(), updatedAt: past() });
+  const resumed = await runImport([{ kind: "parent", ref: "P-020", name: "ولي أمر عشرون" }]);
+  assert.equal(resumed["P-020"].status, "created");
+  assert.equal(await counter(), 20);
+  // ... nor after a crash between the claim (which moved the counter) and the account.
+  await db.doc("academyRefCounters/parent").update({ last: 21 });
+  await db.doc("importRows/P-021").set({
+    kind: "parent",
+    status: "in_progress",
+    actorId: ADMIN,
+    importId: IMPORT_ID,
+    leaseUntil: past(),
+    updatedAt: past(),
+  });
+  const recovered = await runImport([{ kind: "parent", ref: "P-021", name: "ولي أمر واحد وعشرون" }]);
+  assert.equal(recovered["P-021"].status, "created");
+  assert.equal(await counter(), 21);
+  const resumedRefs = (await parentDocs()).map((d) => d.get("academyRef")).filter((r) => r === "P-020" || r === "P-021");
+  assert.deepEqual(resumedRefs.sort(), ["P-020", "P-021"], "each resumed row has exactly one account");
+
+  // (c) A roster import racing app-created parents: unique codes, consistent counter.
+  await Promise.all([
+    runImport([{ kind: "parent", ref: "P-030", name: "ولي أمر متزامن" }]),
+    newParent("متزامن أ"),
+    newParent("متزامن ب"),
+    newParent("متزامن ج"),
+  ]);
+  const docs = await parentDocs();
+  const refs = docs.map((d) => d.get("academyRef"));
+  assert.equal(new Set(refs).size, refs.length, "no parent code is shared");
+  assert.ok(refs.includes("P-030"));
+  assert.equal(
+    await counter(),
+    Math.max(...refs.map((r) => Number(r.slice(2)))),
+    "the counter equals the highest issued code",
+  );
+  for (const d of docs) {
+    assert.equal((await data(`importRows/${d.get("academyRef")}`)).id, d.id, `${d.get("academyRef")} points at its account`);
+  }
 });
 
 test("guardian changes: second guardian, atomic replacement, history kept", async () => {
@@ -339,6 +418,8 @@ test("P2-2: parent/student activation is Admin-callable only, audited, never for
   assert.equal(entry.actorId, ADMIN);
   assert.equal(entry.targetId, s1);
   assert.deepEqual(entry.metadata, { role: "student", previousActive: true, newActive: false });
+  assert.equal(typeof entry.metadata.previousActive, "boolean");
+  assert.equal(typeof entry.metadata.newActive, "boolean");
 
   // An archived student is unarchived first; then activation works.
   await db.doc(`studentProfiles/${s1}`).update({ lifecycle: "archived" });

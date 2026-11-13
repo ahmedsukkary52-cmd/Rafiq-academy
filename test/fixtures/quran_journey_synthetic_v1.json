@@ -1,0 +1,946 @@
+{
+  "synthetic": true,
+  "notice": "بيانات اصطناعية \u2014 ليست بيانات قرآنية. Synthetic data, not Quranic data: invented catalogs, parts and word counts; word-count texts are meaningless letter sequences.",
+  "schemaVersion": 1,
+  "phase": "1A",
+  "expectedValuesSource": "Computed by hand and checked with an independent oracle outside the repository; never produced by the engines under test.",
+  "indexes": {
+    "main": {
+      "ayahCounts": [3, 1, 5, 2, 4, 1, 6],
+      "juzStarts": [
+        [1, 1],
+        [3, 3],
+        [5, 1],
+        [6, 1],
+        [7, 1]
+      ],
+      "wordCounts": [2, 7, 3, 5, 1, 4, 6, 2, 9, 3, 8, 4, 4, 1, 11, 13, 2, 5, 3, 7, 1, 6]
+    },
+    "stressFractions": {
+      "ayahCounts": [2, 2, 2],
+      "juzStarts": [
+        [1, 1],
+        [2, 1],
+        [3, 1]
+      ],
+      "wordCounts": [300000000, 600000000, 200000002, 500000005, 250000000, 750000000]
+    },
+    "stressMaxSafe": {
+      "ayahCounts": [3],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [300239975158, 300239975158, 300239975158]
+    }
+  },
+  "upperBoundCases": [
+    {
+      "sorted": [],
+      "value": 5,
+      "expect": 0
+    },
+    {
+      "sorted": [4],
+      "value": 3,
+      "expect": 0
+    },
+    {
+      "sorted": [4],
+      "value": 4,
+      "expect": 1
+    },
+    {
+      "sorted": [4],
+      "value": 5,
+      "expect": 1
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 0,
+      "expect": 0
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 1,
+      "expect": 1
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 6,
+      "expect": 1
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 7,
+      "expect": 2
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 16,
+      "expect": 4
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 17,
+      "expect": 5
+    },
+    {
+      "sorted": [1, 7, 12, 16, 17],
+      "value": 99,
+      "expect": 5
+    },
+    {
+      "sorted": [1, 3, 3, 5],
+      "value": 3,
+      "expect": 3
+    },
+    {
+      "sorted": [1, 3, 3, 5],
+      "value": 2,
+      "expect": 1
+    }
+  ],
+  "juzOfCases": {
+    "index": "main",
+    "cases": [
+      {
+        "g": 1,
+        "expectJuz": 1
+      },
+      {
+        "g": 6,
+        "expectJuz": 1
+      },
+      {
+        "g": 7,
+        "expectJuz": 2
+      },
+      {
+        "g": 11,
+        "expectJuz": 2
+      },
+      {
+        "g": 12,
+        "expectJuz": 3
+      },
+      {
+        "g": 15,
+        "expectJuz": 3
+      },
+      {
+        "g": 16,
+        "expectJuz": 4
+      },
+      {
+        "g": 17,
+        "expectJuz": 5
+      },
+      {
+        "g": 22,
+        "expectJuz": 5
+      }
+    ]
+  },
+  "positionCases": [
+    {
+      "description": "first position of the index (g = 1)",
+      "index": "main",
+      "from": [1, 1],
+      "to": [1, 1],
+      "expect": {
+        "juz": 1,
+        "level": 5,
+        "progressBp": 909
+      }
+    },
+    {
+      "description": "last position of part 1 (g = boundary - 1)",
+      "index": "main",
+      "from": [1, 1],
+      "to": [3, 2],
+      "expect": {
+        "juz": 1,
+        "level": 5,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "part 2 starts mid-surah (g on a boundary)",
+      "index": "main",
+      "from": [3, 3],
+      "to": [3, 3],
+      "expect": {
+        "juz": 2,
+        "level": 4,
+        "progressBp": 2142
+      }
+    },
+    {
+      "description": "part 2 second position: 8/28 = 2/7",
+      "index": "main",
+      "from": [3, 4],
+      "to": [3, 4],
+      "expect": {
+        "juz": 2,
+        "level": 4,
+        "progressBp": 2857
+      }
+    },
+    {
+      "description": "end of part 2",
+      "index": "main",
+      "from": [3, 5],
+      "to": [4, 2],
+      "expect": {
+        "juz": 2,
+        "level": 4,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "part 3 starts at the first ayah of a surah",
+      "index": "main",
+      "from": [5, 1],
+      "to": [5, 1],
+      "expect": {
+        "juz": 3,
+        "level": 3,
+        "progressBp": 2000
+      }
+    },
+    {
+      "description": "end of part 3",
+      "index": "main",
+      "from": [5, 2],
+      "to": [5, 4],
+      "expect": {
+        "juz": 3,
+        "level": 3,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "single-position part: start is also its end",
+      "index": "main",
+      "from": [6, 1],
+      "to": [6, 1],
+      "expect": {
+        "juz": 4,
+        "level": 2,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "first position of the last part",
+      "index": "main",
+      "from": [7, 1],
+      "to": [7, 1],
+      "expect": {
+        "juz": 5,
+        "level": 1,
+        "progressBp": 833
+      }
+    },
+    {
+      "description": "last position of the index",
+      "index": "main",
+      "from": [7, 1],
+      "to": [7, 6],
+      "expect": {
+        "juz": 5,
+        "level": 1,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "D6: range from part 1 into part 2 uses the end",
+      "index": "main",
+      "from": [2, 1],
+      "to": [3, 4],
+      "expect": {
+        "juz": 2,
+        "level": 4,
+        "progressBp": 2857
+      }
+    },
+    {
+      "description": "D6: range ending on the last position of part 1 does not jump",
+      "index": "main",
+      "from": [2, 1],
+      "to": [3, 2],
+      "expect": {
+        "juz": 1,
+        "level": 5,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "D6: range across every part uses the end",
+      "index": "main",
+      "from": [1, 1],
+      "to": [7, 2],
+      "expect": {
+        "juz": 5,
+        "level": 1,
+        "progressBp": 2916
+      }
+    },
+    {
+      "description": "recurring fraction 1/3 with 10000*num above 2^31",
+      "index": "stressFractions",
+      "from": [1, 1],
+      "to": [1, 1],
+      "expect": {
+        "juz": 1,
+        "level": 3,
+        "progressBp": 3333
+      }
+    },
+    {
+      "description": "recurring fraction 2/7 with 10000*num above 2^31",
+      "index": "stressFractions",
+      "from": [2, 1],
+      "to": [2, 1],
+      "expect": {
+        "juz": 2,
+        "level": 2,
+        "progressBp": 2857
+      }
+    },
+    {
+      "description": "exact division 1/4 with 10000*num above 2^31",
+      "index": "stressFractions",
+      "from": [3, 1],
+      "to": [3, 1],
+      "expect": {
+        "juz": 3,
+        "level": 1,
+        "progressBp": 2500
+      }
+    },
+    {
+      "description": "end of a large part",
+      "index": "stressFractions",
+      "from": [3, 1],
+      "to": [3, 2],
+      "expect": {
+        "juz": 3,
+        "level": 1,
+        "progressBp": 10000
+      }
+    },
+    {
+      "description": "1/3 at the maximum safe total",
+      "index": "stressMaxSafe",
+      "from": [1, 1],
+      "to": [1, 1],
+      "expect": {
+        "juz": 1,
+        "level": 1,
+        "progressBp": 3333
+      }
+    },
+    {
+      "description": "2/3 at the maximum safe total",
+      "index": "stressMaxSafe",
+      "from": [1, 2],
+      "to": [1, 2],
+      "expect": {
+        "juz": 1,
+        "level": 1,
+        "progressBp": 6666
+      }
+    },
+    {
+      "description": "whole part at the maximum safe total",
+      "index": "stressMaxSafe",
+      "from": [1, 1],
+      "to": [1, 3],
+      "expect": {
+        "juz": 1,
+        "level": 1,
+        "progressBp": 10000
+      }
+    }
+  ],
+  "allPositions": {
+    "columns": [
+      "s",
+      "a",
+      "juz",
+      "level",
+      "progressBp"
+    ],
+    "rows": {
+      "main": [
+        [1, 1, 1, 5, 909],
+        [1, 2, 1, 5, 4090],
+        [1, 3, 1, 5, 5454],
+        [2, 1, 1, 5, 7727],
+        [3, 1, 1, 5, 8181],
+        [3, 2, 1, 5, 10000],
+        [3, 3, 2, 4, 2142],
+        [3, 4, 2, 4, 2857],
+        [3, 5, 2, 4, 6071],
+        [4, 1, 2, 4, 7142],
+        [4, 2, 2, 4, 10000],
+        [5, 1, 3, 3, 2000],
+        [5, 2, 3, 3, 4000],
+        [5, 3, 3, 3, 4500],
+        [5, 4, 3, 3, 10000],
+        [6, 1, 4, 2, 10000],
+        [7, 1, 5, 1, 833],
+        [7, 2, 5, 1, 2916],
+        [7, 3, 5, 1, 4166],
+        [7, 4, 5, 1, 7083],
+        [7, 5, 5, 1, 7500],
+        [7, 6, 5, 1, 10000]
+      ],
+      "stressFractions": [
+        [1, 1, 1, 3, 3333],
+        [1, 2, 1, 3, 10000],
+        [2, 1, 2, 2, 2857],
+        [2, 2, 2, 2, 10000],
+        [3, 1, 3, 1, 2500],
+        [3, 2, 3, 1, 10000]
+      ],
+      "stressMaxSafe": [
+        [1, 1, 1, 1, 3333],
+        [1, 2, 1, 1, 6666],
+        [1, 3, 1, 1, 10000]
+      ]
+    }
+  },
+  "invalidRangeCases": [
+    {
+      "description": "surah 0",
+      "index": "main",
+      "from": [0, 1],
+      "to": [1, 1],
+      "expectIssue": "surahOutOfRange"
+    },
+    {
+      "description": "negative surah",
+      "index": "main",
+      "from": [-1, 1],
+      "to": [1, 1],
+      "expectIssue": "surahOutOfRange"
+    },
+    {
+      "description": "surah after the last one",
+      "index": "main",
+      "from": [7, 1],
+      "to": [8, 1],
+      "expectIssue": "surahOutOfRange"
+    },
+    {
+      "description": "ayah 0",
+      "index": "main",
+      "from": [3, 0],
+      "to": [3, 1],
+      "expectIssue": "ayahOutOfRange"
+    },
+    {
+      "description": "negative ayah",
+      "index": "main",
+      "from": [3, 1],
+      "to": [3, -2],
+      "expectIssue": "ayahOutOfRange"
+    },
+    {
+      "description": "ayah after the surah's count (single-ayah surah)",
+      "index": "main",
+      "from": [2, 2],
+      "to": [3, 1],
+      "expectIssue": "ayahOutOfRange"
+    },
+    {
+      "description": "ayah after the surah's count (last surah)",
+      "index": "main",
+      "from": [7, 1],
+      "to": [7, 7],
+      "expectIssue": "ayahOutOfRange"
+    },
+    {
+      "description": "from after to inside one surah",
+      "index": "main",
+      "from": [3, 4],
+      "to": [3, 3],
+      "expectIssue": "reversedRange"
+    },
+    {
+      "description": "from after to across surahs",
+      "index": "main",
+      "from": [5, 1],
+      "to": [4, 2],
+      "expectIssue": "reversedRange"
+    },
+    {
+      "description": "from is checked before order",
+      "index": "main",
+      "from": [9, 1],
+      "to": [1, 1],
+      "expectIssue": "surahOutOfRange"
+    }
+  ],
+  "invalidIndexCases": [
+    {
+      "description": "empty catalog",
+      "ayahCounts": [],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [],
+      "expectIssue": "emptyCatalog"
+    },
+    {
+      "description": "zero-ayah surah",
+      "ayahCounts": [2, 0],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [1, 1],
+      "expectIssue": "invalidAyahCount"
+    },
+    {
+      "description": "negative ayah count",
+      "ayahCounts": [2, -1],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [1, 1],
+      "expectIssue": "invalidAyahCount"
+    },
+    {
+      "description": "fewer word counts than verses",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [1, 1],
+      "expectIssue": "wordCountLengthMismatch"
+    },
+    {
+      "description": "more word counts than verses",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [1, 1, 1, 1],
+      "expectIssue": "wordCountLengthMismatch"
+    },
+    {
+      "description": "zero-word verse",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [1, 0, 1],
+      "expectIssue": "invalidWordCount"
+    },
+    {
+      "description": "negative word count",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [1, -3, 1],
+      "expectIssue": "invalidWordCount"
+    },
+    {
+      "description": "total one word above the safe bound",
+      "ayahCounts": [3],
+      "juzStarts": [
+        [1, 1]
+      ],
+      "wordCounts": [300239975158, 300239975158, 300239975159],
+      "expectIssue": "totalWordsTooLarge"
+    },
+    {
+      "description": "no parts",
+      "ayahCounts": [2, 1],
+      "juzStarts": [],
+      "wordCounts": [1, 1, 1],
+      "expectIssue": "emptyJuzStarts"
+    },
+    {
+      "description": "part start on a missing ayah",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1],
+        [2, 2]
+      ],
+      "wordCounts": [1, 1, 1],
+      "expectIssue": "juzStartOutOfCatalog"
+    },
+    {
+      "description": "part start on a missing surah",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1],
+        [3, 1]
+      ],
+      "wordCounts": [1, 1, 1],
+      "expectIssue": "juzStartOutOfCatalog"
+    },
+    {
+      "description": "first part not at the first verse",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 2]
+      ],
+      "wordCounts": [1, 1, 1],
+      "expectIssue": "firstJuzNotAtStart"
+    },
+    {
+      "description": "duplicate part start",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1],
+        [2, 1],
+        [2, 1]
+      ],
+      "wordCounts": [1, 1, 1],
+      "expectIssue": "juzStartsNotIncreasing"
+    },
+    {
+      "description": "decreasing part start",
+      "ayahCounts": [2, 1],
+      "juzStarts": [
+        [1, 1],
+        [2, 1],
+        [1, 2]
+      ],
+      "wordCounts": [1, 1, 1],
+      "expectIssue": "juzStartsNotIncreasing"
+    }
+  ],
+  "wordCount": {
+    "ruleId": "words-kfgqpc-hafs-v2.0-v2",
+    "separators": [32, 160],
+    "letterRanges": [
+      [1569, 1599],
+      [1601, 1610],
+      [1649, 1747]
+    ],
+    "unicodeVersion": "15.1.0",
+    "disallowedRanges": [
+      [0, 31],
+      [127, 159],
+      [173, 173],
+      [1536, 1541],
+      [1564, 1564],
+      [1757, 1757],
+      [1807, 1807],
+      [2192, 2193],
+      [2274, 2274],
+      [5760, 5760],
+      [6158, 6158],
+      [8192, 8207],
+      [8232, 8239],
+      [8287, 8292],
+      [8294, 8303],
+      [12288, 12288],
+      [65279, 65279],
+      [65529, 65531],
+      [69821, 69821],
+      [69837, 69837],
+      [78896, 78911],
+      [113824, 113827],
+      [119155, 119162],
+      [917505, 917505],
+      [917536, 917631]
+    ],
+    "cases": [
+      {
+        "description": "two segments split by SPACE",
+        "text": "ثقص ظغذ",
+        "expectWords": 2
+      },
+      {
+        "description": "NO-BREAK SPACE separates",
+        "text": "ثقص\u00a0ظغذ",
+        "expectWords": 2
+      },
+      {
+        "description": "runs of mixed separators collapse",
+        "text": "ثقص  \u00a0 \u00a0ظغذ\u00a0\u00a0خضش",
+        "expectWords": 3
+      },
+      {
+        "description": "leading and trailing separators",
+        "text": " \u00a0ثقص ظغذ\u00a0 ",
+        "expectWords": 2
+      },
+      {
+        "description": "empty text",
+        "text": "",
+        "expectWords": 0
+      },
+      {
+        "description": "separators only",
+        "text": " \u00a0  \u00a0",
+        "expectWords": 0
+      },
+      {
+        "description": "isolated U+FC00-block verse-end symbol is not a word",
+        "text": "ثقص ظغذ\u00a0\ufc00",
+        "expectWords": 2,
+        "naivePLetterSegments": 3
+      },
+      {
+        "description": "isolated U+FC5E symbol is not a word",
+        "text": "ثقص\u00a0\ufc5e ظغذ",
+        "expectWords": 2,
+        "naivePLetterSegments": 3
+      },
+      {
+        "description": "isolated U+06DE is not a word",
+        "text": "ثقص \u06de ظغذ",
+        "expectWords": 2
+      },
+      {
+        "description": "U+06E9 attached to a word counts once",
+        "text": "ثقص ظغذ\u06e9",
+        "expectWords": 2
+      },
+      {
+        "description": "isolated U+06E9 is not a word",
+        "text": "ثقص \u06e9",
+        "expectWords": 1
+      },
+      {
+        "description": "isolated Arabic-Indic digits are not a word",
+        "text": "ثقص ظغذ \u0661\u0662\u0663",
+        "expectWords": 2
+      },
+      {
+        "description": "diacritics-only segment is not a word",
+        "text": "ثقص \u064e\u0650\u0652 ظغذ",
+        "expectWords": 2
+      },
+      {
+        "description": "diacritic before a letter still counts once",
+        "text": "\u064eث",
+        "expectWords": 1
+      },
+      {
+        "description": "range boundary U+0621 counts",
+        "text": "ء",
+        "expectWords": 1
+      },
+      {
+        "description": "range boundary U+064A counts",
+        "text": "ي",
+        "expectWords": 1
+      },
+      {
+        "description": "range boundary U+063F (below the tatweel gap) counts",
+        "text": "ؿ",
+        "expectWords": 1
+      },
+      {
+        "description": "range boundary U+0641 (above the tatweel gap) counts",
+        "text": "ف",
+        "expectWords": 1
+      },
+      {
+        "description": "range boundary U+0671 counts",
+        "text": "\u0671",
+        "expectWords": 1
+      },
+      {
+        "description": "range boundary U+06D3 counts",
+        "text": "\u06d3",
+        "expectWords": 1
+      },
+      {
+        "description": "U+0620 just below the first range is not a word",
+        "text": "\u0620",
+        "expectWords": 0
+      },
+      {
+        "description": "U+064B just above the first range is not a word",
+        "text": "\u064b",
+        "expectWords": 0
+      },
+      {
+        "description": "U+0670 just below the second range is not a word",
+        "text": "\u0670",
+        "expectWords": 0
+      },
+      {
+        "description": "U+06D4 just above the second range is not a word",
+        "text": "\u06d4",
+        "expectWords": 0
+      },
+      {
+        "description": "all eight boundaries in one text",
+        "text": "ء ي \u0671 \u06d3 \u0620 \u064b \u0670 \u06d4",
+        "expectWords": 4
+      },
+      {
+        "description": "Latin letters and ASCII digits are not words",
+        "text": "abc ثقص 123",
+        "expectWords": 1
+      },
+      {
+        "description": "tatweel-only segment U+0640 is not a word",
+        "text": "ثقص \u0640",
+        "expectWords": 1,
+        "naivePLetterSegments": 2
+      },
+      {
+        "description": "a run of tatweels alone is not a word",
+        "text": "\u0640\u0640\u0640",
+        "expectWords": 0,
+        "naivePLetterSegments": 1
+      },
+      {
+        "description": "tatweel and diacritics without a letter are not a word",
+        "text": "\u0640\u064e\u0640\u0651",
+        "expectWords": 0
+      },
+      {
+        "description": "tatweel before the letters counts once",
+        "text": "\u0640ثقص",
+        "expectWords": 1
+      },
+      {
+        "description": "tatweel after the letters counts once",
+        "text": "ثقص\u0640",
+        "expectWords": 1
+      },
+      {
+        "description": "tatweel inside the letters counts once",
+        "text": "ث\u0640\u0640قص",
+        "expectWords": 1
+      },
+      {
+        "description": "tatweel separated by SPACE is a separate non-word segment",
+        "text": "ثقص \u0640 ظغذ",
+        "expectWords": 2
+      },
+      {
+        "description": "tatweels separated by NO-BREAK SPACE are a separate non-word segment",
+        "text": "ثقص\u00a0\u0640\u0640\u00a0ظغذ",
+        "expectWords": 2
+      },
+      {
+        "description": "boundaries around the tatweel gap in one text",
+        "text": "ؿ \u0640 ف",
+        "expectWords": 2
+      },
+      {
+        "description": "supplementary Arabic mathematical letter U+1EE00 is not a word",
+        "text": "ثقص \ud83b\ude00",
+        "expectWords": 1,
+        "naivePLetterSegments": 2
+      },
+      {
+        "description": "TAB fails",
+        "text": "ثقص\tظغذ",
+        "expectError": {
+          "codePoint": 9,
+          "offset": 3
+        }
+      },
+      {
+        "description": "LINE FEED fails",
+        "text": "ثقص\nظغذ",
+        "expectError": {
+          "codePoint": 10,
+          "offset": 3
+        }
+      },
+      {
+        "description": "CARRIAGE RETURN fails",
+        "text": "ثقص ظغذ\r",
+        "expectError": {
+          "codePoint": 13,
+          "offset": 7
+        }
+      },
+      {
+        "description": "THIN SPACE U+2009 fails",
+        "text": "ثقص\u2009ظغذ",
+        "expectError": {
+          "codePoint": 8201,
+          "offset": 3
+        }
+      },
+      {
+        "description": "ZERO WIDTH SPACE U+200B fails",
+        "text": "ثقص\u200bظغذ",
+        "expectError": {
+          "codePoint": 8203,
+          "offset": 3
+        }
+      },
+      {
+        "description": "ZERO WIDTH NON-JOINER U+200C fails",
+        "text": "ثقص\u200cظغذ",
+        "expectError": {
+          "codePoint": 8204,
+          "offset": 3
+        }
+      },
+      {
+        "description": "NARROW NO-BREAK SPACE U+202F fails",
+        "text": "ثقص\u202fظغذ",
+        "expectError": {
+          "codePoint": 8239,
+          "offset": 3
+        }
+      },
+      {
+        "description": "BYTE ORDER MARK U+FEFF at the start fails",
+        "text": "\ufeffثقص",
+        "expectError": {
+          "codePoint": 65279,
+          "offset": 0
+        }
+      },
+      {
+        "description": "IDEOGRAPHIC SPACE U+3000 fails",
+        "text": "ثقص\u3000",
+        "expectError": {
+          "codePoint": 12288,
+          "offset": 3
+        }
+      },
+      {
+        "description": "ARABIC LETTER MARK U+061C fails",
+        "text": "ثقص \u061cظغذ",
+        "expectError": {
+          "codePoint": 1564,
+          "offset": 4
+        }
+      },
+      {
+        "description": "LINE SEPARATOR U+2028 fails",
+        "text": "ثقص\u2028ظغذ",
+        "expectError": {
+          "codePoint": 8232,
+          "offset": 3
+        }
+      },
+      {
+        "description": "supplementary format character U+E0001 fails at its UTF-16 offset",
+        "text": "ثقص \udb40\udc01",
+        "expectError": {
+          "codePoint": 917505,
+          "offset": 4
+        }
+      },
+      {
+        "description": "offset counts UTF-16 units after a supplementary character",
+        "text": "ثقص \ud83b\ude00\u2009",
+        "expectError": {
+          "codePoint": 8201,
+          "offset": 6
+        }
+      }
+    ]
+  }
+}

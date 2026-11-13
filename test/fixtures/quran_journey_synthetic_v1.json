@@ -3,7 +3,7 @@
   "notice": "بيانات اصطناعية \u2014 ليست بيانات قرآنية. Synthetic data, not Quranic data: invented catalogs, parts and word counts; word-count texts are meaningless letter sequences.",
   "schemaVersion": 1,
   "phase": "1A",
-  "expectedValuesSource": "Computed by hand and checked with an independent oracle outside the repository; never produced by the engines under test.",
+  "expectedValuesSource": "Computed by hand and recomputed with a script written by the same party that implemented the engines (outside the repository), then reviewed. A later blind recalculation by a separate session of the same implementing system (not an independent verification) agreed on all 142 determinable cases of 146; 4 cases were not determinable from the written spec. No independent oracle was used. Never produced by the engines under test.",
   "indexes": {
     "main": {
       "ayahCounts": [3, 1, 5, 2, 4, 1, 6],

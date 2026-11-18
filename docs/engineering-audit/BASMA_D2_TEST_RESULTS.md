@@ -37,3 +37,9 @@ Required composite: `recitationRecords` / `halaqaId ASC` + `date DESC`.
 ## Commands (latest verification pass)
 
 See agent final report for exact `flutter test` / `flutter analyze` / emulator probe commands and exit codes.
+
+---
+
+### Checkpoint note (added 2026-11-18)
+
+D2 code/docs later checkpointed in commit **`daa8f85`**. HEAD/`bb0a905` lines above remain the test-pass historical baseline. RB-02 Cloud index status remains **not verified**.

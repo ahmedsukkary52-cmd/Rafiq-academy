@@ -86,3 +86,9 @@ Failures are outside D2. Suite is **not** claimed green. Emulator suites **not**
 ## Commit readiness
 
 **READY FOR FINAL COMMIT REVIEW** of the isolated staged set. Do not commit until explicit owner approval. Do not push/merge.
+
+---
+
+### Checkpoint note (added 2026-11-18)
+
+Owner-approved D2 index-only commit landed as **`daa8f85`**. This section’s “ready for review / do not commit” wording is historical. Unstaged WT layers listed above were intentionally left out of that commit.

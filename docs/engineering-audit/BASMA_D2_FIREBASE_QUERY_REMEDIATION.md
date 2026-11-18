@@ -53,3 +53,9 @@ Missing-`date` behavior is explicit: included in `fullHistory`; omitted from `ne
 
 - Supervisor payments still scope to supervised roster.
 - No client write authority changes.
+
+---
+
+### Checkpoint note (added 2026-11-18)
+
+Client query remediations later checkpointed in D2 commit **`daa8f85`**. Index table rows above remain historical (index file still WT/unbundled; **RB-02 Cloud OPEN**).

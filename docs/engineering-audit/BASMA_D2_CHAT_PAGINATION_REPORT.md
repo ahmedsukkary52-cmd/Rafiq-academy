@@ -52,3 +52,9 @@ Single growing-limit listener was used for both the live window and history. The
 - In-memory `_byId` grows for the open room session (acceptable; cleared on close).
 - Peer edit/delete of older-only messages can stay stale until the room is reopened or that id is revalidated locally.
 - Scroll anchoring remains UI-owned (`chat_room.dart`); not redesigned.
+
+---
+
+### Checkpoint note (added 2026-11-18)
+
+Chat pagination remediation later included in D2 commit **`daa8f85`**. Residual risks above still apply.

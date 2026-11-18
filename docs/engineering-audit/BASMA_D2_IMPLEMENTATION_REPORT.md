@@ -63,3 +63,9 @@ Deferred items: `BASMA_D2_FIREBASE_QUERY_REMEDIATION.md`.
 - `BASMA_D2_FIREBASE_QUERY_REMEDIATION.md`
 - `BASMA_D2_TEST_RESULTS.md`
 - `BASMA_D2_FINAL_VALIDATION.md`
+
+---
+
+### Checkpoint note (added 2026-11-18)
+
+The isolated D2 staged set described in this report was later committed as **`daa8f85`**. Baseline tables above remain the pre-commit historical record (`bb0a905` / staged D2). Recitation Cloud index verification (RB-02) remains **OPEN**.

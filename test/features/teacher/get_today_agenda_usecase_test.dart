@@ -4,6 +4,7 @@ import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/shared/domain/absence_request.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/academy_event_publication.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
@@ -90,7 +91,7 @@ class _FakeTeacherRepository implements TeacherRepository {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) async {
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) async {
     if (failReviews != null) return Left(failReviews!);
     return Right(recitations[halaqaId] ?? const []);
   }

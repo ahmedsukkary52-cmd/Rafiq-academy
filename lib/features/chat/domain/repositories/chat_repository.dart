@@ -49,6 +49,20 @@ abstract class ChatRepository {
     required int limit,
   });
 
+  /// Older page before [beforeMessageId] (document cursor), ascending order.
+  /// Does not change the live [watchMessages] window.
+  Future<Either<Failure, List<MessageEntity>>> fetchMessagesBefore({
+    required String conversationId,
+    required String beforeMessageId,
+    required int limit,
+  });
+
+  /// Re-reads specific message docs (edit/delete revalidation outside live).
+  Future<Either<Failure, List<MessageEntity>>> fetchMessagesByIds({
+    required String conversationId,
+    required List<String> messageIds,
+  });
+
   /// يجيب المحادثة لو موجودة، أو ينشئها لو دي أول رسالة بين الطرفين.
   /// الـ caller (الـ use case) هو المسؤول عن التأكد إن الدورين مسموح
   /// لهم يتواصلوا قبل ما يستدعي الدالة دي.

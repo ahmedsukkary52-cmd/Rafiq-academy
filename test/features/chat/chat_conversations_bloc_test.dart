@@ -88,6 +88,11 @@ void main() {
       bloc.add(const StartWatchingConversationsEvent('t1'));
       await _settle();
       expect(watch.params.single.uid, 't1');
+      expect(
+        watch.params.single.limit,
+        ChatConversationsBloc.defaultInboxPageSize,
+        reason: 'BASMA-104: omitted pageSize must still bound the live inbox',
+      );
       expect(bloc.state.conversationsStatus, SectionStatus.loading);
 
       watch.latest.add(const Right([_conversation]));

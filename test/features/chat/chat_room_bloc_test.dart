@@ -13,6 +13,8 @@ import 'package:rafiq_academy/features/chat/presentation/bloc/chat_room_bloc.dar
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_room_event.dart';
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_room_state.dart';
 
+typedef OlderPageResult = Either<Failure, List<MessageEntity>>;
+
 class FakeUploadTask implements ChatUploadTask {
   final progressCtrl = StreamController<double>.broadcast();
   final done = Completer<void>();
@@ -42,6 +44,8 @@ class FakeChatRepository implements ChatRepository {
   final messages =
       StreamController<Either<Failure, List<MessageEntity>>>.broadcast();
   final watchLimits = <int>[];
+  final olderFetches = <({String beforeMessageId, int limit})>[];
+  final List<Future<OlderPageResult> Function()> olderResultFactories = [];
   final sends = <({String messageId, ChatMessageType type, String text, ChatSendMedia? media})>[];
   final replyIds = <String?>[];
   final uploads = <FakeUploadTask>[];
@@ -50,6 +54,28 @@ class FakeChatRepository implements ChatRepository {
   Either<Failure, Unit> editResult = const Right(unit);
   Either<Failure, Unit> deleteResult = const Right(unit);
   int markReadCalls = 0;
+  final byIdFetches = <List<String>>[];
+  final List<Future<Either<Failure, List<MessageEntity>>> Function()>
+      byIdResultFactories = [];
+
+  void enqueueOlder(OlderPageResult result) {
+    olderResultFactories.add(() async => result);
+  }
+
+  void enqueueOlderDelayed(OlderPageResult result, Duration delay) {
+    olderResultFactories.add(() => Future.delayed(delay, () => result));
+  }
+
+  void enqueueByIds(Either<Failure, List<MessageEntity>> result) {
+    byIdResultFactories.add(() async => result);
+  }
+
+  void enqueueByIdsDelayed(
+    Either<Failure, List<MessageEntity>> result,
+    Duration delay,
+  ) {
+    byIdResultFactories.add(() => Future.delayed(delay, () => result));
+  }
 
   @override
   Stream<Either<Failure, List<MessageEntity>>> watchMessages(
@@ -58,6 +84,29 @@ class FakeChatRepository implements ChatRepository {
   }) {
     watchLimits.add(limit);
     return messages.stream;
+  }
+
+  @override
+  Future<Either<Failure, List<MessageEntity>>> fetchMessagesBefore({
+    required String conversationId,
+    required String beforeMessageId,
+    required int limit,
+  }) async {
+    olderFetches.add((beforeMessageId: beforeMessageId, limit: limit));
+    if (olderResultFactories.isEmpty) return const Right([]);
+    return olderResultFactories.removeAt(0)();
+  }
+
+  @override
+  Future<Either<Failure, List<MessageEntity>>> fetchMessagesByIds({
+    required String conversationId,
+    required List<String> messageIds,
+  }) async {
+    byIdFetches.add(List<String>.from(messageIds));
+    if (byIdResultFactories.isEmpty) {
+      return Right([for (final id in messageIds) msg(id)]);
+    }
+    return byIdResultFactories.removeAt(0)();
   }
 
   @override
@@ -126,6 +175,8 @@ class FakeChatRepository implements ChatRepository {
 
 ChatRoomBloc buildBloc(FakeChatRepository repo) => ChatRoomBloc(
   WatchMessagesUseCase(repo),
+  FetchOlderMessagesUseCase(repo),
+  FetchMessagesByIdsUseCase(repo),
   SendMessageUseCase(repo),
   MarkConversationAsReadUseCase(repo),
   SoftDeleteChatMessageUseCase(repo),
@@ -320,24 +371,146 @@ void main() {
     expect(repo.uploads, isEmpty);
   });
 
-  test('pagination grows the window only when a full page was returned', () async {
+  test('short initial page marks older history exhausted', () async {
     await loaded(List.generate(10, (i) => msg('m$i', minute: i)));
-    bloc.add(const LoadOlderMessagesRequestedEvent());
-    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(bloc.state.hasMore, isFalse);
     expect(repo.watchLimits, [ChatRoomState.pageSize]);
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(repo.olderFetches, isEmpty);
+  });
 
-    repo.messages.add(Right(List.generate(30, (i) => msg('p$i', minute: i))));
-    await until((s) => s.messages.length == 30);
+  test('BASMA-103: load older uses cursor fetch; live watch limit stays fixed', () async {
+    expect(ChatRoomState.pageSize, 30);
+    final live = List.generate(30, (i) => msg('w$i', minute: i + 30));
+    await loaded(live);
+    expect(repo.watchLimits, [30]);
     expect(bloc.state.hasMore, isTrue);
+
+    final older = List.generate(30, (i) => msg('o$i', minute: i));
+    repo.enqueueOlder(Right(older));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    final s = await until(
+      (st) => st.messages.length == 60 && !st.loadingOlder,
+    );
+    expect(repo.watchLimits, [30], reason: 'live listener must not grow');
+    expect(bloc.state.limit, 30);
+    expect(repo.olderFetches, [
+      (beforeMessageId: 'w0', limit: 30),
+    ]);
+    expect(s.messages.first.id, 'o0');
+    expect(s.messages.last.id, 'w29');
+    expect(s.hasMore, isTrue);
+  });
+
+  test('BASMA-103 D2 contract: older page must not grow the live watch limit', () async {
+    await loaded(List.generate(30, (i) => msg('w$i', minute: i + 30)));
+    repo.enqueueOlder(Right(List.generate(15, (i) => msg('o$i', minute: i))));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    final s = await until((st) => st.messages.length == 45 && !st.loadingOlder);
+    expect(repo.watchLimits, everyElement(ChatRoomState.pageSize));
+    expect(repo.olderFetches, hasLength(1));
+    expect(s.hasMore, isFalse);
+    expect(s.limit, ChatRoomState.pageSize);
+  });
+
+  test('BASMA-103: dedupe when older page overlaps live window', () async {
+    await loaded(List.generate(30, (i) => msg('w$i', minute: i + 20)));
+    // Overlap on w20..w24 plus true older rows.
+    repo.enqueueOlder(Right([
+      ...List.generate(10, (i) => msg('o$i', minute: i)),
+      ...List.generate(5, (i) => msg('w${20 + i}', minute: 20 + i)),
+    ]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    final s = await until((st) => !st.loadingOlder && st.messages.length > 30);
+    final ids = s.messages.map((m) => m.id).toList();
+    expect(ids.toSet().length, ids.length);
+    expect(ids.where((id) => id == 'w20'), hasLength(1));
+  });
+
+  test('BASMA-103: live arrives during older fetch; both retained', () async {
+    await loaded(List.generate(30, (i) => msg('w$i', minute: i + 30)));
+    repo.enqueueOlderDelayed(
+      Right(List.generate(10, (i) => msg('o$i', minute: i))),
+      const Duration(milliseconds: 40),
+    );
     bloc.add(const LoadOlderMessagesRequestedEvent());
     await until((s) => s.loadingOlder);
-    for (var i = 0; i < 100 && repo.watchLimits.length < 2; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-    }
-    expect(repo.watchLimits.last, 60);
-    repo.messages.add(Right(List.generate(45, (i) => msg('q$i', minute: i))));
-    final s = await until((s) => s.messages.length == 45 && !s.loadingOlder);
-    expect(s.hasMore, isFalse);
+    final livePlus = [
+      ...List.generate(29, (i) => msg('w${i + 1}', minute: i + 31)),
+      msg('new', minute: 100),
+    ];
+    repo.messages.add(Right(livePlus));
+    await until((s) => s.messages.any((m) => m.id == 'new'));
+    final done = await until(
+      (s) => !s.loadingOlder && s.messages.any((m) => m.id == 'o0'),
+    );
+    expect(done.messages.any((m) => m.id == 'new'), isTrue);
+    expect(done.messages.any((m) => m.id == 'o0'), isTrue);
+    expect(repo.watchLimits, everyElement(30));
+  });
+
+  test('BASMA-103: deterministic order when timestamps tie', () async {
+    final t = DateTime(2026, 10, 6, 12, 0);
+    await loaded([
+      MessageEntity(
+        id: 'b',
+        conversationId: 'c1',
+        senderId: 's1',
+        text: 'b',
+        sentAt: t,
+      ),
+      MessageEntity(
+        id: 'a',
+        conversationId: 'c1',
+        senderId: 's1',
+        text: 'a',
+        sentAt: t,
+      ),
+    ]);
+    expect(bloc.state.messages.map((m) => m.id), ['a', 'b']);
+  });
+
+  test('BASMA-103: older-page failure then retry', () async {
+    await loaded(List.generate(30, (i) => msg('w$i', minute: i + 30)));
+    repo.enqueueOlder(
+      const Left(ServerFailure('تعذر تحميل الرسائل القديمة')),
+    );
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    final failed = await until(
+      (s) => !s.loadingOlder && s.messagesError != null,
+    );
+    expect(failed.messages.length, 30);
+    expect(failed.hasMore, isTrue);
+
+    repo.enqueueOlder(Right(List.generate(5, (i) => msg('o$i', minute: i))));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    final ok = await until((s) => s.messages.length == 35 && !s.loadingOlder);
+    expect(ok.messagesError, isNull);
+    expect(ok.hasMore, isFalse);
+  });
+
+  test('BASMA-103: stream failure keeps already-loaded messages', () async {
+    await loaded([msg('keep')]);
+    repo.messages.add(const Left(ServerFailure('تعذر تحميل الرسائل')));
+    final errored = await until((s) => s.messagesStatus == SectionStatus.error);
+    expect(errored.messages.map((m) => m.id), ['keep']);
+    expect(errored.loadingOlder, isFalse);
+  });
+
+  test('BASMA-103: repeated load-older while loading does not stack fetches', () async {
+    await loaded(List.generate(30, (i) => msg('r$i', minute: i + 30)));
+    repo.enqueueOlderDelayed(
+      Right(List.generate(5, (i) => msg('o$i', minute: i))),
+      const Duration(milliseconds: 80),
+    );
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.loadingOlder);
+    await until((s) => !s.loadingOlder);
+    expect(repo.olderFetches, hasLength(1));
+    expect(repo.watchLimits, [30]);
   });
 
   test('unread reset once per new incoming message while the room is open', () async {
@@ -384,6 +557,316 @@ void main() {
     bloc.add(const SoftDeleteMessageRequestedEvent('a'));
     s = await until((s) => s.actionError != null && !s.actionInProgress);
     expect(s.actionError, 'غير مسموح بحذف هذه الرسالة');
+  });
+
+  test('edit of loaded older message updates buffer; live limit stays fixed', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(
+      Right([msg('old1', sender: 't1', minute: 1), msg('old2', minute: 2)]),
+    );
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old1'));
+
+    final refreshed = MessageEntity(
+      id: 'old1',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: 'محدث من الخادم',
+      sentAt: DateTime(2026, 10, 6, 12, 1),
+      editedAt: DateTime(2026, 10, 6, 13),
+    );
+    repo.enqueueByIds(Right([refreshed, msg('old2', minute: 2)]));
+    bloc.add(const EditMessageRequestedEvent('old1', 'محدث محلي'));
+    await until(
+      (s) =>
+          !s.actionInProgress &&
+          s.messages.any((m) => m.id == 'old1' && m.text.contains('محدث')),
+    );
+    await until(
+      (s) => s.messages.any((m) => m.id == 'old1' && m.text == 'محدث من الخادم'),
+    );
+    expect(repo.byIdFetches, isNotEmpty);
+    expect(
+      repo.byIdFetches.last,
+      ['old1'],
+      reason: 'edit must revalidate only the affected id, not the whole buffer',
+    );
+    expect(repo.watchLimits, everyElement(ChatRoomState.pageSize));
+    expect(bloc.state.limit, ChatRoomState.pageSize);
+    expect(bloc.state.messages.where((m) => m.id == 'old1'), hasLength(1));
+  });
+
+  test('soft-delete of loaded older message marks deleted and refreshes', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(Right([msg('old1', sender: 't1', minute: 1)]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old1'));
+
+    final deleted = MessageEntity(
+      id: 'old1',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: '',
+      sentAt: DateTime(2026, 10, 6, 12, 1),
+      deleted: true,
+      deletedAt: DateTime(2026, 10, 6, 13),
+      deletedBy: 't1',
+    );
+    repo.enqueueByIds(Right([deleted]));
+    bloc.add(const SoftDeleteMessageRequestedEvent('old1'));
+    await until(
+      (s) => s.messages.any((m) => m.id == 'old1' && m.deleted),
+    );
+    for (var i = 0; i < 20 && repo.byIdFetches.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(repo.byIdFetches.last, ['old1']);
+    expect(repo.watchLimits, everyElement(ChatRoomState.pageSize));
+  });
+
+  test('edit of one older message does not fetch sibling buffered ids', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(
+      Right([
+        for (var i = 0; i < 25; i++)
+          msg('old$i', sender: i == 0 ? 't1' : 's1', minute: i),
+      ]),
+    );
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old0'));
+    expect(bloc.state.messages.where((m) => m.id.startsWith('old')), hasLength(25));
+
+    repo.enqueueByIds(
+      Right([
+        MessageEntity(
+          id: 'old0',
+          conversationId: 'c1',
+          senderId: 't1',
+          text: 'واحد فقط',
+          sentAt: DateTime(2026, 10, 6, 12, 0),
+          editedAt: DateTime(2026, 10, 6, 13),
+        ),
+      ]),
+    );
+    bloc.add(const EditMessageRequestedEvent('old0', 'واحد فقط'));
+    await until(
+      (s) => s.messages.any((m) => m.id == 'old0' && m.text == 'واحد فقط'),
+    );
+    for (var i = 0; i < 20 && repo.byIdFetches.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(repo.byIdFetches, hasLength(1));
+    expect(repo.byIdFetches.single, ['old0']);
+    expect(
+      repo.byIdFetches.single,
+      isNot(contains('old24')),
+      reason: 'must not re-get the entire older buffer',
+    );
+  });
+
+  test('stale buffer refresh is ignored after a newer refresh', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(Right([msg('old1', sender: 't1', minute: 1)]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old1'));
+
+    final stale = MessageEntity(
+      id: 'old1',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: 'قديم',
+      sentAt: DateTime(2026, 10, 6, 12, 1),
+    );
+    final fresh = MessageEntity(
+      id: 'old1',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: 'أحدث',
+      sentAt: DateTime(2026, 10, 6, 12, 1),
+      editedAt: DateTime(2026, 10, 6, 14),
+    );
+    repo.enqueueByIdsDelayed(Right([stale]), const Duration(milliseconds: 80));
+    repo.enqueueByIds(Right([fresh]));
+    bloc.add(const RefreshBufferedOutsideLiveRequestedEvent(['old1']));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    bloc.add(const RefreshBufferedOutsideLiveRequestedEvent(['old1']));
+    await until((s) => s.messages.any((m) => m.id == 'old1' && m.text == 'أحدث'));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(
+      bloc.state.messages.singleWhere((m) => m.id == 'old1').text,
+      'أحدث',
+      reason: 'stale refresh must not overwrite newer buffer state',
+    );
+  });
+
+  test('concurrent refresh of two different older messages both apply', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(
+      Right([
+        msg('oldA', sender: 't1', minute: 1),
+        msg('oldB', sender: 't1', minute: 2),
+      ]),
+    );
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'oldA'));
+
+    final resultA = MessageEntity(
+      id: 'oldA',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: 'نتيجة أ',
+      sentAt: DateTime(2026, 10, 6, 12, 1),
+      editedAt: DateTime(2026, 10, 6, 13),
+    );
+    final resultB = MessageEntity(
+      id: 'oldB',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: 'نتيجة ب',
+      sentAt: DateTime(2026, 10, 6, 12, 2),
+      editedAt: DateTime(2026, 10, 6, 13),
+    );
+    // A is slow; B completes first — must not cancel A.
+    repo.enqueueByIdsDelayed(Right([resultA]), const Duration(milliseconds: 80));
+    repo.enqueueByIds(Right([resultB]));
+    bloc.add(const RefreshBufferedOutsideLiveRequestedEvent(['oldA']));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    bloc.add(const RefreshBufferedOutsideLiveRequestedEvent(['oldB']));
+    await until((s) => s.messages.any((m) => m.id == 'oldB' && m.text == 'نتيجة ب'));
+    await until((s) => s.messages.any((m) => m.id == 'oldA' && m.text == 'نتيجة أ'));
+    expect(bloc.state.messages.singleWhere((m) => m.id == 'oldA').text, 'نتيجة أ');
+    expect(bloc.state.messages.singleWhere((m) => m.id == 'oldB').text, 'نتيجة ب');
+    expect(bloc.state.limit, ChatRoomState.pageSize);
+  });
+
+  test('closing room ignores pending buffer refresh', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(Right([msg('old1', sender: 't1', minute: 1)]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old1'));
+    repo.enqueueByIdsDelayed(
+      Right([
+        MessageEntity(
+          id: 'old1',
+          conversationId: 'c1',
+          senderId: 't1',
+          text: 'بعد الإغلاق',
+          sentAt: DateTime(2026, 10, 6, 12, 1),
+        ),
+      ]),
+      const Duration(milliseconds: 50),
+    );
+    bloc.add(const RefreshBufferedOutsideLiveRequestedEvent(['old1']));
+    await bloc.close();
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(bloc.isClosed, isTrue);
+  });
+
+  test('live snapshot wins over concurrent buffer refresh for same id', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    // Overlap id: present in older page and later enters live window.
+    repo.enqueueOlder(Right([msg('edge', sender: 't1', minute: 29)]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'edge'));
+
+    repo.enqueueByIdsDelayed(
+      Right([
+        MessageEntity(
+          id: 'edge',
+          conversationId: 'c1',
+          senderId: 't1',
+          text: 'من التحديث المتأخر',
+          sentAt: DateTime(2026, 10, 6, 12, 29),
+        ),
+      ]),
+      const Duration(milliseconds: 60),
+    );
+    bloc.add(const RefreshBufferedOutsideLiveRequestedEvent(['edge']));
+    // Live window now includes edge with authoritative text.
+    final liveWithEdge = [
+      ...List.generate(29, (i) => msg('l${i + 1}', minute: i + 31)),
+      MessageEntity(
+        id: 'edge',
+        conversationId: 'c1',
+        senderId: 't1',
+        text: 'من اللايف',
+        sentAt: DateTime(2026, 10, 6, 12, 29),
+      ),
+    ];
+    repo.messages.add(Right(liveWithEdge));
+    await until((s) => s.messages.any((m) => m.id == 'edge' && m.text == 'من اللايف'));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(
+      bloc.state.messages.singleWhere((m) => m.id == 'edge').text,
+      'من اللايف',
+      reason: 'live window must not be overwritten by stale outside-live refresh',
+    );
+    expect(bloc.state.limit, ChatRoomState.pageSize);
+  });
+
+  test('failed buffer refresh keeps optimistic edit text', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    repo.enqueueOlder(Right([msg('old1', sender: 't1', minute: 1)]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old1'));
+    repo.enqueueByIds(const Left(ServerFailure('تعذر التحديث')));
+    bloc.add(const EditMessageRequestedEvent('old1', 'نص تفاؤلي'));
+    await until(
+      (s) =>
+          !s.actionInProgress &&
+          s.messages.any((m) => m.id == 'old1' && m.text == 'نص تفاؤلي'),
+    );
+    // Refresh failure does not emit; poll the repo call list.
+    for (var i = 0; i < 20 && repo.byIdFetches.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(repo.byIdFetches, isNotEmpty);
+    expect(
+      bloc.state.messages.singleWhere((m) => m.id == 'old1').text,
+      'نص تفاؤلي',
+    );
+  });
+
+  test('soft-delete optimistic clears reactions', () async {
+    final live = List.generate(30, (i) => msg('l$i', minute: i + 30));
+    await loaded(live);
+    final withReaction = MessageEntity(
+      id: 'old1',
+      conversationId: 'c1',
+      senderId: 't1',
+      text: 'نص',
+      sentAt: DateTime(2026, 10, 6, 12, 1),
+      reactions: const {'u2': ChatReaction.heart},
+    );
+    repo.enqueueOlder(Right([withReaction]));
+    bloc.add(const LoadOlderMessagesRequestedEvent());
+    await until((s) => s.messages.any((m) => m.id == 'old1'));
+    repo.enqueueByIds(
+      Right([
+        MessageEntity(
+          id: 'old1',
+          conversationId: 'c1',
+          senderId: 't1',
+          text: '',
+          sentAt: DateTime(2026, 10, 6, 12, 1),
+          deleted: true,
+        ),
+      ]),
+    );
+    bloc.add(const SoftDeleteMessageRequestedEvent('old1'));
+    await until((s) => s.messages.any((m) => m.id == 'old1' && m.deleted));
+    expect(
+      bloc.state.messages.singleWhere((m) => m.id == 'old1').reactions,
+      isEmpty,
+    );
   });
 
   test('closing the room cancels in-flight uploads and removes orphans', () async {

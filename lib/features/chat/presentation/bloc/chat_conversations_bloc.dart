@@ -16,6 +16,9 @@ import 'chat_conversations_state.dart';
 @singleton
 class ChatConversationsBloc
     extends Bloc<ChatConversationsEvent, ChatConversationsState> {
+  /// Default live inbox window when a call site omits [pageSize] (BASMA-104).
+  static const int defaultInboxPageSize = 40;
+
   final WatchConversationsUseCase watchConversations;
   final WatchAllConversationsUseCase watchAllConversations;
   final GetOrCreateConversationUseCase getOrCreateConversation;
@@ -85,6 +88,14 @@ class ChatConversationsBloc
   /// older list so it never vanishes between pages.
   List<ConversationEntity> _mergeLive(List<ConversationEntity> live) {
     if (_pageSize == null) return live;
+    // An empty newest window means the inbox has no threads — do not retain
+    // stale older pages from a previous non-empty snapshot.
+    if (live.isEmpty) {
+      _live = const [];
+      _older = const [];
+      _olderExhausted = true;
+      return const [];
+    }
     final liveIds = {for (final c in live) c.id};
     final olderById = {
       for (final c in _older)
@@ -147,12 +158,13 @@ class ChatConversationsBloc
     StartWatchingConversationsEvent event,
     Emitter<ChatConversationsState> emit,
   ) {
-    _resetPaging(event.pageSize, event.uid);
+    final pageSize = event.pageSize ?? defaultInboxPageSize;
+    _resetPaging(pageSize, event.uid);
     return _watch(
       emit,
       uid: event.uid,
       source: () => watchConversations(
-        ChatUidParams(event.uid, limit: event.pageSize),
+        ChatUidParams(event.uid, limit: pageSize),
       ),
     );
   }
@@ -161,12 +173,13 @@ class ChatConversationsBloc
     StartWatchingAllConversationsEvent event,
     Emitter<ChatConversationsState> emit,
   ) {
-    _resetPaging(event.pageSize, null);
+    final pageSize = event.pageSize ?? defaultInboxPageSize;
+    _resetPaging(pageSize, null);
     return _watch(
       emit,
       uid: event.observerUid,
       source: () => watchAllConversations(
-        ChatUidParams(event.observerUid, limit: event.pageSize),
+        ChatUidParams(event.observerUid, limit: pageSize),
       ),
     );
   }

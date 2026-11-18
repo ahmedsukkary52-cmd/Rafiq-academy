@@ -12,6 +12,7 @@ import '../../../../shared/data/models/recitation_record_model.dart';
 import '../../../../shared/domain/absence_request.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
 import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_query_mode.dart';
 import '../../../../shared/domain/attendance_record_entity.dart';
 import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 import '../../domain/repositories/teacher_repository.dart';
@@ -226,10 +227,20 @@ class TeacherRepositoryImpl implements TeacherRepository {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) async {
+  getHalaqaRecitationRecords(
+    String halaqaId, {
+    int? maxRecords,
+    RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory,
+  }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
-      return Right(await remoteDatasource.getHalaqaRecitationRecords(halaqaId));
+      return Right(
+        await remoteDatasource.getHalaqaRecitationRecords(
+          halaqaId,
+          maxRecords: maxRecords,
+          mode: mode,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }

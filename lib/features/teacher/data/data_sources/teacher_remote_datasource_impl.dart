@@ -17,7 +17,9 @@ import '../../../../shared/data/models/assignment_model.dart';
 import '../../../../shared/data/models/halaqa_model.dart';
 import '../../../../shared/data/models/recitation_record_model.dart';
 import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_query_mode.dart';
 import '../../domain/services/halaqa_student_summary_projector.dart';
+import '../halaqa_recitation_paging.dart';
 import '../models/attendance_record_model.dart';
 import '../models/halaqa_student_summary_model.dart';
 
@@ -353,22 +355,72 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
     }
   }
 
+  /// Firestore page size for id-ordered walks (see [HalaqaRecitationPaging]).
+  static const int halaqaRecitationPageSize = HalaqaRecitationPaging.pageSize;
+
   @override
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
-    String halaqaId,
-  ) async {
+    String halaqaId, {
+    int? maxRecords,
+    RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory,
+  }) async {
     try {
-      final snapshot = await firestore
+      if (maxRecords != null && maxRecords <= 0) return const [];
+
+      if (mode == RecitationRecordsQueryMode.newestByDate) {
+        // Display-only window: one bounded query. Docs missing `date` are
+        // omitted by Firestore orderBy — not used for pending-review counts.
+        final limit = maxRecords;
+        if (limit == null) {
+          throw const ServerException(
+            'newestByDate requires a positive maxRecords',
+          );
+        }
+        final snapshot = await firestore
+            .collection(FirestoreCollections.recitationRecords)
+            .where('halaqaId', isEqualTo: halaqaId)
+            .orderBy('date', descending: true)
+            .limit(limit)
+            .get();
+        final list = snapshot.docs
+            .map(RecitationRecordModel.fromFirestore)
+            .toList();
+        // Deterministic ties: id ascending within equal dates.
+        list.sort(HalaqaRecitationPaging.compareDateDesc);
+        return list;
+      }
+
+      // Full history: page by document id so rows missing `date` are not
+      // dropped. Walk until exhausted, then sort newest-first and apply
+      // optional maxRecords.
+      const pageSize = halaqaRecitationPageSize;
+      final byId = <String, RecitationRecordModel>{};
+      Query<Map<String, dynamic>> query = firestore
           .collection(FirestoreCollections.recitationRecords)
           .where('halaqaId', isEqualTo: halaqaId)
-          .get();
+          .orderBy(FieldPath.documentId)
+          .limit(pageSize);
 
-      final records = snapshot.docs
-          .map(RecitationRecordModel.fromFirestore)
-          .toList();
-      records.sort((a, b) => b.date.compareTo(a.date));
-      return records;
+      QueryDocumentSnapshot<Map<String, dynamic>>? cursor;
+      while (true) {
+        final pageQuery =
+            cursor == null ? query : query.startAfterDocument(cursor);
+        final snapshot = await pageQuery.get();
+        if (snapshot.docs.isEmpty) break;
+        for (final doc in snapshot.docs) {
+          byId[doc.id] = RecitationRecordModel.fromFirestore(doc);
+        }
+        if (snapshot.docs.length < pageSize) break;
+        cursor = snapshot.docs.last;
+      }
+
+      return HalaqaRecitationPaging.sortAndCap(
+        items: byId.values,
+        compare: HalaqaRecitationPaging.compareDateDesc,
+        maxRecords: maxRecords,
+      );
     } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException(e.toString());
     }
   }

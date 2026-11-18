@@ -1302,6 +1302,12 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i337.WatchMessagesUseCase>(
       () => _i337.WatchMessagesUseCase(gh<_i194.ChatRepository>()),
     );
+    gh.lazySingleton<_i337.FetchOlderMessagesUseCase>(
+      () => _i337.FetchOlderMessagesUseCase(gh<_i194.ChatRepository>()),
+    );
+    gh.lazySingleton<_i337.FetchMessagesByIdsUseCase>(
+      () => _i337.FetchMessagesByIdsUseCase(gh<_i194.ChatRepository>()),
+    );
     gh.lazySingleton<_i337.GetOrCreateConversationUseCase>(
       () => _i337.GetOrCreateConversationUseCase(gh<_i194.ChatRepository>()),
     );
@@ -1500,6 +1506,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factoryParam<_i467.ChatRoomBloc, String, String>(
       (conversationId, currentUserId) => _i467.ChatRoomBloc(
         gh<_i337.WatchMessagesUseCase>(),
+        gh<_i337.FetchOlderMessagesUseCase>(),
+        gh<_i337.FetchMessagesByIdsUseCase>(),
         gh<_i337.SendMessageUseCase>(),
         gh<_i337.MarkConversationAsReadUseCase>(),
         gh<_i337.SoftDeleteChatMessageUseCase>(),

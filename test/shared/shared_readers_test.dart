@@ -12,6 +12,7 @@ import 'package:rafiq_academy/shared/domain/halaqa_attendance_for_date.dart';
 import 'package:rafiq_academy/shared/domain/load_halaqa_day_readiness.dart';
 import 'package:rafiq_academy/shared/domain/payment_proof_reader.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 import 'package:rafiq_academy/shared/domain/student_parent_links.dart';
 import 'package:rafiq_academy/shared/domain/user_display_names.dart';
 
@@ -58,7 +59,8 @@ class _AttendanceReader implements HalaqaDayFactsReader {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) => throw UnimplementedError();
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) =>
+      throw UnimplementedError();
 }
 
 void main() {

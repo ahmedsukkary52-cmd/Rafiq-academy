@@ -13,11 +13,11 @@ import '../../../../shared/utils/firestore_in_query.dart';
 import '../../../awards/data/award_grant_errors.dart';
 import '../../../awards/domain/award_submission_id.dart';
 import '../../../../shared/data/models/payment_model.dart';
-import '../../../../shared/domain/parent_payment_proof.dart';
 import '../../../../shared/data/models/halaqa_model.dart';
 import '../../domain/entities/achievement_issue_entity.dart';
 import '../../domain/entities/payment_review_params.dart';
 import '../../domain/entities/supervisor_report_entity.dart';
+import '../supervisor_payments_paging.dart';
 
 @LazySingleton(as: SupervisorRemoteDatasource)
 class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
@@ -84,6 +84,7 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       throw ServerException(e.toString());
     }
   }
+
 
   /// Academy Admission via the admitStudentToHalaqa callable: supervised-halaqa
   /// scope, student role, duplicate and max-2 cap are enforced transactionally.
@@ -243,29 +244,47 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
       if (ids.isEmpty) return const [];
 
       // Rules only allow reads by the supervisor of the student's primary
-      // halaqa, so query per student and skip students supervised elsewhere.
+      // halaqa, so query per student (cannot use a single academy-wide query).
+      // D2: page by document id (always present) — NOT by dueDate — so invoices
+      // missing `dueDate` still appear, matching pre-D2 unordered `.get()`
+      // completeness. Peak reads stay bounded; display sort is applied after.
+      const pageSize = SupervisorPaymentsPaging.pageSize;
+      const concurrency = SupervisorPaymentsPaging.concurrency;
+      final idList = ids.toList();
       final byId = <String, PaymentModel>{};
-      for (final studentId in ids) {
+
+      Future<void> fetchOne(String studentId) async {
         try {
-          final snap = await firestore
+          Query<Map<String, dynamic>> base = firestore
               .collection(FirestoreCollections.payments)
               .where('studentId', isEqualTo: studentId)
-              .get();
-          for (final doc in snap.docs) {
-            byId[doc.id] = PaymentModel.fromFirestore(doc);
+              .orderBy(FieldPath.documentId)
+              .limit(pageSize);
+          QueryDocumentSnapshot<Map<String, dynamic>>? cursor;
+          while (true) {
+            final q = cursor == null ? base : base.startAfterDocument(cursor);
+            final snap = await q.get();
+            if (snap.docs.isEmpty) break;
+            for (final doc in snap.docs) {
+              byId[doc.id] = PaymentModel.fromFirestore(doc);
+            }
+            if (snap.docs.length < pageSize) break;
+            cursor = snap.docs.last;
           }
         } on FirebaseException catch (e) {
-          if (e.code != 'permission-denied') rethrow;
+          if (!SupervisorPaymentsPaging.swallowPermissionDenied(e.code)) {
+            rethrow;
+          }
         }
       }
 
+      for (final chunk
+          in SupervisorPaymentsPaging.concurrencyChunks(idList, concurrency: concurrency)) {
+        await Future.wait(chunk.map(fetchOne));
+      }
+
       final list = byId.values.toList()
-        ..sort((a, b) {
-          final aPending = a.hasProofAwaitingReview ? 0 : 1;
-          final bPending = b.hasProofAwaitingReview ? 0 : 1;
-          if (aPending != bPending) return aPending.compareTo(bPending);
-          return b.dueDate.compareTo(a.dueDate);
-        });
+        ..sort(SupervisorPaymentsPaging.compareDisplayOrder);
       return list;
     } on ServerException {
       rethrow;

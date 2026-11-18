@@ -10,6 +10,7 @@ import '../../../../shared/domain/attendance_record_entity.dart';
 import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 import '../../../../shared/domain/halaqa_roster.dart';
 import '../../../../shared/domain/load_halaqa_day_readiness.dart';
+import '../../../../shared/domain/recitation_records_query_mode.dart';
 
 abstract class TeacherRepository
     implements HalaqaRosterReader, HalaqaDayFactsReader {
@@ -61,10 +62,18 @@ abstract class TeacherRepository
     UpdateRecitationReviewParams params,
   );
 
-  /// تقييمات التسميع لحلقة معيّنة
+  /// تقييمات التسميع لحلقة معيّنة.
+  /// [RecitationRecordsQueryMode.fullHistory]: document-id pages until
+  /// exhausted (includes missing `date`); optional [maxRecords] caps after sort.
+  /// [RecitationRecordsQueryMode.newestByDate]: single `orderBy(date)` + limit
+  /// (display-only; docs without `date` are omitted by Firestore).
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId);
+  getHalaqaRecitationRecords(
+    String halaqaId, {
+    int? maxRecords,
+    RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory,
+  });
 
   /// Commits assignment docs (SSOT) then publishes [HomeworkAssigned] facts.
   Future<Either<Failure, AcademyEventPublication>> sendAssignment({

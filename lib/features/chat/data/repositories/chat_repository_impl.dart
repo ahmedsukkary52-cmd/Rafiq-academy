@@ -89,6 +89,31 @@ class ChatRepositoryImpl implements ChatRepository {
       .transform(_toEither());
 
   @override
+  Future<Either<Failure, List<MessageEntity>>> fetchMessagesBefore({
+    required String conversationId,
+    required String beforeMessageId,
+    required int limit,
+  }) =>
+      _guard(
+        () => remoteDatasource.fetchMessagesBefore(
+          conversationId: conversationId,
+          beforeMessageId: beforeMessageId,
+          limit: limit,
+        ),
+      );
+
+  @override
+  Future<Either<Failure, List<MessageEntity>>> fetchMessagesByIds({
+    required String conversationId,
+    required List<String> messageIds,
+  }) =>
+      _guard(
+        () => remoteDatasource.fetchMessagesByIds(
+          conversationId: conversationId,
+          messageIds: messageIds,
+        ),
+      );
+  @override
   Future<Either<Failure, ConversationEntity>> getOrCreateConversation({
     required ChatParticipantEntity currentUser,
     required ChatParticipantEntity otherUser,

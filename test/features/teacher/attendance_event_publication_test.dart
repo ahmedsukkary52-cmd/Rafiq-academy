@@ -5,6 +5,7 @@ import 'package:rafiq_academy/features/parent/data/models/parent_model.dart';
 import 'package:rafiq_academy/shared/domain/absence_request.dart';
 import 'package:rafiq_academy/shared/data/models/halaqa_model.dart';
 import 'package:rafiq_academy/shared/data/models/recitation_record_model.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
 import 'package:rafiq_academy/features/teacher/data/data_sources/teacher_remote_datasource.dart';
 import 'package:rafiq_academy/features/teacher/data/models/attendance_record_model.dart';
@@ -268,8 +269,11 @@ class _FakeTeacherDatasource implements TeacherRemoteDatasource {
       throw UnimplementedError();
   @override
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
-    String halaqaId,
-  ) => throw UnimplementedError();
+    String halaqaId, {
+    int? maxRecords,
+    RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory,
+  }) =>
+      throw UnimplementedError();
   @override
   Future<DateTime?> getLatestAssignmentDueDate(String halaqaId) =>
       throw UnimplementedError();

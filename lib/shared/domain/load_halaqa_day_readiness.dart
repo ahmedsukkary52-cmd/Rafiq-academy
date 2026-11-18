@@ -6,6 +6,7 @@ import 'halaqa_entity.dart';
 import 'halaqa_day_facts.dart';
 import 'halaqa_day_readiness.dart';
 import 'recitation_record_entity.dart';
+import 'recitation_records_query_mode.dart';
 
 /// The Halaqa-day reads readiness needs (attendance, homework, reviews).
 abstract interface class HalaqaDayFactsReader {
@@ -19,8 +20,13 @@ abstract interface class HalaqaDayFactsReader {
     String halaqaId,
   );
 
+  /// Defaults to [RecitationRecordsQueryMode.fullHistory] for correct counts.
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId);
+  getHalaqaRecitationRecords(
+    String halaqaId, {
+    int? maxRecords,
+    RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory,
+  });
 }
 
 /// Shared W3/W6 readiness I/O — teacher agenda and supervisor board (H2 / A-H14).
@@ -71,6 +77,8 @@ Future<Either<Failure, HalaqaDayFacts>> loadHalaqaDayFacts({
     latestDue = dueEither.getOrElse((_) => null);
   }
 
+  // Full history (paged): pendingReviewCount must not silently omit older
+  // pending reviews beyond a newest-N window.
   final reviewsEither = await teacherRepository.getHalaqaRecitationRecords(
     halaqa.id,
   );

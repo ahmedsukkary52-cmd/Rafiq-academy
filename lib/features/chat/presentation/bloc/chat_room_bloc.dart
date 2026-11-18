@@ -25,11 +25,22 @@ import 'chat_room_state.dart';
 /// ```
 /// (injectable بيسمح بحد أقصى 2 factoryParam لكل كلاس)
 ///
+/// Live window stays fixed at [ChatRoomState.pageSize]. Older history uses
+/// cursor pages via [FetchOlderMessagesUseCase] (BASMA-103).
+///
+/// Edits/deletes outside the live window are applied optimistically then
+/// revalidated for **that message id only** via [FetchMessagesByIdsUseCase]
+/// (no full older-buffer getAll). Peer mutations of older messages are not
+/// pushed without a conversation-level change signal (no unapproved backend
+/// contract).
+///
 /// The outbox is in-memory: closing the room cancels in-flight uploads and
 /// removes their orphan objects.
 @injectable
 class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
   final WatchMessagesUseCase watchMessages;
+  final FetchOlderMessagesUseCase fetchOlderMessages;
+  final FetchMessagesByIdsUseCase fetchMessagesByIds;
   final SendMessageUseCase sendMessage;
   final MarkConversationAsReadUseCase markConversationAsRead;
   final SoftDeleteChatMessageUseCase softDeleteMessage;
@@ -43,8 +54,27 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
   final Map<String, ChatUploadTask> _uploads = {};
   String? _lastMarkedIncomingId;
 
+  /// Merged room buffer: live snapshot + older pages (keyed by message id).
+  final Map<String, MessageEntity> _byId = {};
+
+  /// Ids currently present in the fixed live listener window.
+  final Set<String> _liveIds = {};
+
+  /// Bumped on each older-page request so stale responses are ignored.
+  int _olderRequestId = 0;
+
+  /// Per-message generation for outside-live revalidation. A newer refresh for
+  /// the **same** id supersedes older ones; refreshes for different ids do not
+  /// cancel each other. Cleared / invalidated on [close] via [_roomRefreshEpoch].
+  final Map<String, int> _bufferRefreshGenById = {};
+
+  /// Bumped on [close] so every in-flight buffer refresh is discarded.
+  int _roomRefreshEpoch = 0;
+
   ChatRoomBloc(
     this.watchMessages,
+    this.fetchOlderMessages,
+    this.fetchMessagesByIds,
     this.sendMessage,
     this.markConversationAsRead,
     this.softDeleteMessage,
@@ -58,7 +88,14 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       _onWatchMessagesStarted,
       transformer: restartable(),
     );
-    on<LoadOlderMessagesRequestedEvent>(_onLoadOlder);
+    on<LoadOlderMessagesRequestedEvent>(
+      _onLoadOlder,
+      transformer: droppable(),
+    );
+    on<RefreshBufferedOutsideLiveRequestedEvent>(
+      _onRefreshBufferedOutsideLive,
+      // Concurrent refreshes allowed; [_bufferRefreshRequestId] drops stale.
+    );
     on<SendMessageRequestedEvent>(_onSendText, transformer: sequential());
     on<SendAttachmentRequestedEvent>(_onSendAttachment);
     on<RetryOutgoingRequestedEvent>(_onRetry);
@@ -81,6 +118,29 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     MarkAsReadParams(conversationId: conversationId, uid: currentUserId),
   );
 
+  static int _compareMessages(MessageEntity a, MessageEntity b) {
+    final byTime = a.sentAt.compareTo(b.sentAt);
+    if (byTime != 0) return byTime;
+    return a.id.compareTo(b.id);
+  }
+
+  List<MessageEntity> _sortedMessages() {
+    final list = _byId.values.toList()..sort(_compareMessages);
+    return list;
+  }
+
+  void _applyLiveWindow(List<MessageEntity> live) {
+    final nextLiveIds = {for (final m in live) m.id};
+    for (final m in live) {
+      _byId[m.id] = m;
+    }
+    // Messages that fall out of the fixed live window stay in the buffer so
+    // the UI does not lose history the user already saw.
+    _liveIds
+      ..clear()
+      ..addAll(nextLiveIds);
+  }
+
   // ── Stream ────────────────────────────────────────────────────────────────
 
   Future<void> _onWatchMessagesStarted(
@@ -94,9 +154,14 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       ));
     }
 
+    const liveLimit = ChatRoomState.pageSize;
+
     await emit.forEach(
       watchMessages(
-        WatchMessagesParams(conversationId: conversationId, limit: state.limit),
+        WatchMessagesParams(
+          conversationId: conversationId,
+          limit: liveLimit,
+        ),
       ),
       onData: (either) => either.fold(
         (failure) => state.copyWith(
@@ -106,12 +171,21 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
         ),
         (messages) {
           _markReadIfNewIncoming(messages);
+          final wasLoaded = state.messagesStatus == SectionStatus.loaded;
+          _applyLiveWindow(messages);
+          final merged = _sortedMessages();
           final ids = {for (final m in messages) m.id};
+          // First live page shorter than the window ⇒ no older history.
+          final hasMore = wasLoaded
+              ? state.hasMoreOlder
+              : messages.length >= liveLimit;
           return state.copyWith(
             messagesStatus: SectionStatus.loaded,
-            messages: messages,
+            messages: merged,
             messagesError: null,
-            loadingOlder: false,
+            limit: liveLimit,
+            // Keep loadingOlder — a concurrent cursor fetch may still be in flight.
+            hasMoreOlder: hasMore,
             outbox: state.outbox
                 .where((o) => !ids.contains(o.messageId))
                 .toList(),
@@ -135,20 +209,56 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     if (!firstSnapshot) unawaited(_markRead());
   }
 
-  void _onLoadOlder(
+  Future<void> _onLoadOlder(
     LoadOlderMessagesRequestedEvent event,
     Emitter<ChatRoomState> emit,
-  ) {
+  ) async {
     if (state.loadingOlder ||
         state.messagesStatus != SectionStatus.loaded ||
-        !state.hasMore) {
+        !state.hasMoreOlder ||
+        state.messages.isEmpty) {
       return;
     }
-    emit(state.copyWith(
-      limit: state.limit + ChatRoomState.pageSize,
-      loadingOlder: true,
-    ));
-    add(const WatchMessagesStartedEvent());
+
+    final beforeId = state.messages.first.id;
+    final requestId = ++_olderRequestId;
+    emit(state.copyWith(loadingOlder: true, messagesError: null));
+
+    final result = await fetchOlderMessages(
+      FetchOlderMessagesParams(
+        conversationId: conversationId,
+        beforeMessageId: beforeId,
+        limit: ChatRoomState.pageSize,
+      ),
+    );
+
+    if (isClosed || requestId != _olderRequestId) return;
+
+    result.fold(
+      (failure) {
+        emit(state.copyWith(
+          loadingOlder: false,
+          messagesError: failure.message,
+        ));
+      },
+      (page) {
+        for (final m in page) {
+          // Live window wins for concurrent edits of the same id.
+          if (!_liveIds.contains(m.id)) {
+            _byId[m.id] = m;
+          } else {
+            _byId.putIfAbsent(m.id, () => m);
+          }
+        }
+        final exhausted = page.length < ChatRoomState.pageSize;
+        emit(state.copyWith(
+          messages: _sortedMessages(),
+          loadingOlder: false,
+          hasMoreOlder: !exhausted,
+          messagesError: null,
+        ));
+      },
+    );
   }
 
   // ── Outbox helpers ────────────────────────────────────────────────────────
@@ -384,6 +494,41 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
 
   // ── Edit / delete ─────────────────────────────────────────────────────────
 
+  MessageEntity _withEditedText(MessageEntity m, String text) => MessageEntity(
+        id: m.id,
+        conversationId: m.conversationId,
+        senderId: m.senderId,
+        type: m.type,
+        text: text,
+        media: m.media,
+        sentAt: m.sentAt,
+        editedAt: DateTime.now(),
+        deleted: m.deleted,
+        deletedAt: m.deletedAt,
+        deletedBy: m.deletedBy,
+        replyTo: m.replyTo,
+        reactions: m.reactions,
+        hasLink: m.hasLink,
+      );
+
+  MessageEntity _withSoftDeleted(MessageEntity m) => MessageEntity(
+        id: m.id,
+        conversationId: m.conversationId,
+        senderId: m.senderId,
+        type: m.type,
+        text: '',
+        media: null,
+        sentAt: m.sentAt,
+        editedAt: m.editedAt,
+        deleted: true,
+        deletedAt: DateTime.now(),
+        deletedBy: currentUserId,
+        replyTo: m.replyTo,
+        // Match MessageModel.fromFirestore soft-delete presentation.
+        reactions: const {},
+        hasLink: false,
+      );
+
   Future<void> _onEdit(
     EditMessageRequestedEvent event,
     Emitter<ChatRoomState> emit,
@@ -394,10 +539,31 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       messageId: event.messageId,
       text: event.text,
     ));
-    emit(state.copyWith(
-      actionInProgress: false,
-      actionError: result.fold((f) => f.message, (_) => null),
-    ));
+    if (isClosed) return;
+    result.fold(
+      (failure) {
+        emit(state.copyWith(
+          actionInProgress: false,
+          actionError: failure.message,
+        ));
+      },
+      (_) {
+        final existing = _byId[event.messageId];
+        if (existing != null) {
+          _byId[event.messageId] = _withEditedText(existing, event.text);
+        }
+        emit(state.copyWith(
+          actionInProgress: false,
+          actionError: null,
+          messages: _sortedMessages(),
+        ));
+        // Live window will also update via snapshots; older buffer needs a
+        // single-id revalidation (not a full older-buffer getAll).
+        if (!_liveIds.contains(event.messageId)) {
+          add(RefreshBufferedOutsideLiveRequestedEvent([event.messageId]));
+        }
+      },
+    );
   }
 
   Future<void> _onDelete(
@@ -409,14 +575,96 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       conversationId: conversationId,
       messageId: event.messageId,
     ));
-    emit(state.copyWith(
-      actionInProgress: false,
-      actionError: result.fold((f) => f.message, (_) => null),
-    ));
+    if (isClosed) return;
+    result.fold(
+      (failure) {
+        emit(state.copyWith(
+          actionInProgress: false,
+          actionError: failure.message,
+        ));
+      },
+      (_) {
+        final existing = _byId[event.messageId];
+        if (existing != null) {
+          _byId[event.messageId] = _withSoftDeleted(existing);
+        }
+        emit(state.copyWith(
+          actionInProgress: false,
+          actionError: null,
+          messages: _sortedMessages(),
+        ));
+        if (!_liveIds.contains(event.messageId)) {
+          add(RefreshBufferedOutsideLiveRequestedEvent([event.messageId]));
+        }
+      },
+    );
+  }
+
+  Future<void> _onRefreshBufferedOutsideLive(
+    RefreshBufferedOutsideLiveRequestedEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    // Only the requested ids — never the entire older buffer.
+    final ids = <String>[
+      for (final id in event.messageIds)
+        if (id.trim().isNotEmpty &&
+            _byId.containsKey(id) &&
+            !_liveIds.contains(id))
+          id.trim(),
+    ];
+    if (ids.isEmpty) return;
+
+    final epoch = _roomRefreshEpoch;
+    // Independent generation per id: concurrent refreshes of different
+    // messages do not cancel each other; only a newer refresh of the same id
+    // supersedes an older one.
+    final startedGen = <String, int>{};
+    for (final id in ids) {
+      final next = (_bufferRefreshGenById[id] ?? 0) + 1;
+      _bufferRefreshGenById[id] = next;
+      startedGen[id] = next;
+    }
+
+    final result = await fetchMessagesByIds(
+      FetchMessagesByIdsParams(
+        conversationId: conversationId,
+        messageIds: ids,
+      ),
+    );
+
+    if (isClosed || epoch != _roomRefreshEpoch) return;
+
+    result.fold(
+      (_) {
+        // Keep optimistic buffer; surface no hard error for background refresh.
+      },
+      (fresh) {
+        var applied = false;
+        for (final m in fresh) {
+          // Live window always wins for concurrent snapshot updates.
+          if (_liveIds.contains(m.id)) continue;
+          if (!_byId.containsKey(m.id)) continue;
+          if (_bufferRefreshGenById[m.id] != startedGen[m.id]) continue;
+          _byId[m.id] = m;
+          applied = true;
+        }
+        if (!applied) return;
+        emit(state.copyWith(
+          messages: _sortedMessages(),
+          // Keep fixed live limit — refresh must not grow the watch window.
+          limit: ChatRoomState.pageSize,
+        ));
+      },
+    );
   }
 
   @override
   Future<void> close() async {
+    _olderRequestId++;
+    _roomRefreshEpoch++;
+    _bufferRefreshGenById.clear();
+    _byId.clear();
+    _liveIds.clear();
     final pending = Map.of(_uploads);
     _uploads.clear();
     for (final entry in pending.entries) {

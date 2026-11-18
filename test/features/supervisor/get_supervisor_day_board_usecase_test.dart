@@ -5,6 +5,7 @@ import 'package:rafiq_academy/shared/domain/absence_request.dart';
 import 'package:rafiq_academy/shared/domain/payment_entity.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/achievement_issue_entity.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/payment_review_params.dart';
 import 'package:rafiq_academy/features/supervisor/domain/entities/supervisor_report_entity.dart';
@@ -89,7 +90,7 @@ class _FakeTeacherRepository implements TeacherRepository {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) async =>
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) async =>
       Right(recitations[halaqaId] ?? const []);
 
   @override
@@ -175,9 +176,9 @@ class _FakeDayFactsReader implements HalaqaDayFactsReader {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) {
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) {
     calls.add('reviews:$halaqaId');
-    return _facts.getHalaqaRecitationRecords(halaqaId);
+    return _facts.getHalaqaRecitationRecords(halaqaId, maxRecords: maxRecords, mode: mode);
   }
 }
 

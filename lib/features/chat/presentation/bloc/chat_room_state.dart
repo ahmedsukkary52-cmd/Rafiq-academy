@@ -90,9 +90,13 @@ class ChatRoomState extends Equatable {
   final List<MessageEntity> messages;
   final String? messagesError;
 
-  /// Current listener window (grows by [pageSize] on "load older").
+  /// Fixed live listener window (never grows on "load older").
   final int limit;
   final bool loadingOlder;
+
+  /// False once an older page returns fewer than [pageSize] rows, or the
+  /// initial live window was already shorter than [limit].
+  final bool hasMoreOlder;
 
   final List<ChatOutgoingMessage> outbox;
 
@@ -106,6 +110,7 @@ class ChatRoomState extends Equatable {
     this.messagesError,
     this.limit = pageSize,
     this.loadingOlder = false,
+    this.hasMoreOlder = true,
     this.outbox = const [],
     this.actionError,
     this.actionInProgress = false,
@@ -113,8 +118,8 @@ class ChatRoomState extends Equatable {
 
   factory ChatRoomState.initial() => const ChatRoomState();
 
-  /// The listener returned a full window, so older messages may exist.
-  bool get hasMore => messages.length >= limit;
+  /// UI alias — load-older affordance uses this.
+  bool get hasMore => hasMoreOlder;
 
   /// Outbox entries not yet visible in the server stream (dedupe by id).
   List<ChatOutgoingMessage> get pendingOutbox {
@@ -129,6 +134,7 @@ class ChatRoomState extends Equatable {
     Object? messagesError = _unset,
     int? limit,
     bool? loadingOlder,
+    bool? hasMoreOlder,
     List<ChatOutgoingMessage>? outbox,
     Object? actionError = _unset,
     bool? actionInProgress,
@@ -141,6 +147,7 @@ class ChatRoomState extends Equatable {
           : messagesError as String?,
       limit: limit ?? this.limit,
       loadingOlder: loadingOlder ?? this.loadingOlder,
+      hasMoreOlder: hasMoreOlder ?? this.hasMoreOlder,
       outbox: outbox ?? this.outbox,
       actionError: identical(actionError, _unset)
           ? this.actionError
@@ -156,6 +163,7 @@ class ChatRoomState extends Equatable {
     messagesError,
     limit,
     loadingOlder,
+    hasMoreOlder,
     outbox,
     actionError,
     actionInProgress,

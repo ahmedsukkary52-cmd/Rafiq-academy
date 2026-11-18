@@ -34,6 +34,21 @@ class _FakeChatRemoteDatasource implements ChatRemoteDatasource {
     return messages;
   }
 
+  String? lastBeforeMessageId;
+  int? lastOlderLimit;
+  List<MessageModel> olderPage = const [];
+
+  @override
+  Future<List<MessageModel>> fetchMessagesBefore({
+    required String conversationId,
+    required String beforeMessageId,
+    required int limit,
+  }) async {
+    lastBeforeMessageId = beforeMessageId;
+    lastOlderLimit = limit;
+    return olderPage;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -108,6 +123,38 @@ void main() {
       events.single.fold(
         (f) => expect(f.message, 'لم يعد لديك وصول إلى هذه المحادثة'),
         (_) => fail('expected Left'),
+      );
+    });
+  });
+
+  group('ChatRepositoryImpl.fetchMessagesBefore', () {
+    test('forwards cursor args and returns Right on success', () async {
+      final older = MessageModel(
+        id: 'old1',
+        conversationId: 'c1',
+        senderId: 's1',
+        text: 'قديم',
+        sentAt: DateTime(2026, 1, 1),
+      );
+      final ds = _FakeChatRemoteDatasource()
+        ..olderPage = [older];
+      final repo = ChatRepositoryImpl(
+        remoteDatasource: ds,
+        networkInfo: _Online(),
+      );
+
+      final result = await repo.fetchMessagesBefore(
+        conversationId: 'c1',
+        beforeMessageId: 'live0',
+        limit: 30,
+      );
+
+      expect(ds.lastBeforeMessageId, 'live0');
+      expect(ds.lastOlderLimit, 30);
+      expect(result.isRight(), isTrue);
+      result.fold(
+        (_) => fail('expected Right'),
+        (list) => expect(list.single.id, 'old1'),
       );
     });
   });

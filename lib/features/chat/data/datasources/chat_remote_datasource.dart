@@ -36,7 +36,21 @@ abstract class ChatRemoteDatasource {
     String conversationId, {
     required int limit,
   });
+  /// One page of messages older than [beforeMessageId], ascending by `sentAt`
+  /// then document id. Uses a document cursor so the live listener limit stays
+  /// fixed (BASMA-103).
+  Future<List<MessageModel>> fetchMessagesBefore({
+    required String conversationId,
+    required String beforeMessageId,
+    required int limit,
+  });
 
+  /// One-shot gets for known message ids (buffer revalidation outside the live
+  /// window). Missing docs are omitted from the result.
+  Future<List<MessageModel>> fetchMessagesByIds({
+    required String conversationId,
+    required List<String> messageIds,
+  });
   Future<ConversationModel> getOrCreateConversation({
     required ChatParticipantEntity currentUser,
     required ChatParticipantEntity otherUser,
@@ -206,6 +220,67 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         );
   }
 
+  @override
+  Future<List<MessageModel>> fetchMessagesBefore({
+    required String conversationId,
+    required String beforeMessageId,
+    required int limit,
+  }) async {
+    if (limit <= 0) return const [];
+    try {
+      final cursor = await _messagesRef(conversationId)
+          .doc(beforeMessageId)
+          .get();
+      if (!cursor.exists) return const [];
+
+      final snapshot = await _messagesRef(conversationId)
+          .orderBy('sentAt', descending: true)
+          .startAfterDocument(cursor)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs.reversed
+          .map(
+            (doc) => MessageModel.fromFirestore(
+              doc,
+              conversationId: conversationId,
+            ),
+          )
+          .toList();
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<List<MessageModel>> fetchMessagesByIds({
+    required String conversationId,
+    required List<String> messageIds,
+  }) async {
+    final unique = <String>{
+      for (final id in messageIds)
+        if (id.trim().isNotEmpty) id.trim(),
+    };
+    if (unique.isEmpty) return const [];
+    try {
+      final col = _messagesRef(conversationId);
+      final snaps = await Future.wait(unique.map((id) => col.doc(id).get()));
+      final out = <MessageModel>[];
+      for (final snap in snaps) {
+        if (!snap.exists) continue;
+        out.add(
+          MessageModel.fromFirestore(snap, conversationId: conversationId),
+        );
+      }
+      return out;
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? e.code);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
   @override
   Future<ConversationModel> getOrCreateConversation({
     required ChatParticipantEntity currentUser,

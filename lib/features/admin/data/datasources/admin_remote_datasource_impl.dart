@@ -310,34 +310,38 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
 
       if (usersSnap.docs.isEmpty) return [];
 
-      final profileFutures = usersSnap.docs.map((userDoc) {
-        return firestore
+      // Batch profile reads (chunked whereIn) instead of N+1 get-by-id.
+      final profileById = <String, Map<String, dynamic>?>{};
+      final teacherIds = usersSnap.docs.map((d) => d.id);
+      for (final chunk in FirestoreInQuery.chunkIds(teacherIds)) {
+        final profilesSnap = await firestore
             .collection(FirestoreCollections.teacherProfiles)
-            .doc(userDoc.id)
+            .where(FieldPath.documentId, whereIn: chunk)
             .get();
-      });
-
-      final profileDocs = await Future.wait(profileFutures);
+        for (final doc in profilesSnap.docs) {
+          profileById[doc.id] = doc.data();
+        }
+      }
 
       return [
-        for (var i = 0; i < usersSnap.docs.length; i++)
-          if (StaffStatus.fromUser(usersSnap.docs[i].data()) !=
-              StaffStatus.deleted)
+        for (final userDoc in usersSnap.docs)
+          if (StaffStatus.fromUser(userDoc.data()) != StaffStatus.deleted)
             TeacherManagementEntity(
-              uid: usersSnap.docs[i].id,
-              name: usersSnap.docs[i].data()['name'] ?? '',
+              uid: userDoc.id,
+              name: userDoc.data()['name'] ?? '',
               profileImageUrl:
-                  usersSnap.docs[i].data()['profileImageUrl'] as String?,
+                  userDoc.data()['profileImageUrl'] as String?,
               halaqatIds: List<String>.from(
-                profileDocs[i].data()?['halaqatIds'] ?? const [],
+                profileById[userDoc.id]?['halaqatIds'] ?? const [],
               ),
               performanceRating:
-                  (profileDocs[i].data()?['performanceRating'] as num?)
+                  (profileById[userDoc.id]?['performanceRating'] as num?)
                       ?.toDouble(),
               weeklyQuota:
-                  ((profileDocs[i].data()?['weeklyQuota'] ?? 0) as num).toInt(),
-              isActive: usersSnap.docs[i].data()['isActive'] as bool? ?? true,
-              staffStatus: StaffStatus.fromUser(usersSnap.docs[i].data()).wire,
+                  ((profileById[userDoc.id]?['weeklyQuota'] ?? 0) as num)
+                      .toInt(),
+              isActive: userDoc.data()['isActive'] as bool? ?? true,
+              staffStatus: StaffStatus.fromUser(userDoc.data()).wire,
             ),
       ];
     } catch (e) {
@@ -732,6 +736,9 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   @override
   Future<List<RegistrationRequestEntity>> getRegistrationRequests() async {
     try {
+      // Still scans active students: a true filtered query needs a denormalized
+      // `needsHalaqaAssignment` (or equivalent) flag — deferred (schema).
+      // D2 reduces latency via chunked parallel profile reads (not N serial).
       final usersSnap = await firestore
           .collection(FirestoreCollections.users)
           .where('role', isEqualTo: AppRoles.student)
@@ -740,13 +747,22 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
 
       if (usersSnap.docs.isEmpty) return const [];
 
+      final profileById = <String, Map<String, dynamic>>{};
+      final studentIds = usersSnap.docs.map((d) => d.id).toList();
+      for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
+        final profilesSnap = await firestore
+            .collection(FirestoreCollections.studentProfiles)
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        for (final doc in profilesSnap.docs) {
+          profileById[doc.id] = doc.data();
+        }
+      }
+
       final pending = <RegistrationRequestEntity>[];
       for (final userDoc in usersSnap.docs) {
-        final profileSnap = await firestore
-            .collection(FirestoreCollections.studentProfiles)
-            .doc(userDoc.id)
-            .get();
-        final profileData = profileSnap.data() ?? const <String, dynamic>{};
+        final profileData =
+            profileById[userDoc.id] ?? const <String, dynamic>{};
         final halaqaId = profileData['halaqaId'] as String?;
         if (halaqaId != null && halaqaId.trim().isNotEmpty) continue;
 

@@ -4,6 +4,7 @@ import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/shared/domain/absence_request.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/repositories/teacher_repository.dart';
@@ -34,6 +35,8 @@ class _FakeTeacherRepository implements TeacherRepository {
   final DateTime? latestDue;
   final Failure? failAttendance;
   final void Function()? onHomework;
+  final List<int?> recitationMaxRecordsCalls;
+  final List<RecitationRecordsQueryMode> recitationModeCalls;
 
   _FakeTeacherRepository({
     this.attendance = const [],
@@ -41,7 +44,11 @@ class _FakeTeacherRepository implements TeacherRepository {
     this.latestDue,
     this.failAttendance,
     this.onHomework,
-  });
+    List<int?>? recitationMaxRecordsCalls,
+    List<RecitationRecordsQueryMode>? recitationModeCalls,
+  }) : recitationMaxRecordsCalls = recitationMaxRecordsCalls ?? <int?>[],
+       recitationModeCalls =
+           recitationModeCalls ?? <RecitationRecordsQueryMode>[];
 
   @override
   Future<Either<Failure, List<AttendanceRecordEntity>>>
@@ -63,7 +70,14 @@ class _FakeTeacherRepository implements TeacherRepository {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) async => Right(recitations);
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) async {
+    recitationMaxRecordsCalls.add(maxRecords);
+    recitationModeCalls.add(mode);
+    if (maxRecords == null) return Right(recitations);
+    final sorted = [...recitations]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return Right(sorted.take(maxRecords).toList());
+  }
 
   @override
   Future<Either<Failure, List<HalaqaEntity>>> getTeacherHalaqat(String t) =>
@@ -199,6 +213,70 @@ void main() {
         now: _monday,
       );
       expect(result.isLeft(), isTrue);
+    });
+
+    test('pending reviews beyond a 100-newest window still count', () async {
+      final calls = <int?>[];
+      final recitations = <RecitationRecordEntity>[
+        for (var i = 0; i < 130; i++)
+          RecitationRecordEntity(
+            id: 'r$i',
+            studentId: 's1',
+            studentName: 'n',
+            teacherId: 't1',
+            halaqaId: 'h1',
+            date: DateTime(2024, 1, 1).add(Duration(days: i)),
+            type: RecitationType.memorization,
+            versesRange: '',
+            // Oldest 15 are pending — outside any newest-100 window.
+            reviewStatus: i < 15 ? 'pending' : 'reviewed',
+          ),
+      ];
+      final repo = _FakeTeacherRepository(
+        attendance: [
+          AttendanceRecordEntity(
+            id: 'a1',
+            studentId: 's1',
+            studentName: 's1',
+            halaqaId: 'h1',
+            date: _monday,
+            status: AttendanceStatus.present,
+            recordedBy: 't1',
+            sessionId: 'h1_20240603',
+          ),
+        ],
+        latestDue: _mondayDue,
+        recitations: recitations,
+        recitationMaxRecordsCalls: calls,
+      );
+
+      final facts = await loadHalaqaDayFacts(
+        teacherRepository: repo,
+        halaqa: _halaqa(),
+        now: _monday,
+      );
+      final value = facts.getOrElse((_) => throw StateError('expected Right'));
+
+      expect(calls, [null], reason: 'readiness must request full history');
+      expect(
+        repo.recitationModeCalls,
+        [RecitationRecordsQueryMode.fullHistory],
+      );
+      expect(
+        value.readiness.gaps
+            .where((g) => g.kind == HalaqaDayGapKind.reviewsPending)
+            .single
+            .quantity,
+        15,
+      );
+
+      // Contrast: a silent newest-100 cap would drop all 15 oldest pending.
+      final newest100 = [...recitations]
+        ..sort((a, b) => b.date.compareTo(a.date));
+      expect(
+        newest100.take(100).where((r) => r.isPendingReview),
+        isEmpty,
+      );
     });
   });
 }

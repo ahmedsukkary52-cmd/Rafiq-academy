@@ -6,6 +6,7 @@ import 'package:rafiq_academy/features/awards/domain/repositories/awards_reposit
 import 'package:rafiq_academy/features/parent/domain/entities/parent_entities.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 import 'package:rafiq_academy/shared/domain/attendance_record_entity.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/features/teacher/domain/read_models/teacher_recent_activity.dart';
@@ -37,12 +38,16 @@ class _FakeTeacherRepo implements TeacherRepository {
   final List<AttendanceRecordEntity> attendance;
   final List<RecitationRecordEntity> recitations;
   final DateTime? latestDue;
+  final List<({String halaqaId, int? maxRecords, RecitationRecordsQueryMode mode})>
+      recitationCalls;
 
   _FakeTeacherRepo({
     this.attendance = const [],
     this.recitations = const [],
     this.latestDue,
-  });
+    List<({String halaqaId, int? maxRecords, RecitationRecordsQueryMode mode})>?
+        recitationCalls,
+  }) : recitationCalls = recitationCalls ?? [];
 
   @override
   Future<Either<Failure, List<AttendanceRecordEntity>>>
@@ -58,7 +63,19 @@ class _FakeTeacherRepo implements TeacherRepository {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) async => Right(recitations);
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) async {
+    recitationCalls.add((
+      halaqaId: halaqaId,
+      maxRecords: maxRecords,
+      mode: mode,
+    ));
+    if (mode == RecitationRecordsQueryMode.newestByDate && maxRecords != null) {
+      final sorted = [...recitations]
+        ..sort((a, b) => b.date.compareTo(a.date));
+      return Right(sorted.take(maxRecords).toList());
+    }
+    return Right(recitations);
+  }
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -152,5 +169,84 @@ void main() {
     expect(feed.recentActivities.length, lessThanOrEqualTo(5));
     expect(feed.agenda.featuredSession, isNotNull);
     expect(feed.agenda.featuredSession!.halaqaId, 'h1');
+  });
+
+  test('today halaqa facts path uses fullHistory (pending count), not newestByDate', () async {
+    final calls =
+        <({String halaqaId, int? maxRecords, RecitationRecordsQueryMode mode})>[];
+    final halaqa = _halaqa(id: 'h1'); // monday schedule, now=_monday
+    final useCase = GetTeacherHomeFeedUseCase(
+      teacherRepository: _FakeTeacherRepo(
+        attendance: [
+          AttendanceRecordEntity(
+            id: 'att1',
+            studentId: 's1',
+            studentName: 'n',
+            halaqaId: 'h1',
+            date: _monday,
+            status: AttendanceStatus.present,
+            recordedBy: 't1',
+            sessionId: 'h1_20240603',
+          ),
+        ],
+        latestDue: DateTime(2024, 6, 3, 23, 59),
+        recitations: const [],
+        recitationCalls: calls,
+      ),
+      awardsRepository: _FakeAwardsRepo(const []),
+    );
+
+    await useCase(TodayAgendaParams(halaqat: [halaqa], now: _monday));
+
+    expect(calls, isNotEmpty);
+    expect(
+      calls.every(
+        (c) =>
+            c.mode == RecitationRecordsQueryMode.fullHistory &&
+            c.maxRecords == null,
+      ),
+      isTrue,
+      reason: 'today readiness/facts must not use newestByDate display path',
+    );
+  });
+
+  test('non-today halaqa uses newestByDate bounded mode, not fullHistory', () async {
+    final calls =
+        <({String halaqaId, int? maxRecords, RecitationRecordsQueryMode mode})>[];
+    // Tuesday schedule — not operational on Monday now.
+    final halaqa = _halaqa(id: 'h2', day: 'tuesday');
+    final useCase = GetTeacherHomeFeedUseCase(
+      teacherRepository: _FakeTeacherRepo(
+        recitations: [
+          for (var i = 0; i < 50; i++)
+            RecitationRecordEntity(
+              id: 'r$i',
+              studentId: 's1',
+              studentName: 'n',
+              teacherId: 't1',
+              halaqaId: 'h2',
+              date: DateTime(2024, 5, 1).add(Duration(days: i)),
+              type: RecitationType.memorization,
+              versesRange: '',
+              reviewStatus: 'reviewed',
+            ),
+        ],
+        recitationCalls: calls,
+      ),
+      awardsRepository: _FakeAwardsRepo(const []),
+    );
+
+    await useCase(TodayAgendaParams(halaqat: [halaqa], now: _monday));
+
+    expect(calls, isNotEmpty);
+    expect(
+      calls.every(
+        (c) =>
+            c.mode == RecitationRecordsQueryMode.newestByDate &&
+            c.maxRecords == 40,
+      ),
+      isTrue,
+      reason: 'Home Feed display window must not invoke full-history walk',
+    );
   });
 }

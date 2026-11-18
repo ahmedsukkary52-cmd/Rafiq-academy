@@ -62,6 +62,41 @@ class WatchMessagesUseCase
       repository.watchMessages(params.conversationId, limit: params.limit);
 }
 
+/// Cursor page of messages older than the current oldest visible message.
+@lazySingleton
+class FetchOlderMessagesUseCase
+    extends UseCase<List<MessageEntity>, FetchOlderMessagesParams> {
+  final ChatRepository repository;
+  FetchOlderMessagesUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, List<MessageEntity>>> call(
+    FetchOlderMessagesParams params,
+  ) =>
+      repository.fetchMessagesBefore(
+        conversationId: params.conversationId,
+        beforeMessageId: params.beforeMessageId,
+        limit: params.limit,
+      );
+}
+
+/// One-shot revalidation of buffered message ids outside the live window.
+@lazySingleton
+class FetchMessagesByIdsUseCase
+    extends UseCase<List<MessageEntity>, FetchMessagesByIdsParams> {
+  final ChatRepository repository;
+  FetchMessagesByIdsUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, List<MessageEntity>>> call(
+    FetchMessagesByIdsParams params,
+  ) =>
+      repository.fetchMessagesByIds(
+        conversationId: params.conversationId,
+        messageIds: params.messageIds,
+      );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GetOrCreateConversationUseCase
 // ══════════════════════════════════════════════════════════════════════════════
@@ -294,6 +329,34 @@ class WatchMessagesParams extends Equatable {
 
   @override
   List<Object?> get props => [conversationId, limit];
+}
+
+class FetchOlderMessagesParams extends Equatable {
+  final String conversationId;
+  final String beforeMessageId;
+  final int limit;
+
+  const FetchOlderMessagesParams({
+    required this.conversationId,
+    required this.beforeMessageId,
+    required this.limit,
+  });
+
+  @override
+  List<Object?> get props => [conversationId, beforeMessageId, limit];
+}
+
+class FetchMessagesByIdsParams extends Equatable {
+  final String conversationId;
+  final List<String> messageIds;
+
+  const FetchMessagesByIdsParams({
+    required this.conversationId,
+    required this.messageIds,
+  });
+
+  @override
+  List<Object?> get props => [conversationId, messageIds];
 }
 
 /// Sender identity is never a client parameter (server uses the auth uid).

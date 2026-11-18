@@ -4,6 +4,7 @@ import '../../../../shared/domain/academy_event.dart';
 import '../../../../shared/data/models/halaqa_model.dart';
 import '../../../../shared/data/models/recitation_record_model.dart';
 import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_query_mode.dart';
 import '../models/attendance_record_model.dart';
 import '../models/halaqa_student_summary_model.dart';
 
@@ -39,9 +40,12 @@ abstract class TeacherRemoteDatasource {
     required RecitationGrade behaviorGrade,
     String? notes,
   });
+  /// See [RecitationRecordsQueryMode].
   Future<List<RecitationRecordModel>> getHalaqaRecitationRecords(
-    String halaqaId,
-  );
+    String halaqaId, {
+    int? maxRecords,
+    RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory,
+  });
 
   /// Commits one assignment doc per roster student. Returns [HomeworkAssigned]
   /// facts for the committed docs — no notification writes.

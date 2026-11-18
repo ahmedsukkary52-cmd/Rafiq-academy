@@ -12,6 +12,7 @@ import '../../../schedule/domain/mappers/halaqa_schedule_source_from_entity.dart
 import '../../../schedule/domain/mappers/halaqa_weekly_sessions_mapper.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
 import '../../../../shared/domain/recitation_record_entity.dart';
+import '../../../../shared/domain/recitation_records_query_mode.dart';
 import '../read_models/teacher_day_agenda.dart';
 import '../read_models/teacher_home_feed.dart';
 import '../read_models/teacher_recent_activity.dart';
@@ -98,8 +99,11 @@ class GetTeacherHomeFeedUseCase
     for (final halaqa in params.halaqat) {
       if (todayIds.contains(halaqa.id)) continue;
 
+      // Display-only newest window — bounded date query (not full-history walk).
       final reviewsEither = await teacherRepository.getHalaqaRecitationRecords(
         halaqa.id,
+        maxRecords: 40,
+        mode: RecitationRecordsQueryMode.newestByDate,
       );
       reviewsEither.fold(
         (_) {},

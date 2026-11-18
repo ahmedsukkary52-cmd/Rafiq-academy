@@ -10,6 +10,7 @@ import 'package:rafiq_academy/shared/domain/halaqa_roster.dart';
 import 'package:rafiq_academy/shared/domain/halaqa_students_summary_entity.dart';
 import 'package:rafiq_academy/shared/domain/load_halaqa_day_readiness.dart';
 import 'package:rafiq_academy/shared/domain/recitation_record_entity.dart';
+import 'package:rafiq_academy/shared/domain/recitation_records_query_mode.dart';
 
 const _roleModules = ['student', 'teacher', 'supervisor', 'parent', 'admin'];
 
@@ -84,7 +85,7 @@ class _FakeDayFactsReader implements HalaqaDayFactsReader {
 
   @override
   Future<Either<Failure, List<RecitationRecordEntity>>>
-  getHalaqaRecitationRecords(String halaqaId) async {
+  getHalaqaRecitationRecords(String halaqaId, {int? maxRecords, RecitationRecordsQueryMode mode = RecitationRecordsQueryMode.fullHistory}) async {
     calls.add('reviews:$halaqaId');
     return const Right([]);
   }

@@ -15,7 +15,7 @@ class WatchMessagesStartedEvent extends ChatRoomEvent {
   const WatchMessagesStartedEvent();
 }
 
-/// Grow the listener window by one page (older history).
+/// Fetch one older cursor page without growing the live listener window.
 class LoadOlderMessagesRequestedEvent extends ChatRoomEvent {
   const LoadOlderMessagesRequestedEvent();
 }
@@ -74,6 +74,18 @@ class SoftDeleteMessageRequestedEvent extends ChatRoomEvent {
 
   @override
   List<Object?> get props => [messageId];
+}
+
+/// Re-fetch specific buffered message id(s) outside the fixed live window.
+///
+/// Used after local edit/delete so only the affected id is revalidated (not
+/// the entire older buffer).
+class RefreshBufferedOutsideLiveRequestedEvent extends ChatRoomEvent {
+  final List<String> messageIds;
+  const RefreshBufferedOutsideLiveRequestedEvent(this.messageIds);
+
+  @override
+  List<Object?> get props => [messageIds];
 }
 
 class ActionErrorDismissedEvent extends ChatRoomEvent {

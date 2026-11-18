@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../data/admin_broadcast_audience_count.dart';
 import '../../domain/admin_broadcast_form.dart';
 import '../../domain/entities/admin_operations_entities.dart'
     show newHalaqaRequestId;
@@ -17,14 +19,12 @@ import '../widgets/admin_subpage_scaffold.dart';
 
 typedef BroadcastAudienceCounter = Future<int> Function(String targetRole);
 
-Future<int> countBroadcastAudience(String targetRole) async {
-  Query<Map<String, dynamic>> q = FirebaseFirestore.instance.collection(
-    FirestoreCollections.users,
-  );
-  if (targetRole != 'all') q = q.where('role', isEqualTo: targetRole);
-  final snap = await q.count().get();
-  return snap.count ?? 0;
-}
+/// Default counter: DI Firestore (emulator-aware), not `FirebaseFirestore.instance`.
+Future<int> countBroadcastAudience(String targetRole) =>
+    countBroadcastAudienceForRole(
+      firestore: sl<FirebaseFirestore>(),
+      targetRole: targetRole,
+    );
 
 class AdminBroadcastPage extends StatefulWidget {
   final BroadcastAudienceCounter countAudience;

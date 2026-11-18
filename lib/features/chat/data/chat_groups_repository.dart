@@ -50,6 +50,9 @@ class ChatGroupsRepository {
   final FirebaseFunctions functions;
   final FirebaseStorage storage;
 
+  /// People search reuses the accounts member-prefix query (same indexes).
+  final AcademyAccountsRepository accounts;
+
   static const libraryPageSize = 30;
   static const groupImageMaxBytes = 10 * 1024 * 1024;
 
@@ -65,6 +68,7 @@ class ChatGroupsRepository {
     required this.firestore,
     required this.functions,
     required this.storage,
+    required this.accounts,
   });
 
   Future<Map<String, dynamic>> _call(
@@ -136,10 +140,6 @@ class ChatGroupsRepository {
     required String excludeUid,
     List<String> roles = searchableRoles,
   }) async {
-    final accounts = AcademyAccountsRepository(
-      functions: functions,
-      firestore: firestore,
-    );
     try {
       final perRole = await Future.wait([
         for (final role in roles)

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +25,10 @@ import '../../../../shared/widgets/app_filter_chip.dart';
 
 typedef ReportFileSaver = Future<bool> Function(String fileName, Uint8List bytes);
 typedef ReportPdfSharer = Future<void> Function(String fileName, Uint8List bytes);
+
+/// Composition-root default: GetIt-registered reports repository.
+AdminReportsRepository defaultAdminReportsRepository() =>
+    sl<AdminReportsRepository>();
 
 /// Asks where to save; returns false when the user cancels.
 Future<bool> saveReportFile(String fileName, Uint8List bytes) async {
@@ -70,8 +73,7 @@ class AdminReportsPage extends StatefulWidget {
 
 class _AdminReportsPageState extends State<AdminReportsPage> {
   late final AdminReportsRepository _repo =
-      widget.repository ??
-      AdminReportsRepository(firestore: sl<FirebaseFirestore>());
+      widget.repository ?? defaultAdminReportsRepository();
 
   AdminReportType _type = AdminReportType.students;
   ReportRangePreset _preset = ReportRangePreset.thisMonth;

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -13,10 +11,8 @@ import '../../auth/presentation/bloc/auth_state.dart';
 import '../data/cover_duty_repository.dart';
 import 'cover_attendance_page.dart';
 
-CoverDutyRepository defaultCoverDutyRepository() => FirestoreCoverDutyRepository(
-  firestore: sl<FirebaseFirestore>(),
-  functions: sl<FirebaseFunctions>(),
-);
+/// Composition-root default: GetIt-registered cover-duty repository.
+CoverDutyRepository defaultCoverDutyRepository() => sl<CoverDutyRepository>();
 
 /// Assistant teacher home: the halaqat the assistant is assigned to (read
 /// only) and any halaqa it is covering now (attendance enabled). The primary

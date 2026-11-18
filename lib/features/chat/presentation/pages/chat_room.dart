@@ -1,8 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -109,9 +106,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     _loader = widget.mediaLoader ?? sl<ChatMediaLoader>();
     _scrollCtrl.addListener(_onScroll);
     _groups = widget.groups ??
-        (sl.isRegistered<FirebaseFirestore>() &&
-                sl.isRegistered<FirebaseFunctions>() &&
-                sl.isRegistered<FirebaseStorage>()
+        (sl.isRegistered<ChatGroupsRepository>()
             ? resolveChatGroupsRepository()
             : null);
     _metaSub = _groups

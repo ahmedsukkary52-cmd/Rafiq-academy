@@ -12,28 +12,15 @@ import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../../shared/domain/payment_proof_reader.dart';
 import '../../../../shared/widgets/payment_proof_image.dart';
 import '../../data/admin_payments_ledger.dart';
-import '../../../../shared/domain/payment_status_label.dart';
 import '../../domain/entities/admin_payment_record.dart';
 import '../../domain/entities/financial_summary_entity.dart';
 import '../admin_format.dart';
+import '../admin_payment_ledger_labels.dart';
+import '../admin_payments_ledger_session.dart';
 import '../../../../shared/widgets/app_filter_chip.dart';
 
 AdminPaymentsLedger defaultAdminPaymentsLedger() =>
     AdminPaymentsLedger(firestore: sl<FirebaseFirestore>());
-
-String _date(DateTime? d) => d == null ? '—' : '${d.day}/${d.month}/${d.year}';
-
-AppStatusTone _tone(AdminPaymentRecord p) {
-  if (p.awaitingReview) return AppStatusTone.info;
-  return switch (p.status) {
-    'paid' => AppStatusTone.success,
-    'overdue' => AppStatusTone.error,
-    _ => AppStatusTone.warning,
-  };
-}
-
-String _chipLabel(AdminPaymentRecord p) =>
-    p.awaitingReview ? 'بانتظار المراجعة' : paymentStatusLabel(p.status);
 
 /// One finance screen: live totals (server aggregates), status filters and a
 /// cursor-paginated ledger; each row opens the full payment record.
@@ -50,81 +37,32 @@ class AdminPaymentsLedgerPage extends StatefulWidget {
 class _AdminPaymentsLedgerPageState extends State<AdminPaymentsLedgerPage> {
   late final AdminPaymentsLedger _ledger =
       widget.ledger ?? defaultAdminPaymentsLedger();
+  late final AdminPaymentsLedgerSession _session =
+      AdminPaymentsLedgerSession(_ledger);
   final _scroll = ScrollController();
-  final List<AdminPaymentRecord> _items = [];
-  PaymentLedgerFilter _filter = PaymentLedgerFilter.all;
-  FinancialSummaryEntity? _summary;
-  Object? _cursor;
-  bool _hasMore = true;
-  bool _loading = false;
-  String? _error;
-  int _generation = 0;
 
   @override
   void initState() {
     super.initState();
+    _session.addListener(_onSession);
     _scroll.addListener(() {
       if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 240) {
-        _loadMore();
+        _session.loadMore();
       }
     });
-    _reload();
+    _session.reload();
+  }
+
+  void _onSession() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _session.removeListener(_onSession);
+    _session.dispose();
     _scroll.dispose();
     super.dispose();
-  }
-
-  Future<void> _reload() async {
-    _generation++;
-    setState(() {
-      _items.clear();
-      _cursor = null;
-      _hasMore = true;
-      _error = null;
-      _loading = false;
-    });
-    _loadSummary();
-    await _loadMore();
-  }
-
-  Future<void> _loadSummary() async {
-    try {
-      final s = await _ledger.summary();
-      if (mounted) setState(() => _summary = s);
-    } catch (_) {
-      // The list still works; the totals strip stays hidden.
-    }
-  }
-
-  Future<void> _loadMore() async {
-    if (_loading || !_hasMore) return;
-    final generation = _generation;
-    setState(() => _loading = true);
-    try {
-      final page = await _ledger.fetchPage(filter: _filter, cursor: _cursor);
-      if (!mounted || generation != _generation) return;
-      setState(() {
-        _items.addAll(page.items);
-        _cursor = page.cursor;
-        _hasMore = page.cursor != null;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted || generation != _generation) return;
-      setState(() {
-        _error = userFacingErrorText(e.toString());
-        _loading = false;
-      });
-    }
-  }
-
-  void _setFilter(PaymentLedgerFilter f) {
-    if (_filter == f) return;
-    _filter = f;
-    _reload();
   }
 
   Future<void> _open(AdminPaymentRecord p) async {
@@ -141,11 +79,13 @@ class _AdminPaymentsLedgerPageState extends State<AdminPaymentsLedgerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final session = _session;
     return AppSubpageScaffold(
       title: 'سجل المدفوعات',
       body: Column(
         children: [
-          if (_summary != null) _SummaryStrip(summary: _summary!),
+          if (session.summary != null)
+            _SummaryStrip(summary: session.summary!),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -155,56 +95,58 @@ class _AdminPaymentsLedgerPageState extends State<AdminPaymentsLedgerPage> {
                   AppFilterChip(
                     key: Key('payments-filter-${f.name}'),
                     label: f.label,
-                    selected: _filter == f,
-                    onTap: () => _setFilter(f),
+                    selected: session.filter == f,
+                    onTap: () => session.setFilter(f),
                   ),
               ],
             ),
           ),
-          Expanded(child: _body()),
+          Expanded(child: _body(session)),
         ],
       ),
     );
   }
 
-  Widget _body() {
-    if (_items.isEmpty && _loading) return const AppLoadingWidget();
-    if (_items.isEmpty && _error != null) {
-      return AppErrorWidget(message: _error!, onRetry: _reload);
+  Widget _body(AdminPaymentsLedgerSession session) {
+    if (session.items.isEmpty && session.loading) {
+      return const AppLoadingWidget();
     }
-    if (_items.isEmpty) {
+    if (session.items.isEmpty && session.error != null) {
+      return AppErrorWidget(message: session.error!, onRetry: session.reload);
+    }
+    if (session.items.isEmpty) {
       return AppEmptyState(
         icon: Icons.payments_outlined,
         title: 'لا توجد مدفوعات',
-        message: _filter == PaymentLedgerFilter.all
+        message: session.filter == PaymentLedgerFilter.all
             ? 'ستظهر هنا فواتير أولياء الأمور فور إصدارها.'
-            : 'لا توجد مدفوعات ضمن «${_filter.label}».',
+            : 'لا توجد مدفوعات ضمن «${session.filter.label}».',
       );
     }
     return RefreshIndicator(
-      onRefresh: _reload,
+      onRefresh: session.reload,
       child: ListView.separated(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-        itemCount: _items.length + 1,
+        itemCount: session.items.length + 1,
         separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, i) {
-          if (i == _items.length) {
-            if (_error != null) {
+          if (i == session.items.length) {
+            if (session.error != null) {
               return TextButton(
-                onPressed: _loadMore,
+                onPressed: session.loadMore,
                 child: const Text('تعذر تحميل المزيد — إعادة المحاولة'),
               );
             }
-            return _hasMore
+            return session.hasMore
                 ? const Padding(
                     padding: EdgeInsets.all(12),
                     child: Center(child: CircularProgressIndicator()),
                   )
                 : const SizedBox.shrink();
           }
-          final p = _items[i];
+          final p = session.items[i];
           return _PaymentCard(
             key: Key('payment-${p.id}'),
             payment: p,
@@ -291,7 +233,10 @@ class _PaymentCard extends StatelessWidget {
                   ),
                 ),
               ),
-              AppStatusChip(label: _chipLabel(p), tone: _tone(p)),
+              AppStatusChip(
+                label: adminPaymentLedgerChipLabel(p),
+                tone: adminPaymentLedgerTone(p),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -313,8 +258,8 @@ class _PaymentCard extends StatelessWidget {
               const Spacer(),
               Text(
                 p.status == 'paid'
-                    ? 'دُفعت ${_date(p.paidAt)}'
-                    : 'تستحق ${_date(p.dueDate)}',
+                    ? 'دُفعت ${adminPaymentLedgerDate(p.paidAt)}'
+                    : 'تستحق ${adminPaymentLedgerDate(p.dueDate)}',
                 style: AppTextStyles.labelMedium.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -405,16 +350,25 @@ class _AdminPaymentDetailsPageState extends State<AdminPaymentDetailsPage> {
                                 ),
                               ),
                             ),
-                            AppStatusChip(label: _chipLabel(p), tone: _tone(p)),
+                            AppStatusChip(
+                              label: adminPaymentLedgerChipLabel(p),
+                              tone: adminPaymentLedgerTone(p),
+                            ),
                           ],
                         ),
                         const Divider(height: 24),
                         _Row('الطالب', p.studentName),
                         _Row('ولي الأمر', p.parentName),
                         if (p.periodKey != null) _Row('الفترة', p.periodKey!),
-                        _Row('تاريخ الاستحقاق', _date(p.dueDate)),
+                        _Row(
+                          'تاريخ الاستحقاق',
+                          adminPaymentLedgerDate(p.dueDate),
+                        ),
                         if (p.paidAt != null)
-                          _Row('تاريخ السداد', _date(p.paidAt)),
+                          _Row(
+                            'تاريخ السداد',
+                            adminPaymentLedgerDate(p.paidAt),
+                          ),
                         _Row('طريقة الدفع', paymentMethodLabel(p.method)),
                         if (p.amountPaidConfirmed != null)
                           _Row(
@@ -438,11 +392,17 @@ class _AdminPaymentDetailsPageState extends State<AdminPaymentDetailsPage> {
                         const SizedBox(height: 8),
                         _Row('حالة الإيصال', paymentReviewStatusLabel(p.reviewStatus)),
                         if (p.proofSubmittedAt != null)
-                          _Row('تاريخ الرفع', _date(p.proofSubmittedAt)),
+                          _Row(
+                            'تاريخ الرفع',
+                            adminPaymentLedgerDate(p.proofSubmittedAt),
+                          ),
                         if (p.reviewedByName != null)
                           _Row('المراجِع', p.reviewedByName!),
                         if (p.reviewedAt != null)
-                          _Row('تاريخ المراجعة', _date(p.reviewedAt)),
+                          _Row(
+                            'تاريخ المراجعة',
+                            adminPaymentLedgerDate(p.reviewedAt),
+                          ),
                         if (p.reviewNotes != null)
                           _Row('ملاحظات', p.reviewNotes!),
                         if (p.hasProof) ...[
@@ -491,7 +451,7 @@ class _AdminPaymentDetailsPageState extends State<AdminPaymentDetailsPage> {
                               title: Text('${h.decisionLabel} — ${h.actorName}'),
                               subtitle: Text(
                                 [
-                                  _date(h.at),
+                                  adminPaymentLedgerDate(h.at),
                                   if (h.receiptAmount != null)
                                     'المستلم ${academyMoneyLabel(h.receiptAmount!)}',
                                   if (h.remainingAmount != null &&

@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/di/injection_container.dart';
@@ -15,10 +13,7 @@ import 'directory_navigation.dart';
 import 'directory_pickers.dart';
 
 AcademyDirectoryRepository defaultDirectoryRepository() =>
-    FirestoreAcademyDirectoryRepository(
-      firestore: sl<FirebaseFirestore>(),
-      functions: sl<FirebaseFunctions>(),
-    );
+    sl<AcademyDirectoryRepository>();
 
 /// Admin-only academy directory: every person and halaqa, searchable by name
 /// or academy code, filtered by role, status, halaqa and relationship, and

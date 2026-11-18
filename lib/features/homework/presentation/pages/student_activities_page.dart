@@ -62,7 +62,11 @@ class _StudentActivitiesPageState extends State<StudentActivitiesPage> {
     try {
       final auth = context.read<AuthBloc>().state;
       if (auth is AuthAuthenticated) return auth.user.uid;
-    } catch (_) {}
+    } catch (e) {
+      // Hosts/tests without AuthBloc throw ProviderNotFoundException.
+      if (e.runtimeType.toString() != 'ProviderNotFoundException') rethrow;
+      return '';
+    }
     return '';
   }
 
@@ -304,7 +308,11 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
     try {
       final auth = context.read<AuthBloc>().state;
       if (auth is AuthAuthenticated) return auth.user.uid;
-    } catch (_) {}
+    } catch (e) {
+      // Hosts/tests without AuthBloc throw ProviderNotFoundException.
+      if (e.runtimeType.toString() != 'ProviderNotFoundException') rethrow;
+      return '';
+    }
     return '';
   }
 
@@ -314,7 +322,10 @@ class _StudentActivityDetailPageState extends State<StudentActivityDetailPage> {
       if (auth is AuthAuthenticated && auth.user.name.trim().isNotEmpty) {
         return auth.user.name.trim();
       }
-    } catch (_) {}
+    } catch (e) {
+      // Hosts/tests without AuthBloc throw ProviderNotFoundException.
+      if (e.runtimeType.toString() != 'ProviderNotFoundException') rethrow;
+    }
     return 'طالب';
   }
 

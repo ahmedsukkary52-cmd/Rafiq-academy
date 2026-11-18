@@ -2,14 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/router/app_routes.dart';
-import '../../../../shared/data/models/halaqa_model.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
 import '../../../../shared/domain/halaqa_roster.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
+import '../../data/admin_halaqa_document_loader.dart';
 import '../../domain/entities/admin_directory_entity.dart';
 import '../admin_format.dart';
 import '../widgets/admin_subpage_scaffold.dart';
@@ -27,17 +26,10 @@ typedef AdminHalaqaDetailsLoader =
     Future<AdminHalaqaDetails> Function(String halaqaId);
 
 Future<AdminHalaqaDetails> loadAdminHalaqaDetails(String halaqaId) async {
-  final DocumentSnapshot doc;
-  try {
-    doc = await FirebaseFirestore.instance
-        .collection(FirestoreCollections.halaqat)
-        .doc(halaqaId)
-        .get();
-  } on FirebaseException {
-    throw 'تعذر تحميل بيانات الحلقة';
-  }
-  if (!doc.exists) throw 'الحلقة غير موجودة';
-  final halaqa = HalaqaModel.fromFirestore(doc);
+  final halaqa = await loadAdminHalaqaDocument(
+    firestore: sl<FirebaseFirestore>(),
+    halaqaId: halaqaId,
+  );
   final roster = await sl<GetHalaqaStudentsUseCase>()(
     HalaqaStudentsParams(halaqaId),
   );

@@ -16,36 +16,18 @@ import '../../../auth/presentation/pages/first_login_page.dart'
     show firstLoginPasswordProblem;
 import '../widgets/admin_figma_widgets.dart';
 import 'admin_academy_import_page.dart';
+import '../../data/admin_change_own_password.dart';
 
 typedef PasswordChanger =
     Future<void> Function(String currentPassword, String newPassword);
 
 /// Re-authenticates with the current password, then sets the new one.
-Future<void> changeOwnPassword(String currentPassword, String newPassword) async {
-  final user = sl<FirebaseAuth>().currentUser;
-  final email = user?.email;
-  if (user == null || email == null || email.isEmpty) {
-    throw const ServerException('سجّل الدخول من جديد ثم أعد المحاولة');
-  }
-  try {
-    await user.reauthenticateWithCredential(
-      EmailAuthProvider.credential(email: email, password: currentPassword),
+Future<void> changeOwnPassword(String currentPassword, String newPassword) =>
+    changeOwnPasswordWithAuth(
+      auth: sl<FirebaseAuth>(),
+      currentPassword: currentPassword,
+      newPassword: newPassword,
     );
-    await user.updatePassword(newPassword);
-  } on FirebaseAuthException catch (e) {
-    throw ServerException(switch (e.code) {
-      'wrong-password' ||
-      'invalid-credential' ||
-      'invalid-login-credentials' => 'كلمة المرور الحالية غير صحيحة',
-      'too-many-requests' => 'محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة',
-      'weak-password' => 'كلمة المرور الجديدة ضعيفة',
-      'network-request-failed' => 'تعذر الاتصال. تحقق من الإنترنت',
-      'requires-recent-login' || 'user-mismatch' || 'user-not-found' =>
-        'سجّل الدخول من جديد ثم أعد المحاولة',
-      _ => 'تعذر تغيير كلمة المرور، حاول مرة أخرى',
-    });
-  }
-}
 
 /// How the signed-in account logs in: the academy username for internal
 /// addresses, otherwise the email itself.

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/error/exception.dart';
 import '../../../shared/domain/arabic_search_normalizer.dart';
 import '../domain/onboarding_models.dart';
@@ -37,6 +38,7 @@ class AcademyAccountsRepository {
       OnboardingResult.fromMap(
         await _call('adminOnboardStudent', request.toPayload()),
       );
+
 
   Future<IssuedCredential> resetMemberPassword({
     required String userId,
@@ -77,5 +79,31 @@ class AcademyAccountsRepository {
         if (d.data()['isActive'] != false)
           MemberSearchHit(uid: d.id, name: '${d.data()['name'] ?? ''}'),
     ];
+  }
+
+  /// Parents linked to [studentId] via `parentProfiles.childrenIds`.
+  ///
+  /// Caps at [limit] (product UI shows a few reset targets). Does **not**
+  /// filter `users.isActive` — matches the historical access-card query.
+  Future<List<MemberSearchHit>> listLinkedParentsForStudent(
+    String studentId, {
+    int limit = 3,
+  }) async {
+    final links = await firestore
+        .collection(FirestoreCollections.parentProfiles)
+        .where('childrenIds', arrayContains: studentId)
+        .limit(limit)
+        .get();
+    final hits = <MemberSearchHit>[];
+    for (final link in links.docs) {
+      final user = await firestore
+          .collection(FirestoreCollections.users)
+          .doc(link.id)
+          .get();
+      hits.add(
+        MemberSearchHit(uid: link.id, name: '${user.data()?['name'] ?? ''}'),
+      );
+    }
+    return hits;
   }
 }

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -33,7 +32,10 @@ class _TeacherCoverBannerState extends State<TeacherCoverBanner> {
   Future<void> _load() async {
     final s = context.read<AuthBloc>().state;
     if (s is! AuthAuthenticated) return;
-    if (widget.repository == null && !sl.isRegistered<FirebaseFirestore>()) return;
+    if (widget.repository == null &&
+        !sl.isRegistered<CoverDutyRepository>()) {
+      return;
+    }
     try {
       final repo = widget.repository ?? defaultCoverDutyRepository();
       final list = await repo.myHalaqat(s.user.uid, assistant: false);

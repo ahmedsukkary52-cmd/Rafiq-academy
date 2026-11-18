@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -11,12 +9,8 @@ import 'complaint_widgets.dart';
 import 'pages/complaint_details_page.dart';
 import 'pages/complaints_list_page.dart';
 
-/// Built on demand from the existing Firebase registrations (no generated
-/// DI entry for the repository).
-ComplaintsRepository defaultComplaintsRepository() => ComplaintsRepository(
-  firestore: sl<FirebaseFirestore>(),
-  functions: sl<FirebaseFunctions>(),
-);
+/// Composition-root default: GetIt-registered complaints repository.
+ComplaintsRepository defaultComplaintsRepository() => sl<ComplaintsRepository>();
 
 ComplaintViewer? complaintViewerOf(BuildContext context) {
   final auth = context.read<AuthBloc>().state;

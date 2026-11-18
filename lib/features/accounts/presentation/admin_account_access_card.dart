@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/di/injection_container.dart';
@@ -50,29 +48,16 @@ class _AdminAccountAccessCardState extends State<AdminAccountAccessCard> {
 
   Future<void> _loadParents() async {
     try {
-      final load = widget.loadParents ?? _defaultParents;
+      final load =
+          widget.loadParents ??
+          (id) => sl<AcademyAccountsRepository>().listLinkedParentsForStudent(
+            id,
+          );
       final parents = await load(widget.studentId);
       if (mounted) setState(() => _parents = parents);
     } catch (_) {
       // The student's own reset stays available.
     }
-  }
-
-  static Future<List<MemberSearchHit>> _defaultParents(String studentId) async {
-    final db = sl<FirebaseFirestore>();
-    final links = await db
-        .collection('parentProfiles')
-        .where('childrenIds', arrayContains: studentId)
-        .limit(3)
-        .get();
-    final hits = <MemberSearchHit>[];
-    for (final link in links.docs) {
-      final user = await db.collection('users').doc(link.id).get();
-      hits.add(
-        MemberSearchHit(uid: link.id, name: '${user.data()?['name'] ?? ''}'),
-      );
-    }
-    return hits;
   }
 
   Future<void> _reset(String userId, String name, String role) async {
@@ -100,11 +85,7 @@ class _AdminAccountAccessCardState extends State<AdminAccountAccessCard> {
     setState(() => _busyFor = userId);
     try {
       final reset =
-          widget.reset ??
-          AcademyAccountsRepository(
-            functions: sl<FirebaseFunctions>(),
-            firestore: sl<FirebaseFirestore>(),
-          ).resetMemberPassword;
+          widget.reset ?? sl<AcademyAccountsRepository>().resetMemberPassword;
       final issued = await reset(userId: userId, name: name, role: role);
       if (mounted) setState(() => _issued = issued);
     } on ServerException catch (e) {

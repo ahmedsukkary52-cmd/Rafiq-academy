@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -58,10 +56,9 @@ enum _ParentMode { existing, create }
 class _AdminOnboardStudentPageState extends State<AdminOnboardStudentPage> {
   static const _stepTitles = ['ولي الأمر', 'الطالب', 'الحلقة', 'المراجعة'];
 
-  late final AcademyAccountsRepository _repo = AcademyAccountsRepository(
-    functions: sl<FirebaseFunctions>(),
-    firestore: sl<FirebaseFirestore>(),
-  );
+  /// Lazily resolved so widget tests that inject [submit]/[searchParents]
+  /// never touch GetIt.
+  AcademyAccountsRepository get _repo => sl<AcademyAccountsRepository>();
 
   int _step = 0;
   String _requestId = newOnboardingRequestId();

@@ -47,7 +47,7 @@ const ROSTER = [
   { kind: "halaqa", ref: "H002", name: "حَلقة-الفجر", teacherRef: "T001", schedule: monday },
   { kind: "student", ref: "ST001", name: "يوسف محمد", parentRef: "P001", halaqaRef: "H001" },
   { kind: "student", ref: "ST002", name: "عمر خالد", parentRef: "P002", halaqaRef: "H002" },
-  { kind: "student", ref: "ST003", name: "زيد", parentRef: "P404" },
+  { kind: "student", ref: "ST003", name: "زيد", parentRef: "P404", halaqaRef: "H001" },
 ];
 
 async function clearAll() {
@@ -120,6 +120,11 @@ test("journey 15: import a sample roster, report every row, retry without duplic
     importer.adminImportAcademyRowCore(deps, ADMIN, { importId: IMPORT_ID, row: { kind: "teacher", ref: "uid/../x", name: "س س" } }),
     (e) => e.code === "invalid-argument",
   );
+  await assert.rejects(
+    importer.adminImportAcademyRowCore(deps, ADMIN, { importId: IMPORT_ID, row: { kind: "student", ref: "ST-NO-HALAQA", name: "طالب بلا حلقة", parentRef: "P001" } }),
+    (e) => e.code === "invalid-argument",
+  );
+  assert.equal((await db.doc("importRows/ST-NO-HALAQA").get()).exists, false);
 
   const first = await run(ROSTER);
   for (const ref of ["T001", "S001", "P001", "P002", "H001", "ST001"]) {
@@ -148,6 +153,9 @@ test("journey 15: import a sample roster, report every row, retry without duplic
   const st1 = (await ledger("ST001")).id;
   assert.deepEqual(h1.get("studentIds"), [st1]);
   assert.deepEqual((await db.doc(`parentProfiles/${(await ledger("P001")).id}`).get()).get("childrenIds"), [st1]);
+  const teacherId = (await ledger("T001")).id;
+  assert.equal((await db.doc(`users/${teacherId}`).get()).get("isActive"), true);
+  assert.deepEqual((await db.doc(`teacherProfiles/${teacherId}`).get()).get("halaqatIds"), [h1.id]);
 
   const afterFirst = await counts();
   assert.deepEqual(

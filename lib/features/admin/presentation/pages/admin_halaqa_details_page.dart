@@ -191,7 +191,7 @@ class _AdminHalaqaDetailsPageState extends State<AdminHalaqaDetailsPage> {
                       style: AppTextStyles.bodyLarge,
                     ),
                   ),
-                  const Icon(Icons.chevron_left, color: AppColors.textHint),
+                  const Icon(Icons.chevron_right, color: AppColors.textHint),
                 ],
               ),
             ),

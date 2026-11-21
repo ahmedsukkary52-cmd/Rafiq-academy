@@ -513,3 +513,82 @@ test('users list: deactivated callers cannot list admin contacts or rosters', as
   );
   await assertFails(authed('teacher1').collection('users').get());
 });
+
+// ── D4 deactivation boundary gaps ─────────────────────────────────────────
+
+test('D4 studentSearch: deactivated staff in visibleTo cannot read projections', async () => {
+  await assertSucceeds(authed('teacher1').doc('studentSearch/student1').get());
+  await setActive('teacher1', false);
+  await assertFails(authed('teacher1').doc('studentSearch/student1').get());
+});
+
+test('D4 notifications: deactivated accounts lose audience read and readBy writes', async () => {
+  await seedAll({
+    'notifications/all_broadcast': {
+      audience: 'all',
+      title: 't',
+      body: 'b',
+      readBy: [],
+      senderId: 'admin1',
+    },
+    'notifications/teacher_role': {
+      audience: 'teacher',
+      title: 't',
+      body: 'b',
+      readBy: [],
+      senderId: 'admin1',
+    },
+  });
+  await assertSucceeds(authed('teacher1').doc('notifications/all_broadcast').get());
+  await assertSucceeds(authed('teacher1').doc('notifications/teacher_role').get());
+  await assertSucceeds(
+    authed('teacher1').doc('notifications/all_broadcast').update({ readBy: ['teacher1'] }),
+  );
+
+  await setActive('teacher1', false);
+  await assertFails(authed('teacher1').doc('notifications/all_broadcast').get());
+  await assertFails(authed('teacher1').doc('notifications/teacher_role').get());
+  await assertFails(
+    authed('teacher1').doc('notifications/all_broadcast').update({ readBy: ['teacher1'] }),
+  );
+});
+
+test('D4 users: deactivated self-update and pendingHalaqaAssignment forge denied', async () => {
+  await assertSucceeds(authed('teacher1').doc('users/teacher1').update({ name: 'معلم محدّث' }));
+  await assertFails(
+    authed('teacher1').doc('users/teacher1').update({ pendingHalaqaAssignment: true }),
+  );
+
+  await setActive('teacher1', false);
+  await assertFails(authed('teacher1').doc('users/teacher1').update({ name: 'بعد الإيقاف' }));
+});
+
+test('D4 parent payments and teacherProfiles: deactivated self mutations denied', async () => {
+  await seedAll({
+    'payments/pay1': {
+      parentId: 'parent1',
+      studentId: 'student1',
+      status: 'pending',
+      amount: 100,
+    },
+    'teacherProfiles/teacher1': {
+      weeklyQuota: 5,
+      performanceRating: 4,
+      halaqatIds: ['h1'],
+    },
+  });
+  await assertSucceeds(authed('parent1').doc('payments/pay1').get());
+  await assertSucceeds(
+    authed('teacher1').doc('teacherProfiles/teacher1').update({ notes: 'ok' }),
+  );
+
+  await setActive('parent1', false);
+  await setActive('teacher1', false);
+  await assertFails(authed('parent1').doc('payments/pay1').get());
+  await assertFails(
+    authed('teacher1').doc('teacherProfiles/teacher1').update({ notes: 'blocked' }),
+  );
+  await assertFails(
+    authed('parent1').doc('parentProfiles/parent1').update({ displayName: 'x' }),
+  );
+});

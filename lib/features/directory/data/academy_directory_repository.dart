@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/error/exception.dart';
+import '../../../core/error/user_facing_error.dart';
 import '../../../shared/domain/arabic_search_normalizer.dart';
 import '../../../shared/utils/firestore_in_query.dart';
 import '../../accounts/domain/onboarding_models.dart';
@@ -50,9 +51,15 @@ abstract class AcademyDirectoryRepository {
     required String name,
   });
 
-  Future<void> linkParent({required String parentId, required String studentId});
+  Future<void> linkParent({
+    required String parentId,
+    required String studentId,
+  });
 
-  Future<void> unlinkParent({required String parentId, required String studentId});
+  Future<void> unlinkParent({
+    required String parentId,
+    required String studentId,
+  });
 
   Future<void> replaceParent({
     required String studentId,
@@ -60,7 +67,10 @@ abstract class AcademyDirectoryRepository {
     required String toParentId,
   });
 
-  Future<void> admitStudent({required String halaqaId, required String studentId});
+  Future<void> admitStudent({
+    required String halaqaId,
+    required String studentId,
+  });
 
   Future<void> transferStudent({
     required String studentId,
@@ -90,7 +100,8 @@ abstract class AcademyDirectoryRepository {
   Future<void> endCover({required String halaqaId});
 }
 
-class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository {
+class FirestoreAcademyDirectoryRepository
+    implements AcademyDirectoryRepository {
   FirestoreAcademyDirectoryRepository({
     required this.firestore,
     required this.functions,
@@ -114,7 +125,9 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
   Future<Map<String, DirectoryPerson>> _peopleById(Iterable<String> ids) async {
     final out = <String, DirectoryPerson>{};
     for (final chunk in FirestoreInQuery.chunkIds(ids)) {
-      final snap = await _users.where(FieldPath.documentId, whereIn: chunk).get();
+      final snap = await _users
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
       for (final d in snap.docs) {
         out[d.id] = DirectoryPerson.fromUser(d.id, d.data());
       }
@@ -125,7 +138,9 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
   Future<Map<String, String>> _halaqaNames(Iterable<String> ids) async {
     final out = <String, String>{};
     for (final chunk in FirestoreInQuery.chunkIds(ids)) {
-      final snap = await _halaqat.where(FieldPath.documentId, whereIn: chunk).get();
+      final snap = await _halaqat
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
       for (final d in snap.docs) {
         out[d.id] = '${d.data()['name'] ?? ''}'.trim();
       }
@@ -135,7 +150,8 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
 
   static String _str(Object? v) => v is String ? v.trim() : '';
   static List<String> _ids(Object? v) => [
-    for (final x in (v is List ? v : const [])) if (x is String && x.trim().isNotEmpty) x.trim(),
+    for (final x in (v is List ? v : const []))
+      if (x is String && x.trim().isNotEmpty) x.trim(),
   ];
   static bool _coverActive(Map<String, dynamic> d) =>
       _str(d['coverId']).isNotEmpty && _str(d['coverTeacherId']).isNotEmpty;
@@ -164,16 +180,18 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
     if (_coverActive(d)) _str(d['coverTeacherId']),
   }..remove('');
 
-  HalaqaStaff _staffOf(Map<String, dynamic> d, Map<String, DirectoryPerson> people) =>
-      HalaqaStaff(
-        teacher: people[_str(d['teacherId'])],
-        supervisor: people[_str(d['supervisorId'])],
-        assistants: [
-          for (final id in _ids(d['assistantTeacherIds']))
-            if (people[id] != null) people[id]!,
-        ],
-        cover: _coverActive(d) ? people[_str(d['coverTeacherId'])] : null,
-      );
+  HalaqaStaff _staffOf(
+    Map<String, dynamic> d,
+    Map<String, DirectoryPerson> people,
+  ) => HalaqaStaff(
+    teacher: people[_str(d['teacherId'])],
+    supervisor: people[_str(d['supervisorId'])],
+    assistants: [
+      for (final id in _ids(d['assistantTeacherIds']))
+        if (people[id] != null) people[id]!,
+    ],
+    cover: _coverActive(d) ? people[_str(d['coverTeacherId'])] : null,
+  );
 
   @override
   Future<DirectoryPage<DirectoryPerson>> browsePeople({
@@ -193,7 +211,10 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
         final slice = ids.skip(start).take(size).toList();
         final people = await _peopleById(slice);
         return DirectoryPage(
-          items: [for (final id in slice) if (people[id] != null) people[id]!],
+          items: [
+            for (final id in slice)
+              if (people[id] != null) people[id]!,
+          ],
           cursor: start + slice.length,
           hasMore: start + slice.length < ids.length,
         );
@@ -224,15 +245,23 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
         );
       }
 
-      Query<Map<String, dynamic>> q = _users.where('role', isEqualTo: role.wire);
+      Query<Map<String, dynamic>> q = _users.where(
+        'role',
+        isEqualTo: role.wire,
+      );
       if (status != DirectoryStatusFilter.all) {
-        q = q.where('isActive', isEqualTo: status == DirectoryStatusFilter.active);
+        q = q.where(
+          'isActive',
+          isEqualTo: status == DirectoryStatusFilter.active,
+        );
       }
       q = q.orderBy('name').limit(size);
       if (cursor is DocumentSnapshot) q = q.startAfterDocument(cursor);
       final snap = await q.get();
       return DirectoryPage(
-        items: [for (final d in snap.docs) DirectoryPerson.fromUser(d.id, d.data())],
+        items: [
+          for (final d in snap.docs) DirectoryPerson.fromUser(d.id, d.data()),
+        ],
         cursor: snap.docs.isEmpty ? null : snap.docs.last,
         hasMore: snap.docs.length == size,
       );
@@ -255,7 +284,9 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
             .where('academyRef', whereIn: {ref, raw.toUpperCase()}.toList())
             .limit(10)
             .get();
-        return [for (final d in snap.docs) DirectoryPerson.fromUser(d.id, d.data())];
+        return [
+          for (final d in snap.docs) DirectoryPerson.fromUser(d.id, d.data()),
+        ];
       }
       final normalized = ArabicSearchNormalizer.normalize(raw);
       if (normalized.length < 2) return const [];
@@ -269,7 +300,12 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
             .limit(_searchLimit)
             .get(),
         // Accounts created before `nameNormalized` existed carry `name` only.
-        base.orderBy('name').startAt([raw]).endAt(['$raw\uf8ff']).limit(_searchLimit).get(),
+        base
+            .orderBy('name')
+            .startAt([raw])
+            .endAt(['$raw\uf8ff'])
+            .limit(_searchLimit)
+            .get(),
       ]);
       final seen = <String>{};
       return [
@@ -302,7 +338,10 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
       if (cursor is DocumentSnapshot) q = q.startAfterDocument(cursor);
       final snap = await q.get();
       final people = await _peopleById({
-        for (final d in snap.docs) ...[_str(d.data()['teacherId']), _str(d.data()['supervisorId'])],
+        for (final d in snap.docs) ...[
+          _str(d.data()['teacherId']),
+          _str(d.data()['supervisorId']),
+        ],
       });
       return DirectoryPage(
         items: [for (final d in snap.docs) _halaqaOf(d.id, d.data(), people)],
@@ -321,10 +360,21 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
     try {
       final ref = normalizeAcademyRef(raw);
       final snap = ref != null
-          ? await _halaqat.where('academyRef', whereIn: {ref, raw.toUpperCase()}.toList()).limit(10).get()
-          : await _halaqat.orderBy('name').startAt([raw]).endAt(['$raw\uf8ff']).limit(_searchLimit).get();
+          ? await _halaqat
+                .where('academyRef', whereIn: {ref, raw.toUpperCase()}.toList())
+                .limit(10)
+                .get()
+          : await _halaqat
+                .orderBy('name')
+                .startAt([raw])
+                .endAt(['$raw\uf8ff'])
+                .limit(_searchLimit)
+                .get();
       final people = await _peopleById({
-        for (final d in snap.docs) ...[_str(d.data()['teacherId']), _str(d.data()['supervisorId'])],
+        for (final d in snap.docs) ...[
+          _str(d.data()['teacherId']),
+          _str(d.data()['supervisorId']),
+        ],
       });
       return [for (final d in snap.docs) _halaqaOf(d.id, d.data(), people)];
     } catch (_) {
@@ -339,13 +389,18 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
   Future<List<StructureCount>> structureOverview() async {
     try {
       final roleCounts = await Future.wait([
-        for (final r in DirectoryRole.values) _count(_users.where('role', isEqualTo: r.wire)),
+        for (final r in DirectoryRole.values)
+          _count(_users.where('role', isEqualTo: r.wire)),
       ]);
       final other = await Future.wait([
         _count(_halaqat),
         _count(_halaqat.where('supervisorId', isEqualTo: '')),
         _count(_halaqat.where('coverId', isNotEqualTo: '')),
-        _count(firestore.collection(FirestoreCollections.studentProfiles).where('halaqaId', isNull: true)),
+        _count(
+          firestore
+              .collection(FirestoreCollections.studentProfiles)
+              .where('halaqaId', isNull: true),
+        ),
         _count(
           firestore
               .collection(FirestoreCollections.parentProfiles)
@@ -360,7 +415,11 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
             count: roleCounts[i],
             role: DirectoryRole.values[i],
           ),
-        StructureCount(label: 'الحلقات', count: other[0], halaqaFilter: HalaqaListFilter.all),
+        StructureCount(
+          label: 'الحلقات',
+          count: other[0],
+          halaqaFilter: HalaqaListFilter.all,
+        ),
         StructureCount(
           label: 'حلقات بلا مشرف',
           count: other[1],
@@ -383,7 +442,11 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
           role: DirectoryRole.parent,
           relation: DirectoryRelationFilter.parentsWithoutChildren,
         ),
-        StructureCount(label: 'حسابات غير نشطة', count: other[5], status: DirectoryStatusFilter.inactive),
+        StructureCount(
+          label: 'حسابات غير نشطة',
+          count: other[5],
+          status: DirectoryStatusFilter.inactive,
+        ),
       ];
     } catch (_) {
       throw const ServerException('تعذر تحميل ملخص الأكاديمية');
@@ -419,28 +482,39 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
           operation: _str(d.data()['operation']),
           at: _date(d.data()['at']),
           actorName: person(_str(d.data()['actorId'])),
-          description: describeRelationshipEntry(d.data(), person: person, halaqa: halaqa),
+          description: describeRelationshipEntry(
+            d.data(),
+            person: person,
+            halaqa: halaqa,
+          ),
         ),
     ];
   }
 
   /// Halaqat where [uid] holds [role], with their staff resolved.
-  Future<List<({String id, Map<String, dynamic> data, HalaqaRole role})>> _halaqatOf(
-    String uid,
-    String personRole,
-  ) async {
+  Future<List<({String id, Map<String, dynamic> data, HalaqaRole role})>>
+  _halaqatOf(String uid, String personRole) async {
     final queries = <(Query<Map<String, dynamic>>, HalaqaRole)>[
       if (personRole == AppRoles.student)
         (_halaqat.where('studentIds', arrayContains: uid), HalaqaRole.student),
       if (personRole == AppRoles.teacher)
-        (_halaqat.where('teacherId', isEqualTo: uid), HalaqaRole.primaryTeacher),
+        (
+          _halaqat.where('teacherId', isEqualTo: uid),
+          HalaqaRole.primaryTeacher,
+        ),
       if (personRole == AppRoles.supervisor)
         (_halaqat.where('supervisorId', isEqualTo: uid), HalaqaRole.supervisor),
       if (personRole == AppRoles.assistantTeacher)
-        (_halaqat.where('assistantTeacherIds', arrayContains: uid), HalaqaRole.assistant),
-      if (personRole == AppRoles.teacher || personRole == AppRoles.assistantTeacher)
         (
-          _halaqat.where('coverTeacherId', isEqualTo: uid).where('coverId', isNotEqualTo: ''),
+          _halaqat.where('assistantTeacherIds', arrayContains: uid),
+          HalaqaRole.assistant,
+        ),
+      if (personRole == AppRoles.teacher ||
+          personRole == AppRoles.assistantTeacher)
+        (
+          _halaqat
+              .where('coverTeacherId', isEqualTo: uid)
+              .where('coverId', isNotEqualTo: ''),
           HalaqaRole.cover,
         ),
     ];
@@ -449,7 +523,8 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
     ]);
     return [
       for (var i = 0; i < queries.length; i++)
-        for (final d in snaps[i].docs) (id: d.id, data: d.data(), role: queries[i].$2),
+        for (final d in snaps[i].docs)
+          (id: d.id, data: d.data(), role: queries[i].$2),
     ];
   }
 
@@ -491,10 +566,16 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
       }
 
       // Children's halaqat (parent profile).
-      final childHalaqat = <String, List<({String id, Map<String, dynamic> data})>>{};
+      final childHalaqat =
+          <String, List<({String id, Map<String, dynamic> data})>>{};
       for (final childId in childIds) {
-        final snap = await _halaqat.where('studentIds', arrayContains: childId).limit(5).get();
-        childHalaqat[childId] = [for (final d in snap.docs) (id: d.id, data: d.data())];
+        final snap = await _halaqat
+            .where('studentIds', arrayContains: childId)
+            .limit(5)
+            .get();
+        childHalaqat[childId] = [
+          for (final d in snap.docs) (id: d.id, data: d.data()),
+        ];
       }
 
       // Students reached through staff halaqat.
@@ -521,14 +602,18 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
       if (role == AppRoles.student || role == AppRoles.parent) {
         final snap = await firestore
             .collection(FirestoreCollections.payments)
-            .where(role == AppRoles.student ? 'studentId' : 'parentId', isEqualTo: uid)
+            .where(
+              role == AppRoles.student ? 'studentId' : 'parentId',
+              isEqualTo: uid,
+            )
             .orderBy('dueDate', descending: true)
             .limit(6)
             .get();
         payments = [
           for (final d in snap.docs)
             PaymentSummary(
-              studentName: people[_str(d.data()['studentId'])]?.name ?? person.name,
+              studentName:
+                  people[_str(d.data()['studentId'])]?.name ?? person.name,
               amount: d.data()['amount'] is num ? d.data()['amount'] as num : 0,
               status: _str(d.data()['status']),
               dueDate: _date(d.data()['dueDate']),
@@ -539,7 +624,10 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
       final supervisorStaff = <DirectoryPerson>[
         if (role == AppRoles.supervisor)
           for (final id in {
-            for (final h in halaqat) ...[_str(h.data['teacherId']), ..._ids(h.data['assistantTeacherIds'])],
+            for (final h in halaqat) ...[
+              _str(h.data['teacherId']),
+              ..._ids(h.data['assistantTeacherIds']),
+            ],
           })
             if (people[id] != null) people[id]!,
       ];
@@ -554,8 +642,14 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
               staff: _staffOf(h.data, people),
             ),
         ],
-        parents: [for (final id in parentIds) if (people[id] != null) people[id]!],
-        siblings: [for (final id in siblingIds) if (people[id] != null) people[id]!],
+        parents: [
+          for (final id in parentIds)
+            if (people[id] != null) people[id]!,
+        ],
+        siblings: [
+          for (final id in siblingIds)
+            if (people[id] != null) people[id]!,
+        ],
         children: [
           for (final id in childIds)
             if (people[id] != null)
@@ -571,8 +665,10 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
                 ],
               ),
         ],
-        students: [for (final id in shownStudents) if (people[id] != null) people[id]!]
-          ..sort((a, b) => a.name.compareTo(b.name)),
+        students: [
+          for (final id in shownStudents)
+            if (people[id] != null) people[id]!,
+        ]..sort((a, b) => a.name.compareTo(b.name)),
         studentsTruncated: studentIds.length > shownStudents.length,
         staff: supervisorStaff,
         payments: payments,
@@ -623,7 +719,9 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
       });
       final schedule = [
         for (final s in (d['schedule'] as List? ?? const []))
-          if (s is Map) '${s['day'] ?? ''} ${s['startTime'] ?? ''}–${s['endTime'] ?? ''}'.trim(),
+          if (s is Map)
+            '${s['day'] ?? ''} ${s['startTime'] ?? ''}–${s['endTime'] ?? ''}'
+                .trim(),
       ];
       return HalaqaProfile(
         halaqa: _halaqaOf(doc.id, d, people),
@@ -663,7 +761,10 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
 
   // ── callables ───────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> _call(String name, Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _call(
+    String name,
+    Map<String, dynamic> payload,
+  ) async {
     try {
       final result = await functions.httpsCallable(name).call<dynamic>(payload);
       final data = result.data;
@@ -676,17 +777,20 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
             : 'تعذر إتمام العملية، حاول مرة أخرى',
       );
     } catch (_) {
-      throw const ServerException('تعذر الاتصال بالخادم، أعد المحاولة');
+      throw const ServerException(connectionErrorText);
     }
   }
 
   @override
-  Future<MemberAccount> loadAccount(String uid) async =>
-      MemberAccount.fromMap(await _call('adminGetMemberAccount', {'userId': uid}));
+  Future<MemberAccount> loadAccount(String uid) async => MemberAccount.fromMap(
+    await _call('adminGetMemberAccount', {'userId': uid}),
+  );
 
   @override
   Future<IssuedCredential> resetPassword(DirectoryPerson person) async {
-    final data = await _call('adminResetMemberPassword', {'userId': person.uid});
+    final data = await _call('adminResetMemberPassword', {
+      'userId': person.uid,
+    });
     return IssuedCredential(
       role: person.role,
       uid: person.uid,
@@ -702,24 +806,31 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
     required DirectoryRole role,
     required String name,
   }) async => IssuedCredential.fromMap(
-    await _call('adminCreateMemberAccount', {'role': role.wire, 'name': name.trim()}),
+    await _call('adminCreateMemberAccount', {
+      'role': role.wire,
+      'name': name.trim(),
+    }),
   );
 
   @override
-  Future<void> linkParent({required String parentId, required String studentId}) =>
-      _call('adminLinkParentChild', {
-        'parentId': parentId,
-        'studentId': studentId,
-        'operation': 'link',
-      });
+  Future<void> linkParent({
+    required String parentId,
+    required String studentId,
+  }) => _call('adminLinkParentChild', {
+    'parentId': parentId,
+    'studentId': studentId,
+    'operation': 'link',
+  });
 
   @override
-  Future<void> unlinkParent({required String parentId, required String studentId}) =>
-      _call('adminLinkParentChild', {
-        'parentId': parentId,
-        'studentId': studentId,
-        'operation': 'unlink',
-      });
+  Future<void> unlinkParent({
+    required String parentId,
+    required String studentId,
+  }) => _call('adminLinkParentChild', {
+    'parentId': parentId,
+    'studentId': studentId,
+    'operation': 'unlink',
+  });
 
   @override
   Future<void> replaceParent({
@@ -733,8 +844,13 @@ class FirestoreAcademyDirectoryRepository implements AcademyDirectoryRepository 
   });
 
   @override
-  Future<void> admitStudent({required String halaqaId, required String studentId}) =>
-      _call('admitStudentToHalaqa', {'halaqaId': halaqaId, 'studentId': studentId});
+  Future<void> admitStudent({
+    required String halaqaId,
+    required String studentId,
+  }) => _call('admitStudentToHalaqa', {
+    'halaqaId': halaqaId,
+    'studentId': studentId,
+  });
 
   @override
   Future<void> transferStudent({

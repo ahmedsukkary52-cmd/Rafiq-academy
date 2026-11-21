@@ -108,10 +108,11 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                         decoration: BoxDecoration(
                           gradient: AppColors.primaryGradient,
                         ),
-                        child: SizedBox(height: 340),
+                        child: SizedBox(height: 200),
                       ),
                     ),
                     Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         AdminRoleHomeHeader(
                           displayName: displayName,
@@ -123,46 +124,12 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                           onNotificationsTap: () =>
                               context.push(AppRoutes.adminNotifications),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: loading && stats == null
-                              ? const AdminHeroCardSkeleton()
-                              : AdminGradientHeroCard(
-                                  key: Key('admin-health-${health.level.name}'),
-                                  eyebrow: health.detail,
-                                  headline: health.headline,
-                                  statusIcon: health.icon,
-                                  centered: true,
-                                  metrics: [
-                                    AdminHeroMetric(
-                                      value: loading
-                                          ? '…'
-                                          : fmt(stats?.totalHalaqat),
-                                      label: 'حلقة نشطة',
-                                    ),
-                                    AdminHeroMetric(
-                                      value: loading
-                                          ? '…'
-                                          : fmt(stats?.totalTeachers),
-                                      label: 'معلم',
-                                    ),
-                                    AdminHeroMetric(
-                                      value: loading
-                                          ? '…'
-                                          : fmt(finance?.totalRevenue.round()),
-                                      label: '$academyCurrencyLabel محصّل',
-                                    ),
-                                  ],
-                                ),
-                        ),
                         Container(
                           width: double.infinity,
-                          margin: const EdgeInsets.only(top: 20),
                           decoration: const BoxDecoration(
                             color: AppColors.background,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(AppSizes.radiusXL),
-                              topRight: Radius.circular(AppSizes.radiusXL),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(AppSizes.radiusXL),
                             ),
                           ),
                           child: Padding(
@@ -170,6 +137,42 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (loading && stats == null)
+                                  const AdminHeroCardSkeleton()
+                                else
+                                  AdminGradientHeroCard(
+                                    key: Key(
+                                      'admin-health-${health.level.name}',
+                                    ),
+                                    eyebrow: health.detail,
+                                    headline: health.headline,
+                                    statusIcon: health.icon,
+                                    centered: true,
+                                    metrics: [
+                                      AdminHeroMetric(
+                                        value: loading
+                                            ? '…'
+                                            : fmt(stats?.totalHalaqat),
+                                        label: 'حلقة نشطة',
+                                      ),
+                                      AdminHeroMetric(
+                                        value: loading
+                                            ? '…'
+                                            : fmt(stats?.totalTeachers),
+                                        label: 'معلم',
+                                      ),
+                                      AdminHeroMetric(
+                                        value: loading
+                                            ? '…'
+                                            : fmt(
+                                                finance?.totalRevenue.round(),
+                                              ),
+                                        label:
+                                            '$academyCurrencyLabel محصّل',
+                                      ),
+                                    ],
+                                  ),
+                                const SizedBox(height: 16),
                                 if (state.statsStatus == SectionStatus.error)
                                   AppErrorWidget(
                                     message:
@@ -186,9 +189,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                     shrinkWrap: true,
                                     physics:
                                         const NeverScrollableScrollPhysics(),
-                                    mainAxisSpacing: 12,
-                                    crossAxisSpacing: 12,
-                                    childAspectRatio: 1.25,
+                                    mainAxisSpacing: 10,
+                                    crossAxisSpacing: 10,
+                                    childAspectRatio: 1.35,
                                     children: [
                                       AdminStatTile(
                                         value: loading
@@ -203,12 +206,15 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                             : () => widget.onSwitchTab!(1),
                                       ),
                                       AdminStatTile(
-                                        key: const Key('admin-stat-supervisors'),
+                                        key: const Key(
+                                          'admin-stat-supervisors',
+                                        ),
                                         value: loading
                                             ? '…'
                                             : fmt(stats?.totalSupervisors),
                                         label: 'إجمالي المشرفين',
-                                        icon: Icons.supervisor_account_outlined,
+                                        icon: Icons
+                                            .supervisor_account_outlined,
                                         iconBg: AppColors.primaryLight,
                                         iconColor: AppColors.primary,
                                         onTap: () => context.push(
@@ -226,7 +232,8 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                         iconColor: AppColors.warning,
                                         badge:
                                             finance != null &&
-                                                finance.awaitingReviewCount > 0
+                                                finance.awaitingReviewCount >
+                                                    0
                                             ? '${finance.awaitingReviewCount} للمراجعة'
                                             : null,
                                         badgeColor: AppColors.info,
@@ -248,9 +255,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                       ),
                                     ],
                                   ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
                                 AdminSectionHeader(
-                                  title: 'طلبات بانتظار الموافقة',
+                                  title: 'طلبات بانتظار التعيين',
                                   actionLabel: pendingRequests.isNotEmpty
                                       ? 'عرض الكل'
                                       : null,
@@ -275,7 +282,8 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                 else if (pendingRequests.isEmpty)
                                   const _DashboardEmpty(
                                     icon: Icons.how_to_reg_outlined,
-                                    text: 'لا توجد طلبات تسجيل بانتظار التعيين',
+                                    text:
+                                        'لا توجد طلبات تسجيل بانتظار التعيين',
                                   )
                                 else
                                   ...pendingRequests
@@ -285,10 +293,13 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                           padding: const EdgeInsets.only(
                                             bottom: 10,
                                           ),
-                                          child: _registrationTile(r, context),
+                                          child: _registrationTile(
+                                            r,
+                                            context,
+                                          ),
                                         ),
                                       ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
                                 AdminSectionHeader(
                                   title: 'شكاوى مفتوحة',
                                   actionLabel: openComplaints.isNotEmpty
@@ -328,7 +339,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                           child: _complaintTile(c, context),
                                         ),
                                       ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
                                 const AdminSectionHeader(
                                   title: 'إجراءات سريعة',
                                 ),
@@ -339,6 +350,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                       child: AdminQuickActionTile(
                                         icon: Icons.group_add_outlined,
                                         label: 'حلقة جديدة',
+                                        iconColor: AppColors.primary,
                                         onTap: () => context.push(
                                           AppRoutes.adminCreateHalaqa,
                                         ),
@@ -347,8 +359,10 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: AdminQuickActionTile(
-                                        icon: Icons.person_add_alt_1_outlined,
+                                        icon: Icons
+                                            .person_add_alt_1_outlined,
                                         label: 'تسجيل طالب',
+                                        iconColor: AppColors.success,
                                         onTap: () => context.push(
                                           AppRoutes.adminOnboardStudent,
                                         ),
@@ -359,6 +373,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                       child: AdminQuickActionTile(
                                         icon: Icons.campaign_outlined,
                                         label: 'إعلان عام',
+                                        iconColor: AppColors.warning,
                                         onTap: () => context.push(
                                           AppRoutes.adminBroadcast,
                                         ),
@@ -478,7 +493,7 @@ AdminDashboardHealth adminDashboardHealth(
   final proofs = finance?.awaitingReviewCount ?? 0;
   final pending = <String>[
     if (requests > 0)
-      '$requests ${requests == 1 ? 'طلب' : 'طلبات'} بانتظار الموافقة',
+      '$requests ${requests == 1 ? 'طلب' : 'طلبات'} بانتظار التعيين',
     if (proofs > 0) '$proofs ${proofs == 1 ? 'إيصال' : 'إيصالات'} قيد مراجعة المشرفين',
   ];
   if (pending.isNotEmpty) {

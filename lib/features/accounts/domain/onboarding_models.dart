@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../core/constants/academy_branding.dart';
+
 /// A Halaqa the onboarding wizard can admit the new student into.
 class OnboardingHalaqaOption extends Equatable {
   final String id;
@@ -66,7 +68,7 @@ class IssuedCredential extends Equatable {
 
   /// Text the Admin copies or shares with the family.
   String get shareText =>
-      'أكاديمية رفيق — بيانات دخول $roleLabel ($name)\n'
+      '${AcademyBranding.displayName} — بيانات دخول $roleLabel ($name)\n'
       'اسم المستخدم: $username\n'
       'كلمة المرور المؤقتة: $temporaryPassword\n'
       'سيُطلب منك تغيير كلمة المرور عند أول تسجيل دخول.';

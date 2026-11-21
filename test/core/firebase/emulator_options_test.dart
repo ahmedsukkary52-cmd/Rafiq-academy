@@ -31,7 +31,9 @@ void main() {
       final domains = RegExp(
         r'<domain[^>]*>([^<]+)</domain>',
       ).allMatches(config).map((m) => m.group(1)).toList();
-      expect(domains, ['127.0.0.1']);
+      // Debug cleartext is loopback-only; cloud_functions may dial either
+      // 127.0.0.1 or localhost depending on platform wiring.
+      expect(domains, ['127.0.0.1', 'localhost']);
       expect(config, isNot(contains('<base-config')));
     });
   });

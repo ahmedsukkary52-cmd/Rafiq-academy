@@ -35,7 +35,7 @@ class SupervisorSubpageScaffold extends StatelessWidget {
                   child: Row(
                     children: [
                       _CircleButton(
-                        icon: Icons.chevron_right_rounded,
+                        icon: Icons.chevron_left_rounded,
                         onTap: () => Navigator.of(context).maybePop(),
                       ),
                       Expanded(

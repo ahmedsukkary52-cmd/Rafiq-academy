@@ -81,6 +81,31 @@ class ParentRepositoryImpl implements ParentRepository {
   }
 
   @override
+  Future<Either<Failure, ParentPaymentsPage>> getPaymentsPage({
+    required String parentId,
+    int limit = ParentPaymentsPage.defaultLimit,
+    String? afterPaymentId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      final page = await remoteDatasource.getPaymentsPage(
+        parentId: parentId,
+        limit: limit,
+        afterPaymentId: afterPaymentId,
+      );
+      return Right(
+        ParentPaymentsPage(
+          items: page.items,
+          nextCursorId: page.nextCursorId,
+          hasMore: page.hasMore,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Future<Either<Failure, PaymentPublicSettingsEntity>>
   getPaymentPublicSettings() async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());

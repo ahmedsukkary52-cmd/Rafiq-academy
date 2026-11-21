@@ -55,78 +55,93 @@ class ChatConversationTile extends StatelessWidget {
     final subtitle = observer && !c.isGroup
         ? c.participants.map((p) => chatRoleLabel(p.role)).join(' · ')
         : null;
-    return ListTile(
-      onTap: onTap,
-      leading: CircleAvatar(
-        radius: 24,
-        backgroundColor: AppColors.primaryLight,
-        child: c.isGroup
-            ? const Icon(Icons.groups_rounded, color: AppColors.primary)
-            : Text(
-                title.trim().isEmpty ? '؟' : title.trim().characters.first,
-                style: const TextStyle(
+    final peerImage = !c.isGroup && !observer
+        ? c.otherParticipant(viewerUid).profileImageUrl
+        : null;
+    return Material(
+      color: unread > 0
+          ? AppColors.primary.withValues(alpha: 0.05)
+          : Colors.transparent,
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: AppColors.primaryLight,
+          backgroundImage:
+              peerImage != null && peerImage.isNotEmpty
+              ? NetworkImage(peerImage)
+              : null,
+          child: peerImage != null && peerImage.isNotEmpty
+              ? null
+              : c.isGroup
+              ? const Icon(Icons.groups_rounded, color: AppColors.primary)
+              : Text(
+                  title.trim().isEmpty ? '؟' : title.trim().characters.first,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: unread > 0 ? FontWeight.w800 : FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              chatListTimeLabel(c.lastMessageAt),
+              style: AppTextStyles.labelSmall.copyWith(
+                color: unread > 0 ? AppColors.primary : AppColors.textHint,
+              ),
+            ),
+          ],
+        ),
+        subtitle: Row(
+          children: [
+            Expanded(
+              child: Text(
+                subtitle == null
+                    ? chatListPreview(c, viewerUid)
+                    : '$subtitle · ${chatListPreview(c, viewerUid)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (observer)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 6),
+                child: Text(
+                  'مراقبة',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.info,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            else if (unread > 0)
+              Container(
+                margin: const EdgeInsetsDirectional.only(start: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
                   color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$unread',
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
                 ),
               ),
-      ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: unread > 0 ? FontWeight.w800 : FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            chatListTimeLabel(c.lastMessageAt),
-            style: AppTextStyles.labelSmall.copyWith(
-              color: unread > 0 ? AppColors.primary : AppColors.textHint,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Row(
-        children: [
-          Expanded(
-            child: Text(
-              subtitle == null
-                  ? chatListPreview(c, viewerUid)
-                  : '$subtitle · ${chatListPreview(c, viewerUid)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (observer)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(start: 6),
-              child: Text(
-                'مراقبة',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.info,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            )
-          else if (unread > 0)
-            Container(
-              margin: const EdgeInsetsDirectional.only(start: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$unread',
-                style: const TextStyle(color: Colors.white, fontSize: 11),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

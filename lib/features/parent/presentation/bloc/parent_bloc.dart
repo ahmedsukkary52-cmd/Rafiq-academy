@@ -5,7 +5,6 @@ import 'package:injectable/injectable.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../domain/entities/parent_entities.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/repositories/parent_repositories.dart';
 import '../../domain/usecases/get_absence_requests_usecase.dart';
@@ -53,6 +52,10 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     on<SelectChildEvent>(_onSelectChild);
     on<LoadWeeklyReportEvent>(_onLoadWeeklyReport);
     on<LoadPaymentsEvent>(_onLoadPayments);
+    on<LoadMorePaymentsEvent>(
+      _onLoadMorePayments,
+      transformer: droppable(),
+    );
     on<LoadPaymentDestinationsEvent>(_onLoadPaymentDestinations);
     on<LoadAbsenceRequestsEvent>(_onLoadAbsenceRequests);
     on<LoadStudentHalaqatEvent>(_onLoadStudentHalaqat);
@@ -117,10 +120,20 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
     final householdResult = await getHousehold(
       ParentHouseholdParams(parentId: event.parentId, childrenIds: children),
     );
-    final paymentsResult = await getPayments(ParentIdParams(event.parentId));
+    // First payments page only — full history uses LoadMore on subscriptions.
+    final paymentsResult = await getPayments.page(
+      ParentPaymentsPageParams(parentId: event.parentId),
+    );
 
     final household = householdResult.getOrElse((_) => const ParentHousehold());
-    final payments = paymentsResult.getOrElse((_) => const <PaymentEntity>[]);
+    final paymentsPage = paymentsResult.getOrElse(
+      (_) => const ParentPaymentsPage(
+        items: [],
+        nextCursorId: null,
+        hasMore: false,
+      ),
+    );
+    final payments = paymentsPage.items;
     final hydrated = ParentHouseholdAssembler.withPayments(
       children: household.children,
       payments: payments,
@@ -138,6 +151,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
             ? SectionStatus.error
             : SectionStatus.loaded,
         payments: payments,
+        paymentsHasMore: paymentsPage.hasMore,
+        paymentsCursorId: paymentsPage.nextCursorId,
         paymentsError: paymentsResult.fold((f) => f.message, (_) => null),
         familySummary: ParentHouseholdAssembler.summarize(
           children: hydrated,
@@ -247,12 +262,19 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
   ) async {
     emit(
       state.copyWith(
+        parentId: event.parentId,
         paymentsStatus: SectionStatus.loading,
         paymentsError: null,
+        paymentsHasMore: false,
+        paymentsLoadingMore: false,
+        paymentsCursorId: null,
+        payments: const [],
       ),
     );
 
-    final result = await getPayments(ParentIdParams(event.parentId));
+    final result = await getPayments.page(
+      ParentPaymentsPageParams(parentId: event.parentId),
+    );
     final publicResult = await getPaymentPublicSettings(const NoParams());
     final accessResult = await getPaymentAccess(ParentIdParams(event.parentId));
 
@@ -275,7 +297,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
           paymentAccess: access,
         ),
       ),
-      (payments) {
+      (page) {
+        final payments = page.items;
         final hydrated = ParentHouseholdAssembler.withPayments(
           children: state.childrenSnapshots,
           payments: payments,
@@ -284,6 +307,8 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
           state.copyWith(
             paymentsStatus: SectionStatus.loaded,
             payments: payments,
+            paymentsHasMore: page.hasMore,
+            paymentsCursorId: page.nextCursorId,
             childrenSnapshots: hydrated,
             familySummary: ParentHouseholdAssembler.summarize(
               children: hydrated,
@@ -297,6 +322,61 @@ class ParentBloc extends Bloc<ParentEvent, ParentState> {
             instapayDestination: instapay,
             paymentDestinationsStatus: destinationsStatus,
             paymentAccess: access,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _onLoadMorePayments(
+    LoadMorePaymentsEvent event,
+    Emitter<ParentState> emit,
+  ) async {
+    final parentId = state.parentId.trim();
+    final cursor = state.paymentsCursorId?.trim() ?? '';
+    if (parentId.isEmpty ||
+        cursor.isEmpty ||
+        !state.paymentsHasMore ||
+        state.paymentsLoadingMore ||
+        state.paymentsStatus != SectionStatus.loaded) {
+      return;
+    }
+    emit(state.copyWith(paymentsLoadingMore: true, paymentsError: null));
+    final result = await getPayments.page(
+      ParentPaymentsPageParams(parentId: parentId, afterPaymentId: cursor),
+    );
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          paymentsLoadingMore: false,
+          paymentsError: failure.message,
+        ),
+      ),
+      (page) {
+        final known = {for (final p in state.payments) p.id};
+        final merged = [
+          ...state.payments,
+          ...page.items.where((p) => !known.contains(p.id)),
+        ];
+        final hydrated = ParentHouseholdAssembler.withPayments(
+          children: state.childrenSnapshots,
+          payments: merged,
+        );
+        emit(
+          state.copyWith(
+            payments: merged,
+            paymentsHasMore: page.hasMore,
+            paymentsCursorId: page.nextCursorId,
+            paymentsLoadingMore: false,
+            childrenSnapshots: hydrated,
+            familySummary: ParentHouseholdAssembler.summarize(
+              children: hydrated,
+              payments: merged,
+            ),
+            alerts: ParentHouseholdAssembler.alerts(
+              children: hydrated,
+              payments: merged,
+            ),
           ),
         );
       },

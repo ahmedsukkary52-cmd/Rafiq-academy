@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../firebase_options.dart' as generated;
 import 'app_flavor.dart';
 
 /// `--dart-define=USE_FIREBASE_EMULATOR=true` is REQUIRED for the local
@@ -64,7 +65,8 @@ void assertEmulatorOptions(FirebaseOptions options) {
 
 FirebaseApp? _emulatorApp;
 
-/// The emulator app; only valid after [initializeAppFirebase] completed.
+/// The emulator app; only valid after [initializeAppFirebase] completed
+/// for a local flavor.
 FirebaseApp get firebaseEmulatorApp =>
     _emulatorApp ??
     (throw StateError(
@@ -72,16 +74,36 @@ FirebaseApp get firebaseEmulatorApp =>
       'finished wiring the emulators.',
     ));
 
-/// Initializes Firebase. Fail-closed: only a local flavor in a debug build
-/// with USE_FIREBASE_EMULATOR=true gets past [assertFirebaseRouting]; every
-/// service the app uses is routed to the Emulator Suite before this returns,
-/// independent of whether the emulators are actually running.
+/// Initializes Firebase. Fail-closed routing via [assertFirebaseRouting].
+/// Local flavors wire every service to the Emulator Suite. Trial uses the
+/// real `rafiq-academy` project via [generated.DefaultFirebaseOptions].
 Future<void> initializeAppFirebase() async {
+  final flavor = currentAppFlavor();
   assertFirebaseRouting(
-    flavor: currentAppFlavor(),
+    flavor: flavor,
     emulatorRequested: useFirebaseEmulator,
     isDebugBuild: kDebugMode,
   );
+
+  if (flavor == AppFlavor.trial) {
+    final FirebaseApp app;
+    if (Firebase.apps.isEmpty) {
+      app = await Firebase.initializeApp(
+        options: generated.DefaultFirebaseOptions.currentPlatform,
+      );
+    } else {
+      app = Firebase.app();
+    }
+    final projectId = app.options.projectId;
+    if (projectId != trialFirebaseProjectId) {
+      throw StateError(
+        'Trial flavor must use Firebase project "$trialFirebaseProjectId", '
+        'got "$projectId".',
+      );
+    }
+    return;
+  }
+
   assertLoopbackEmulatorHost(firebaseEmulatorHost);
 
   final defaultApp = await Firebase.initializeApp(

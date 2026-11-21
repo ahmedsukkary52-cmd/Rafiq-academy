@@ -258,11 +258,19 @@ service cloud.firestore {
 
       allow update: if signedIn() && (
         (
+          // Active profiles only: deactivated tokens must not mutate self
+          // (incl. server-owned flags omitted from the denylist historically).
           isSelf(userId)
+          && hasActiveProfile()
           && roleUnchanged()
           && isActiveUnchanged()
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'isActive', 'phone', 'createdAt', 'lifecycle', 'email', 'staffStatus', 'deletedAt', 'passwordChangeRequired', 'academyRef'])
+              .hasAny([
+                'role', 'isActive', 'phone', 'createdAt', 'lifecycle', 'email',
+                'staffStatus', 'deletedAt', 'passwordChangeRequired', 'academyRef',
+                'pendingHalaqaAssignment', 'nameNormalized',
+                'isActiveUpdatedBy', 'staffStatusUpdatedBy',
+              ])
           && !hasExposedPhone(request.resource.data)
           && !writesContactField()
         )
@@ -301,7 +309,10 @@ service cloud.firestore {
     match /parentProfiles/{parentId} {
       allow read: if isAdmin() || isSelf(parentId);
       allow create, delete: if false;
-      allow update: if (isSelf(parentId) || isAdmin())
+      allow update: if (
+          (isSelf(parentId) && hasActiveProfile())
+          || isAdmin()
+        )
         && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['childrenIds', 'phone'])
         && !hasExposedPhone(request.resource.data)
@@ -378,6 +389,7 @@ service cloud.firestore {
           isAdmin()
           || (
             isSelf(teacherId)
+            && hasActiveProfile()
             && !changedKeys().hasAny([
               'performanceRating', 'weeklyQuota', 'halaqatIds'
             ])
@@ -519,7 +531,7 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read: if signedIn() && (
         isAdmin()
-        || resource.data.parentId == uid()
+        || (hasActiveProfile() && resource.data.parentId == uid())
         || (isSupervisor() && isSupervisorOfStudent(resource.data.studentId))
       );
       allow create: if false;
@@ -831,13 +843,12 @@ service cloud.firestore {
       }
 
       function isNotificationAudience() {
-        return signedIn()
+        // Deactivated / pending-password accounts must not retain inbox access
+        // (role broadcasts and uid/'all' cards). Admin read uses isAdmin().
+        return hasActiveProfile()
           && (
             resource.data.audience in [uid(), 'all']
-            || (
-              resource.data.audience == userDoc().role
-              && userDoc().get('passwordChangeRequired', false) != true
-            )
+            || resource.data.audience == userDoc().role
           );
       }
 
@@ -1198,7 +1209,10 @@ service cloud.firestore {
     // carry `visibleTo array-contains <caller>` or it fails on the first row.
     match /studentSearch/{studentId} {
       allow read: if isAdmin()
-        || (signedIn() && uid() in resource.data.get('visibleTo', []));
+        || (
+          hasActiveProfile()
+          && uid() in resource.data.get('visibleTo', [])
+        );
       allow write: if false;
     }
     // C11 / WA-13 — FCM device tokens: own uid only, never exposed to others.

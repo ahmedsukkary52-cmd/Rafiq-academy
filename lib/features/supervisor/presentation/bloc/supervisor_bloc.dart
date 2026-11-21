@@ -285,6 +285,7 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       state.copyWith(
         admitStudentStatus: SubmissionStatus.submitting,
         admitStudentError: null,
+        admitStudentRosterRefreshFailed: false,
       ),
     );
 
@@ -301,11 +302,39 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
         state.copyWith(
           admitStudentStatus: SubmissionStatus.error,
           admitStudentError: failure.message,
+          admitStudentRosterRefreshFailed: false,
         ),
       ),
       (_) async {
-        emit(state.copyWith(admitStudentStatus: SubmissionStatus.success));
-        add(LoadSupervisedHalaqatEvent(event.supervisorId));
+        // The callable succeeded, but enrollment is not reported as complete
+        // until the same roster used by the Supervisor UI has been refreshed.
+        emit(
+          state.copyWith(
+            halaqatStatus: SectionStatus.loading,
+            halaqatError: null,
+          ),
+        );
+        final refresh = await getSupervisedHalaqat(
+          SupervisorIdParams(event.supervisorId),
+        );
+        refresh.fold(
+          (failure) => emit(
+            state.copyWith(
+              admitStudentStatus: SubmissionStatus.success,
+              admitStudentRosterRefreshFailed: true,
+              halaqatStatus: SectionStatus.error,
+              halaqatError: failure.message,
+            ),
+          ),
+          (halaqat) => emit(
+            state.copyWith(
+              admitStudentStatus: SubmissionStatus.success,
+              admitStudentRosterRefreshFailed: false,
+              halaqatStatus: SectionStatus.loaded,
+              halaqat: halaqat,
+            ),
+          ),
+        );
       },
     );
   }
@@ -318,6 +347,7 @@ class SupervisorBloc extends Bloc<SupervisorEvent, SupervisorState> {
       state.copyWith(
         admitStudentStatus: SubmissionStatus.idle,
         admitStudentError: null,
+        admitStudentRosterRefreshFailed: false,
       ),
     );
   }

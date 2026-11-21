@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/error/user_facing_error.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../../../shared/domain/id_params.dart';
 import '../entities/homework_entity.dart';
@@ -19,8 +20,10 @@ class GetLatestHomeworkUseCase
   Future<Either<Failure, HomeworkEntity?>> call(StudentUidParams params) async {
     try {
       return Right(await repository.getLatestHomework(params.uid));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userFacingErrorText('$e')));
     }
   }
 }
@@ -40,8 +43,10 @@ class WatchLatestHomeworkUseCase
       await for (final hw in repository.watchLatestHomework(params.uid)) {
         yield Right(hw);
       }
+    } on ServerException catch (e) {
+      yield Left(ServerFailure(e.message));
     } catch (e) {
-      yield Left(ServerFailure(e.toString()));
+      yield Left(ServerFailure(userFacingErrorText('$e')));
     }
   }
 }
@@ -74,7 +79,7 @@ class ToggleHomeworkTaskUseCase
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userFacingErrorText('$e')));
     }
   }
 }
@@ -92,7 +97,7 @@ class CompleteHomeworkUseCase extends UseCase<int, String> {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userFacingErrorText('$e')));
     }
   }
 }
@@ -113,7 +118,7 @@ class SubmitHomeworkRecitationUseCase
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userFacingErrorText('$e')));
     }
   }
 }

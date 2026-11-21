@@ -12,6 +12,7 @@ import 'pages/supervisor_grant_award_page.dart';
 import 'pages/supervisor_halaqa_detail_page.dart';
 import 'pages/supervisor_halaqat_page.dart';
 import 'pages/supervisor_payments_page.dart';
+import 'pages/supervisor_onboard_student_page.dart';
 import 'pages/supervisor_register_page.dart';
 import 'pages/supervisor_teachers_page.dart';
 import 'pages/supervisor_transfer_page.dart';
@@ -49,6 +50,11 @@ class SupervisorDestinations {
       context,
       SupervisorRegisterPage(preselectedHalaqaId: preselectedHalaqaId),
     );
+  }
+
+  /// Create parent + student and admit into a supervised halaqa.
+  static Future<void> onboardStudent(BuildContext context) {
+    return _push(context, const SupervisorOnboardStudentPage());
   }
 
   static Future<void> transfer(

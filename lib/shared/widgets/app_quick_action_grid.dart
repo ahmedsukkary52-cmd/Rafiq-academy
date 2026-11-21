@@ -73,7 +73,7 @@ class _GridActions extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var j = 0; j < crossAxisCount; j++) ...[
-                if (j > 0) const SizedBox(width: 4),
+                if (j > 0) const SizedBox(width: 8),
                 Expanded(
                   child: j < slice.length
                       ? _GridActionCell(item: slice[j])
@@ -90,7 +90,7 @@ class _GridActions extends StatelessWidget {
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(AppSizes.radiusXL),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppSizes.radiusXL),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../domain/meeting_link_policy.dart';
 import '../theme/app_theme.dart';
@@ -64,8 +65,9 @@ class _MeetingLinkDialogState extends State<_MeetingLinkDialog> {
   }
 
   void _save() {
-    final value = _controller.text.trim();
-    if (value == widget.currentLink && value.isNotEmpty) {
+    final value = normalizeMeetingLinkInput(_controller.text);
+    final current = normalizeMeetingLinkInput(widget.currentLink);
+    if (value == current && value.isNotEmpty) {
       Navigator.pop(context);
       return;
     }
@@ -96,9 +98,17 @@ class _MeetingLinkDialogState extends State<_MeetingLinkDialog> {
             textDirection: TextDirection.ltr,
             keyboardType: TextInputType.url,
             autocorrect: false,
+            enableSuggestions: false,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
             maxLength: kMaxMeetingLinkLength,
+            inputFormatters: const [MeetingLinkInputFormatter()],
             decoration: InputDecoration(
-              labelText: 'رابط الاجتماع (https://)',
+              labelText: 'رابط Zoom أو Google Meet',
+              hintText: 'https://meet.google.com/xxx-xxxx-xxx',
+              helperText:
+                  'الصق رابط الغرفة كما هو. أي شرطات أو رموز خفية تُصلَّح تلقائياً.',
+              helperMaxLines: 2,
               errorText: _error,
               errorMaxLines: 3,
             ),
@@ -139,6 +149,35 @@ class _MeetingLinkDialogState extends State<_MeetingLinkDialog> {
           onPressed: _save,
         ),
       ],
+    );
+  }
+}
+
+/// Live-field sanitizer: unicode dashes → ASCII, drop invisible / whitespace junk.
+class MeetingLinkInputFormatter extends TextInputFormatter {
+  const MeetingLinkInputFormatter();
+
+  static final _betweenAlnum = RegExp(r'(?<=[A-Za-z0-9])\s+(?=[A-Za-z0-9])');
+  static final _junk = RegExp(
+    r'[\s\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060\u2066-\u2069\ufeff\u00ad]',
+  );
+  static final _dashes = RegExp(
+    '[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe58\ufe63\uff0d]',
+  );
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final cleaned = newValue.text
+        .replaceAllMapped(_betweenAlnum, (_) => '-')
+        .replaceAll(_junk, '')
+        .replaceAll(_dashes, '-');
+    if (cleaned == newValue.text) return newValue;
+    return TextEditingValue(
+      text: cleaned,
+      selection: TextSelection.collapsed(offset: cleaned.length),
     );
   }
 }

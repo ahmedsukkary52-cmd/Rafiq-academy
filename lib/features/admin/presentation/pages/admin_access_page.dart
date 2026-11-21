@@ -83,6 +83,19 @@ class _AccessBodyState extends State<_AccessBody> {
     return ListView(
       padding: const EdgeInsets.all(AppSizes.paddingM),
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'يُستخدم عندما يُوقف وصول ولي الأمر للتطبيق بسبب تأخر الدفع أو '
+            'تعليق مؤقت. إعادة التفعيل تفتح التطبيق دون مسح الفواتير أو '
+            'تغيير حالتها.',
+            textAlign: TextAlign.right,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.45,
+            ),
+          ),
+        ),
         AdminSectionCard(
           title: 'ولي الأمر',
           subtitle: 'يُعاد الوصول دون تعديل الفواتير أو حالتها',

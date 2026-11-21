@@ -38,13 +38,15 @@ class _StudentAchievementsPageState extends State<StudentAchievementsPage> {
     if (auth is! AuthAuthenticated) return;
     context.read<StudentBloc>()
       ..add(LoadStudentProfileEvent(auth.user.uid))
-      ..add(LoadAchievementsEvent(auth.user.uid));
+      ..add(LoadAchievementsEvent(auth.user.uid, paged: true));
   }
 
   void _retryAchievements() {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
-    context.read<StudentBloc>().add(LoadAchievementsEvent(auth.user.uid));
+    context.read<StudentBloc>().add(
+      LoadAchievementsEvent(auth.user.uid, paged: true),
+    );
   }
 
   @override
@@ -58,6 +60,8 @@ class _StudentAchievementsPageState extends State<StudentAchievementsPage> {
               prev.achievementsStatus != curr.achievementsStatus ||
               prev.achievements != curr.achievements ||
               prev.achievementsError != curr.achievementsError ||
+              prev.achievementsHasMore != curr.achievementsHasMore ||
+              prev.achievementsLoadingMore != curr.achievementsLoadingMore ||
               prev.profile != curr.profile,
           builder: (context, state) {
             if (state.achievementsStatus == SectionStatus.initial ||
@@ -108,6 +112,38 @@ class _StudentAchievementsPageState extends State<StudentAchievementsPage> {
                       },
                     ),
                   ),
+                  if (state.achievementsHasMore ||
+                      state.achievementsLoadingMore)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                        child: Center(
+                          child: state.achievementsLoadingMore
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : TextButton(
+                                  key: const Key(
+                                    'student-achievements-load-more',
+                                  ),
+                                  onPressed: () => context
+                                      .read<StudentBloc>()
+                                      .add(const LoadMoreAchievementsEvent()),
+                                  child: Text(
+                                    'عرض إنجازات أقدم',
+                                    style: AppTextStyles.labelMedium.copyWith(
+                                      color: AppColors.primaryDark,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
                 ],
               ],
             );
@@ -190,7 +226,7 @@ class _Header extends StatelessWidget {
               children: [
                 if (Navigator.canPop(context))
                   _HeaderButton(
-                    icon: Icons.chevron_right_rounded,
+                    icon: Icons.chevron_left_rounded,
                     onTap: () => Navigator.maybePop(context),
                   )
                 else

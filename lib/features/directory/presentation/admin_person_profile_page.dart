@@ -214,7 +214,7 @@ class _AdminPersonProfilePageState extends State<AdminPersonProfilePage> {
             '${showRole ? '${l.role.label} — ' : ''}${h.studentCount} طالب'
             '${h.isOpen ? '' : ' — مغلقة'}',
           ),
-          trailing: trailing ?? const Icon(Icons.chevron_left),
+          trailing: trailing ?? const Icon(Icons.chevron_right),
           onTap: () => widget.navigator.openHalaqa(context, h.id),
         ),
         Padding(

@@ -34,7 +34,7 @@ void main() {
     test('iconFor maps RTL/LTR correctly', () {
       expect(
         AppBackButton.iconFor(TextDirection.rtl),
-        Icons.chevron_right_rounded,
+        Icons.chevron_left_rounded,
       );
       expect(
         AppBackButton.iconFor(TextDirection.ltr),
@@ -65,7 +65,16 @@ void main() {
         ),
       );
 
-      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_left_rounded), findsOneWidget);
+      // Icon mirrors matchTextDirection icons under RTL, so the rendered
+      // chevron points right (toward the leading edge), as Back should.
+      final mirror = tester.widget<Transform>(
+        find.descendant(
+          of: find.byIcon(Icons.chevron_left_rounded),
+          matching: find.byType(Transform),
+        ),
+      );
+      expect(mirror.transform.storage[0], -1.0);
       await tester.tap(find.byType(AppBackButton));
       await tester.pump();
       expect(popped, isTrue);

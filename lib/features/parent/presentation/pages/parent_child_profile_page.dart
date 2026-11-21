@@ -18,8 +18,11 @@ import '../../../../shared/domain/student_profile_latest_evaluation.dart';
 import '../../../../shared/domain/recitation_records_reader.dart';
 import '../../../../shared/domain/student_profile_summary.dart';
 import '../../../../shared/domain/id_params.dart';
+import '../../../../shared/utils/time_format.dart';
 import '../../domain/parent_household.dart';
 import '../../domain/parent_performance.dart';
+import '../../../homework/domain/entities/homework_entity.dart';
+import '../../../homework/domain/usecases/homework_usecases.dart';
 import '../../domain/usecases/get_child_achievements_usecase.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_child_access.dart';
@@ -52,6 +55,7 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
   bool _achievementsLoading = false;
   String? _achievementsError;
   List<RecitationRecordEntity> _reviewedRecitations = const [];
+  HomeworkEntity? _latestHomework;
   bool _startingChat = false;
 
   @override
@@ -76,6 +80,7 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
         _achievementsLoading = false;
         _achievementsError = null;
         _reviewedRecitations = const [];
+        _latestHomework = null;
       });
       return;
     }
@@ -91,6 +96,7 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
     final recitationsResult = await sl<RecitationRecordsReader>()
         .getRecitationRecords(widget.studentId);
     final achievementsResult = await sl<GetChildAchievementsUseCase>()(uid);
+    final homeworkResult = await sl<GetLatestHomeworkUseCase>()(uid);
     if (!mounted) return;
 
     profileResult.fold(
@@ -119,6 +125,7 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
             (_) => null,
           );
           _reviewedRecitations = reviewed;
+          _latestHomework = homeworkResult.getOrElse((_) => null);
         });
       },
     );
@@ -152,13 +159,18 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
     });
   }
 
-  Future<void> _startTeacherChat(ParentChildSnapshot? snapshot) async {
+  Future<void> _startStaffChat(
+    ParentChildSnapshot? snapshot, {
+    required bool preferTeacher,
+  }) async {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated || _startingChat) return;
 
     final teacherId = (snapshot?.teacherId ?? '').trim();
     final supervisorId = (snapshot?.supervisorId ?? '').trim();
-    final targetId = teacherId.isNotEmpty ? teacherId : supervisorId;
+    final primary = preferTeacher ? teacherId : supervisorId;
+    final fallback = preferTeacher ? supervisorId : teacherId;
+    final targetId = primary.isNotEmpty ? primary : fallback;
     if (targetId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لا يوجد معلم أو مشرف مرتبط بهذا الابن')),
@@ -361,6 +373,30 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
+                          _CircleDetailCard(
+                            halaqa: halaqa,
+                            teacher: teacher,
+                            supervisor: supervisor,
+                            onSchedule: () => ParentDestinations.schedule(
+                              context,
+                              studentId: widget.studentId,
+                              studentName: name,
+                            ),
+                            onChatTeacher: _startingChat || teacher.isEmpty
+                                ? null
+                                : () => _startStaffChat(
+                                      snapshot,
+                                      preferTeacher: true,
+                                    ),
+                            onChatSupervisor:
+                                _startingChat || supervisor.isEmpty
+                                ? null
+                                : () => _startStaffChat(
+                                      snapshot,
+                                      preferTeacher: false,
+                                    ),
+                          ),
+                          const SizedBox(height: 16),
                           _ActionsGrid(
                             onEvaluations: () => ParentDestinations.evaluations(
                               context,
@@ -379,7 +415,10 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
                             ),
                             onContact: _startingChat
                                 ? null
-                                : () => _startTeacherChat(snapshot),
+                                : () => _startStaffChat(
+                                      snapshot,
+                                      preferTeacher: true,
+                                    ),
                           ),
                           const SizedBox(height: 20),
                           _MemorizationSection(
@@ -387,7 +426,10 @@ class _ParentChildProfilePageState extends State<ParentChildProfilePage> {
                             memorizedVerses: verses,
                           ),
                           const SizedBox(height: 18),
-                          _NotesSection(teacherNote: teacherNote),
+                          _ChildHomeworkSection(
+                            homework: _latestHomework,
+                            teacherNote: teacherNote,
+                          ),
                           const SizedBox(height: 18),
                           _ActivitiesSection(
                             items: activities,
@@ -492,7 +534,7 @@ class _ProfileHero extends StatelessWidget {
                               width: 40,
                               height: 40,
                               child: Icon(
-                                Icons.chevron_right_rounded,
+                                Icons.chevron_left_rounded,
                                 color: AppColors.onPrimary,
                               ),
                             ),
@@ -674,6 +716,355 @@ class _StatCell extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CircleDetailCard extends StatelessWidget {
+  final String halaqa;
+  final String teacher;
+  final String supervisor;
+  final VoidCallback onSchedule;
+  final VoidCallback? onChatTeacher;
+  final VoidCallback? onChatSupervisor;
+
+  const _CircleDetailCard({
+    required this.halaqa,
+    required this.teacher,
+    required this.supervisor,
+    required this.onSchedule,
+    required this.onChatTeacher,
+    required this.onChatSupervisor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.groups_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'تفاصيل الحلقة',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      halaqa.isEmpty ? 'لم تُربط حلقة بعد' : halaqa,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: onSchedule,
+                child: const Text('المواعيد'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _StaffChatRow(
+            roleLabel: 'المعلم',
+            name: teacher.isEmpty ? 'غير معيّن' : teacher,
+            onChat: onChatTeacher,
+          ),
+          const SizedBox(height: 10),
+          _StaffChatRow(
+            roleLabel: 'المشرف',
+            name: supervisor.isEmpty ? 'غير معيّن' : supervisor,
+            onChat: onChatSupervisor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffChatRow extends StatelessWidget {
+  final String roleLabel;
+  final String name;
+  final VoidCallback? onChat;
+
+  const _StaffChatRow({
+    required this.roleLabel,
+    required this.name,
+    required this.onChat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+            child: Text(
+              name.isNotEmpty ? String.fromCharCode(name.runes.first) : '؟',
+              style: AppTextStyles.titleMedium.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  roleLabel,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textHint,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  name,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onChat,
+            tooltip: 'محادثة',
+            style: IconButton.styleFrom(
+              backgroundColor: onChat == null
+                  ? AppColors.surfaceGrey
+                  : AppColors.primary,
+              foregroundColor: onChat == null
+                  ? AppColors.textHint
+                  : Colors.white,
+            ),
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChildHomeworkSection extends StatelessWidget {
+  final HomeworkEntity? homework;
+  final String teacherNote;
+
+  const _ChildHomeworkSection({
+    required this.homework,
+    required this.teacherNote,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hw = homework;
+    final hasHomework = hw != null;
+    final newRange = hw?.newMemorizationRange.trim() ?? '';
+    final reviewRange = hw?.reviewRange.trim() ?? '';
+    final dueLabel = hw == null ? '' : formatDateDmy(hw.dueAt);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.assignment_outlined,
+                  color: AppColors.secondaryDeep,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'الواجب وملاحظات المعلم',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          if (hasHomework) ...[
+            const SizedBox(height: 12),
+            Text(
+              hw.title.trim().isNotEmpty ? hw.title.trim() : 'واجب الحلقة',
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryDark,
+                fontSize: 14,
+              ),
+            ),
+            if (dueLabel.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'التسليم: $dueLabel',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
+            ],
+            if (newRange.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _HomeworkRangeRow(
+                label: 'حفظ جديد',
+                value: newRange,
+                icon: Icons.auto_stories_outlined,
+              ),
+            ],
+            if (reviewRange.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _HomeworkRangeRow(
+                label: 'مراجعة',
+                value: reviewRange,
+                icon: Icons.replay_rounded,
+              ),
+            ],
+            if (hw.isSubmitted) ...[
+              const SizedBox(height: 8),
+              Text(
+                'تم تسليم الواجب',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ] else ...[
+            const SizedBox(height: 12),
+            Text(
+              'لا يوجد تكليف حفظ/مراجعة منشور حالياً.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
+          ],
+          if (teacherNote.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'ملاحظة التقييم',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textHint,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              teacherNote,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                height: 1.55,
+              ),
+            ),
+          ] else if (!hasHomework) ...[
+            const SizedBox(height: 6),
+            Text(
+              'لا ملاحظة من آخر تقييم معتمد.',
+              style: AppTextStyles.labelMedium.copyWith(
+                color: AppColors.textHint,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeworkRangeRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _HomeworkRangeRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                value,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -990,93 +1381,6 @@ class _MemorizationSection extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NotesSection extends StatelessWidget {
-  final String teacherNote;
-
-  const _NotesSection({required this.teacherNote});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _NoteBlock(
-          title: 'ملاحظات المعلم',
-          icon: Icons.info_outline_rounded,
-          iconColor: AppColors.primary,
-          background: AppColors.primaryLight,
-          body: teacherNote.isEmpty
-              ? 'لا توجد ملاحظة من المعلم في آخر تقييم معتمد.'
-              : teacherNote,
-        ),
-        const SizedBox(height: 10),
-        const _NoteBlock(
-          title: 'ملاحظات المشرف',
-          icon: Icons.verified_user_outlined,
-          iconColor: AppColors.secondaryDeep,
-          background: AppColors.secondaryBg,
-          body:
-              'لا توجد ملاحظات مشرف محفوظة في النظام بعد — ستظهر هنا عند توفر مصدرها.',
-        ),
-      ],
-    );
-  }
-}
-
-class _NoteBlock extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color iconColor;
-  final Color background;
-  final String body;
-
-  const _NoteBlock({
-    required this.title,
-    required this.icon,
-    required this.iconColor,
-    required this.background,
-    required this.body,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: iconColor),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: AppTextStyles.titleLarge.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppSizes.radiusL),
-          ),
-          child: Text(
-            body,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary.withValues(alpha: 0.82),
-              height: 1.45,
-            ),
           ),
         ),
       ],

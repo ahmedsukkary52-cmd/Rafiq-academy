@@ -47,6 +47,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
+          bottom: false,
           child: BlocBuilder<AdminBloc, AdminState>(
             buildWhen: (p, c) =>
                 p.financialStatus != c.financialStatus ||
@@ -94,14 +95,16 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
+                      const AdminSectionHeader(title: 'ملخص المستحقات'),
+                      const SizedBox(height: 12),
                       GridView.count(
                         crossAxisCount: 2,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,
-                        childAspectRatio: 1.25,
+                        childAspectRatio: 1.35,
                         children: [
                           AdminStatTile(
                             value: academyMoneyText(
@@ -131,7 +134,22 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
+                      const AdminSectionHeader(title: 'إجراءات مالية'),
+                      const SizedBox(height: 12),
+                      AppButton(
+                        key: const Key('finance-open-pricing'),
+                        label: 'تسعير الاشتراكات الشهرية',
+                        onPressed: () => context.push(AppRoutes.adminPricing),
+                      ),
+                      const SizedBox(height: 10),
+                      AppButton(
+                        key: const Key('finance-open-issue-invoice'),
+                        label: 'إصدار فاتورة لطالب',
+                        onPressed: () =>
+                            context.push(AppRoutes.adminIssueInvoice),
+                      ),
+                      const SizedBox(height: 10),
                       AppButton(
                         key: const Key('finance-open-ledger'),
                         label: 'سجل المدفوعات والتفاصيل',

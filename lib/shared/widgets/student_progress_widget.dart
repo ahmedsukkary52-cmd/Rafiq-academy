@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 
-/// كارت تقدم الحفظ — Figma: عنوان + تفاصيل + دونات + صف إحصاءات.
+/// كارت تقدم الحفظ — عنوان يمين + تفاصيل يسار (RTL صريح).
 class StudentProgressWidget extends StatelessWidget {
   final double progressPercent;
   final String planName;
@@ -34,59 +34,72 @@ class StudentProgressWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final pct = progressPercent.clamp(0, 100).toInt();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            GestureDetector(
-              onTap: onDetailsTap ?? onTap,
-              child: Text(
-                'التفاصيل',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.star_rounded,
+                color: AppColors.secondary,
+                size: 18,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'تقدم الحفظ',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ),
-            const Spacer(),
-            const Icon(Icons.star_rounded, color: AppColors.secondary, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              'تقدم الحفظ',
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Material(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(22),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.07),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
+              const Spacer(),
+              GestureDetector(
+                onTap: onDetailsTap ?? onTap,
+                child: Text(
+                  'التفاصيل',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
+                ),
               ),
-              child: progressAvailable
-                  ? _measured(pct)
-                  : _notYetMeasured(),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Material(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(22),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: AppColors.border),
+                  gradient: LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      AppColors.surface,
+                      AppColors.primaryLight.withValues(alpha: 0.35),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.07),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: progressAvailable ? _measured(pct) : _notYetMeasured(),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -111,74 +124,64 @@ class StudentProgressWidget extends StatelessWidget {
 
   Widget _measured(int pct) {
     return Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              planName.isNotEmpty ? planName : 'تقدم الحفظ',
-                              textAlign: TextAlign.right,
-                              style: AppTextStyles.titleLarge.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '$totalVerses آية محفوظة',
-                              textAlign: TextAlign.right,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      SizedBox(
-                        width: 84,
-                        height: 84,
-                        child: CustomPaint(
-                          painter: _DonutPainter((pct / 100).clamp(0.0, 1.0)),
-                          child: Center(
-                            child: Text(
-                              '$pct%\nمكتمل',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontFamily: 'NotoNaskhArabic',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primaryDark,
-                                height: 1.2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 88,
+              height: 88,
+              child: CustomPaint(
+                painter: _DonutPainter((pct / 100).clamp(0.0, 1.0)),
+                child: Center(
+                  child: Text(
+                    '$pct%\nمكتمل',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.labelMedium.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primaryDark,
+                      height: 1.2,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  const Divider(height: 1, color: AppColors.border),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _MiniStat(
-                          value: '$completedSurahs',
-                          label: 'سور مكتملة',
-                        ),
-                      ),
-                      Expanded(
-                        child: _MiniStat(
-                          value: '$totalStars',
-                          label: 'نجمة',
-                        ),
-                      ),
-                    ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    planName.isNotEmpty ? planName : 'تقدم الحفظ',
+                    textAlign: TextAlign.right,
+                    style: AppTextStyles.titleLarge.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$totalVerses آية محفوظة',
+                    textAlign: TextAlign.right,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Divider(height: 1, color: AppColors.border),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _MiniStat(value: '$completedSurahs', label: 'سور مكتملة'),
+            ),
+            Expanded(child: _MiniStat(value: '$totalStars', label: 'نجمة')),
+          ],
+        ),
+      ],
     );
   }
 }

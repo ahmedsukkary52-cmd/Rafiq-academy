@@ -124,6 +124,12 @@ android {
             resValue("string", "app_name", "بصمة (تجريبي)")
             signingConfig = signingConfigs.getByName("debug")
         }
+        create("trial") {
+            dimension = "env"
+            applicationId = "com.example.rafiq_academy"
+            resValue("string", "app_name", "بصمة (تجربة الأكاديمية)")
+            signingConfig = signingConfigs.getByName("debug")
+        }
         create("prod") {
             dimension = "env"
             applicationId = "com.basmaacademy.app"
@@ -145,7 +151,9 @@ android {
                 (!useFirebaseEmulator).toString()
         }
         // release sets no signingConfig, so each flavor's applies: debug for
-        // dev and staging, the upload key for prod.
+        // dev, staging and trial; the upload key for prod (when present).
+        // Without an upload key, prod release artifact tasks fail in whenReady
+        // instead of falling back to the debug key.
         release {
         }
     }
@@ -168,7 +176,15 @@ val localFlavorAppIds = mapOf(
     "staging" to "com.basmaacademy.app.staging",
 )
 val localArtifactTask = Regex("^(assemble|bundle|package|install)(Dev|Staging)(Debug|Profile|Release)$")
+val trialArtifactTask = Regex("^(assemble|bundle|package|install)Trial(Debug|Profile|Release)$")
 gradle.taskGraph.whenReady {
+    val trial = allTasks.map { it.name }.filter { trialArtifactTask.matches(it) }
+    if (trial.isNotEmpty() && useFirebaseEmulator) {
+        throw GradleException(
+            "Trial flavor connects to the real rafiq-academy Firebase project: " +
+                "do not build with --dart-define=USE_FIREBASE_EMULATOR=true ($trial)."
+        )
+    }
     val local = allTasks.map { it.name }.filter { localArtifactTask.matches(it) }
     if (local.isNotEmpty()) {
         if (local.any { !it.endsWith("Debug") }) {

@@ -21,15 +21,25 @@ String parentAchievementsErrorMessage(String code, String? serverMessage) {
 /// contract break, not an empty result, so it throws [FormatException].
 /// Entries that are not maps or lack an id are skipped.
 List<AchievementModel> parseParentAchievementsResponse(Object? data) {
-  final raw = data is Map ? data['achievements'] : null;
+  final root = data is Map
+      ? <String, dynamic>{
+          for (final e in data.entries) e.key.toString(): e.value,
+        }
+      : null;
+  final raw = root?['achievements'];
   if (raw is! List) {
     throw const FormatException('getParentAchievements: missing list');
   }
   return [
     for (final item in raw)
-      if (item is Map &&
-          item['id'] is String &&
-          (item['id'] as String).isNotEmpty)
-        AchievementModel.fromParentCallable(Map<String, dynamic>.from(item)),
-  ];
+      if (item is Map)
+        () {
+          final map = <String, dynamic>{
+            for (final e in item.entries) e.key.toString(): e.value,
+          };
+          final id = map['id']?.toString().trim() ?? '';
+          if (id.isEmpty) return null;
+          return AchievementModel.fromParentCallable(map);
+        }(),
+  ].whereType<AchievementModel>().toList();
 }

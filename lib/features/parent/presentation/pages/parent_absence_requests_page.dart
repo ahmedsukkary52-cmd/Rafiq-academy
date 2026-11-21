@@ -113,7 +113,7 @@ class _ParentAbsenceRequestsPageState extends State<ParentAbsenceRequestsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('طلبات الاستئذان')),
+      appBar: AppBar(title: const Text('إعلام اعتذار')),
       body: BlocConsumer<ParentBloc, ParentState>(
         listenWhen: (prev, curr) =>
             prev.childrenStatus != curr.childrenStatus ||
@@ -135,7 +135,7 @@ class _ParentAbsenceRequestsPageState extends State<ParentAbsenceRequestsPage> {
 
           if (state.absenceSubmissionStatus == SubmissionStatus.success) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم إرسال طلب الاستئذان')),
+              const SnackBar(content: Text('تم إرسال إعلام الاعتذار')),
             );
             _reasonController.clear();
             context.read<ParentBloc>().add(const ResetAbsenceSubmissionEvent());
@@ -212,7 +212,7 @@ class _ParentAbsenceRequestsPageState extends State<ParentAbsenceRequestsPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'الحالة تُعرض من سجل الاستئذان الحالي — وليست بديلاً عن سجل الحضور.',
+                  'هذا إعلام يظهر للمعلم والمشرف كمعذور — وليس طلباً يحتاج موافقة لمنع الغياب.',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textHint,
                   ),
@@ -269,7 +269,7 @@ class _SubmitFormCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'تقديم استئذان',
+            'إعلام اعتذار',
             style: AppTextStyles.titleLarge,
             textAlign: TextAlign.right,
           ),
@@ -337,7 +337,7 @@ class _SubmitFormCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.paddingM),
-          Text('السبب', style: AppTextStyles.labelLarge),
+          Text('السبب (اختياري)', style: AppTextStyles.labelLarge),
           const SizedBox(height: 6),
           TextField(
             controller: reasonController,
@@ -345,7 +345,7 @@ class _SubmitFormCard extends StatelessWidget {
             maxLines: 3,
             textAlign: TextAlign.right,
             decoration: const InputDecoration(
-              hintText: 'اكتب سبب الاستئذان',
+              hintText: 'يمكنك ترك السبب فارغاً إن رغبت',
               filled: true,
               border: InputBorder.none,
             ),
@@ -361,7 +361,7 @@ class _SubmitFormCard extends StatelessWidget {
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('إرسال الطلب'),
+                  : const Text('إرسال الإعلام'),
             ),
           ),
         ],
@@ -591,8 +591,8 @@ class _EmptyRequests extends StatelessWidget {
   Widget build(BuildContext context) {
     return const AppEmptyState(
       icon: Icons.event_busy_outlined,
-      title: 'لا توجد طلبات استئذان بعد',
-      message: 'بعد الإرسال والمراجعة ستظهر نتيجة كل طلب هنا من سجل الاستئذان.',
+      title: 'لا توجد إعلامات اعتذار بعد',
+      message: 'بعد الإرسال ستظهر الإعلامات هنا ليطّلع عليها المعلم والمشرف.',
     );
   }
 }

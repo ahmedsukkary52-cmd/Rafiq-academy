@@ -34,8 +34,18 @@ abstract class ParentRepository
     required DateTime weekStart,
   });
 
-  /// سجل المدفوعات والاشتراكات
+  /// سجل المدفوعات والاشتراكات (unbounded — prefer [getPaymentsPage]).
   Future<Either<Failure, List<PaymentEntity>>> getPayments(String parentId);
+
+  /// Cursor page of this parent's payments (`dueDate` desc).
+  ///
+  /// [afterPaymentId] is the last document id from the previous page
+  /// (Firestore `startAfterDocument`); equal dueDates stay stable.
+  Future<Either<Failure, ParentPaymentsPage>> getPaymentsPage({
+    required String parentId,
+    int limit = ParentPaymentsPage.defaultLimit,
+    String? afterPaymentId,
+  });
 
   /// C3 — Parent-readable Vodafone destination.
   Future<Either<Failure, PaymentPublicSettingsEntity>>
@@ -114,6 +124,39 @@ class ParentIdParams extends Equatable {
 
   @override
   List<Object?> get props => [parentId];
+}
+
+/// One cursor page of parent-owned payment invoices.
+class ParentPaymentsPage extends Equatable {
+  static const int defaultLimit = 30;
+
+  final List<PaymentEntity> items;
+  final String? nextCursorId;
+  final bool hasMore;
+
+  const ParentPaymentsPage({
+    required this.items,
+    required this.nextCursorId,
+    required this.hasMore,
+  });
+
+  @override
+  List<Object?> get props => [items, nextCursorId, hasMore];
+}
+
+class ParentPaymentsPageParams extends Equatable {
+  final String parentId;
+  final int limit;
+  final String? afterPaymentId;
+
+  const ParentPaymentsPageParams({
+    required this.parentId,
+    this.limit = ParentPaymentsPage.defaultLimit,
+    this.afterPaymentId,
+  });
+
+  @override
+  List<Object?> get props => [parentId, limit, afterPaymentId];
 }
 
 class WeeklyReportParams extends Equatable {

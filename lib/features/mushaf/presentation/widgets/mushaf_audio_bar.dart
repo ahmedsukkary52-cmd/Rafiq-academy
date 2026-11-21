@@ -77,17 +77,17 @@ class MushafAudioBar extends StatelessWidget {
                 builder: (context, constraints) {
                   if (constraints.maxWidth < stackedBreakpoint) {
                     return Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 2),
+                      padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
                             child: _info(),
                           ),
                           SizedBox(
-                            height: 54,
+                            height: 44,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: _controls(),
@@ -98,11 +98,11 @@ class MushafAudioBar extends StatelessWidget {
                     );
                   }
                   return SizedBox(
-                    height: 60,
+                    height: 52,
                     child: Padding(
                       padding: const EdgeInsetsDirectional.only(
-                        start: 16,
-                        end: 4,
+                        start: 12,
+                        end: 2,
                       ),
                       child: Row(
                         children: [
@@ -165,9 +165,9 @@ class MushafAudioBar extends StatelessWidget {
           'سورة $surahName · الآية ${_digits(ayahNumber)}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: tokens.chromeLabelStyle(size: 13, weight: FontWeight.w700),
+          style: tokens.chromeLabelStyle(size: 12, weight: FontWeight.w700),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Semantics(
           liveRegion: true,
           child: Text(
@@ -176,7 +176,7 @@ class MushafAudioBar extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: tokens
-                .chromeLabelStyle(size: 11, weight: FontWeight.w500)
+                .chromeLabelStyle(size: 10.5, weight: FontWeight.w500)
                 .copyWith(color: isError ? tokens.error : tokens.chromeMuted),
           ),
         ),
@@ -204,8 +204,8 @@ class _BarIconButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-      icon: Icon(icon, size: 21),
+      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      icon: Icon(icon, size: 20),
       color: tokens.chromeInk,
       disabledColor: tokens.chromeMuted.withValues(alpha: 0.45),
     );
@@ -248,7 +248,7 @@ class MushafAudioPrimaryButton extends StatelessWidget {
         label: tooltipFor(status),
         excludeSemantics: true,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Material(
             key: const ValueKey('mushaf-audio-primary'),
             color: tokens.accent,
@@ -257,19 +257,19 @@ class MushafAudioPrimaryButton extends StatelessWidget {
               customBorder: const CircleBorder(),
               onTap: onPressed,
               child: SizedBox(
-                width: 46,
-                height: 46,
+                width: 40,
+                height: 40,
                 child: Center(
                   child: loading
                       ? SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
+                            strokeWidth: 2,
                             color: tokens.onAccent,
                           ),
                         )
-                      : Icon(icon, size: 26, color: tokens.onAccent),
+                      : Icon(icon, size: 22, color: tokens.onAccent),
                 ),
               ),
             ),

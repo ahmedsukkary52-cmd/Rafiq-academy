@@ -3,22 +3,26 @@
 /// a value accepted for one method is never reused for the other.
 enum AcademyPaymentMethod { vodafoneCash, instapay }
 
-enum InstapayDestinationKind { address, link }
+enum InstapayDestinationKind { mobile, address, link }
 
 abstract final class AcademyPaymentDestinations {
   static const int vodafoneCashMaxLength = 32;
-  static const int instapayMaxLength = 200;
+  static const int instapayMaxLength = 32;
 
   static const String vodafoneCashRequiredMessage =
       'أدخل رقم محفظة فودافون كاش';
   static const String vodafoneCashInvalidMessage =
       'رقم فودافون كاش يجب أن يتكوّن من ١١ رقماً ويبدأ بـ 010';
-  static const String instapayRequiredMessage =
-      'أدخل عنوان إنستاباي أو رابط الدفع';
+  static const String instapayRequiredMessage = 'أدخل رقم إنستاباي';
   static const String instapayInvalidMessage =
-      'أدخل عنوان إنستاباي بصيغة name@instapay أو رابطاً يبدأ بـ https://';
+      'رقم إنستاباي يجب أن يتكوّن من ١١ رقماً ويبدأ بـ 01';
 
+  /// Vodafone Cash wallets are 010… only.
   static final RegExp _vodafoneCash = RegExp(r'^010\d{8}$');
+
+  /// InstaPay accepts common Egyptian mobile prefixes.
+  static final RegExp _egyptianMobile = RegExp(r'^01[0125]\d{8}$');
+
   static final RegExp _instapayAddress = RegExp(
     r'^[a-z0-9][a-z0-9._-]{0,63}@instapay$',
   );
@@ -40,8 +44,8 @@ abstract final class AcademyPaymentDestinations {
     return out.toString();
   }
 
-  /// Canonical local form (`010…`), accepting `+20` / `0020` prefixes.
-  static String normalizeVodafoneCash(String raw) {
+  /// Canonical local form (`01…`), accepting `+20` / `0020` prefixes.
+  static String normalizeEgyptianMobile(String raw) {
     var v = _asciiDigits(raw.trim());
     if (v.startsWith('+20')) {
       v = '0${v.substring(3)}';
@@ -51,28 +55,37 @@ abstract final class AcademyPaymentDestinations {
     return v;
   }
 
+  static String normalizeVodafoneCash(String raw) =>
+      normalizeEgyptianMobile(raw);
+
   static bool isValidVodafoneCash(String raw) =>
       _vodafoneCash.hasMatch(normalizeVodafoneCash(raw));
 
   static String normalizeInstapay(String raw) {
     final v = raw.trim();
     if (v.toLowerCase().endsWith('@instapay')) return v.toLowerCase();
-    return v;
+    if (v.toLowerCase().startsWith('http')) return v;
+    return normalizeEgyptianMobile(v);
   }
 
   static InstapayDestinationKind? instapayKind(String raw) {
     final v = normalizeInstapay(raw);
-    if (v.isEmpty || v.length > instapayMaxLength) return null;
+    if (v.isEmpty) return null;
+    if (_egyptianMobile.hasMatch(v)) return InstapayDestinationKind.mobile;
     if (_instapayAddress.hasMatch(v)) return InstapayDestinationKind.address;
-    return instapayLinkUri(v) == null ? null : InstapayDestinationKind.link;
+    // Legacy links still resolve so old admin values remain readable.
+    return instapayLinkUri(raw) == null ? null : InstapayDestinationKind.link;
   }
 
-  static bool isValidInstapay(String raw) => instapayKind(raw) != null;
+  /// New admin saves accept Egyptian mobile only (same UX as Vodafone Cash).
+  /// Legacy address/link values still parse via [instapayKind] for parent display.
+  static bool isValidInstapay(String raw) =>
+      instapayKind(raw) == InstapayDestinationKind.mobile;
 
-  /// Only absolute `https` links with a host and no embedded credentials.
+  /// Legacy absolute `https` links still validate so old admin values load.
   static Uri? instapayLinkUri(String raw) {
     final v = raw.trim();
-    if (v.isEmpty || v.length > instapayMaxLength || v.contains(' ')) {
+    if (v.isEmpty || v.length > 200 || v.contains(' ')) {
       return null;
     }
     final uri = Uri.tryParse(v);

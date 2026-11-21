@@ -12,9 +12,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { clientFunctionsRegion } from "./helpers/client_region.mjs";
 
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -36,10 +37,7 @@ admin.initializeApp({ projectId: PROJECT_ID });
 const db = admin.firestore();
 const { Timestamp } = admin.firestore;
 
-const CLIENT_REGION = (() => {
-  const di = readFileSync(join(here, "..", "..", "lib", "core", "di", "di_module.dart"), "utf8");
-  return di.match(/FirebaseFunctions\.instanceFor\(\s*region:\s*'([^']+)'/)[1];
-})();
+const CLIENT_REGION = clientFunctionsRegion();
 
 async function clearFirestore() {
   const res = await fetch(

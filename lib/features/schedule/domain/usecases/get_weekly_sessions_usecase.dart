@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/error/user_facing_error.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../entities/class_session_entity.dart';
 import '../repositories/schedule_repository.dart';
@@ -30,7 +31,7 @@ class GetWeeklySessionsUseCase
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(userFacingErrorText('$e')));
     }
   }
 }

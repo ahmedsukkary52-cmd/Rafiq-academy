@@ -40,11 +40,64 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function eligibleParentIds(
+  db: admin.firestore.Firestore,
+  studentId: string,
+): Promise<string[]> {
+  // Discover relationship candidates before the membership lock transaction.
+  // Firestore Emulator cannot safely combine an array-contains query followed
+  // by additional transaction reads under concurrent admissions.
+  const profiles = await db
+    .collection("parentProfiles")
+    .where("childrenIds", "array-contains", studentId)
+    .get();
+  if (profiles.empty) {
+    throw new HttpsError("failed-precondition", "يجب ربط الطالب بولي أمر نشط قبل التسجيل في الحلقة");
+  }
+  const parents = await db.getAll(...profiles.docs.map((profile) => db.collection("users").doc(profile.id)));
+  const ids = parents
+    .filter((parent) => parent.exists && parent.get("role") === "parent" && parent.get("isActive") !== false)
+    .map((parent) => parent.id);
+  if (ids.length === 0) {
+    throw new HttpsError("failed-precondition", "لا يوجد ولي أمر صالح ونشط مرتبط بالطالب");
+  }
+  return ids;
+}
+
+async function requireEligibleParent(
+  db: admin.firestore.Firestore,
+  tx: admin.firestore.Transaction,
+  studentId: string,
+  candidateIds: readonly string[],
+): Promise<void> {
+  const refs = candidateIds.flatMap((id) => [
+    db.collection("users").doc(id),
+    db.collection("parentProfiles").doc(id),
+  ]);
+  const docs = await tx.getAll(...refs);
+  for (let index = 0; index < candidateIds.length; index++) {
+    const user = docs[index * 2];
+    const profile = docs[index * 2 + 1];
+    if (
+      user.exists &&
+      user.get("role") === "parent" &&
+      user.get("isActive") !== false &&
+      Array.isArray(profile.get("childrenIds")) &&
+      profile.get("childrenIds").includes(studentId)
+    ) {
+      return;
+    }
+  }
+  throw new HttpsError("failed-precondition", "لا يوجد ولي أمر صالح ونشط مرتبط بالطالب");
+}
+
 /** AcademyMembershipInvariant.shouldSetPrimaryOnEstablish. */
 export function shouldSetPrimaryOnEstablish(params: {
   currentPrimary: string;
   otherMembershipIds: readonly string[];
 }): boolean {
+  // PH-02 invariant: never invent a primary while other memberships already
+  // exist; only establish primary when the student has none yet.
   if (params.otherMembershipIds.length > 0) return false;
   return params.currentPrimary.trim() === "";
 }
@@ -115,6 +168,12 @@ export async function admitStudentToHalaqaCore(
     );
   }
 
+  const candidateStudent = await db.collection("users").doc(studentId).get();
+  if (!candidateStudent.exists) throw new HttpsError("not-found", "الطالب غير موجود");
+  if (candidateStudent.get("role") !== "student") {
+    throw new HttpsError("failed-precondition", "لا يمكن إتمام العضوية: دور المستخدم ليس طالباً");
+  }
+  const parentIds = await eligibleParentIds(db, studentId);
   const lockRef = db.collection(MEMBERSHIP_LOCKS_COLLECTION).doc(studentId);
   const userRef = db.collection("users").doc(studentId);
   const profileRef = db.collection("studentProfiles").doc(studentId);
@@ -136,10 +195,14 @@ export async function admitStudentToHalaqaCore(
     }
     if (!profileSnap.exists) throw new HttpsError("not-found", "ملف الطالب غير موجود");
     if (!halaqaSnap.exists) throw new HttpsError("not-found", "الحلقة غير موجودة");
+    if (text(halaqaSnap.get("status")) && text(halaqaSnap.get("status")) !== "active") {
+      throw new HttpsError("failed-precondition", "لا يمكن التسجيل في حلقة غير نشطة");
+    }
 
     if (role === "supervisor" && text(halaqaSnap.data()?.supervisorId) !== uid) {
       throw new HttpsError("permission-denied", "الحلقة خارج نطاق إشرافك");
     }
+    await requireEligibleParent(db, tx, studentId, parentIds);
 
     const membershipSnap = await tx.get(
       db.collection("halaqat").where("studentIds", "array-contains", studentId),
@@ -241,6 +304,12 @@ export async function adminTransferStudentCore(
     );
   }
 
+  const candidateStudent = await db.collection("users").doc(studentId).get();
+  if (!candidateStudent.exists) throw new HttpsError("not-found", "الطالب غير موجود");
+  if (candidateStudent.get("role") !== "student") {
+    throw new HttpsError("failed-precondition", "لا يمكن إتمام النقل: دور المستخدم ليس طالباً");
+  }
+  const parentIds = await eligibleParentIds(db, studentId);
   const lockRef = db.collection(MEMBERSHIP_LOCKS_COLLECTION).doc(studentId);
   const userRef = db.collection("users").doc(studentId);
   const profileRef = db.collection("studentProfiles").doc(studentId);
@@ -266,6 +335,9 @@ export async function adminTransferStudentCore(
     if (!sourceSnap.exists || !targetSnap.exists) {
       throw new HttpsError("not-found", "الحلقة غير موجودة");
     }
+    if (text(targetSnap.get("status")) && text(targetSnap.get("status")) !== "active") {
+      throw new HttpsError("failed-precondition", "لا يمكن نقل الطالب إلى حلقة غير نشطة");
+    }
     if (
       role === "supervisor" &&
       (text(sourceSnap.data()?.supervisorId) !== uid ||
@@ -273,6 +345,7 @@ export async function adminTransferStudentCore(
     ) {
       throw new HttpsError("permission-denied", "الحلقة خارج نطاق إشرافك");
     }
+    await requireEligibleParent(db, tx, studentId, parentIds);
 
     const membershipSnap = await tx.get(
       db.collection("halaqat").where("studentIds", "array-contains", studentId),

@@ -70,7 +70,7 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
       listenWhen: (p, c) => p.approveStudentStatus != c.approveStudentStatus,
       listener: (context, state) {
         if (state.approveStudentStatus == SubmissionStatus.success) {
-          AppSnackBar.showSuccess(context, 'تم قبول الطالب في الحلقة');
+          AppSnackBar.showSuccess(context, 'تم تعيين الطالب في الحلقة');
           context.read<AdminBloc>().add(const ResetApproveStudentEvent());
           setState(() {
             _selectedStudentId = null;
@@ -81,14 +81,14 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
         } else if (state.approveStudentStatus == SubmissionStatus.error) {
           AppSnackBar.showError(
             context,
-            state.approveStudentError ?? 'تعذر قبول الطالب',
+            state.approveStudentError ?? 'تعذر تعيين الطالب',
           );
           context.read<AdminBloc>().add(const ResetApproveStudentEvent());
         }
       },
       child: AdminSubpageScaffold(
-        title: 'قبول طالب',
-        subtitle: 'تعيين طالب لحلقة',
+        title: 'تعيين طالب لحلقة',
+        subtitle: 'للطلبات الواردة بانتظار التعيين — وليس إنشاء طالب جديد',
         body: BlocBuilder<AdminBloc, AdminState>(
           buildWhen: (p, c) =>
               p.approveStudentStatus != c.approveStudentStatus ||
@@ -112,10 +112,13 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
                 Text(
-                  'اختر طالباً من قائمة الانتظار وحلقة للتعيين. لتسجيل طالب '
-                  'جديد بحساب وولي أمر استخدم "تسجيل طالب جديد".',
+                  'هذه الشاشة لتعيين طلاب خارجيين بانتظار حلقة. '
+                  'إنشاء طالب جديد (مع ولي أمر وحلقة) يتم من «تسجيل طالب جديد» '
+                  'وليس من هنا.',
+                  textAlign: TextAlign.right,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
+                    height: 1.45,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -159,9 +162,10 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
                         const SizedBox(height: 8),
                         const AdminPlaceholderCard(
                           icon: Icons.person_off_outlined,
-                          title: 'لا طلاب في الانتظار',
+                          title: 'لا طلبات بانتظار التعيين',
                           message:
-                              'لتسجيل طالب جديد استخدم زر "تسجيل طالب جديد" أعلاه.',
+                              'لا يوجد طلاب واردون بانتظار حلقة. لإنشاء طالب '
+                              'جديد استخدم «تسجيل طالب جديد» أعلاه.',
                         ),
                       ],
                       const SizedBox(height: 16),
@@ -209,7 +213,7 @@ class _AdminAdmitPageState extends State<AdminAdmitPage> {
                       ],
                       const SizedBox(height: 16),
                       AppButton(
-                        label: 'قبول وتعيين',
+                        label: 'تعيين للحلقة',
                         isLoading: submitting,
                         onPressed: _submit,
                       ),

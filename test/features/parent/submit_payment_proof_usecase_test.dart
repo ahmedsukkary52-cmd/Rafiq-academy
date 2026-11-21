@@ -66,6 +66,14 @@ class _FakeParentRepository implements ParentRepository {
       throw UnimplementedError();
 
   @override
+  Future<Either<Failure, ParentPaymentsPage>> getPaymentsPage({
+    required String parentId,
+    int limit = ParentPaymentsPage.defaultLimit,
+    String? afterPaymentId,
+  }) =>
+      throw UnimplementedError();
+
+  @override
   Future<Either<Failure, PaymentPublicSettingsEntity>>
   getPaymentPublicSettings() => throw UnimplementedError();
 

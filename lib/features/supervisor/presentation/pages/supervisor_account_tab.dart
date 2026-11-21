@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/academy_branding.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -137,7 +138,7 @@ class _SupervisorAccountTabState extends State<SupervisorAccountTab> {
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
-                                      'بواسطة Team Academy — التطوير المستمر · إصدار 2.0',
+                                      'بواسطة ${AcademyBranding.displayName} — التطوير المستمر · إصدار 2.0',
                                       textAlign: TextAlign.center,
                                       style: AppTextStyles.labelSmall.copyWith(
                                         color: AppColors.textHint,
@@ -268,7 +269,7 @@ class _ProfileHeader extends StatelessWidget {
           if (email.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'منصة Team Academy${email.isNotEmpty ? ' · $email' : ''}',
+              '${AcademyBranding.displayName}${email.isNotEmpty ? ' · $email' : ''}',
               textAlign: TextAlign.center,
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColors.onPrimary.withValues(alpha: 0.85),
@@ -472,7 +473,7 @@ class _NavRow extends StatelessWidget {
               if (onTap != null) ...[
                 const SizedBox(width: 4),
                 Icon(
-                  Icons.chevron_left_rounded,
+                  Icons.chevron_right_rounded,
                   size: 18,
                   color: AppColors.textHint.withValues(alpha: 0.7),
                 ),

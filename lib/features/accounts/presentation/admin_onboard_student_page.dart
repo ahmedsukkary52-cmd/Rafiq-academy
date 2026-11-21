@@ -38,12 +38,20 @@ class AdminOnboardStudentPage extends StatefulWidget {
   /// Pre-selected guardian when adding another child from a parent profile.
   final MemberSearchHit? initialParent;
 
+  /// AppBar title (Admin vs Supervisor wording).
+  final String title;
+
+  /// When true, a halaqa must be selected before submit (supervisor scope).
+  final bool requireHalaqa;
+
   const AdminOnboardStudentPage({
     super.key,
     this.submit,
     this.searchParents,
     required this.loadHalaqat,
     this.initialParent,
+    this.title = 'تسجيل طالب جديد',
+    this.requireHalaqa = false,
   });
 
   @override
@@ -142,6 +150,8 @@ class _AdminOnboardStudentPageState extends State<AdminOnboardStudentPage> {
         _parentName.text.trim().length < 2 =>
       'اكتب اسم ولي الأمر',
     1 when _studentName.text.trim().length < 2 => 'اكتب اسم الطالب',
+    2 when widget.requireHalaqa && _halaqa == null =>
+      'اختر الحلقة التي ستُسند إليها الطالب',
     _ => null,
   };
 
@@ -203,7 +213,7 @@ class _AdminOnboardStudentPageState extends State<AdminOnboardStudentPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
-        title: const Text('تسجيل طالب جديد'),
+        title: Text(widget.title),
       ),
       body: SafeArea(
         child: result != null
@@ -380,8 +390,10 @@ class _AdminOnboardStudentPageState extends State<AdminOnboardStudentPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'المعلم والمشرف يُحدَّدان من الحلقة. يمكن تخطي هذه الخطوة وإضافة '
-          'الطالب لاحقاً.',
+          widget.requireHalaqa
+              ? 'اختر حلقة من حلقاتك لإسناد الطالب إليها. المعلم يُحدَّد من الحلقة.'
+              : 'المعلم والمشرف يُحدَّدان من الحلقة. يمكن تخطي هذه الخطوة وإضافة '
+                  'الطالب لاحقاً.',
           style: AppTextStyles.labelMedium,
         ),
         const SizedBox(height: 8),
@@ -394,11 +406,12 @@ class _AdminOnboardStudentPageState extends State<AdminOnboardStudentPage> {
           ),
           child: Column(
             children: [
-              const RadioListTile<String?>(
-                key: Key('onboard-halaqa-none'),
-                value: null,
-                title: Text('بدون حلقة الآن'),
-              ),
+              if (!widget.requireHalaqa)
+                const RadioListTile<String?>(
+                  key: Key('onboard-halaqa-none'),
+                  value: null,
+                  title: Text('بدون حلقة الآن'),
+                ),
               for (final h in halaqat)
                 RadioListTile<String?>(
                   key: Key('onboard-halaqa-${h.id}'),

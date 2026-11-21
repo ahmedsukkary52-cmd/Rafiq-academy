@@ -83,7 +83,7 @@ class PersonTile extends StatelessWidget {
       leading: const Icon(Icons.person_outline),
       title: Text(person.displayName),
       subtitle: Text(caption),
-      trailing: trailing ?? (onTap == null ? null : const Icon(Icons.chevron_left)),
+      trailing: trailing ?? (onTap == null ? null : const Icon(Icons.chevron_right)),
       onTap: onTap,
     );
   }

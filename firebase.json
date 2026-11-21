@@ -38,6 +38,8 @@
         "*.local",
         "firestore-debug.log",
         "seed-emulator*.mjs",
+        "seed-cloud-trial*.mjs",
+        "e2e-emulator-journeys.mjs",
         "deploy-functions.mjs",
         "serve-emulators.mjs",
         "test",

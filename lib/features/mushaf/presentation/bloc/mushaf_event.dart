@@ -2,7 +2,6 @@ import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/mushaf_ayah.dart';
 import '../../domain/entities/mushaf_position.dart';
-import '../../domain/entities/quran_text_bundle.dart';
 
 abstract class MushafEvent extends Equatable {
   const MushafEvent();
@@ -111,5 +110,3 @@ class MushafPersistPositionEvent extends MushafEvent {
   List<Object?> get props => [studentId, position];
 }
 
-// Re-export bundle type for listeners if needed
-typedef MushafQuranBundle = QuranTextBundle;

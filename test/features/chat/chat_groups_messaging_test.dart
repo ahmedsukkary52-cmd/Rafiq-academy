@@ -377,6 +377,30 @@ void main() {
     });
   });
 
+  group('role inbox paging (participant filter)', () {
+    test('LoadMore uses participantUid and keeps older threads reachable', () async {
+      final repo = _PagingRepo();
+      final bloc = ChatConversationsBloc(
+        watchConversations: WatchConversationsUseCase(repo),
+        watchAllConversations: WatchAllConversationsUseCase(repo),
+        getOrCreateConversation: GetOrCreateConversationUseCase(repo),
+      );
+      addTearDown(bloc.close);
+      bloc.add(const StartWatchingConversationsEvent('t1', pageSize: 2));
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.roleLimits, [2]);
+      repo.roleLive.add(Right([_conv('c3', 3), _conv('c2', 2)]));
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.hasMoreConversations, isTrue);
+
+      bloc.add(const LoadMoreConversationsEvent());
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(repo.roleCursors, ['c2']);
+      expect(repo.roleParticipants, ['t1']);
+      expect(bloc.state.conversations.map((c) => c.id), ['c3', 'c2', 'c1']);
+    });
+  });
+
   group('wire parsing and list previews', () {
     test('messages carry reply, reactions and link flag; deleted drop reactions', () {
       final m = MessageModel.fromMap('m2', {
@@ -443,8 +467,13 @@ ConversationEntity _conv(String id, int minute) => ConversationEntity(
 
 class _PagingRepo extends Fake implements ChatRepository {
   final live = StreamController<Either<Failure, List<ConversationEntity>>>();
+  final roleLive =
+      StreamController<Either<Failure, List<ConversationEntity>>>();
   final limits = <int?>[];
+  final roleLimits = <int?>[];
   final cursors = <String>[];
+  final roleCursors = <String>[];
+  final roleParticipants = <String?>[];
 
   @override
   Stream<Either<Failure, List<ConversationEntity>>> watchAllConversations({
@@ -456,14 +485,28 @@ class _PagingRepo extends Fake implements ChatRepository {
   }
 
   @override
+  Stream<Either<Failure, List<ConversationEntity>>> watchConversations(
+    String uid, {
+    int? limit,
+  }) {
+    roleLimits.add(limit);
+    return roleLive.stream;
+  }
+
+  @override
   Future<Either<Failure, List<ConversationEntity>>> fetchConversationsAfter({
     String? participantUid,
     required String viewerUid,
     required String afterConversationId,
     required int limit,
   }) async {
-    cursors.add(afterConversationId);
-    expect(participantUid, isNull, reason: 'academy-wide oversight');
+    if (participantUid == null) {
+      cursors.add(afterConversationId);
+      expect(participantUid, isNull, reason: 'academy-wide oversight');
+    } else {
+      roleCursors.add(afterConversationId);
+      roleParticipants.add(participantUid);
+    }
     return Right([_conv('c1', 1)]);
   }
 }

@@ -106,7 +106,7 @@ void main() {
 
     expect(find.text('لا محادثات مع أولياء الأمور'), findsOneWidget);
     expect(
-      find.text('تواصل مع ولي الأمر من الملف الشخصي للطالب'),
+      find.text('ابدأ محادثة من زر + أو من ملف الطالب'),
       findsOneWidget,
     );
     expect(find.textContaining('غير متاح'), findsNothing);

@@ -26,7 +26,13 @@ void main() {
       notFoundErrorText,
     );
     expect(
-      userFacingErrorText('[cloud_firestore/failed-precondition] index'),
+      userFacingErrorText(
+        '[cloud_firestore/failed-precondition] The query requires an index.',
+      ),
+      missingIndexErrorText,
+    );
+    expect(
+      userFacingErrorText('[firebase_functions/failed-precondition] index'),
       genericErrorText,
     );
   });

@@ -60,7 +60,7 @@ class TeacherPendingAbsenceSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         if (status == SectionStatus.initial || status == SectionStatus.loading)
-          const TeacherRosterRowsSkeleton(itemCount: 2)
+          const TeacherRosterRowsSkeleton(itemCount: 2, shrinkWrap: true)
         else if (status == SectionStatus.error)
           AppErrorWidget(
             message: error ?? 'تعذر تحميل طلبات الاستئذان',

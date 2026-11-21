@@ -20,6 +20,8 @@ import '../../features/admin/presentation/pages/admin_oversight_pages.dart';
 import '../../features/admin/presentation/pages/admin_payments_ledger_page.dart';
 import '../../features/admin/presentation/pages/admin_parent_links_page.dart';
 import '../../features/admin/presentation/pages/admin_payment_destinations_page.dart';
+import '../../features/admin/presentation/pages/admin_issue_invoice_page.dart';
+import '../../features/admin/presentation/pages/admin_pricing_page.dart';
 import '../../features/admin/presentation/pages/admin_registration_requests_page.dart';
 import '../../features/admin/presentation/pages/admin_teachers_page.dart';
 import '../../features/admin/presentation/pages/payment_review_page.dart';
@@ -75,6 +77,7 @@ import '../../features/student/presentation/pages/student_streak_page.dart';
 import '../../features/student/presentation/student_bloc_current_profile.dart';
 import '../../features/student/presentation/student_chat_teacher_resolver.dart';
 import '../../features/supervisor/presentation/pages/supervisor_home_page.dart';
+import '../../features/supervisor/presentation/pages/supervisor_payments_page.dart';
 import '../../features/teacher/presentation/pages/teacher_attendance_page.dart';
 import '../../features/teacher/presentation/pages/teacher_class_detail_page.dart';
 import '../../features/teacher/presentation/pages/teacher_evalutation_page.dart';
@@ -364,7 +367,7 @@ class AppRouter {
         routes: [
           GoRoute(
             path: 'payments',
-            builder: (_, __) => const PaymentReviewPage(isAdmin: false),
+            builder: (_, __) => const SupervisorPaymentsPage(),
           ),
         ],
       ),
@@ -515,7 +518,7 @@ class AppRouter {
           ),
           GoRoute(
             path: 'create-halaqa',
-            redirect: (_, __) => AppRoutes.adminHalaqat,
+            redirect: (_, __) => '${AppRoutes.adminHalaqat}?create=1',
           ),
           GoRoute(
             path: 'finance-detail',
@@ -524,6 +527,14 @@ class AppRouter {
           GoRoute(
             path: 'payments-overview',
             builder: (_, __) => const AdminPaymentsLedgerPage(),
+          ),
+          GoRoute(
+            path: 'pricing',
+            builder: (_, __) => const AdminPricingPage(),
+          ),
+          GoRoute(
+            path: 'issue-invoice',
+            builder: (_, __) => const AdminIssueInvoicePage(),
           ),
           GoRoute(
             path: 'supervisors',

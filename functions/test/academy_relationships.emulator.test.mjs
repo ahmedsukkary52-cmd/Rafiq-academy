@@ -426,6 +426,17 @@ test("P2-2: parent/student activation is Admin-callable only, audited, never for
   await rejects(set(ADMIN, s1, true), "failed-precondition", "مؤرشف");
   await db.doc(`studentProfiles/${s1}`).update({ lifecycle: "active" });
   assert.equal((await set(ADMIN, s1, true)).changed, true);
+
+  // A Parent who is the sole eligible guardian of an active Student cannot be
+  // deactivated: the account stays active and no audit is written.
+  const s2 = await idOf("S-002");
+  await rejects(set(ADMIN, p1, false), "failed-precondition", "الوحيد");
+  assert.equal((await data(`users/${p1}`)).isActive, true);
+
+  // With a second active guardian for every child, deactivation is allowed.
+  const p2 = (await accounts.adminCreateMemberAccountCore(deps, ADMIN, { role: "parent", name: "ولي أمر بديل" })).uid;
+  await parentLink.adminLinkParentChildCore(db, ADMIN, { parentId: p2, studentId: s1, operation: "link" });
+  await parentLink.adminLinkParentChildCore(db, ADMIN, { parentId: p2, studentId: s2, operation: "link" });
   assert.equal((await set(ADMIN, p1, false)).changed, true);
   assert.equal((await set(ADMIN, p1, true)).changed, true);
   assert.equal((await audits()).length, 4);

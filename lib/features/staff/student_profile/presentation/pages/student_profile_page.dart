@@ -460,7 +460,7 @@ class _ProfileHeader extends StatelessWidget {
           Row(
             children: [
               _HeaderCircleButton(
-                icon: Icons.chevron_right_rounded,
+                icon: Icons.chevron_left_rounded,
                 onTap: onBack,
               ),
               Expanded(

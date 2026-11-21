@@ -198,8 +198,13 @@ void main() {
         'otherUid': 'student1',
       });
       expect(result.isLeft(), isTrue);
+      // Same _callableMessage mapping as send/edit/delete: non-Arabic
+      // permission-denied becomes the Arabic denial (never raw English).
       result.match(
-        (f) => expect(f.message, 'No active relationship'),
+        (f) => expect(
+          f.message,
+          'غير مسموح بهذا الإجراء في هذه المحادثة',
+        ),
         (_) => fail('denied conversation must not succeed'),
       );
     });

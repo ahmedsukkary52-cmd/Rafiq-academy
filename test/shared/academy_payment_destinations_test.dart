@@ -77,7 +77,18 @@ void main() {
   });
 
   group('InstaPay destination', () {
-    test('accepts an address and an https link, classified separately', () {
+    test('admin saves accept Egyptian mobile only', () {
+      expect(
+        AcademyPaymentDestinations.validate(i, kDevPlaceholderInstapayMobile),
+        isNull,
+      );
+      expect(
+        AcademyPaymentDestinations.instapayKind(kDevPlaceholderInstapayMobile),
+        InstapayDestinationKind.mobile,
+      );
+    });
+
+    test('legacy address/link still classify for parent display', () {
       expect(
         AcademyPaymentDestinations.instapayKind(kDevPlaceholderInstapayAddress),
         InstapayDestinationKind.address,
@@ -90,9 +101,18 @@ void main() {
         AcademyPaymentDestinations.instapayKind(kDevPlaceholderInstapayLink),
         InstapayDestinationKind.link,
       );
+      // New admin writes reject non-mobile values.
+      expect(
+        AcademyPaymentDestinations.validate(i, kDevPlaceholderInstapayAddress),
+        AcademyPaymentDestinations.instapayInvalidMessage,
+      );
+      expect(
+        AcademyPaymentDestinations.validate(i, kDevPlaceholderInstapayLink),
+        AcademyPaymentDestinations.instapayInvalidMessage,
+      );
     });
 
-    test('rejects insecure, malformed and wallet-number values', () {
+    test('rejects insecure, malformed and non-mobile values', () {
       for (final bad in [
         'http://dev-placeholder.invalid/instapay',
         'javascript:alert(1)',
@@ -101,7 +121,7 @@ void main() {
         'https://dev placeholder.invalid',
         'name@gmail.com',
         '@instapay',
-        kDevPlaceholderVodafoneCash,
+        '02xxxxxxx',
         'https://dev-placeholder.invalid/${'a' * 200}',
       ]) {
         expect(
@@ -156,13 +176,13 @@ void main() {
       await useCase(
         const UpdatePaymentPublicParams(
           method: AcademyPaymentMethod.instapay,
-          value: 'Dev-Placeholder@InstaPay',
+          value: kDevPlaceholderInstapayMobile,
         ),
       );
 
       expect(repo.calls, [
         (vodafoneCash: kDevPlaceholderVodafoneCash, instapay: null),
-        (vodafoneCash: null, instapay: kDevPlaceholderInstapayAddress),
+        (vodafoneCash: null, instapay: kDevPlaceholderInstapayMobile),
       ]);
     });
 

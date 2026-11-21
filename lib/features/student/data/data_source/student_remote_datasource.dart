@@ -17,6 +17,26 @@ abstract class StudentRemoteDatasource {
 
   Future<List<AchievementModel>> getAchievements(String studentId);
 
+  /// Cursor page of achievements for [studentId] (dual query merge).
+  ///
+  /// [afterStudentAchievementId] / [afterRecipientsAchievementId] are the
+  /// last raw doc ids from each query shape on the previous page.
+  Future<
+    ({
+      List<AchievementModel> items,
+      String? studentCursorId,
+      String? recipientsCursorId,
+      bool hasMoreStudent,
+      bool hasMoreRecipients,
+    })
+  >
+  getAchievementsPage({
+    required String studentId,
+    int limit = 20,
+    String? afterStudentAchievementId,
+    String? afterRecipientsAchievementId,
+  });
+
   Future<AssignmentModel?> getLatestAssignment(String studentId);
 
   Future<HalaqaModel> getStudentHalaqa(String halaqaId);

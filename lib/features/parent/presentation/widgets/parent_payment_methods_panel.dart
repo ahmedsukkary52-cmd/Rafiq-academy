@@ -21,17 +21,20 @@ abstract final class ParentPaymentMethodsText {
   static const String vodafoneCashUnset =
       'لم تُحدِّد الأكاديمية رقم محفظة فودافون كاش بعد.';
   static const String instapayUnset =
-      'لم تُحدِّد الأكاديمية وجهة التحويل عبر إنستاباي بعد.';
+      'لم تُحدِّد الأكاديمية رقم إنستاباي بعد.';
   static const String vodafoneCashInvalid =
       'رقم محفظة فودافون كاش المسجَّل غير صالح حالياً. يُرجى إبلاغ إدارة الأكاديمية.';
   static const String instapayInvalid =
-      'وجهة إنستاباي المسجَّلة غير صالحة حالياً. يُرجى إبلاغ إدارة الأكاديمية.';
+      'رقم إنستاباي المسجَّل غير صالح حالياً. يُرجى إبلاغ إدارة الأكاديمية.';
   static const String walletLabel = 'رقم المحفظة';
+  static const String instapayNumberLabel = 'رقم إنستاباي';
   static const String instapayAddressLabel = 'عنوان إنستاباي';
   static const String instapayLinkLabel = 'رابط الدفع';
   static const String openInstapayLink = 'فتح رابط إنستاباي';
   static const String linkOpenFailed =
       'تعذر فتح رابط إنستاباي. انسخ الرابط وافتحه من المتصفح.';
+  static const String chooseMethodHint =
+      'اختر الرقم المناسب للتحويل (فودافون كاش أو إنستاباي).';
   static const String copied = 'تم النسخ';
 }
 
@@ -85,6 +88,14 @@ class ParentPaymentMethodsPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          ParentPaymentMethodsText.chooseMethodHint,
+          style: AppTextStyles.labelMedium.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
         _VodafoneCashCard(destination: vodafoneCashDestination),
         const SizedBox(height: 10),
         _InstapayCard(destination: instapayDestination, openLink: openLink),
@@ -166,6 +177,12 @@ class _InstapayCard extends StatelessWidget {
         key: Key('instapay-invalid'),
         text: ParentPaymentMethodsText.instapayInvalid,
         color: AppColors.error,
+      );
+    } else if (kind == InstapayDestinationKind.mobile) {
+      body = _DestinationValue(
+        key: const Key('instapay-destination'),
+        label: ParentPaymentMethodsText.instapayNumberLabel,
+        value: AcademyPaymentDestinations.normalizeInstapay(raw),
       );
     } else if (kind == InstapayDestinationKind.address) {
       body = _DestinationValue(

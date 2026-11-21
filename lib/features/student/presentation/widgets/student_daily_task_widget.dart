@@ -4,7 +4,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/assignment_entity.dart';
 import 'student_loading_skeletons.dart';
 
-/// كارت «درس اليوم» — مطابق لـ Figma Home.
+/// كارت «درس اليوم» — بهجة بهوية التطبيق (تيل/فيروزي) بدون ألوان دخيلة.
 class StudentDailyTaskWidget extends StatelessWidget {
   final AssignmentEntity? assignment;
   final SectionStatus status;
@@ -70,19 +70,15 @@ class StudentDailyTaskWidget extends StatelessWidget {
           : range,
     );
 
-    return GestureDetector(
-      onTap: onCardTap,
+    return Directionality(
+      textDirection: TextDirection.rtl,
       child: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [Color(0xFF1ECAD6), Color(0xFF0E8F9A)],
-          ),
+          gradient: AppColors.primaryGradient,
           borderRadius: BorderRadius.circular(26),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.32),
+              color: AppColors.primaryDark.withValues(alpha: 0.28),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -92,12 +88,36 @@ class StudentDailyTaskWidget extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              left: -8,
-              bottom: -18,
+              left: -24,
+              top: -28,
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -18,
+              bottom: -30,
+              child: Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              bottom: 8,
               child: Icon(
                 Icons.menu_book_rounded,
-                size: 120,
-                color: Colors.white.withValues(alpha: 0.10),
+                size: 72,
+                color: Colors.white.withValues(alpha: 0.12),
               ),
             ),
             Padding(
@@ -106,54 +126,84 @@ class StudentDailyTaskWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Text(
-                        isSubmitted ? 'درس اليوم — مكتمل' : 'درس اليوم',
-                        style: const TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white70,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isSubmitted
+                                  ? Icons.check_circle_rounded
+                                  : Icons.auto_stories_rounded,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              isSubmitted ? 'مكتمل' : 'درس اليوم',
+                              style: AppTextStyles.labelMedium.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      const Icon(
-                        Icons.menu_book_rounded,
-                        color: Colors.white70,
-                        size: 16,
-                      ),
+                      const Spacer(),
+                      if (isSubmitted)
+                        Text(
+                          'أحسنت 🌟',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    suraName,
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      height: 1.25,
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: onCardTap,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          suraName,
+                          textAlign: TextAlign.right,
+                          style: AppTextStyles.headlineMedium.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            fontSize: 26,
+                            height: 1.25,
+                          ),
+                        ),
+                        if (versesRange.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'الآيات $versesRange',
+                            textAlign: TextAlign.right,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (versesRange.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'الآيات $versesRange',
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 18),
                   Row(
                     children: [
                       Expanded(
-                        child: _OutlineAction(
+                        child: _SolidAction(
                           label: isSubmitted ? 'التفاصيل' : 'اقرأ',
                           icon: Icons.chrome_reader_mode_outlined,
                           onTap: onReadTap,
@@ -161,7 +211,7 @@ class StudentDailyTaskWidget extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _SolidAction(
+                        child: _OutlineAction(
                           label: 'استمع',
                           icon: Icons.headphones_rounded,
                           onTap: onListenTap,
@@ -232,7 +282,8 @@ class _OutlineAction extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -241,9 +292,7 @@ class _OutlineAction extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 14,
+                style: AppTextStyles.labelLarge.copyWith(
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -284,9 +333,7 @@ class _SolidAction extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 14,
+                style: AppTextStyles.labelLarge.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.primaryDark,
                 ),

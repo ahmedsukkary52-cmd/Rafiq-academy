@@ -1,9 +1,9 @@
 /**
- * Demo dataset v2 contract (scripts/seed-emulator-dataset.mjs): fixed UIDs,
- * no personal phone numbers anywhere, email only in userPrivate, and fields and values identical
- * to what adminProvisionUser writes today (read from the current sources), including
- * nameNormalized from the compiled backend normalizer and the pending first-login flags of an
- * Admin. Writes go only to in-memory doubles: nothing reaches an emulator or Firebase.
+ * Demo dataset v3 contract (scripts/seed-emulator-dataset.mjs): fixed UIDs,
+ * no personal phone numbers anywhere, email only in userPrivate, provision-shaped
+ * user docs (nameNormalized + first-login flags), plus a small trial graph
+ * (halaqa / roster / attendance / recitations / homework) for UI walkthroughs.
+ * Writes go only to in-memory doubles: nothing reaches an emulator or Firebase.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,6 +16,7 @@ import {
   buildDemoDataset,
   classifyEmulatorState,
   DEMO_ACCOUNTS,
+  DEMO_HALAQA_MORNING_ID,
   DEMO_PASSWORD,
   DEMO_SEED_VERSION,
   SEED_META,
@@ -206,12 +207,13 @@ test("adminProvisionUser's users and userPrivate writes are the ones this contra
   assert.deepEqual(provisionUpdates("userPrivate"), { everyone: [], adminOnly: [["mustChangePassword", "true"]] });
 });
 
-test("users documents equal what adminProvisionUser writes for each account, values included", () => {
-  const { everyone, adminOnly } = provisionUpdates("users");
+test("users documents match provision shape without first-login gates (demo skips completeFirstLogin)", () => {
+  const { everyone } = provisionUpdates("users");
   assert.equal(docsIn("users").length, DEMO_ACCOUNTS.length);
   for (const a of DEMO_ACCOUNTS) {
-    const entries = [...provisionEntries("users"), ...everyone, ...(a.role === "admin" ? adminOnly : [])];
+    const entries = [...provisionEntries("users"), ...everyone];
     assert.deepEqual(docOf("users", a.uid).data, expectedData(entries, a), a.uid);
+    assert.equal("passwordChangeRequired" in docOf("users", a.uid).data, false, a.uid);
   }
 });
 
@@ -230,28 +232,52 @@ test("users fields the app writes itself stay within UserModel.toFirestore; the 
 });
 
 test("email lives only in userPrivate, with the fields adminProvisionUser writes", () => {
-  const { adminOnly } = provisionUpdates("userPrivate");
   assert.equal(docsIn("userPrivate").length, DEMO_ACCOUNTS.length);
   for (const a of DEMO_ACCOUNTS) {
     const priv = docOf("userPrivate", a.uid);
     assert.ok(priv, a.uid);
-    const entries = [...provisionEntries("userPrivate"), ...(a.role === "admin" ? adminOnly : [])];
+    // Demo seed skips mustChangePassword so trial Admin reaches home immediately.
+    const entries = [...provisionEntries("userPrivate")];
     assert.deepEqual(priv.data, expectedData(entries, a), a.uid);
     assert.equal(priv.data.email === a.email, true, `${a.uid}: email matches its Auth account`);
     assert.equal(priv.data.emailSource, "auth", a.uid);
+    assert.equal("mustChangePassword" in priv.data, false, a.uid);
   }
   for (const doc of dataset.documents.filter((d) => d.collection !== "userPrivate")) {
     assert.equal("email" in doc.data, false, `${doc.collection}/${doc.id}`);
   }
 });
 
-test("role profile fields and values equal adminProvisionUser's writeRoleProfile", () => {
+test("role profile fields cover adminProvisionUser's writeRoleProfile (trial graph may enrich links)", () => {
+  // Relationship fields the trial graph may set beyond a bare provision write.
+  const enrichable = new Set([
+    "halaqaId",
+    "halaqaName",
+    "childrenIds",
+    "halaqatIds",
+    "level",
+    "coins",
+    "totalStars",
+    "streakDays",
+    "currentPlanName",
+    "overallProgressPercent",
+    "totalVersesMemorized",
+    "completedJuz",
+    "completedSurahs",
+    "avatarId",
+    "weeklyQuota",
+  ]);
   for (const collection of ["studentProfiles", "parentProfiles", "teacherProfiles"]) {
     const entries = provisionEntries(collection);
     assert.ok(docsIn(collection).length > 0, collection);
     for (const doc of docsIn(collection)) {
       const account = DEMO_ACCOUNTS.find((a) => a.uid === doc.id);
-      assert.deepEqual(doc.data, expectedData(entries, account), `${collection}/${doc.id}`);
+      const expected = expectedData(entries, account);
+      for (const key of Object.keys(expected)) {
+        assert.ok(key in doc.data, `${collection}/${doc.id} missing ${key}`);
+        if (enrichable.has(key)) continue;
+        assert.deepEqual(doc.data[key], expected[key], `${collection}/${doc.id}.${key}`);
+      }
     }
   }
 });
@@ -294,7 +320,26 @@ test("each account gets exactly the profile adminProvisionUser gives its role", 
 
 test("only known collections are written; all fit in one batch", () => {
   const collections = new Set(dataset.documents.map((d) => d.collection));
-  assert.deepEqual([...collections].sort(), ["parentProfiles", "studentProfiles", "teacherProfiles", "userPrivate", "users"]);
+  assert.deepEqual(
+    [...collections].sort(),
+    [
+      "academySettings",
+      "assignments",
+      "attendanceRecords",
+      "conversations",
+      "halaqaMeetingLinks",
+      "halaqat",
+      "notifications",
+      "parentProfiles",
+      "payments",
+      "pricingRules",
+      "recitationRecords",
+      "studentProfiles",
+      "teacherProfiles",
+      "userPrivate",
+      "users",
+    ],
+  );
   for (const c of collections) assert.match(rulesSource, new RegExp(`match /${c}/\\{`), c);
   assert.doesNotMatch(rulesSource, new RegExp(`match /${SEED_META.collection}/`), "seed marker stays under the catch-all deny");
   assert.ok(dataset.documents.length < 500);
@@ -401,8 +446,8 @@ function fakeFirebase() {
     const data = store.get(key);
     return { exists: data !== undefined, data: () => (data ? { ...data } : undefined), get: (field) => data?.[field] };
   };
-  const ref = (collection, id) => {
-    const key = `${collection}/${id}`;
+  const ref = (path) => {
+    const key = path;
     return {
       key,
       create: async (data) => {
@@ -414,10 +459,13 @@ function fakeFirebase() {
         store.set(key, { ...store.get(key), ...data });
       },
       get: async () => snapshot(key),
+      collection: (sub) => ({
+        doc: (subId) => ref(`${path}/${sub}/${subId}`),
+      }),
     };
   };
   const db = {
-    collection: (collection) => ({ doc: (id) => ref(collection, id) }),
+    collection: (collection) => ({ doc: (id) => ref(`${collection}/${id}`) }),
     batch: () => {
       const ops = [];
       return {
@@ -472,24 +520,29 @@ function stringsIn(value, out = []) {
   return out;
 }
 
-test("the demo Admin has no authority until first login, like a provisioned Admin; other roles are active", () => {
+test("demo accounts are active immediately; provisioned-Admin first-login gate still exists in rules", () => {
   for (const a of DEMO_ACCOUNTS) {
     const user = docOf("users", a.uid).data;
-    assert.equal(activeRoleOf(user), a.role === "admin" ? "" : a.role, a.uid);
-    if (a.role !== "admin") {
-      assert.equal("passwordChangeRequired" in user, false, a.uid);
-      assert.equal("mustChangePassword" in docOf("userPrivate", a.uid).data, false, a.uid);
-    }
+    assert.equal(activeRoleOf(user), a.role, a.uid);
+    assert.equal("passwordChangeRequired" in user, false, a.uid);
+    assert.equal("mustChangePassword" in docOf("userPrivate", a.uid).data, false, a.uid);
   }
-  assert.equal(activeRoleOf({ ...docOf("users", "demo-admin-01").data, passwordChangeRequired: false }), "admin");
   // Security rules: no Admin rights while the flag is set, and no client may clear it.
   assert.match(rulesSource, /userDoc\(\)\.get\('passwordChangeRequired', false\) != true;/);
   const protectedLists = [...rulesSource.matchAll(/\.hasAny\(\[([^\]]*)\]\)/g)].map((m) => m[1]);
   assert.ok(protectedLists.some((list) => list.includes("'passwordChangeRequired'")), "users self-update protects the flag");
 });
 
-test("completeFirstLogin accepts the seeded Admin, clears both flags and restores the Admin role", async () => {
+test("completeFirstLogin accepts a provisioned Admin (flags set), clears both flags and restores the Admin role", async () => {
   const fake = await seedIntoFake();
+  fake.store.set("users/demo-admin-01", {
+    ...fake.store.get("users/demo-admin-01"),
+    passwordChangeRequired: true,
+  });
+  fake.store.set("userPrivate/demo-admin-01", {
+    ...fake.store.get("userPrivate/demo-admin-01"),
+    mustChangePassword: true,
+  });
   const newPassword = "NewAdmin2026";
   assert.deepEqual(await completeFirstLoginCore(fake, "demo-admin-01", { newPassword }), { ok: true });
   const user = fake.store.get("users/demo-admin-01");
@@ -517,20 +570,31 @@ test("completeFirstLogin refuses seeded non-Admin accounts: no first-login flag 
 
 // ── secrets, audit and relationships ─────────────────────────────────────────
 
-test("the demo password reaches Auth only: never Firestore, the seed marker, logs or audit records", async () => {
+test("each demo account has a unique Auth password that never reaches Firestore or logs", async () => {
   const fake = await seedIntoFake();
   assert.equal(fake.authUsers.size, DEMO_ACCOUNTS.length);
-  for (const user of fake.authUsers.values()) assert.equal(user.password, DEMO_PASSWORD);
-  assert.equal(stringsIn(dataset.documents).some((s) => s.includes(DEMO_PASSWORD)), false, "dataset documents");
+  const passwords = DEMO_ACCOUNTS.map((a) => a.password);
+  assert.equal(new Set(passwords).size, passwords.length, "passwords must be unique per account");
+  for (const a of DEMO_ACCOUNTS) {
+    assert.equal(fake.authUsers.get(a.uid).password, a.password, a.uid);
+    assert.notEqual(a.password, DEMO_PASSWORD, `${a.uid} must not reuse the deprecated shared password`);
+  }
+  for (const password of passwords) {
+    assert.equal(stringsIn(dataset.documents).some((s) => s.includes(password)), false, "dataset documents");
+  }
   for (const [key, doc] of fake.store) {
-    assert.equal(stringsIn(doc).some((s) => s.includes(DEMO_PASSWORD)), false, key);
+    for (const password of passwords) {
+      assert.equal(stringsIn(doc).some((s) => s.includes(password)), false, key);
+    }
     for (const field of Object.keys(doc).filter((f) => /password/i.test(f))) {
       assert.ok(["passwordChangeRequired", "mustChangePassword"].includes(field), `${key}.${field}`);
       assert.equal(typeof doc[field], "boolean", `${key}.${field}`);
     }
   }
   const output = fake.logs.join("\n");
-  assert.doesNotMatch(output, new RegExp(DEMO_PASSWORD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const password of passwords) {
+    assert.doesNotMatch(output, new RegExp(password.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
   for (const a of DEMO_ACCOUNTS) {
     assert.ok(!output.includes(a.email) && !output.includes(a.name), `${a.uid}: logs name no email or name`);
   }
@@ -538,20 +602,40 @@ test("the demo password reaches Auth only: never Firestore, the seed marker, log
   const marker = fake.store.get(`${SEED_META.collection}/${SEED_META.id}`);
   assert.equal(marker.status, "complete");
   assert.equal(marker.version, DEMO_SEED_VERSION);
-  assert.equal(DEMO_SEED_VERSION, 2);
+  assert.equal(DEMO_SEED_VERSION, 4);
   assert.deepEqual(marker.counts, { authUsers: DEMO_ACCOUNTS.length, documents: dataset.documents.length });
 });
 
-test("no relationship is seeded, so nothing contradicts the server-owned relationship invariants", () => {
-  for (const doc of docsIn("parentProfiles")) assert.deepEqual(doc.data.childrenIds, [], doc.id);
-  for (const doc of docsIn("teacherProfiles")) assert.deepEqual(doc.data.halaqatIds, [], doc.id);
-  for (const doc of docsIn("studentProfiles")) {
-    assert.equal(doc.data.halaqaId, null, doc.id);
-    assert.equal(doc.data.halaqaName, null, doc.id);
+test("trial graph includes chats, payments and notifications", () => {
+  assert.ok(docsIn("conversations").length >= 3, "direct conversations");
+  assert.ok(docsIn("payments").length >= 2, "parent invoices");
+  assert.ok(docsIn("notifications").length >= 3, "notifications");
+});
+
+test("trial graph links teacher, supervisor, parent and both students to one halaqa", () => {
+  const halaqa = docsIn("halaqat").find((d) => d.id === DEMO_HALAQA_MORNING_ID);
+  assert.ok(halaqa, "morning halaqa");
+  assert.equal(halaqa.data.teacherId, "demo-teacher-01");
+  assert.equal(halaqa.data.supervisorId, "demo-supervisor-01");
+  assert.deepEqual(halaqa.data.studentIds, ["demo-student-01", "demo-student-02"]);
+  assert.equal(halaqa.data.status, "active");
+
+  const teacher = docsIn("teacherProfiles").find((d) => d.id === "demo-teacher-01");
+  assert.deepEqual(teacher.data.halaqatIds, [DEMO_HALAQA_MORNING_ID]);
+
+  const parent = docsIn("parentProfiles").find((d) => d.id === "demo-parent-01");
+  assert.deepEqual(parent.data.childrenIds, ["demo-student-01", "demo-student-02"]);
+
+  for (const sid of ["demo-student-01", "demo-student-02"]) {
+    const profile = docsIn("studentProfiles").find((d) => d.id === sid);
+    assert.equal(profile.data.halaqaId, DEMO_HALAQA_MORNING_ID);
+    assert.equal(profile.data.halaqaName, "حلقة الفجر");
   }
-  for (const doc of dataset.documents) {
-    for (const key of ["academyRef", "parentIds", "studentIds", "teacherId", "supervisorId", "assistantTeacherIds"]) {
-      assert.equal(key in doc.data, false, `${doc.collection}/${doc.id}.${key}`);
-    }
-  }
+
+  // Seed marks up to 12 meeting days × 2 students (schedule-filtered); keep
+  // the floor aligned with that generator, not an arbitrary larger count.
+  assert.ok(docsIn("attendanceRecords").length >= 16, "attendance history for charts");
+  assert.ok(docsIn("recitationRecords").length >= 8, "recitation history for performance");
+  assert.ok(docsIn("assignments").length >= 2, "homework for student/teacher");
+  assert.equal(docsIn("users").some((d) => "phone" in d.data), false);
 });

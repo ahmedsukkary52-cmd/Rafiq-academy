@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Mushaf-local visual tokens (Paper / Night). Reader-scoped — not app ThemeMode.
+/// Mushaf-local visual tokens (Paper / Night / Emerald / Sepia).
+/// Reader-scoped — not app ThemeMode.
 class MushafReaderTokens {
   const MushafReaderTokens._({
     required this.isNight,
@@ -70,8 +71,58 @@ class MushafReaderTokens {
     error: Color(0xFFE39A8F),
   );
 
+  /// Soft teal-tinted daytime page — easy on the eyes.
+  static const emerald = MushafReaderTokens._(
+    isNight: false,
+    canvas: Color(0xFFEEF6F4),
+    ink: Color(0xFF1A2422),
+    inkMuted: Color(0xFF5C6B66),
+    chrome: Color(0xFFF2F9F7),
+    chromeInk: Color(0xFF24302D),
+    chromeMuted: Color(0xFF7A8A84),
+    selection: Color(0x3328A89A),
+    ayahMarker: Color(0xFF1A8A7D),
+    divider: Color(0x332A6B5C),
+    accent: Color(0xFF28A89A),
+    onAccent: Color(0xFFFFFFFF),
+    error: Color(0xFFB0473C),
+  );
+
+  /// Warm sepia tones — vintage book feel.
+  static const sepia = MushafReaderTokens._(
+    isNight: false,
+    canvas: Color(0xFFEDE4D4),
+    ink: Color(0xFF2C2218),
+    inkMuted: Color(0xFF7A6B5A),
+    chrome: Color(0xFFF3EBDD),
+    chromeInk: Color(0xFF3A2E22),
+    chromeMuted: Color(0xFF9A8876),
+    selection: Color(0x33B8860B),
+    ayahMarker: Color(0xFF8B6914),
+    divider: Color(0x338B7355),
+    accent: Color(0xFFC49A3C),
+    onAccent: Color(0xFF2C2218),
+    error: Color(0xFFB0473C),
+  );
+
+  static const Set<String> styleIds = {'paper', 'night', 'emerald', 'sepia'};
+
   static MushafReaderTokens of({required bool isNight}) =>
       isNight ? night : paper;
+
+  static MushafReaderTokens styleOf(String id) {
+    switch (id) {
+      case 'night':
+        return night;
+      case 'emerald':
+        return emerald;
+      case 'sepia':
+        return sepia;
+      case 'paper':
+      default:
+        return paper;
+    }
+  }
 
   /// Responsive horizontal page margin.
   static double horizontalMargin(double width) {
@@ -93,11 +144,14 @@ class MushafReaderTokens {
     return width;
   }
 
-  TextStyle bodyStyle({required double fontSize}) {
+  TextStyle bodyStyle({
+    required double fontSize,
+    double lineHeight = 1.45,
+  }) {
     return TextStyle(
       fontFamily: 'Amiri',
       fontSize: fontSize,
-      height: 2.05,
+      height: lineHeight,
       letterSpacing: 0,
       color: ink,
       fontWeight: FontWeight.w500,
@@ -108,7 +162,7 @@ class MushafReaderTokens {
     return TextStyle(
       fontFamily: 'Amiri',
       fontSize: fontSize,
-      height: 1.9,
+      height: 1.6,
       color: ink,
       fontWeight: FontWeight.w600,
     );
@@ -160,3 +214,9 @@ class MushafReaderTokens {
 
 /// Local prefs key for reader-only Paper/Night (not app ThemeMode).
 const kMushafNightModePrefsKey = 'mushaf_reader_night_mode';
+
+/// Reader color theme: paper | night | emerald | sepia.
+const kMushafStylePrefsKey = 'mushaf_reader_style';
+
+/// Reader ayah line height multiplier (typically 1.25–1.9).
+const kMushafLineHeightPrefsKey = 'mushaf_reader_line_height';

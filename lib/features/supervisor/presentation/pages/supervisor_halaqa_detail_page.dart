@@ -12,6 +12,8 @@ import '../../../admin/domain/usecases/admin_operations_usecases.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/halaqa_group_chat_contract.dart';
+import '../../../chat/presentation/pages/chat_room.dart';
 import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 import '../../../../shared/domain/halaqa_roster.dart';
 import '../bloc/supervisor_bloc.dart';
@@ -85,6 +87,35 @@ class _SupervisorHalaqaDetailPageState
       if (h.id == widget.halaqaId) return h;
     }
     return null;
+  }
+
+  void _openHalaqaGroupChat(BuildContext context, HalaqaEntity halaqa) {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) {
+      AppSnackBar.showInfo(context, 'يجب تسجيل الدخول أولاً');
+      return;
+    }
+    final supervisorId = auth.user.uid;
+    if (halaqa.supervisorId.trim() != supervisorId) {
+      AppSnackBar.showInfo(
+        context,
+        'لم يُسجَّل هذا الحساب كمشرف للحلقة. تواصل مع الإدارة لتحديث الإسناد ومزامنة مجموعة الحلقة.',
+      );
+      return;
+    }
+    final conversationId =
+        HalaqaGroupChatContract.conversationIdForHalaqa(halaqa.id);
+    final title = halaqa.name.trim().isEmpty
+        ? 'مجموعة الحلقة'
+        : 'مجموعة ${halaqa.name.trim()}';
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatRoomPage(
+          conversationId: conversationId,
+          otherUserName: title,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadStudents() async {
@@ -182,6 +213,11 @@ class _SupervisorHalaqaDetailPageState
                       sourceHalaqaId: halaqa.id,
                     ),
                   ),
+                  _ActionChip(
+                    icon: Icons.forum_outlined,
+                    label: 'مجموعة الحلقة',
+                    onTap: () => _openHalaqaGroupChat(context, halaqa),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -245,7 +281,7 @@ class _SupervisorHalaqaDetailPageState
                             ? 'في خطر'
                             : 'حضور ${s.attendancePercent.toStringAsFixed(0)}%',
                       ),
-                      trailing: const Icon(Icons.chevron_left_rounded),
+                      trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => SupervisorDestinations.studentProfile(
                         context,
                         studentId: s.uid,

@@ -40,12 +40,14 @@ class MushafReaderTopChrome extends StatelessWidget {
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 220),
           opacity: visible ? 1 : 0,
-          child: Material(
+          child: ColoredBox(
             color: tokens.chrome.withValues(alpha: 0.96),
-            elevation: 0,
-            child: SafeArea(
-              bottom: false,
-              child: SizedBox(
+            child: Material(
+              color: tokens.chrome.withValues(alpha: 0.96),
+              elevation: 0,
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
                 height: 48,
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
@@ -126,11 +128,11 @@ class MushafReaderTopChrome extends StatelessWidget {
                           color: tokens.chromeInk,
                         ),
                         onSelected: (value) {
-                          switch (value) {
-                            case 'settings':
-                              onOpenSettings();
-                            case 'recitation':
-                              onOpenRecitation?.call();
+                          if (value == 'settings') {
+                            onOpenSettings();
+                          } else if (value == 'recitation' &&
+                              onOpenRecitation != null) {
+                            onOpenRecitation!();
                           }
                         },
                         itemBuilder: (context) => [
@@ -155,6 +157,7 @@ class MushafReaderTopChrome extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
             ),
           ),
         ),

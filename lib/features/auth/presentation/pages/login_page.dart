@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/firebase/app_flavor.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
@@ -16,6 +17,7 @@ class LoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTrial = currentAppFlavor() == AppFlavor.trial;
     return Scaffold(
       body: Stack(
         children: [
@@ -30,8 +32,31 @@ class LoginPage extends StatelessWidget {
                 children: [
                   const SizedBox(height: 24),
                   const AuthBrandHeader(
-                    title: 'مرحباً بعودتك!\nسجّل دخولك للمتابعة',
+                    title: 'أهلاً بعودتك\nسجّل دخولك للمتابعة',
                   ),
+                  if (isTrial) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Text(
+                        'نسخة تجربة الأكاديمية (BASMA Trial)\n'
+                        'متصلة بمشروع rafiq-academy. العمليات التي تعتمد على '
+                        'Cloud Functions لن تكتمل حتى يتم نشر الـ Backend بموافقة مستقلة.',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   const _LoginForm(),
                   const SizedBox(height: 16),
@@ -97,13 +122,14 @@ class _LoginFormState extends State<_LoginForm> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _LoginStatusBanner(state: state),
-                const AuthFieldLabel('اسم المستخدم أو البريد الإلكتروني'),
+                const AuthFieldLabel('اسم المستخدم'),
                 const SizedBox(height: 6),
                 AppTextField(
-                  hint: 'st123456',
+                  key: const Key('login-identifier'),
+                  hint: 'مثال: ahmed.mohamed.ali',
                   controller: _emailCtrl,
                   enabled: !isLoading,
-                  keyboardType: TextInputType.emailAddress,
+                  keyboardType: TextInputType.text,
                   prefixIcon: const Icon(
                     Icons.person_outline,
                     color: AppColors.textHint,
@@ -115,6 +141,7 @@ class _LoginFormState extends State<_LoginForm> {
                 const AuthFieldLabel('كلمة المرور'),
                 const SizedBox(height: 6),
                 AppTextField(
+                  key: const Key('login-password'),
                   hint: '••••••••',
                   controller: _passwordCtrl,
                   enabled: !isLoading,
@@ -146,19 +173,27 @@ class _LoginFormState extends State<_LoginForm> {
                     onPressed: isLoading
                         ? null
                         : () => context.push(AppRoutes.forgotPassword),
-                    child: const Text('نسيت كلمة المرور؟'),
+                    child: Text(
+                      'نسيت كلمة المرور؟',
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 AppButton(
+                  key: const Key('login-submit'),
                   label: state is AuthError && state.isRetryable
                       ? 'إعادة المحاولة'
                       : 'تسجيل الدخول',
                   onPressed: isLoading ? null : _submit,
                   isLoading: isLoading,
+                  // In RTL, [leading] sits to the right of the label.
                   leading: isLoading
                       ? null
-                      : const Icon(Icons.arrow_back_rounded, size: 18),
+                      : const AppForwardIcon(color: Colors.white, size: 18),
                 ),
               ],
             ),

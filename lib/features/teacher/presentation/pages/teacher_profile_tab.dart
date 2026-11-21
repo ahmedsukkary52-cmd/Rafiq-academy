@@ -564,7 +564,7 @@ class _NavRow extends StatelessWidget {
               ),
               if (onTap != null)
                 const Icon(
-                  Icons.chevron_left_rounded,
+                  Icons.chevron_right_rounded,
                   size: 18,
                   color: AppColors.textHint,
                 ),

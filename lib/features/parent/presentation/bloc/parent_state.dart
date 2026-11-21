@@ -35,6 +35,10 @@ class ParentState extends Equatable {
   final SectionStatus paymentsStatus;
   final List<PaymentEntity> payments;
   final String? paymentsError;
+  final bool paymentsHasMore;
+  final bool paymentsLoadingMore;
+  /// Opaque Firestore tip id for the next payments page (not shown in UI).
+  final String? paymentsCursorId;
 
   /// C3 — from academySettings/paymentPublic (never hard-coded). The two
   /// destinations are configured independently.
@@ -83,6 +87,9 @@ class ParentState extends Equatable {
     this.paymentsStatus = SectionStatus.initial,
     this.payments = const [],
     this.paymentsError,
+    this.paymentsHasMore = false,
+    this.paymentsLoadingMore = false,
+    this.paymentsCursorId,
     this.vodafoneCashDestination = '',
     this.instapayDestination = '',
     this.paymentDestinationsStatus = SectionStatus.initial,
@@ -131,6 +138,9 @@ class ParentState extends Equatable {
     SectionStatus? paymentsStatus,
     List<PaymentEntity>? payments,
     Object? paymentsError = _unset,
+    bool? paymentsHasMore,
+    bool? paymentsLoadingMore,
+    Object? paymentsCursorId = _unset,
     String? vodafoneCashDestination,
     String? instapayDestination,
     SectionStatus? paymentDestinationsStatus,
@@ -175,6 +185,11 @@ class ParentState extends Equatable {
       paymentsError: identical(paymentsError, _unset)
           ? this.paymentsError
           : paymentsError as String?,
+      paymentsHasMore: paymentsHasMore ?? this.paymentsHasMore,
+      paymentsLoadingMore: paymentsLoadingMore ?? this.paymentsLoadingMore,
+      paymentsCursorId: identical(paymentsCursorId, _unset)
+          ? this.paymentsCursorId
+          : paymentsCursorId as String?,
       vodafoneCashDestination:
           vodafoneCashDestination ?? this.vodafoneCashDestination,
       instapayDestination: instapayDestination ?? this.instapayDestination,
@@ -232,6 +247,9 @@ class ParentState extends Equatable {
     paymentsStatus,
     payments,
     paymentsError,
+    paymentsHasMore,
+    paymentsLoadingMore,
+    paymentsCursorId,
     vodafoneCashDestination,
     instapayDestination,
     paymentDestinationsStatus,

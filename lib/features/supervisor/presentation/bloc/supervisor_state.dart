@@ -34,6 +34,7 @@ class SupervisorState extends Equatable {
 
   final SubmissionStatus admitStudentStatus;
   final String? admitStudentError;
+  final bool admitStudentRosterRefreshFailed;
 
   final SubmissionStatus transferStudentStatus;
   final String? transferStudentError;
@@ -73,6 +74,7 @@ class SupervisorState extends Equatable {
     this.submitReportError,
     this.admitStudentStatus = SubmissionStatus.idle,
     this.admitStudentError,
+    this.admitStudentRosterRefreshFailed = false,
     this.transferStudentStatus = SubmissionStatus.idle,
     this.transferStudentError,
     this.registerStudentStatus = SubmissionStatus.idle,
@@ -105,6 +107,7 @@ class SupervisorState extends Equatable {
     Object? submitReportError = _unset,
     SubmissionStatus? admitStudentStatus,
     Object? admitStudentError = _unset,
+    bool? admitStudentRosterRefreshFailed,
     SubmissionStatus? transferStudentStatus,
     Object? transferStudentError = _unset,
     SubmissionStatus? registerStudentStatus,
@@ -148,6 +151,9 @@ class SupervisorState extends Equatable {
       admitStudentError: identical(admitStudentError, _unset)
           ? this.admitStudentError
           : admitStudentError as String?,
+      admitStudentRosterRefreshFailed:
+          admitStudentRosterRefreshFailed ??
+          this.admitStudentRosterRefreshFailed,
       transferStudentStatus:
           transferStudentStatus ?? this.transferStudentStatus,
       transferStudentError: identical(transferStudentError, _unset)
@@ -201,6 +207,7 @@ class SupervisorState extends Equatable {
     submitReportError,
     admitStudentStatus,
     admitStudentError,
+    admitStudentRosterRefreshFailed,
     transferStudentStatus,
     transferStudentError,
     registerStudentStatus,

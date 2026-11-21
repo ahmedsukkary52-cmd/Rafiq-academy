@@ -9,7 +9,10 @@ import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/parent_household.dart';
+import '../../domain/repositories/parent_repositories.dart';
 import '../../domain/usecases/get_attendance_marks_usecase.dart';
+import '../../domain/usecases/get_child_weekly_sessions_usecase.dart';
+import '../bloc/parent_bloc.dart';
 import '../parent_display.dart';
 import '../widgets/parent_loading_skeletons.dart';
 import '../widgets/parent_subpage_scaffold.dart';
@@ -33,6 +36,8 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
   bool _loading = true;
   String? _error;
   List<ParentAttendanceMark> _marks = const [];
+  /// DateTime.weekday values (Mon=1…Sun=7) when the child's halaqa meets.
+  Set<int> _sessionWeekdays = const {};
 
   static const _weekdays = ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'];
 
@@ -62,6 +67,8 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
       ),
     );
     if (!mounted) return;
+    await _loadSessionWeekdays();
+    if (!mounted) return;
     result.fold(
       (f) => setState(() {
         _loading = false;
@@ -72,6 +79,35 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
         _marks = marks;
       }),
     );
+  }
+
+  Future<void> _loadSessionWeekdays() async {
+    try {
+      final parentState = context.read<ParentBloc>().state;
+      final snap = parentState.snapshotFor(widget.studentId);
+      final halaqaId = (snap?.halaqaId ?? '').trim();
+      if (halaqaId.isEmpty) {
+        setState(() => _sessionWeekdays = {});
+        return;
+      }
+      final schedule = await GetChildWeeklySessionsUseCase(
+        sl<ParentRepository>(),
+      ).call(
+        ChildWeeklySessionsParams(
+          studentId: widget.studentId,
+          halaqaId: halaqaId,
+        ),
+      );
+      final days = <int>{};
+      schedule.fold((_) {}, (sessions) {
+        for (final s in sessions) {
+          days.add(s.startAt.weekday);
+        }
+      });
+      setState(() => _sessionWeekdays = days);
+    } catch (_) {
+      if (mounted) setState(() => _sessionWeekdays = {});
+    }
   }
 
   Map<DateTime, String> get _byDay {
@@ -218,7 +254,7 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
                           _load();
                         },
                         icon: const Icon(
-                          Icons.chevron_right_rounded,
+                          Icons.chevron_left_rounded,
                           color: AppColors.onPrimary,
                         ),
                       ),
@@ -240,7 +276,7 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
                           _load();
                         },
                         icon: const Icon(
-                          Icons.chevron_left_rounded,
+                          Icons.chevron_right_rounded,
                           color: AppColors.onPrimary,
                         ),
                       ),
@@ -306,9 +342,15 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
                               _month.month,
                               day,
                             );
-                            final status =
-                                byDay[AttendancePolicy.dayStart(date)];
-                            final color = _colorFor(status);
+                            final isSessionDay =
+                                _sessionWeekdays.isEmpty ||
+                                _sessionWeekdays.contains(date.weekday);
+                            final status = isSessionDay
+                                ? byDay[AttendancePolicy.dayStart(date)]
+                                : null;
+                            final color = isSessionDay
+                                ? _colorFor(status)
+                                : null;
                             final isToday = AttendancePolicy.isSameCalendarDay(
                               date,
                               DateTime.now(),
@@ -316,9 +358,12 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
                             return Container(
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color:
-                                    color?.withValues(alpha: 0.16) ??
-                                    Colors.transparent,
+                                color: isSessionDay
+                                    ? (color?.withValues(alpha: 0.16) ??
+                                          Colors.transparent)
+                                    : AppColors.surfaceGrey.withValues(
+                                        alpha: 0.35,
+                                      ),
                                 shape: BoxShape.circle,
                                 border: isToday
                                     ? Border.all(
@@ -330,7 +375,9 @@ class _ParentAttendancePageState extends State<ParentAttendancePage> {
                               child: Text(
                                 parentEasternDigits('$day'),
                                 style: AppTextStyles.labelMedium.copyWith(
-                                  color: color ?? AppColors.textPrimary,
+                                  color: isSessionDay
+                                      ? (color ?? AppColors.textPrimary)
+                                      : AppColors.textHint,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

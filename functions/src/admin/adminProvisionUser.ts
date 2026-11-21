@@ -111,8 +111,19 @@ export const adminProvisionUser = onCall<
   const password = requireNonEmptyString(request.data?.password, "password");
   const name = requireNonEmptyString(request.data?.name, "name");
   const role = parseProvisionRole(request.data?.role);
-  const isActive =
+  if (role === "student") {
+    throw new HttpsError(
+      "failed-precondition",
+      "يجب تسجيل الطالب مع ولي أمر وحلقة من مسار تسجيل الطلاب",
+    );
+  }
+  const requestedActive =
     typeof request.data?.isActive === "boolean" ? request.data.isActive : true;
+  // Teachers remain unable to use academy services until a Halaqa assignment
+  // transaction activates them. Auth creation itself is not atomic with that
+  // later assignment, so the Firestore role gate stays closed meanwhile.
+  const isPendingTeacher = role === "teacher";
+  const isActive = isPendingTeacher ? false : requestedActive;
 
   if (password.length < 6) {
     throw new HttpsError(
@@ -127,7 +138,7 @@ export const adminProvisionUser = onCall<
       email,
       password,
       displayName: name,
-      disabled: !isActive,
+      disabled: !isPendingTeacher && !isActive,
     });
 
     const uid = authUser.uid;
@@ -158,6 +169,9 @@ export const adminProvisionUser = onCall<
       batch.update(db.collection("userPrivate").doc(uid), { mustChangePassword: true });
     }
     await batch.commit();
+    if (isPendingTeacher) {
+      await db.collection("users").doc(uid).update({ pendingHalaqaAssignment: true });
+    }
 
     await writeRoleProfile(db, uid, role, name);
     await writeAuditLog({
@@ -172,11 +186,16 @@ export const adminProvisionUser = onCall<
     return { uid };
   } catch (e: unknown) {
     if (authUser) {
-      try {
-        await admin.auth().deleteUser(authUser.uid);
-      } catch {
-        // Compensation best-effort; surface original error.
-      }
+      const uid = authUser.uid;
+      const db = admin.firestore();
+      await Promise.all([
+        admin.auth().deleteUser(uid).catch(() => undefined),
+        db.collection("users").doc(uid).delete().catch(() => undefined),
+        db.collection("userPrivate").doc(uid).delete().catch(() => undefined),
+        db.collection("studentProfiles").doc(uid).delete().catch(() => undefined),
+        db.collection("parentProfiles").doc(uid).delete().catch(() => undefined),
+        db.collection("teacherProfiles").doc(uid).delete().catch(() => undefined),
+      ]);
     }
 
     if (e instanceof HttpsError) {

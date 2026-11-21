@@ -13,10 +13,14 @@ import '../widgets/auth_widgets.dart';
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
+  /// Matches native Android [basma_launch_background] — soft neutral so the
+  /// logo artwork is not lost against teal/blue fills.
+  static const Color background = AppColors.background;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: background,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -33,7 +37,7 @@ class SplashPage extends StatelessWidget {
                           width: 28,
                           height: 28,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
+                            color: AppColors.primary,
                             strokeWidth: 2.5,
                           ),
                         ),
@@ -56,23 +60,20 @@ class _SplashMark extends StatelessWidget {
       children: [
         const AcademyLogo(size: 120),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           AcademyBranding.shortName,
-          style: TextStyle(
-            fontFamily: AppTextStyles.fontFamily,
+          style: AppTextStyles.displayLarge.copyWith(
             fontSize: 36,
             fontWeight: FontWeight.w700,
-            color: Colors.white,
+            color: AppColors.textPrimary,
             letterSpacing: 1,
           ),
         ),
         const SizedBox(height: 6),
         Text(
           AcademyBranding.tagline,
-          style: TextStyle(
-            fontFamily: AppTextStyles.fontFamily,
-            fontSize: 14,
-            color: Colors.white.withValues(alpha: 0.8),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -89,22 +90,22 @@ class _StartupRetry extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 36),
+        const Icon(
+          Icons.wifi_off_rounded,
+          color: AppColors.textSecondary,
+          size: 36,
+        ),
         const SizedBox(height: 12),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontFamily: AppTextStyles.fontFamily,
-            fontSize: 15,
-            color: Colors.white,
-          ),
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textPrimary),
         ),
         const SizedBox(height: 20),
         FilledButton.icon(
           style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.primary,
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
           ),
           onPressed: () =>
               context.read<AuthBloc>().add(const CheckAuthStatusEvent()),
@@ -113,7 +114,7 @@ class _StartupRetry extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextButton(
-          style: TextButton.styleFrom(foregroundColor: Colors.white),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primaryDark),
           onPressed: () => context.read<AuthBloc>().add(const LogoutEvent()),
           child: const Text('تسجيل الدخول بحساب آخر'),
         ),

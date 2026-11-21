@@ -4,8 +4,8 @@ import '../../../core/error/exception.dart';
 abstract final class AuthErrorMessages {
   static const generic = 'حدث خطأ غير متوقع، حاول مرة أخرى';
   static const invalidCredentials =
-      'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-  static const invalidEmail = 'البريد الإلكتروني غير صالح';
+      'اسم المستخدم أو كلمة المرور غير صحيحة';
+  static const invalidEmail = 'اسم المستخدم أو البريد الإلكتروني غير صالح';
   static const notProvisioned =
       'هذا الحساب غير مفعّل في الأكاديمية. يرجى التواصل مع الإدارة';
   static const disabled = 'هذا الحساب موقوف، يرجى التواصل مع الإدارة';
@@ -45,7 +45,12 @@ abstract final class AuthErrorMessages {
       network,
       reason: AuthErrorReason.network,
     ),
-    'user-token-expired' || 'requires-recent-login' => const AuthException(
+    // Persisted emulator / wiped Auth sessions surface as these — not "no
+    // internet". Clearing the local session and asking for login again is
+    // the correct recovery (see INVALID_REFRESH_TOKEN on device logs).
+    'user-token-expired' ||
+    'invalid-user-token' ||
+    'requires-recent-login' => const AuthException(
       sessionEnded,
       reason: AuthErrorReason.sessionEnded,
     ),
@@ -56,6 +61,12 @@ abstract final class AuthErrorMessages {
     'unavailable' || 'deadline-exceeded' => const AuthException(
       network,
       reason: AuthErrorReason.network,
+    ),
+    // Auth emulator restart invalidates the phone's refresh token; Firestore
+    // then fails as unauthenticated while the UI used to look like "no net".
+    'unauthenticated' => const AuthException(
+      sessionEnded,
+      reason: AuthErrorReason.sessionEnded,
     ),
     'permission-denied' => const AuthException(
       permissionDenied,

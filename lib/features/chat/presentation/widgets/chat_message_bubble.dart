@@ -52,14 +52,20 @@ class _BubbleFrame extends StatelessWidget {
                           vertical: 10,
                         ),
                   decoration: BoxDecoration(
-                    color: isMine ? AppColors.primary : AppColors.surface,
+                    gradient: isMine ? AppColors.primaryGradient : null,
+                    color: isMine ? null : const Color(0xFFFFFFFF),
                     borderRadius: ChatMessageAlignment.bubbleBorderRadius(
                       isMine: isMine,
                     ).resolve(Directionality.of(context)),
+                    border: isMine
+                        ? null
+                        : Border.all(
+                            color: AppColors.border.withValues(alpha: 0.55),
+                          ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 6,
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -390,15 +396,50 @@ class _OutgoingContent extends StatelessWidget {
       return Text(item.text, style: _bodyStyle(true), softWrap: true);
     }
     if (draft.type == ChatMessageType.image) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.file(
-          File(draft.localPath),
-          width: 160,
-          height: 160,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              const _OutgoingLabel(icon: Icons.image_outlined, label: 'صورة'),
+      return GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              fullscreenDialog: true,
+              builder: (_) => Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  leading: IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                body: Center(
+                  child: InteractiveViewer(
+                    maxScale: 4,
+                    child: Image.file(
+                      File(draft.localPath),
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 220,
+              maxHeight: 260,
+              minWidth: 120,
+              minHeight: 120,
+            ),
+            child: Image.file(
+              File(draft.localPath),
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) =>
+                  const _OutgoingLabel(icon: Icons.image_outlined, label: 'صورة'),
+            ),
+          ),
         ),
       );
     }

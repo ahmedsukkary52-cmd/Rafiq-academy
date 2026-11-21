@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
@@ -10,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 
 class Recording {
@@ -149,7 +151,7 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
         });
       }
     } catch (e) {
-      debugPrint('Recording start error: $e');
+      if (kDebugMode) debugPrint('Recording start error: $e');
       if (mounted) {
         AppSnackBar.showError(context, 'فشل بدء تسجيل الصوت');
       }
@@ -231,8 +233,8 @@ class _StudentRecitationPageState extends State<StudentRecitationPage> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward, size: 28),
+                  AppBackButton(
+                    iconSize: 28,
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],

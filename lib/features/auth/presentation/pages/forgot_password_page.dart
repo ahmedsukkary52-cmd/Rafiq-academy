@@ -9,8 +9,10 @@ import '../../../../shared/widgets/shared_widgets.dart';
 import '../bloc/password_reset_bloc.dart';
 import '../widgets/auth_widgets.dart';
 
-/// Password recovery through Firebase's reset email: the link opens the
-/// Firebase action page where the new password is set; the user then signs in.
+/// Recovery for academy accounts. Username login cannot receive Firebase
+/// reset mail (internal `.invalid` addresses), so the primary path is Admin
+/// issuance of a temporary password. Staff with a real email can still request
+/// a Firebase reset link from the secondary section.
 class ForgotPasswordPage extends StatelessWidget {
   final PasswordResetBloc? bloc;
 
@@ -36,7 +38,7 @@ class ForgotPasswordPage extends StatelessWidget {
                     child: IconButton(
                       tooltip: 'رجوع',
                       color: Colors.white,
-                      icon: const Icon(Icons.arrow_forward_rounded),
+                      icon: const Icon(Icons.arrow_back_rounded),
                       onPressed: () => _backToLogin(context),
                     ),
                   ),
@@ -54,7 +56,7 @@ class ForgotPasswordPage extends StatelessWidget {
                         PasswordResetEmailSent(:final email) => _ResetSentView(
                           email: email,
                         ),
-                        _ => _ResetRequestForm(state: state),
+                        _ => _RecoveryBody(state: state),
                       },
                     ),
                   ),
@@ -84,6 +86,113 @@ void _backToLogin(BuildContext context) {
     context.pop();
   } else {
     context.go(AppRoutes.login);
+  }
+}
+
+class _RecoveryBody extends StatelessWidget {
+  final PasswordResetState state;
+
+  const _RecoveryBody({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthMessageBanner(
+          tone: AuthBannerTone.info,
+          message:
+              'الدخول في بصمة يتم باسم المستخدم وكلمة المرور المعتمدين من '
+              'الأكاديمية. حسابات الطلاب وأولياء الأمور لا تُستعاد عبر بريد '
+              'إلكتروني تلقائي.',
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'الطريق الصحيح',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        const _Step(number: '1', text: 'تواصل مع إدارة الأكاديمية.'),
+        const _Step(
+          number: '2',
+          text: 'اطلب كلمة مرور مؤقتة لحسابك (باسم المستخدم الثلاثي الواضح).',
+        ),
+        const _Step(
+          number: '3',
+          text: 'سجّل الدخول، ثم غيّر كلمة المرور من الإعدادات إن طُلب منك.',
+        ),
+        const SizedBox(height: 16),
+        AppButton(
+          label: 'العودة لتسجيل الدخول',
+          onPressed: () => _backToLogin(context),
+          leading: const AppForwardIcon(color: Colors.white, size: 18),
+        ),
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 12),
+        Text(
+          'للموظفين الذين لديهم بريد إلكتروني حقيقي',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.labelLarge.copyWith(
+            color: AppColors.primaryDark,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'إن كان حسابك يستخدم بريداً يستقبل الرسائل فعلاً، يمكنك طلب رابط '
+          'تعيين كلمة مرور جديدة.',
+          textAlign: TextAlign.right,
+          style: AppTextStyles.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        _ResetRequestForm(state: state),
+      ],
+    );
+  }
+}
+
+class _Step extends StatelessWidget {
+  final String number;
+  final String text;
+
+  const _Step({required this.number, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              number,
+              style: AppTextStyles.labelMedium.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              textAlign: TextAlign.right,
+              style: AppTextStyles.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -132,15 +241,6 @@ class _ResetRequestFormState extends State<_ResetRequestForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'أدخل البريد الإلكتروني المسجّل لدى الأكاديمية، وسنرسل إليك رابطاً '
-            'لتعيين كلمة مرور جديدة.\n'
-            'إن كنت تدخل باسم مستخدم من الأكاديمية فاطلب كلمة مرور مؤقتة '
-            'جديدة من إدارة الأكاديمية.',
-            textAlign: TextAlign.right,
-            style: AppTextStyles.bodyMedium,
-          ),
-          const SizedBox(height: 16),
           if (state is PasswordResetFailure) ...[
             AuthMessageBanner(message: state.message),
             const SizedBox(height: 16),
@@ -159,18 +259,14 @@ class _ResetRequestFormState extends State<_ResetRequestForm> {
             ),
             validator: AuthValidators.email,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           AppButton(
             label: state is PasswordResetFailure && state.retryable
                 ? 'إعادة المحاولة'
                 : 'إرسال رابط الاستعادة',
             onPressed: submitting ? null : _submit,
             isLoading: submitting,
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: submitting ? null : () => _backToLogin(context),
-            child: const Text('العودة لتسجيل الدخول'),
+            gradient: AppColors.primaryGradient,
           ),
         ],
       ),
@@ -210,6 +306,7 @@ class _ResetSentView extends StatelessWidget {
         AppButton(
           label: 'العودة لتسجيل الدخول',
           onPressed: () => _backToLogin(context),
+          gradient: AppColors.primaryGradient,
         ),
         const SizedBox(height: 8),
         TextButton(

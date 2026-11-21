@@ -7,8 +7,10 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/error/user_facing_error.dart';
 import '../../../../core/network/network_info.dart';
 import '../../../../shared/domain/contact_info_policy.dart';
+import '../../../../shared/domain/halaqa_group_chat_contract.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../../domain/policies/chat_media_policy.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -46,6 +48,8 @@ class ChatRepositoryImpl implements ChatRepository {
       return Right(await run());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(userFacingErrorText(e.toString())));
     }
   }
 
@@ -86,7 +90,7 @@ class ChatRepositoryImpl implements ChatRepository {
     required int limit,
   }) => remoteDatasource
       .watchMessages(conversationId, limit: limit)
-      .transform(_toEither());
+      .transform(_toEitherForMessages(conversationId));
 
   @override
   Future<Either<Failure, List<MessageEntity>>> fetchMessagesBefore({
@@ -113,6 +117,42 @@ class ChatRepositoryImpl implements ChatRepository {
           messageIds: messageIds,
         ),
       );
+
+  StreamTransformer<List<T>, Either<Failure, List<T>>> _toEitherForMessages<T>(
+    String conversationId,
+  ) =>
+      StreamTransformer.fromHandlers(
+        handleData: (list, sink) => sink.add(Right(List<T>.from(list))),
+        handleError: (error, stackTrace, sink) {
+          if (error is ServerException) {
+            sink.add(Left(ServerFailure(error.message)));
+            return;
+          }
+          final denied =
+              error is FirebaseException && error.code == 'permission-denied';
+          if (denied &&
+              HalaqaGroupChatContract.isHalaqaGroupConversationId(
+                conversationId,
+              )) {
+            sink.add(
+              const Left(
+                ServerFailure(
+                  'لست عضواً في مجموعة هذه الحلقة. تأكد من إسنادك كمشرف للحلقة؛ تتم مزامنة الأعضاء تلقائياً عند تحديث بيانات الحلقة.',
+                ),
+              ),
+            );
+            return;
+          }
+          sink.add(
+            Left(
+              ServerFailure(
+                denied ? _accessLost : userFacingErrorText(error.toString()),
+              ),
+            ),
+          );
+        },
+      );
+
   @override
   Future<Either<Failure, ConversationEntity>> getOrCreateConversation({
     required ChatParticipantEntity currentUser,

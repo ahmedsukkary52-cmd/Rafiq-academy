@@ -3,6 +3,38 @@ import 'package:flutter/material.dart';
 import '../../core/error/user_facing_error.dart';
 import '../theme/app_theme.dart';
 
+export 'app_search_field.dart';
+
+/// Forward CTA arrow — mirrors in RTL (points left under Arabic layout).
+class AppForwardIcon extends StatelessWidget {
+  final double size;
+  final Color? color;
+
+  const AppForwardIcon({super.key, this.size = 18, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(Icons.arrow_forward_rounded, size: size, color: color);
+  }
+}
+
+/// Trailing “go” chevron for list rows — points left (into the page) in RTL.
+class AppGoChevron extends StatelessWidget {
+  final double size;
+  final Color? color;
+
+  const AppGoChevron({super.key, this.size = 22, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    // Force LTR so chevron_left is not mirrored into pointing right.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Icon(Icons.chevron_left_rounded, size: size, color: color),
+    );
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // AppButton - زرار موحّد للتطبيق
 // ══════════════════════════════════════════════════════════════════════════════
@@ -16,6 +48,8 @@ class AppButton extends StatelessWidget {
   final double? width;
   final double height;
   final Widget? leading;
+  final Widget? trailing;
+  final Gradient? gradient;
 
   const AppButton({
     super.key,
@@ -27,10 +61,77 @@ class AppButton extends StatelessWidget {
     this.width,
     this.height = 52,
     this.leading,
+    this.trailing,
+    this.gradient,
   });
 
   @override
   Widget build(BuildContext context) {
+    final fg = textColor ?? Colors.white;
+    // Default primary CTA uses the brand gradient unless a flat [backgroundColor]
+    // is set or an explicit [gradient] is provided.
+    final effectiveGradient =
+        gradient ??
+        (backgroundColor == null ? AppColors.primaryGradient : null);
+    final child = isLoading
+        ? SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(color: fg, strokeWidth: 2.5),
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (leading != null) ...[leading!, const SizedBox(width: 8)],
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontFamily: AppTextStyles.fontFamily,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            ],
+          );
+
+    if (effectiveGradient != null) {
+      final enabled = !isLoading && onPressed != null;
+      return SizedBox(
+        width: width ?? double.infinity,
+        height: height,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: enabled ? effectiveGradient : null,
+            color: enabled ? null : AppColors.border,
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.28),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: enabled ? onPressed : null,
+              borderRadius: BorderRadius.circular(AppSizes.radiusL),
+              child: Center(child: child),
+            ),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       width: width ?? double.infinity,
       height: height,
@@ -38,25 +139,9 @@ class AppButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundColor ?? AppColors.primary,
-          foregroundColor: textColor ?? Colors.white,
+          foregroundColor: fg,
         ),
-        child: isLoading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (leading != null) ...[leading!, const SizedBox(width: 8)],
-                  Text(label),
-                ],
-              ),
+        child: child,
       ),
     );
   }
@@ -291,9 +376,10 @@ class AppSnackBar {
   }
 
   static void showError(BuildContext context, String message) {
+    final text = userFacingErrorText(message);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, textAlign: TextAlign.right),
+        content: Text(text, textAlign: TextAlign.right),
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(

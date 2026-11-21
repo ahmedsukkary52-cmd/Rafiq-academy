@@ -752,52 +752,56 @@ class _StudentActivitiesHomeEntryState
     final id = widget.halaqaId?.trim() ?? '';
     if (id.isEmpty) return const SizedBox.shrink();
 
-    return AppCard(
-      onTap: () {
-        Navigator.of(context)
-            .push(
-          MaterialPageRoute<void>(
-            builder: (_) => StudentActivitiesPage(halaqaId: id),
-          ),
-        )
-            .then((_) {
-          if (mounted) _loadCount();
-        });
-      },
-      child: Row(
-        children: [
-          const Icon(Icons.chevron_left_rounded, color: AppColors.primary),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'أنشطة الحلقة',
-                style: AppTextStyles.titleLarge.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _count == 0
-                    ? 'مهام خفيفة من المعلم'
-                    : '$_count مهمة — اضغط للعرض والرد',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textHint,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-            child: const Icon(
-              Icons.tips_and_updates_outlined,
-              color: AppColors.primary,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AppCard(
+        onTap: () {
+          Navigator.of(context)
+              .push(
+            MaterialPageRoute<void>(
+              builder: (_) => StudentActivitiesPage(halaqaId: id),
             ),
-          ),
-        ],
+          )
+              .then((_) {
+            if (mounted) _loadCount();
+          });
+        },
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+              child: const Icon(
+                Icons.tips_and_updates_outlined,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'أنشطة الحلقة',
+                    style: AppTextStyles.titleLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _count == 0
+                        ? 'مهام خفيفة من المعلم'
+                        : '$_count مهمة — اضغط للعرض والرد',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const AppGoChevron(color: AppColors.primary),
+          ],
+        ),
       ),
     );
   }

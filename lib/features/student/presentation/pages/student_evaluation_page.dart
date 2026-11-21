@@ -168,7 +168,7 @@ class _EvaluationsHeader extends StatelessWidget {
       child: Row(
         children: [
           _SoftIconButton(
-            icon: Icons.chevron_right_rounded,
+            icon: Icons.chevron_left_rounded,
             onTap: onBack,
           ),
           const Expanded(

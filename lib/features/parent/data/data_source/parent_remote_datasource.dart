@@ -24,6 +24,14 @@ abstract class ParentRemoteDatasource {
   });
   Future<List<PaymentModel>> getPayments(String parentId);
 
+  /// Cursor page (`dueDate` desc). [afterPaymentId] is the previous page tip.
+  Future<({List<PaymentModel> items, String? nextCursorId, bool hasMore})>
+  getPaymentsPage({
+    required String parentId,
+    int limit = 30,
+    String? afterPaymentId,
+  });
+
   /// C3 — Parent-safe Vodafone destination from academySettings/paymentPublic.
   Future<PaymentPublicSettingsEntity> getPaymentPublicSettings();
 

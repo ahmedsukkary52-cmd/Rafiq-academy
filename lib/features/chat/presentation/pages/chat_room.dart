@@ -447,11 +447,26 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             _chatBloc.add(const ActionErrorDismissedEvent());
           },
           child: Scaffold(
-            backgroundColor: const Color(0xFFF5FAFB),
+            backgroundColor: const Color(0xFFE8F3F1),
             body: Column(
               children: [
                 _header(),
-                Expanded(child: _buildMessages()),
+                Expanded(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0xFFEAF6F4),
+                          Color(0xFFE2EEEA),
+                          Color(0xFFDCEAE6),
+                        ],
+                      ),
+                    ),
+                    child: _buildMessages(),
+                  ),
+                ),
                 if (widget.readOnly)
                   Container(
                     width: double.infinity,

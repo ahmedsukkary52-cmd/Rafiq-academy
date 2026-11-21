@@ -8,6 +8,9 @@ import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations_bloc.dart';
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations_state.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
+import 'package:rafiq_academy/features/homework/domain/entities/homework_entity.dart';
+import 'package:rafiq_academy/features/homework/domain/repositories/homework_repository.dart';
+import 'package:rafiq_academy/features/homework/domain/usecases/homework_usecases.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/get_child_achievements_usecase.dart';
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart';
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_state.dart';
@@ -74,6 +77,11 @@ class _ParentRepository extends Fake implements ParentRepository {
   ) async => const Right(<AchievementEntity>[]);
 }
 
+class _HomeworkRepository extends Fake implements HomeworkRepository {
+  @override
+  Future<HomeworkEntity?> getLatestHomework(String studentId) async => null;
+}
+
 const _summary = StudentProfileSummary(
   name: ' سارة ',
   halaqaName: 'حلقة النور',
@@ -102,6 +110,9 @@ void main() {
     _replace<GetChildAchievementsUseCase>(
       GetChildAchievementsUseCase(_ParentRepository()),
     );
+    _replace<GetLatestHomeworkUseCase>(
+      GetLatestHomeworkUseCase(_HomeworkRepository()),
+    );
     _replace<ChatConversationsBloc>(_FakeChatBloc());
     bloc = _FakeParentBloc(
       const ParentState(parentId: 'parent1', childrenIds: ['s1', 's2']),
@@ -112,6 +123,7 @@ void main() {
     _remove<StudentProfileSummaryReader>();
     _remove<RecitationRecordsReader>();
     _remove<GetChildAchievementsUseCase>();
+    _remove<GetLatestHomeworkUseCase>();
     _remove<ChatConversationsBloc>();
   });
 
@@ -138,7 +150,8 @@ void main() {
     expect(summaries.requested, ['s2']);
     expect(find.text('سارة'), findsWidgets);
     expect(AppCapabilities.streakAndLevelAvailable, isFalse);
-    expect(find.text('حلقة النور'), findsOneWidget);
+    // Hero + detail both show the halaqa name in the current profile layout.
+    expect(find.text('حلقة النور'), findsWidgets);
     expect(find.textContaining('المستوى'), findsNothing);
   });
 

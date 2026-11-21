@@ -45,6 +45,10 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
     on<LoadMonthlyReviewScheduleEvent>(_onLoadMonthlySchedule);
     on<LoadRecitationRecordsEvent>(_onLoadRecitationRecords);
     on<LoadAchievementsEvent>(_onLoadAchievements);
+    on<LoadMoreAchievementsEvent>(
+      _onLoadMoreAchievements,
+      transformer: droppable(),
+    );
     on<LoadStudentHalaqaEvent>(_onLoadHalaqa);
     on<StartWatchingAssignmentEvent>(
       _onStartWatchingAssignment,
@@ -175,11 +179,36 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
       state.copyWith(
         achievementsStatus: SectionStatus.loading,
         achievementsError: null,
+        achievements: const [],
+        achievementsHasMore: false,
+        achievementsLoadingMore: false,
+        achievementsStudentCursorId: null,
+        achievementsRecipientsCursorId: null,
+        achievementsStudentId: event.studentId,
       ),
     );
 
-    final result = await getAchievements(StudentUidParams(event.studentId));
+    if (!event.paged) {
+      final result = await getAchievements(StudentUidParams(event.studentId));
+      result.fold(
+        (failure) => emit(
+          state.copyWith(
+            achievementsStatus: SectionStatus.error,
+            achievementsError: failure.message,
+          ),
+        ),
+        (achievements) => emit(
+          state.copyWith(
+            achievementsStatus: SectionStatus.loaded,
+            achievements: achievements,
+            achievementsHasMore: false,
+          ),
+        ),
+      );
+      return;
+    }
 
+    final result = await getAchievements.page(studentId: event.studentId);
     result.fold(
       (failure) => emit(
         state.copyWith(
@@ -187,12 +216,58 @@ class StudentBloc extends Bloc<StudentEvent, StudentState> {
           achievementsError: failure.message,
         ),
       ),
-      (achievements) => emit(
+      (page) => emit(
         state.copyWith(
           achievementsStatus: SectionStatus.loaded,
-          achievements: achievements,
+          achievements: page.items,
+          achievementsHasMore: page.hasMore,
+          achievementsStudentCursorId: page.studentCursorId,
+          achievementsRecipientsCursorId: page.recipientsCursorId,
         ),
       ),
+    );
+  }
+
+  Future<void> _onLoadMoreAchievements(
+    LoadMoreAchievementsEvent event,
+    Emitter<StudentState> emit,
+  ) async {
+    final studentId = state.achievementsStudentId.trim();
+    if (studentId.isEmpty ||
+        !state.achievementsHasMore ||
+        state.achievementsLoadingMore ||
+        state.achievementsStatus != SectionStatus.loaded) {
+      return;
+    }
+    emit(state.copyWith(achievementsLoadingMore: true, achievementsError: null));
+    final result = await getAchievements.page(
+      studentId: studentId,
+      afterStudentAchievementId: state.achievementsStudentCursorId,
+      afterRecipientsAchievementId: state.achievementsRecipientsCursorId,
+    );
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          achievementsLoadingMore: false,
+          achievementsError: failure.message,
+        ),
+      ),
+      (page) {
+        final known = {for (final a in state.achievements) a.id};
+        final merged = [
+          ...state.achievements,
+          ...page.items.where((a) => !known.contains(a.id)),
+        ]..sort((a, b) => b.date.compareTo(a.date));
+        emit(
+          state.copyWith(
+            achievements: merged,
+            achievementsHasMore: page.hasMore,
+            achievementsStudentCursorId: page.studentCursorId,
+            achievementsRecipientsCursorId: page.recipientsCursorId,
+            achievementsLoadingMore: false,
+          ),
+        );
+      },
     );
   }
 

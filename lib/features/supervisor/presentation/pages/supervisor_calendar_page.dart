@@ -82,7 +82,7 @@ class SupervisorCalendarPage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_left_rounded),
+                        const Icon(Icons.chevron_right_rounded),
                       ],
                     ),
                   ),

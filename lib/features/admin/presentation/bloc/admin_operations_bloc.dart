@@ -203,12 +203,50 @@ class AdminOperationsBloc
   Future<void> _onCreateHalaqa(
     CreateHalaqaEvent event,
     Emitter<AdminOperationsState> emit,
-  ) => _runAction<String>(
-    emit,
-    action: () => createHalaqa(event.params),
-    successMessage: (_) => 'تم إنشاء الحلقة ومواعيدها',
-    reloadDirectory: true,
-  );
+  ) async {
+    emit(
+      state.copyWith(
+        actionStatus: SubmissionStatus.submitting,
+        actionError: null,
+        actionMessage: null,
+      ),
+    );
+    final createResult = await createHalaqa(event.params);
+    final failure = createResult.fold<Failure?>((f) => f, (_) => null);
+    if (failure != null) {
+      emit(
+        state.copyWith(
+          actionStatus: SubmissionStatus.error,
+          actionError: failure.message,
+        ),
+      );
+      return;
+    }
+    final halaqaId = createResult.getOrElse((_) => '');
+    var admitted = 0;
+    var admitFailed = 0;
+    for (final studentId in event.admitStudentIds) {
+      final id = studentId.trim();
+      if (id.isEmpty || halaqaId.isEmpty) continue;
+      final admitResult = await admitStudent(
+        ApproveStudentParams(studentId: id, halaqaId: halaqaId),
+      );
+      admitResult.fold((_) => admitFailed++, (_) => admitted++);
+    }
+    final message = event.admitStudentIds.isEmpty
+        ? 'تم إنشاء الحلقة ومواعيدها'
+        : admitFailed == 0
+        ? 'تم إنشاء الحلقة وإضافة $admitted طالب'
+        : 'تم إنشاء الحلقة · أُضيف $admitted · تعذّر $admitFailed';
+    emit(
+      state.copyWith(
+        actionStatus: SubmissionStatus.success,
+        actionMessage: message,
+      ),
+    );
+    AcademyDataRevision.bumpStructure();
+    add(const LoadAdminDirectoryEvent());
+  }
 
   Future<void> _onAddSlot(
     AddHalaqaSlotEvent event,

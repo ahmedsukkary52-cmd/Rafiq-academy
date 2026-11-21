@@ -22,8 +22,8 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 import { writeRoleProfile } from "../admin/adminProvisionUser";
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../audit/auditLogContract";
-import { adminActor, writeAuditLog } from "../audit/auditLogWrite";
-import { loadCallerRole, optionalText, requireCallerUid, requireText } from "../authority/callerContext";
+import { adminActor, supervisorActor, writeAuditLog } from "../audit/auditLogWrite";
+import { loadCallerRole, requireCallerUid, requireText } from "../authority/callerContext";
 import { admitStudentToHalaqaCore } from "../halaqa/membershipFunctions";
 import { contactInfoViolation } from "../privacy/contactInfoPolicy";
 import { assertBackendAllowed } from "../productionGate";
@@ -129,7 +129,7 @@ export function refKindOf(role: MemberRole): RefKind {
  */
 export async function createMemberAccount(
   deps: OnboardingDeps,
-  params: { role: MemberRole; name: string; ref?: string },
+  params: { role: MemberRole; name: string; ref?: string; isActive?: boolean },
 ): Promise<IssuedCredential> {
   const { db, auth } = deps;
   let username = "";
@@ -165,7 +165,8 @@ export async function createMemberAccount(
       name: params.name,
       nameNormalized: normalizeArabicSearchText(params.name),
       role: params.role,
-      isActive: true,
+      isActive: params.isActive ?? (params.role !== "teacher"),
+      ...(params.role === "teacher" ? { pendingHalaqaAssignment: true } : {}),
       createdAt: now,
       ...(params.ref ? { academyRef: params.ref } : {}),
     });
@@ -184,9 +185,21 @@ export async function createMemberAccount(
     }
   } catch (e) {
     if (uid) {
-      await auth.deleteUser(uid).catch(() => undefined);
-      await db.collection("users").doc(uid).delete().catch(() => undefined);
-      await db.collection("userPrivate").doc(uid).delete().catch(() => undefined);
+      const profileCollection = params.role === "student"
+        ? "studentProfiles"
+        : params.role === "parent"
+          ? "parentProfiles"
+          : params.role === "teacher"
+            ? "teacherProfiles"
+            : "users";
+      await Promise.all([
+        auth.deleteUser(uid).catch(() => undefined),
+        db.collection("users").doc(uid).delete().catch(() => undefined),
+        db.collection("userPrivate").doc(uid).delete().catch(() => undefined),
+        profileCollection === "users"
+          ? Promise.resolve()
+          : db.collection(profileCollection).doc(uid).delete().catch(() => undefined),
+      ]);
     }
     await usernameRef.delete().catch(() => undefined);
     if (e instanceof HttpsError) throw e;
@@ -241,7 +254,7 @@ export async function adminOnboardStudentCore(
   }
   const studentName = requireName(data.studentName, "اسم الطالب");
   const parent = parseParent(data.parent);
-  const halaqaId = optionalText(data.halaqaId, 128);
+  const halaqaId = requireText(data.halaqaId, "الحلقة", 128);
   const fingerprint = fingerprintOf(studentName, parent, halaqaId);
 
   const requestRef = db.collection(ONBOARDING_REQUESTS_COLLECTION).doc(`${uid}_${requestId}`);
@@ -263,12 +276,10 @@ export async function adminOnboardStudentCore(
   const previous = await requestRef.get();
   if (checkRequest(previous.exists, previous.data() ?? {})) return replayOf(previous.data() ?? {});
 
-  if (halaqaId) {
-    const halaqa = await db.collection("halaqat").doc(halaqaId).get();
-    if (!halaqa.exists) throw new HttpsError("not-found", "الحلقة غير موجودة");
-    if ((halaqa.get("status") ?? "active") !== "active") {
-      throw new HttpsError("failed-precondition", "الحلقة غير نشطة");
-    }
+  const halaqa = await db.collection("halaqat").doc(halaqaId).get();
+  if (!halaqa.exists) throw new HttpsError("not-found", "الحلقة غير موجودة");
+  if ((halaqa.get("status") ?? "active") !== "active") {
+    throw new HttpsError("failed-precondition", "الحلقة غير نشطة");
   }
   if (parent.mode === "existing") {
     const [user, profile] = await Promise.all([
@@ -366,12 +377,16 @@ export async function adminOnboardStudentCore(
         role: "student",
         name: studentName,
         ref: internal.studentRef,
+        isActive: false,
       });
       studentId = issued.uid;
       credentials.push(issued);
       await writeOwned({ studentUid: studentId });
-      steps.push({ step: "student", status: "done", message: "تم إنشاء حساب الطالب" });
+      steps.push({ step: "student", status: "done", message: "تم إنشاء حساب الطالب قيد استكمال التسجيل" });
     }
+    // A resumed partial request may contain a student created by an older
+    // attempt. Keep it inactive until both the guardian and halaqa links exist.
+    await db.collection("users").doc(studentId).update({ isActive: false });
   } catch (e) {
     steps.push({ step: "student", status: "failed", message: stepMessage(e) });
     return finish("partial");
@@ -385,19 +400,15 @@ export async function adminOnboardStudentCore(
     return finish("partial");
   }
 
-  if (!halaqaId) {
-    steps.push({ step: "halaqa", status: "skipped", message: "لم تُحدد حلقة بعد" });
-  } else {
-    try {
-      await admitStudentToHalaqaCore(db, uid, { studentId, halaqaId });
-      steps.push({ step: "halaqa", status: "done", message: "تمت إضافة الطالب إلى الحلقة" });
-    } catch (e) {
-      if (e instanceof HttpsError && e.code === "already-exists") {
-        steps.push({ step: "halaqa", status: "done", message: "الطالب عضو في الحلقة" });
-      } else {
-        steps.push({ step: "halaqa", status: "failed", message: stepMessage(e) });
-        return finish("partial");
-      }
+  try {
+    await admitStudentToHalaqaCore(db, uid, { studentId, halaqaId });
+    steps.push({ step: "halaqa", status: "done", message: "تمت إضافة الطالب إلى الحلقة" });
+  } catch (e) {
+    if (e instanceof HttpsError && e.code === "already-exists") {
+      steps.push({ step: "halaqa", status: "done", message: "الطالب عضو في الحلقة" });
+    } else {
+      steps.push({ step: "halaqa", status: "failed", message: stepMessage(e) });
+      return finish("partial");
     }
   }
 
@@ -478,11 +489,235 @@ export async function completeFirstLoginCore(
   return { ok: true };
 }
 
+async function requireSupervisorCaller(db: admin.firestore.Firestore, callerUid: string | undefined) {
+  const uid = requireCallerUid(callerUid);
+  if ((await loadCallerRole(db, uid)) !== "supervisor") {
+    throw new HttpsError("permission-denied", "هذه العملية متاحة للمشرف فقط");
+  }
+  return uid;
+}
+
+/**
+ * Supervisor-scoped onboard: create parent (optional) + student, link, admit
+ * into a halaqa the caller supervises. Does not open admin-wide callables.
+ */
+export async function supervisorOnboardStudentCore(
+  deps: OnboardingDeps,
+  callerUid: string | undefined,
+  data: Record<string, unknown>,
+): Promise<OnboardingResult> {
+  const { db } = deps;
+  const uid = await requireSupervisorCaller(db, callerUid);
+  const requestId = typeof data.requestId === "string" ? data.requestId : "";
+  if (!REQUEST_ID_PATTERN.test(requestId)) {
+    throw new HttpsError("invalid-argument", "معرّف الطلب غير صالح");
+  }
+  const studentName = requireName(data.studentName, "اسم الطالب");
+  const parent = parseParent(data.parent);
+  const halaqaId = requireText(data.halaqaId, "الحلقة", 128);
+  const fingerprint = fingerprintOf(studentName, parent, halaqaId);
+
+  const halaqa = await db.collection("halaqat").doc(halaqaId).get();
+  if (!halaqa.exists) throw new HttpsError("not-found", "الحلقة غير موجودة");
+  if ((halaqa.get("status") ?? "active") !== "active") {
+    throw new HttpsError("failed-precondition", "الحلقة غير نشطة");
+  }
+  if (halaqa.get("supervisorId") !== uid) {
+    throw new HttpsError("permission-denied", "الحلقة ليست ضمن نطاق إشرافك");
+  }
+
+  if (parent.mode === "existing") {
+    const [user, profile] = await Promise.all([
+      db.collection("users").doc(parent.parentId).get(),
+      db.collection("parentProfiles").doc(parent.parentId).get(),
+    ]);
+    if (!user.exists || user.get("role") !== "parent" || !profile.exists) {
+      throw new HttpsError("failed-precondition", "الحساب المحدد ليس ولي أمر");
+    }
+    if (user.get("isActive") !== true) {
+      throw new HttpsError("failed-precondition", "حساب ولي الأمر غير نشط");
+    }
+  }
+
+  const requestRef = db.collection(ONBOARDING_REQUESTS_COLLECTION).doc(`sup_${uid}_${requestId}`);
+  const replayOf = (state: admin.firestore.DocumentData): OnboardingResult => ({
+    status: "completed",
+    replayed: true,
+    studentId: state.studentUid ?? null,
+    parentId: state.parentUid ?? null,
+    halaqaId: state.halaqaId || null,
+    steps: Array.isArray(state.steps) ? state.steps : [],
+    credentials: [],
+  });
+  const checkRequest = (exists: boolean, state: admin.firestore.DocumentData) => {
+    if (exists && state.fingerprint !== fingerprint) {
+      throw new HttpsError("already-exists", REQUEST_ID_REUSED_MESSAGE);
+    }
+    return exists && state.status === "completed";
+  };
+  const previous = await requestRef.get();
+  if (checkRequest(previous.exists, previous.data() ?? {})) return replayOf(previous.data() ?? {});
+
+  const attemptId = randomUUID();
+  const claimed = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(requestRef);
+    const current = snap.data() ?? {};
+    if (checkRequest(snap.exists, current)) return { replay: replayOf(current) };
+    const leaseUntilMs = current.leaseUntil?.toMillis?.() ?? 0;
+    if (current.status === "in_progress" && Date.now() < leaseUntilMs) {
+      throw new HttpsError("aborted", ONBOARDING_IN_PROGRESS_MESSAGE);
+    }
+    tx.set(
+      requestRef,
+      {
+        fingerprint,
+        actorId: uid,
+        actorRole: "supervisor",
+        status: "in_progress",
+        attemptId,
+        leaseUntil: Timestamp.fromMillis(Date.now() + ONBOARDING_LEASE_MS),
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(snap.exists ? {} : { createdAt: FieldValue.serverTimestamp() }),
+      },
+      { merge: true },
+    );
+    return { state: current };
+  });
+  if ("replay" in claimed) return claimed.replay as OnboardingResult;
+  const state = claimed.state;
+
+  const writeOwned = (fields: Record<string, unknown>) =>
+    db.runTransaction(async (tx) => {
+      const current = await tx.get(requestRef);
+      if (current.get("attemptId") !== attemptId) {
+        throw new HttpsError("aborted", "تولّت محاولة أحدث هذا الطلب؛ راجع نتيجتها");
+      }
+      tx.update(requestRef, { ...fields, updatedAt: FieldValue.serverTimestamp() });
+    });
+
+  const steps: OnboardingStep[] = [];
+  const credentials: IssuedCredential[] = [];
+  let parentId: string | null = parent.mode === "existing" ? parent.parentId : state.parentUid ?? null;
+  let studentId: string | null = state.studentUid ?? null;
+
+  const finish = async (status: "completed" | "partial"): Promise<OnboardingResult> => {
+    await writeOwned({
+      status: status === "completed" ? "completed" : "failed",
+      steps,
+      parentUid: parentId,
+      studentUid: studentId,
+      halaqaId,
+      leaseUntil: FieldValue.delete(),
+    });
+    return { status, replayed: false, studentId, parentId, halaqaId: halaqaId || null, steps, credentials };
+  };
+
+  try {
+    if (parent.mode === "existing") {
+      steps.push({ step: "parent", status: "done", message: "تم اختيار ولي أمر موجود" });
+    } else if (parentId) {
+      credentials.push(await reissuePassword(deps, parentId));
+      steps.push({ step: "parent", status: "done", message: "حساب ولي الأمر موجود من محاولة سابقة" });
+    } else {
+      const issued = await createMemberAccount(deps, { role: "parent", name: parent.name });
+      parentId = issued.uid;
+      credentials.push(issued);
+      await writeOwned({ parentUid: parentId });
+      steps.push({ step: "parent", status: "done", message: "تم إنشاء حساب ولي الأمر" });
+    }
+  } catch (e) {
+    steps.push({ step: "parent", status: "failed", message: stepMessage(e) });
+    return finish("partial");
+  }
+
+  try {
+    if (studentId) {
+      credentials.push(await reissuePassword(deps, studentId));
+      steps.push({ step: "student", status: "done", message: "حساب الطالب موجود من محاولة سابقة" });
+    } else {
+      const issued = await createMemberAccount(deps, {
+        role: "student",
+        name: studentName,
+        isActive: false,
+      });
+      studentId = issued.uid;
+      credentials.push(issued);
+      await writeOwned({ studentUid: studentId });
+      steps.push({ step: "student", status: "done", message: "تم إنشاء حساب الطالب قيد استكمال التسجيل" });
+    }
+    await db.collection("users").doc(studentId).update({ isActive: false });
+  } catch (e) {
+    steps.push({ step: "student", status: "failed", message: stepMessage(e) });
+    return finish("partial");
+  }
+
+  try {
+    await adminLinkParentChildCore(
+      db,
+      uid,
+      { parentId, studentId, operation: "link" },
+      { allowSupervisor: true },
+    );
+    steps.push({ step: "link", status: "done", message: "تم ربط الطالب بولي الأمر" });
+  } catch (e) {
+    steps.push({ step: "link", status: "failed", message: stepMessage(e) });
+    return finish("partial");
+  }
+
+  // Supervisor admit refuses inactive accounts (admin admit activates). Activate
+  // only after parent link so a partial crash never leaves a login-ready orphan.
+  try {
+    await db.collection("users").doc(studentId as string).update({ isActive: true });
+  } catch (e) {
+    steps.push({ step: "halaqa", status: "failed", message: stepMessage(e) });
+    return finish("partial");
+  }
+
+  try {
+    await admitStudentToHalaqaCore(db, uid, { studentId, halaqaId });
+    steps.push({ step: "halaqa", status: "done", message: "تمت إضافة الطالب إلى الحلقة" });
+  } catch (e) {
+    if (e instanceof HttpsError && e.code === "already-exists") {
+      steps.push({ step: "halaqa", status: "done", message: "الطالب عضو في الحلقة" });
+    } else {
+      steps.push({ step: "halaqa", status: "failed", message: stepMessage(e) });
+      return finish("partial");
+    }
+  }
+
+  await writeAuditLog(
+    {
+      actor: supervisorActor(uid),
+      action: AUDIT_ACTION.studentOnboard,
+      targetType: AUDIT_TARGET_TYPE.user,
+      targetId: studentId as string,
+      metadata: {
+        studentId: studentId as string,
+        parentId: parentId as string,
+        halaqaId,
+        requestId,
+      },
+      source: "supervisorOnboardStudent",
+    },
+    db,
+  );
+  return finish("completed");
+}
+
 const deps = (): OnboardingDeps => ({ db: admin.firestore(), auth: admin.auth() });
 
 export const adminOnboardStudent = onCall({ region: "europe-west1" }, async (request) => {
   assertBackendAllowed("adminOnboardStudent");
   return adminOnboardStudentCore(deps(), request.auth?.uid, (request.data ?? {}) as Record<string, unknown>);
+});
+
+export const supervisorOnboardStudent = onCall({ region: "europe-west1" }, async (request) => {
+  assertBackendAllowed("supervisorOnboardStudent");
+  return supervisorOnboardStudentCore(
+    deps(),
+    request.auth?.uid,
+    (request.data ?? {}) as Record<string, unknown>,
+  );
 });
 
 export const adminResetMemberPassword = onCall({ region: "europe-west1" }, async (request) => {

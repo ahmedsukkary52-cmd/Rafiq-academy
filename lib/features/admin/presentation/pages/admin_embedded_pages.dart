@@ -164,7 +164,7 @@ class _AdminGroupLibrariesPageState extends State<AdminGroupLibrariesPage> {
                         '${g.participants.length} عضو',
                         style: AppTextStyles.labelSmall,
                       ),
-                      trailing: const Icon(Icons.chevron_left_rounded),
+                      trailing: const Icon(Icons.chevron_right_rounded),
                     ),
                   );
                 },

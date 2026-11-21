@@ -3,9 +3,10 @@ import 'package:rafiq_academy/core/firebase/app_flavor.dart';
 
 void main() {
   group('parseAppFlavor', () {
-    test('accepts dev, staging and prod', () {
+    test('accepts dev, staging, trial and prod', () {
       expect(parseAppFlavor('dev'), AppFlavor.dev);
       expect(parseAppFlavor('staging'), AppFlavor.staging);
+      expect(parseAppFlavor('trial'), AppFlavor.trial);
       expect(parseAppFlavor('prod'), AppFlavor.prod);
     });
 
@@ -19,9 +20,10 @@ void main() {
   });
 
   group('local flavors are Emulator-only (Basma isolation)', () {
-    test('dev and staging are local, prod is not', () {
+    test('dev and staging are local; trial and prod are not', () {
       expect(isLocalFlavor(AppFlavor.dev), isTrue);
       expect(isLocalFlavor(AppFlavor.staging), isTrue);
+      expect(isLocalFlavor(AppFlavor.trial), isFalse);
       expect(isLocalFlavor(AppFlavor.prod), isFalse);
     });
 

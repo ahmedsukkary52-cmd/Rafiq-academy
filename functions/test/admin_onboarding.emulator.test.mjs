@@ -149,14 +149,30 @@ test("journey 3: new parent + student, linked, admitted, credentials sign in, no
   for (const c of result.credentials) assert.equal(everything.includes(c.temporaryPassword), false);
 });
 
+test("student onboarding rejects a missing Halaqa before creating Auth or Firestore records", async () => {
+  await assert.rejects(
+    onboarding.adminOnboardStudentCore(deps, ADMIN, {
+      requestId: requestId(),
+      studentName: "طالب بلا حلقة",
+      parent: { mode: "new", name: "ولي تجريبي" },
+    }),
+    (error) => error.code === "invalid-argument",
+  );
+  assert.equal((await auth.listUsers()).users.length, 0);
+  assert.equal((await db.collection("users").where("role", "==", "student").get()).size, 0);
+  assert.equal((await db.collection("studentProfiles").get()).size, 0);
+  assert.equal((await db.collection("onboardingRequests").get()).size, 0);
+});
+
 test("existing parent is linked, not duplicated; replay of a completed request returns no credentials", async () => {
   const first = await onboarding.adminOnboardStudentCore(deps, ADMIN, {
     requestId: requestId(),
     studentName: "سارة",
     parent: { mode: "new", name: "خالد" },
+    halaqaId: HALAQA,
   });
   assert.equal(first.status, "completed");
-  assert.equal(first.steps.find((s) => s.step === "halaqa").status, "skipped");
+  assert.equal(first.steps.find((s) => s.step === "halaqa").status, "done");
 
   const id = requestId();
   const input = {
@@ -234,6 +250,7 @@ test("first login replaces the temporary password; Admin recovery issues a new o
     requestId: requestId(),
     studentName: "عمر",
     parent: { mode: "new", name: "حسن" },
+    halaqaId: HALAQA,
   });
   const student = result.credentials.find((c) => c.role === "student");
   const email = credentials.loginEmailFor(student.username);
@@ -378,7 +395,7 @@ test("name backfill: dry run by default, then stamps legacy accounts once (resum
 });
 
 test("guards: admin only, valid parent, active halaqa, no contact info in names", async () => {
-  const base = { requestId: requestId(), studentName: "طالب", parent: { mode: "new", name: "ولي" } };
+  const base = { requestId: requestId(), studentName: "طالب", parent: { mode: "new", name: "ولي" }, halaqaId: HALAQA };
   await db.doc("users/t1").set({ name: "معلم", role: "teacher", isActive: true });
   await assert.rejects(
     onboarding.adminOnboardStudentCore(deps, "t1", base),
@@ -404,4 +421,122 @@ test("guards: admin only, valid parent, active halaqa, no contact info in names"
   // Nothing was created by any rejected call.
   assert.equal((await auth.listUsers()).users.length, 0);
   assert.equal((await db.collection("loginUsernames").get()).size, 0);
+});
+
+test("compensation: a Firestore failure after Auth creation removes only the failed operation's records", async () => {
+  // Pre-existing, unrelated resources that the failed operation must not touch.
+  await auth.createUser({ uid: "keep1", email: "keep1@example.test", password: "Synthetic-Pass-42" });
+  const keepDocs = {
+    "users/keep1": { name: "قديم", role: "parent", isActive: true },
+    "userPrivate/keep1": { email: "keep1@example.test", loginUsername: "pr999999" },
+    "parentProfiles/keep1": { uid: "keep1", childrenIds: ["keepStudent"] },
+    "loginUsernames/pr999999": { uid: "keep1", role: "parent", status: "active" },
+  };
+  for (const [path, doc] of Object.entries(keepDocs)) await db.doc(path).set(doc);
+
+  const deleted = [];
+  const spyAuth = {
+    createUser: (props) => auth.createUser(props),
+    updateUser: (uid, props) => auth.updateUser(uid, props),
+    deleteUser: async (uid) => {
+      deleted.push(uid);
+      return auth.deleteUser(uid);
+    },
+  };
+  // The Firestore batch fails after the Auth account already exists.
+  const failingBatch = {
+    set() { return this; },
+    update() { return this; },
+    commit: async () => { throw new Error("simulated firestore outage"); },
+  };
+  const failingDb = { collection: db.collection.bind(db), batch: () => failingBatch };
+
+  await assert.rejects(
+    onboarding.createMemberAccount({ db: failingDb, auth: spyAuth }, { role: "parent", name: "ولي فاشل" }),
+    (e) => e.code === "internal",
+  );
+
+  // (2) Only the just-created Auth account was rolled back; nothing pre-existing.
+  assert.equal(deleted.length, 1, "exactly one Auth account rolled back");
+  assert.notEqual(deleted[0], "keep1", "a pre-existing Auth account is never deleted");
+  assert.equal((await auth.getUser("keep1")).uid, "keep1");
+  assert.equal((await auth.listUsers()).users.length, 1);
+
+  // (3) Pre-existing Firestore documents are neither deleted nor overwritten.
+  for (const [path, doc] of Object.entries(keepDocs)) {
+    assert.deepEqual(await data(path), doc, path);
+  }
+  // (1) The failed operation left no user/profile behind.
+  // seedBase() always writes users/admin_onb; keep1 is the only pre-existing
+  // member doc. Compensation must not leave a third users doc from the failed op.
+  const userIds = (await db.collection("users").get()).docs.map((d) => d.id).sort();
+  assert.deepEqual(userIds, [ADMIN, "keep1"].sort(), "only seed admin + keep1 remain in users");
+  assert.equal((await db.collection("userPrivate").get()).size, 1);
+  assert.equal((await db.collection("parentProfiles").get()).size, 1);
+  // (4) ... and released only its own username reservation.
+  assert.equal((await db.collection("loginUsernames").get()).size, 1);
+});
+
+test("compensation: role-profile and username cleanup target only the failed operation", async () => {
+  await db.doc("users/other").set({ name: "آخر", role: "teacher", isActive: true });
+  await db.doc("teacherProfiles/other").set({ uid: "other", halaqatIds: ["hX"] });
+  await db.doc("loginUsernames/tc111111").set({ uid: "other", role: "teacher", status: "active" });
+
+  const failingBatch = {
+    set() { return this; },
+    update() { return this; },
+    commit: async () => { throw new Error("simulated firestore outage"); },
+  };
+  const failingDb = { collection: db.collection.bind(db), batch: () => failingBatch };
+  await assert.rejects(
+    onboarding.createMemberAccount({ db: failingDb, auth }, { role: "teacher", name: "معلم فاشل" }),
+    (e) => e.code === "internal",
+  );
+
+  // A different account's role profile and reservation survive untouched.
+  assert.deepEqual(await data("teacherProfiles/other"), { uid: "other", halaqatIds: ["hX"] });
+  assert.deepEqual(await data("loginUsernames/tc111111"), { uid: "other", role: "teacher", status: "active" });
+  assert.equal((await db.collection("teacherProfiles").get()).size, 1);
+  assert.equal((await db.collection("loginUsernames").get()).size, 1);
+  assert.equal((await auth.listUsers()).users.length, 0);
+});
+
+test("compensation: a successful account creation retains Auth, Firestore, username and profile", async () => {
+  const issued = await onboarding.createMemberAccount({ db, auth }, { role: "teacher", name: "معلم ناجح" });
+  assert.equal((await auth.getUser(issued.uid)).uid, issued.uid);
+  const account = await data(`users/${issued.uid}`);
+  assert.equal(account.role, "teacher");
+  assert.equal(account.isActive, false);
+  assert.equal(account.pendingHalaqaAssignment, true);
+  assert.equal((await data(`userPrivate/${issued.uid}`)).loginUsername, issued.username);
+  assert.equal((await data(`loginUsernames/${issued.username}`)).uid, issued.uid);
+  assert.equal((await data(`loginUsernames/${issued.username}`)).status, "active");
+  assert.equal((await data(`teacherProfiles/${issued.uid}`)).uid, issued.uid);
+  assert.equal(typeof account.academyRef, "string");
+});
+
+test("compensation: adminProvisionUser never deletes a pre-existing Auth account on a failed retry", async () => {
+  await auth.createUser({ uid: "existingAuth", email: "dup-target@academy.test", password: "Synthetic-Pass-42" });
+  await db.doc("users/existingAuth").set({ name: "قديم", role: "parent", isActive: true });
+
+  const { adminProvisionUser } = require("../lib/admin/adminProvisionUser.js");
+  const previous = process.env.FUNCTIONS_EMULATOR;
+  process.env.FUNCTIONS_EMULATOR = "true";
+  try {
+    // Re-using the same email fails at Auth creation, before any Firestore write.
+    await assert.rejects(
+      adminProvisionUser.run({
+        auth: { uid: ADMIN },
+        data: { email: "dup-target@academy.test", password: "Initial1", name: "مكرر", role: "parent" },
+      }),
+      (e) => e.code === "already-exists",
+    );
+  } finally {
+    if (previous === undefined) delete process.env.FUNCTIONS_EMULATOR;
+    else process.env.FUNCTIONS_EMULATOR = previous;
+  }
+
+  assert.equal((await auth.getUser("existingAuth")).uid, "existingAuth");
+  assert.deepEqual(await data("users/existingAuth"), { name: "قديم", role: "parent", isActive: true });
+  assert.equal((await auth.listUsers()).users.length, 1);
 });

@@ -33,21 +33,20 @@ class AdminPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // RTL: title block first (= right), optional actions after Spacer (= left).
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (leading != null) leading!,
-          if (actions != null) ...actions!,
-          if (actions != null) const Spacer(),
+          if (leading != null) ...[leading!, const SizedBox(width: 8)],
           Expanded(
-            flex: actions == null ? 1 : 0,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   title,
+                  textAlign: TextAlign.right,
                   style: AppTextStyles.headlineMedium.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -55,6 +54,7 @@ class AdminPageHeader extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
+                    textAlign: TextAlign.right,
                     style: AppTextStyles.labelMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -62,6 +62,7 @@ class AdminPageHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (actions != null) ...[const SizedBox(width: 8), ...actions!],
         ],
       ),
     );
@@ -142,9 +143,9 @@ class AdminHeaderCircleButton extends StatelessWidget {
               child: Icon(icon, color: AppColors.onPrimary, size: 20),
             ),
             if (showDot)
-              Positioned(
+              PositionedDirectional(
                 top: 5,
-                right: 5,
+                end: 5,
                 child: Container(
                   width: 8,
                   height: 8,
@@ -190,7 +191,7 @@ class AdminRoleHomeHeader extends StatelessWidget {
         top: MediaQuery.paddingOf(context).top + 12,
         left: 20,
         right: 20,
-        bottom: 16,
+        bottom: 28,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -218,6 +219,7 @@ class AdminRoleHomeHeader extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         name,
@@ -237,7 +239,7 @@ class AdminRoleHomeHeader extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.labelMedium.copyWith(
                           color: AppColors.onPrimaryMuted,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: FontWeight.w500,
                           fontSize: 12,
                           height: 1.3,
                         ),
@@ -249,25 +251,17 @@ class AdminRoleHomeHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (onSearchTap != null) ...[
-                  AdminHeaderCircleButton(
-                    icon: Icons.search_rounded,
-                    onTap: onSearchTap,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                AdminHeaderCircleButton(
-                  icon: Icons.notifications_outlined,
-                  showDot: unreadNotifications > 0,
-                  onTap: onNotificationsTap,
-                ),
-              ],
+          if (onSearchTap != null) ...[
+            AdminHeaderCircleButton(
+              icon: Icons.search_rounded,
+              onTap: onSearchTap,
             ),
+            const SizedBox(width: 8),
+          ],
+          AdminHeaderCircleButton(
+            icon: Icons.notifications_outlined,
+            showDot: unreadNotifications > 0,
+            onTap: onNotificationsTap,
           ),
         ],
       ),
@@ -401,74 +395,94 @@ class AdminStatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 1.25,
+      aspectRatio: 1.35,
       child: Material(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusXL),
+        elevation: 0,
+        borderRadius: BorderRadius.circular(AppSizes.radiusL),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-          child: Ink(
+          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+          child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppSizes.radiusXL),
-              border: Border.all(color: AppColors.border),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusL),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.9)),
               boxShadow: const [
                 BoxShadow(
                   color: AppColors.softShadow,
-                  blurRadius: 12,
+                  blurRadius: 10,
                   offset: Offset(0, 4),
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: iconBg,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(icon, color: iconColor, size: 20),
+                      child: Icon(icon, color: iconColor, size: 22),
                     ),
-                    const Spacer(),
-                    if (badge != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (badgeColor ?? AppColors.success).withValues(
-                            alpha: 0.15,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          badge!,
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: badgeColor ?? AppColors.success,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 9,
+                    if (badge != null) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (badgeColor ?? AppColors.success)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              badge!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: badgeColor ?? AppColors.success,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 9,
+                              ),
+                            ),
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
                 const Spacer(),
                 Text(
                   value,
-                  style: AppTextStyles.titleLarge.copyWith(
-                    fontWeight: FontWeight.w800,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.headlineMedium.copyWith(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 22,
+                    height: 1.1,
+                    color: AppColors.textPrimary,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   label,
-                  style: AppTextStyles.labelSmall.copyWith(
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.labelMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1.25,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -495,8 +509,18 @@ class AdminSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // RTL Row: first child on the right → title right, "عرض الكل" left.
     return Row(
       children: [
+        Expanded(
+          child: Text(
+            title,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
         if (actionLabel != null)
           TextButton(
             onPressed: onAction,
@@ -508,13 +532,6 @@ class AdminSectionHeader extends StatelessWidget {
               ),
             ),
           ),
-        const Spacer(),
-        Text(
-          title,
-          style: AppTextStyles.titleMedium.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
       ],
     );
   }
@@ -538,31 +555,12 @@ class AdminSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (trailing != null) ...[trailing!, const SizedBox(width: 10)],
-        Expanded(
-          child: TextField(
-            controller: controller,
-            enabled: enabled,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textHint,
-              ),
-              prefixIcon: const Icon(Icons.search_rounded, size: 22),
-              filled: true,
-              fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSizes.radiusL),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-        ),
-      ],
+    return AppSearchField(
+      controller: controller,
+      hint: hint,
+      enabled: enabled,
+      trailing: trailing,
+      onChanged: onChanged,
     );
   }
 }
@@ -753,12 +751,13 @@ class AdminAudienceTile extends StatelessWidget {
   }
 }
 
-/// Square quick-action — Figma dashboard row.
+/// Square quick-action — solid readable card (aligned with supervisor home).
 class AdminQuickActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final bool disabled;
+  final Color? iconColor;
 
   const AdminQuickActionTile({
     super.key,
@@ -766,40 +765,51 @@ class AdminQuickActionTile extends StatelessWidget {
     required this.label,
     this.onTap,
     this.disabled = false,
+    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = iconColor ?? AppColors.primary;
     return Opacity(
       opacity: disabled ? 0.45 : 1,
       child: Material(
         color: AppColors.surface,
+        elevation: 0,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
         child: InkWell(
           onTap: disabled ? null : onTap,
           borderRadius: BorderRadius.circular(AppSizes.radiusL),
-          child: Ink(
+          child: Container(
+            height: 96,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: BoxDecoration(
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppSizes.radiusL),
               border: Border.all(color: AppColors.border),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.softShadow,
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
             ),
-            padding: const EdgeInsets.symmetric(vertical: 18),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: AppColors.textPrimary, size: 22),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: accent, size: 22),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   label,
                   textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.labelSmall.copyWith(
                     fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    height: 1.2,
                   ),
                 ),
               ],
@@ -811,7 +821,7 @@ class AdminQuickActionTile extends StatelessWidget {
   }
 }
 
-/// Management hub grid tile — matches dashboard quick-action styling.
+/// Management hub grid tile — solid surface card like role-home quick actions.
 class AdminHubTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -833,58 +843,59 @@ class AdminHubTile extends StatelessWidget {
       opacity: disabled ? 0.55 : 1,
       child: Material(
         color: AppColors.surface,
+        elevation: 0,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
         child: InkWell(
           onTap: disabled ? null : onTap,
           borderRadius: BorderRadius.circular(AppSizes.radiusL),
-          child: Ink(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             decoration: BoxDecoration(
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppSizes.radiusL),
               border: Border.all(color: AppColors.border),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.softShadow,
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
             ),
-            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    if (wired)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'متصل',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.primary,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    const Spacer(),
-                    Icon(icon, color: AppColors.primary, size: 22),
-                  ],
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: AppColors.primary, size: 22),
                 ),
-                const Spacer(),
-                Text(
-                  label,
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.w700,
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.bottomStart,
+                    child: Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        height: 1.25,
+                      ),
+                    ),
                   ),
                 ),
+                if (wired) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'متاح',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -987,7 +998,7 @@ class AdminSettingsTile extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             )
-          : const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+          : const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
       onTap: onTap,
     );
   }

@@ -77,7 +77,7 @@ void main() {
 
       await tester.tap(find.text('تسجيل الدخول'));
       await tester.pump();
-      expect(find.text('أدخل اسم المستخدم أو البريد الإلكتروني'), findsOneWidget);
+      expect(find.text('أدخل اسم المستخدم'), findsOneWidget);
       expect(bloc.events, isEmpty);
 
       await tester.enterText(find.byType(TextFormField).at(0), 'بريد خطأ');
@@ -85,7 +85,7 @@ void main() {
       await tester.tap(find.text('تسجيل الدخول'));
       await tester.pump();
       expect(
-        find.text('اسم المستخدم أو البريد الإلكتروني غير صالح'),
+        find.text('اسم المستخدم غير صالح'),
         findsOneWidget,
       );
       expect(bloc.events, isEmpty);
@@ -186,15 +186,22 @@ void main() {
       final bloc = PasswordResetBloc(
         sendPasswordReset: SendPasswordResetUseCase(repo),
       );
+      await tester.binding.setSurfaceSize(const Size(400, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(_app(ForgotPasswordPage(bloc: bloc)));
 
+      expect(find.textContaining('تواصل مع إدارة الأكاديمية'), findsWidgets);
+      expect(find.text('العودة لتسجيل الدخول'), findsOneWidget);
+
       await tester.enterText(find.byType(TextFormField), 'bad');
+      await tester.ensureVisible(find.text('إرسال رابط الاستعادة'));
       await tester.tap(find.text('إرسال رابط الاستعادة'));
       await tester.pump();
       expect(find.text('البريد الإلكتروني غير صالح'), findsOneWidget);
       expect(repo.sent, isEmpty);
 
       await tester.enterText(find.byType(TextFormField), 'a@x.test');
+      await tester.ensureVisible(find.text('إرسال رابط الاستعادة'));
       await tester.tap(find.text('إرسال رابط الاستعادة'));
       await tester.pumpAndSettle();
       expect(repo.sent, ['a@x.test']);
@@ -210,8 +217,11 @@ void main() {
       final bloc = PasswordResetBloc(
         sendPasswordReset: SendPasswordResetUseCase(repo),
       );
+      await tester.binding.setSurfaceSize(const Size(400, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(_app(ForgotPasswordPage(bloc: bloc)));
       await tester.enterText(find.byType(TextFormField), 'a@x.test');
+      await tester.ensureVisible(find.text('إرسال رابط الاستعادة'));
       await tester.tap(find.text('إرسال رابط الاستعادة'));
       await tester.pumpAndSettle();
       expect(find.text(const NetworkFailure().message), findsOneWidget);

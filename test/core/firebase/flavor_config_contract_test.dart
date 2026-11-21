@@ -86,7 +86,7 @@ android {
     expect(flavors.keys.toSet(), AppFlavor.values.map((f) => f.name).toSet());
   });
 
-  test('every Gradle flavor declares a unique applicationId and app_name', () {
+  test('every Gradle flavor declares applicationId and app_name', () {
     final ids = <String>[];
     for (final MapEntry(key: name, value: block) in flavors.entries) {
       final id = _applicationId(block);
@@ -94,7 +94,22 @@ android {
       expect(_appName(block), isNotNull, reason: '$name must set app_name');
       ids.add(id!);
     }
-    expect(ids.toSet().length, ids.length, reason: 'applicationIds: $ids');
+    final byId = <String, List<String>>{};
+    for (final MapEntry(key: name, value: block) in flavors.entries) {
+      final id = _applicationId(block)!;
+      byId.putIfAbsent(id, () => []).add(name);
+    }
+    for (final entry in byId.entries) {
+      if (entry.value.length > 1) {
+        expect(
+          entry.key,
+          _devApplicationId,
+          reason:
+              'only trial may share dev applicationId; got ${entry.value}',
+        );
+        expect(entry.value.toSet(), {'dev', 'trial'});
+      }
+    }
   });
 
   test('Gradle flavors set the expected application IDs and app names', () {
@@ -102,8 +117,28 @@ android {
     expect(_appName(flavors['dev']!), 'بصمة (تطوير)');
     expect(_applicationId(flavors['staging']!), _stagingApplicationId);
     expect(_appName(flavors['staging']!), 'بصمة (تجريبي)');
+    expect(_applicationId(flavors['trial']!), _devApplicationId);
+    expect(_appName(flavors['trial']!), 'بصمة (تجربة الأكاديمية)');
     expect(_applicationId(flavors['prod']!), _prodApplicationId);
     expect(_appName(flavors['prod']!), 'بصمة');
+  });
+
+  test('trial has no fake emulator google-services override', () {
+    expect(
+      File('android/app/src/trial/google-services.json').existsSync(),
+      isFalse,
+    );
+    expect(
+      File('android/app/src/trial/AndroidManifest.xml').existsSync(),
+      isFalse,
+    );
+    expect(gradle, contains('trialArtifactTask'));
+    expect(
+      gradle,
+      contains(
+        'Trial flavor connects to the real rafiq-academy Firebase project',
+      ),
+    );
   });
 
   test('defaultConfig leaves the application ID to the flavors', () {
@@ -227,17 +262,25 @@ android {
         contains('com.google.firebase.provider.FirebaseInitProvider'),
       );
       expect(xml, contains('tools:node="remove"'));
-      for (final registrar in [
-        'com.google.firebase.messaging.FirebaseMessagingRegistrar',
-        'com.google.firebase.messaging.FirebaseMessagingKtxRegistrar',
-      ]) {
+      if (entry.key == 'staging') {
+        for (final registrar in [
+          'com.google.firebase.messaging.FirebaseMessagingRegistrar',
+          'com.google.firebase.messaging.FirebaseMessagingKtxRegistrar',
+        ]) {
+          expect(
+            RegExp(
+              'components:${RegExp.escape(registrar)}"\\s+tools:node="remove"',
+            ).hasMatch(xml),
+            isTrue,
+            reason: '$registrar must be removed in staging',
+          );
+        }
+      } else {
         expect(
-          RegExp(
-            'components:${RegExp.escape(registrar)}"\\s+tools:node="remove"',
-          ).hasMatch(xml),
-          isTrue,
-          reason: '$registrar must be removed in local flavors',
+          xml,
+          contains('firebase_messaging_notification_delegation_enabled'),
         );
+        expect(xml, isNot(contains('FirebaseMessagingRegistrar')));
       }
       // firebase-functions requires FirebaseInstanceIdInternal from iid.
       expect(RegExp(r'iid\.Registrar"\s+tools:node').hasMatch(xml), isFalse);

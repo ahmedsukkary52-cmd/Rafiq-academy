@@ -9,18 +9,18 @@ class AcademyBranding {
   static const String logoAsset = 'assets/branding/academy_logo.png';
 
   /// Primary product / academy name shown in chrome and titles.
-  static const String displayName = 'أكاديمية رفيق';
+  static const String displayName = 'أكاديمية بصمة';
 
   /// Short brand mark (splash hero, compact chrome).
-  static const String shortName = 'رفيق';
+  static const String shortName = 'بصمة';
 
   /// Supporting line under [shortName] (e.g. splash).
   static const String tagline = 'أكاديمية تحفيظ القرآن الكريم';
 
   /// Longer title used where a combined label is needed.
-  static const String fullTitle = 'رفيق - أكاديمية التحفيظ';
+  static const String fullTitle = 'بصمة - أكاديمية التحفيظ';
 
-  /// Footer / about lines: `أكاديمية رفيق · الإصدار 1.0.0`
+  /// Footer / about lines: `أكاديمية بصمة · الإصدار 1.0.0`
   static String versionFooter(String version) =>
       '$displayName · الإصدار $version';
 }

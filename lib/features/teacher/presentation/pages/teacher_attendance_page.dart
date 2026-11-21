@@ -664,7 +664,7 @@ class _AttendanceHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, top + 8, 16, 40),
       child: Row(
         children: [
-          _HeaderCircleButton(icon: Icons.chevron_right_rounded, onTap: onBack),
+          _HeaderCircleButton(icon: Icons.chevron_left_rounded, onTap: onBack),
           Expanded(
             child: Text(
               'الحضور والغياب',

@@ -13,6 +13,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/parent_entities.dart';
 import '../../../../shared/domain/parent_payment_proof.dart';
+import '../../../../shared/domain/pricing_rules_contract.dart';
 import '../bloc/parent_bloc.dart';
 import '../bloc/parent_event.dart';
 import '../bloc/parent_state.dart';
@@ -197,6 +198,8 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
             p.paymentsStatus != c.paymentsStatus ||
             p.payments != c.payments ||
             p.paymentsError != c.paymentsError ||
+            p.paymentsHasMore != c.paymentsHasMore ||
+            p.paymentsLoadingMore != c.paymentsLoadingMore ||
             p.paymentProofStatus != c.paymentProofStatus ||
             p.paymentProofPaymentId != c.paymentProofPaymentId ||
             p.childrenSnapshots != c.childrenSnapshots ||
@@ -224,15 +227,26 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
       );
     }
 
+    final periodKey = PricingRulesContract.periodKeyForDate(DateTime.now());
+    bool inCurrentPeriod(PaymentEntity p) {
+      final key = (p.periodKey ?? '').trim();
+      if (key.isNotEmpty) return key == periodKey;
+      final due = p.dueDate;
+      return due.year == DateTime.now().year && due.month == DateTime.now().month;
+    }
+
+    final monthPayments = state.payments.where(inCurrentPeriod).toList();
+    final scoped = monthPayments;
+    final monthHasNoInvoices = monthPayments.isEmpty;
     final filteredLists = [
-      state.payments,
-      state.payments.where((p) => p.status == PaymentStatus.paid).toList(),
-      state.payments.where((p) => p.status == PaymentStatus.due).toList(),
-      state.payments.where((p) => p.status == PaymentStatus.overdue).toList(),
+      scoped,
+      scoped.where((p) => p.status == PaymentStatus.paid).toList(),
+      scoped.where((p) => p.status == PaymentStatus.due).toList(),
+      scoped.where((p) => p.status == PaymentStatus.overdue).toList(),
     ];
     final visible = filteredLists[_filter];
-    final total = state.payments.fold<double>(0, (s, p) => s + p.amount);
-    final paid = state.payments.fold<double>(
+    final total = scoped.fold<double>(0, (s, p) => s + p.amount);
+    final paid = scoped.fold<double>(
       0,
       (s, p) =>
           s +
@@ -243,7 +257,7 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
     final remaining = (total - paid) < 0 ? 0.0 : (total - paid);
     final progress = total <= 0 ? 0.0 : (paid / total).clamp(0.0, 1.0);
     final childrenCaption = parentPaymentsChildrenCaption(
-      payments: state.payments,
+      payments: scoped,
       nameFor: state.childDisplayName,
     );
     final proofBusy = state.paymentProofStatus == SubmissionStatus.submitting;
@@ -325,13 +339,16 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                     ),
                     const SizedBox(height: 14),
                     if (visible.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 24, bottom: 16),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24, bottom: 16),
                         child: ParentEmptyState(
                           icon: Icons.account_balance_wallet_outlined,
-                          title: 'لا توجد مدفوعات في هذا التصنيف',
-                          message:
-                              'ستظهر هنا اشتراكات أبنائك عند إضافتها من الأكاديمية.',
+                          title: monthHasNoInvoices && _filter == 0
+                              ? 'لا فواتير هذا الشهر'
+                              : 'لا توجد مدفوعات في هذا التصنيف',
+                          message: monthHasNoInvoices && _filter == 0
+                              ? 'لم تُصدر فاتورة لهذا الشهر'
+                              : 'ستظهر هنا اشتراكات أبنائك عند إضافتها من الأكاديمية.',
                         ),
                       )
                     else
@@ -349,6 +366,49 @@ class _ParentSubscriptionsPageState extends State<ParentSubscriptionsPage> {
                               : () => _startExternalPayThenProof(payment),
                         ),
                       ),
+                    if (state.paymentsHasMore || state.paymentsLoadingMore) ...[
+                      const SizedBox(height: 8),
+                      Center(
+                        child: state.paymentsLoadingMore
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : TextButton(
+                                key: const Key('parent-payments-load-more'),
+                                onPressed: () => context
+                                    .read<ParentBloc>()
+                                    .add(const LoadMorePaymentsEvent()),
+                                child: Text(
+                                  'عرض مدفوعات أقدم',
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    color: AppColors.primaryDark,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                    if (state.paymentsError != null &&
+                        state.paymentsStatus == SectionStatus.loaded) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        state.paymentsError!,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context
+                            .read<ParentBloc>()
+                            .add(const LoadMorePaymentsEvent()),
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _UploadReceiptCard(
                       onTap: proofBusy
@@ -495,7 +555,7 @@ class _PaymentsHeader extends StatelessWidget {
         children: [
           if (!embedded)
             _HeaderIconButton(
-              icon: Icons.chevron_right_rounded,
+              icon: Icons.chevron_left_rounded,
               onTap: () => Navigator.of(context).maybePop(),
             )
           else
@@ -570,7 +630,7 @@ class _MonthlySummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'الإجمالي الشهري',
+            'اشتراك هذا الشهر',
             style: AppTextStyles.labelMedium.copyWith(
               color: AppColors.onPrimaryMuted,
             ),

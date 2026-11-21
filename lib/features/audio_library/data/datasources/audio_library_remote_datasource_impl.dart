@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../core/error/user_facing_error.dart';
 import '../models/audio_models.dart';
 import 'audio_library_remote_datasource.dart';
 import 'mp3quran_catalog_service.dart';
@@ -44,7 +45,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
               .toList() ??
           [];
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -80,7 +81,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
             ),
       ];
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -175,7 +176,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
         });
       }
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -186,7 +187,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
       if (!doc.exists) return null;
       return SurahAudioModel.fromFirestore(doc);
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -200,7 +201,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
           .doc(docId)
           .set(progress.toFirestore(), SetOptions(merge: true));
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -219,7 +220,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
       if (snap.docs.isEmpty) return null;
       return ListeningProgressModel.fromFirestore(snap.docs.first);
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -242,7 +243,7 @@ class AudioLibraryRemoteDatasourceImpl implements AudioLibraryRemoteDatasource {
 
       return SurahAudioModel.fromFirestore(audioDoc);
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 }

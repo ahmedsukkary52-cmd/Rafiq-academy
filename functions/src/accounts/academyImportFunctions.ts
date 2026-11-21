@@ -122,7 +122,7 @@ function canonicalRow(kind: ImportKind, row: Record<string, unknown>): Record<st
       return {
         name: requireName(row.name, "اسم الطالب"),
         parentRef: requireRef(row.parentRef, "مرجع ولي الأمر"),
-        halaqaRef: row.halaqaRef ? requireRef(row.halaqaRef, "مرجع الحلقة") : "",
+        halaqaRef: requireRef(row.halaqaRef, "مرجع الحلقة"),
       };
   }
 }
@@ -151,10 +151,37 @@ export async function adminImportAcademyRowCore(
   const raw = (data.row ?? {}) as Record<string, unknown>;
   const kind = parseKind(raw.kind);
   const ref = requireRef(raw.ref, "المرجع");
+
+  // Early duplicate guard: a conflicting claim on a committed ledger slot must
+  // return already-exists even when the conflicting row omits fields that
+  // canonicalRow would reject as invalid-argument (e.g. student without
+  // halaqaRef). Same-fingerprint retries and matching manual adopts must still
+  // reach the transaction so they resolve as existing/adopted — never reject
+  // every committed non-manual slot here.
+  const ledger = db.collection(IMPORT_ROWS_COLLECTION);
+  const conflictMessage = `المرجع ${ref} استُخدم لسجل آخر سبق استيراده؛ استخدم مرجعاً جديداً`;
+  const preSnap = await ledger.doc(ref).get();
+  if (preSnap.exists) {
+    const preData = preSnap.data() ?? {};
+    const preCommitted = preData.status === "done" || typeof preData.id === "string";
+    if (preCommitted && !manualEntryMatches(preData, kind, String(raw.name ?? ""))) {
+      try {
+        const probe = canonicalRow(kind, raw);
+        const probeFingerprint = hash([kind, probe]);
+        if (typeof preData.fingerprint === "string" && preData.fingerprint !== probeFingerprint) {
+          throw new HttpsError("already-exists", conflictMessage);
+        }
+      } catch (e) {
+        if (e instanceof HttpsError && e.code === "invalid-argument") {
+          throw new HttpsError("already-exists", conflictMessage);
+        }
+        throw e;
+      }
+    }
+  }
+
   const row = canonicalRow(kind, raw);
   const fingerprint = hash([kind, row]);
-
-  const ledger = db.collection(IMPORT_ROWS_COLLECTION);
   const rowRef = ledger.doc(ref);
   const attemptId = randomUUID();
   // A roster code in the app format of its kind (S-500) moves the counter
@@ -317,7 +344,7 @@ export async function adminImportAcademyRowCore(
     }
 
     const parentId = await resolve(String(row.parentRef), "parent", "ولي الأمر");
-    const halaqaId = row.halaqaRef ? await resolve(String(row.halaqaRef), "halaqa", "الحلقة") : "";
+    const halaqaId = await resolve(String(row.halaqaRef), "halaqa", "الحلقة");
     const result = await adminOnboardStudentCore(
       deps,
       adminUid,
@@ -325,7 +352,7 @@ export async function adminImportAcademyRowCore(
         requestId: `imp_${hash(["student", ref]).slice(0, 40)}`,
         studentName: row.name,
         parent: { mode: "existing", parentId },
-        ...(halaqaId ? { halaqaId } : {}),
+        halaqaId,
       },
       { studentRef: ref },
     );

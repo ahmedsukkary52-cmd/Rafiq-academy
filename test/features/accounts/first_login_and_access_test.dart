@@ -78,6 +78,8 @@ void main() {
       tester,
     ) async {
       final submitted = <String>[];
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _app(
           FirstLoginPage(submit: (p) async => submitted.add(p)),
@@ -86,6 +88,7 @@ void main() {
       );
 
       await tester.enterText(find.byKey(const Key('first-login-password')), 'short');
+      await tester.ensureVisible(find.text('حفظ ومتابعة'));
       await tester.tap(find.text('حفظ ومتابعة'));
       await tester.pump();
       expect(find.text('كلمة المرور يجب أن تكون 8 أحرف على الأقل'), findsOneWidget);
@@ -95,6 +98,7 @@ void main() {
         'NewPass2026',
       );
       await tester.enterText(find.byKey(const Key('first-login-confirm')), 'Other2026');
+      await tester.ensureVisible(find.text('حفظ ومتابعة'));
       await tester.tap(find.text('حفظ ومتابعة'));
       await tester.pump();
       expect(find.text('كلمتا المرور غير متطابقتين'), findsOneWidget);
@@ -104,6 +108,7 @@ void main() {
         find.byKey(const Key('first-login-confirm')),
         'NewPass2026',
       );
+      await tester.ensureVisible(find.text('حفظ ومتابعة'));
       await tester.tap(find.text('حفظ ومتابعة'));
       await tester.pumpAndSettle();
       expect(submitted, ['NewPass2026']);
@@ -131,6 +136,8 @@ void main() {
         ),
       );
       final submitted = <String>[];
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _app(
           FirstLoginPage(submit: (p) async => submitted.add(p)),
@@ -145,6 +152,7 @@ void main() {
         find.byKey(const Key('first-login-confirm')),
         'Admin2026x',
       );
+      await tester.ensureVisible(find.text('حفظ ومتابعة'));
       await tester.tap(find.text('حفظ ومتابعة'));
       await tester.pumpAndSettle();
       expect(submitted, ['Admin2026x']);
@@ -159,6 +167,8 @@ void main() {
     testWidgets('server rejection is shown and no sign-in happens', (
       tester,
     ) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _app(
           FirstLoginPage(
@@ -176,6 +186,7 @@ void main() {
         find.byKey(const Key('first-login-confirm')),
         'NewPass2026',
       );
+      await tester.ensureVisible(find.text('حفظ ومتابعة'));
       await tester.tap(find.text('حفظ ومتابعة'));
       await tester.pumpAndSettle();
       expect(find.text('لا يلزم تغيير كلمة المرور'), findsOneWidget);
@@ -187,6 +198,8 @@ void main() {
     testWidgets('issues a temporary password for the student or a linked '
         'parent after confirmation', (tester) async {
       final resets = <String>[];
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _app(
           AdminAccountAccessCard(

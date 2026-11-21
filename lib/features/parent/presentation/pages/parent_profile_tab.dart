@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/academy_branding.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -103,7 +104,7 @@ class ParentProfileTab extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'بوابة أولياء الأمور — Team Academy · الإصدار $_appVersion',
+                                    'بوابة أولياء الأمور — ${AcademyBranding.displayName} · الإصدار $_appVersion',
                                     style: AppTextStyles.labelSmall.copyWith(
                                       color: AppColors.textHint,
                                       fontSize: 11,
@@ -618,7 +619,7 @@ class _NavRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
             ],
           ),
         ),

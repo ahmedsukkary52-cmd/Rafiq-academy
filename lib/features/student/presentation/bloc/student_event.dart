@@ -45,10 +45,19 @@ class LoadRecitationRecordsEvent extends StudentEvent {
 class LoadAchievementsEvent extends StudentEvent {
   final String studentId;
 
-  const LoadAchievementsEvent(this.studentId);
+  /// When true, load a cursor page (achievements list). When false, load the
+  /// full merged set (badges stats / readers that need completeness).
+  final bool paged;
+
+  const LoadAchievementsEvent(this.studentId, {this.paged = false});
 
   @override
-  List<Object?> get props => [studentId];
+  List<Object?> get props => [studentId, paged];
+}
+
+/// الصفحة التالية من إنجازات الطالب (cursor).
+class LoadMoreAchievementsEvent extends StudentEvent {
+  const LoadMoreAchievementsEvent();
 }
 
 /// تحميل بيانات حلقة الطالب (الموعد ورابط الزوم)

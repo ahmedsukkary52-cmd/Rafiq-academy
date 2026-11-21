@@ -10,6 +10,7 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/time_format.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../../domain/policies/chat_media_policy.dart';
+import '../media/chat_picked_file.dart';
 import '../media/chat_voice_recorder.dart';
 
 typedef ChatAttachmentPicker =
@@ -17,26 +18,33 @@ typedef ChatAttachmentPicker =
 
 /// Default picker: images through the gallery picker (iOS converts to JPEG
 /// via compression), documents restricted to PDF / Word.
+///
+/// Always requests bytes as a fallback — some platforms omit [PlatformFile.path].
 Future<ChatAttachmentDraft?> pickChatAttachment(ChatMessageType type) async {
   final result = type == ChatMessageType.image
       ? await FilePicker.platform.pickFiles(
           type: FileType.image,
           compressionQuality: 80,
+          withData: true,
         )
       : await FilePicker.platform.pickFiles(
           type: FileType.custom,
           allowedExtensions: ChatMediaPolicy.documentExtensions,
+          withData: true,
         );
   final file = result?.files.singleOrNull;
   if (file == null) return null;
-  final path = file.path;
-  if (path == null) throw const FileSystemException('no path');
+  final path = await resolveChatPickedLocalPath(file);
+  if (path == null) {
+    throw const FileSystemException('no path or bytes for attachment');
+  }
+  final sizeBytes = file.size > 0 ? file.size : await File(path).length();
   return ChatAttachmentDraft(
     type: type,
     localPath: path,
-    fileName: file.name,
+    fileName: file.name.trim().isEmpty ? path.split(Platform.pathSeparator).last : file.name,
     contentType: ChatMediaPolicy.contentTypeFor(type, file.name) ?? '',
-    sizeBytes: file.size,
+    sizeBytes: sizeBytes,
   );
 }
 

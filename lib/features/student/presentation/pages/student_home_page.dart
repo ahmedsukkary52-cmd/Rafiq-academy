@@ -8,6 +8,7 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../shared/domain/halaqa_meeting_link.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_floating_bottom_nav.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../widgets/student_daily_task_widget.dart';
 import '../../../../shared/widgets/student_header_widget.dart';
@@ -30,6 +31,7 @@ import '../bloc/student_event.dart';
 import '../bloc/student_state.dart';
 import '../../../mushaf/presentation/pages/mushaf_reader_host.dart';
 import '../widgets/halaqa_meeting_join.dart';
+import '../widgets/student_no_halaqa_card.dart';
 import '../../../../shared/widgets/student_page_skeletons.dart';
 import 'student_badges_page.dart';
 import 'student_mushaf_page.dart';
@@ -43,16 +45,6 @@ class StudentHomePage extends StatefulWidget {
 
 class _StudentHomePageState extends State<StudentHomePage> {
   int _currentTab = 0;
-
-  // ترتيب القائمة يطابق التصميم في RTL: الرئيسية (يمين) ... حسابي (يسار)
-  // Figma: الرئيسية / مصحفي / ★ (أصفر) / خريطتي (layers) / حسابي
-  final _tabs = const [
-    _StudentTab(icon: Icons.home_outlined, label: 'الرئيسية'),
-    _StudentTab(icon: Icons.view_list_outlined, label: 'مصحفي'),
-    _StudentTab(icon: Icons.star_rounded, label: '', isElevated: true),
-    _StudentTab(icon: Icons.route_outlined, label: 'خطة الحلقة'),
-    _StudentTab(icon: Icons.person_outline_rounded, label: 'حسابي'),
-  ];
 
   @override
   void initState() {
@@ -99,25 +91,64 @@ class _StudentHomePageState extends State<StudentHomePage> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: IndexedStack(
-          index: _currentTab,
-          children: [
-            _StudentHomeTab(
-              onTabChanged: (index) => setState(() => _currentTab = index),
-              onRetryProfile: _loadStudentData,
-            ),
-            const MushafBlocScope(
-              child: MushafReaderHost(reader: buildStudentMushafReader),
-            ),
-            const StudentBadgesPage(),
-            const _StudentPlanTab(),
-            const StudentProfileTab(),
-          ],
+        extendBody: true,
+        body: AppFloatingBottomNav.padBody(
+          context,
+          child: IndexedStack(
+            index: _currentTab,
+            children: [
+              _StudentHomeTab(
+                onTabChanged: (index) => setState(() => _currentTab = index),
+                onRetryProfile: _loadStudentData,
+              ),
+              const MushafBlocScope(
+                child: MushafReaderHost(reader: buildStudentMushafReader),
+              ),
+              const StudentBadgesPage(),
+              const _StudentPlanTab(),
+              const StudentProfileTab(),
+            ],
+          ),
         ),
-        bottomNavigationBar: _StudentBottomNav(
-          tabs: _tabs,
-          selected: _currentTab,
-          onChanged: (i) => setState(() => _currentTab = i),
+        bottomNavigationBar: BlocSelector<NotificationsBloc, NotificationsState, int>(
+          bloc: sl<NotificationsBloc>(),
+          selector: (state) => state.unreadCount,
+          builder: (context, unread) {
+            final labels = [
+              'الرئيسية',
+              'مصحفي',
+              'أوسمتي',
+              'خطة الحلقة',
+              'حسابي',
+            ];
+            final base = AppNavIcons.student(labels);
+            final destinations = [
+              for (var i = 0; i < base.length; i++)
+                if (i == 0)
+                  AppNavDestination(
+                    icon: base[i].icon,
+                    selectedIcon: base[i].selectedIcon,
+                    label: base[i].label,
+                    badge: unread > 0
+                        ? Container(
+                            width: 9,
+                            height: 9,
+                            decoration: const BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                          )
+                        : null,
+                  )
+                else
+                  base[i],
+            ];
+            return AppFloatingBottomNav(
+              selected: _currentTab,
+              onChanged: (i) => setState(() => _currentTab = i),
+              destinations: destinations,
+            );
+          },
         ),
       ),
     );
@@ -308,12 +339,21 @@ class _StudentHomeTab extends StatelessWidget {
                   ),
                   child: StudentProgressWidget(
                     progressPercent: profile?.overallProgressPercent ?? 0,
-                    planName: profile?.currentPlanName ?? '',
+                    planName: _currentSurahLabel(
+                      profile?.currentPlanName,
+                      state.latestAssignment?.newMemorizationRange ??
+                          state.latestAssignment?.displayTitle,
+                    ),
                     totalVerses: profile?.totalVersesMemorized ?? 0,
                     completedSurahs: profile?.completedSurahs ?? 0,
                     totalStars: profile?.totalStars ?? 0,
                     progressAvailable:
-                        AppCapabilities.memorizationProgressAvailable,
+                        AppCapabilities.memorizationProgressAvailable ||
+                        (profile?.currentPlanName.trim().isNotEmpty ?? false) ||
+                        (state.latestAssignment?.newMemorizationRange
+                                .trim()
+                                .isNotEmpty ??
+                            false),
                     onTap: () => context.push(AppRoutes.studentProgressReport),
                     onDetailsTap: () =>
                         context.push(AppRoutes.studentProgressReport),
@@ -358,6 +398,17 @@ class _StudentHomeTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Profile plan name first; otherwise derive a surah label from the latest
+  /// assignment so «سورة الملك» (and similar) stay tied to real homework data.
+  String _currentSurahLabel(String? planName, String? assignmentRange) {
+    final plan = (planName ?? '').trim();
+    if (plan.isNotEmpty) return plan;
+    final raw = (assignmentRange ?? '').trim();
+    if (raw.isEmpty) return '';
+    final cut = raw.split(RegExp(r'[-–—]|الآيات')).first.trim();
+    return cut.isEmpty ? raw : cut;
   }
 
   List<Widget> _halaqaSectionSlivers(
@@ -424,42 +475,12 @@ class _StudentHomeTab extends StatelessWidget {
       ];
     }
 
+    // No halaqa membership yet — do not lure the student into an empty schedule.
     return [
-      SliverToBoxAdapter(
+      const SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
-          child: AppCard(
-            onTap: () => context.push(AppRoutes.studentSchedule),
-            child: Row(
-              children: [
-                const Icon(Icons.chevron_left, color: AppColors.textHint),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('حصة الحفظ اليومية', style: AppTextStyles.titleMedium),
-                    Text(
-                      'اضغط لعرض جدول الحصص',
-                      style: AppTextStyles.labelSmall,
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.dark,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusM),
-                  ),
-                  child: const Icon(
-                    Icons.videocam_rounded,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          padding: EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+          child: StudentNoHalaqaCard(),
         ),
       ),
     ];
@@ -975,151 +996,8 @@ class _ProfileMenuItem extends StatelessWidget {
       ),
       trailing: isDestructive
           ? null
-          : const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+          : const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
     );
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Bottom Navigation
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _StudentTab {
-  final IconData icon;
-  final String label;
-  final bool isElevated;
-
-  const _StudentTab({
-    required this.icon,
-    required this.label,
-    this.isElevated = false,
-  });
-}
-
-class _StudentBottomNav extends StatelessWidget {
-  final List<_StudentTab> tabs;
-  final int selected;
-  final void Function(int) onChanged;
-
-  const _StudentBottomNav({
-    required this.tabs,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocSelector<NotificationsBloc, NotificationsState, int>(
-      bloc: sl<NotificationsBloc>(),
-      selector: (state) => state.unreadCount,
-      builder: (context, unreadCount) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.softShadow,
-                blurRadius: 12,
-                offset: Offset(0, -2),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: SizedBox(
-              height: AppSizes.bottomNavHeight,
-              child: Row(
-                children: List.generate(tabs.length, (i) {
-                  final tab = tabs[i];
-                  final isSelected = i == selected;
-
-                  if (tab.isElevated) {
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => onChanged(i),
-                        behavior: HitTestBehavior.opaque,
-                        child: Transform.translate(
-                          offset: const Offset(0, -10),
-                          child: Center(
-                            child: Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: AppColors.secondary,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.secondary.withValues(
-                                      alpha: 0.45,
-                                    ),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                tab.icon,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onChanged(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          NotificationBadge(
-                            count: i == 0 ? unreadCount : 0,
-                            child: Icon(
-                              isSelected && i == 0
-                                  ? Icons.home_rounded
-                                  : tab.icon,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              size: AppSizes.iconL,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            tab.label,
-                            style: AppTextStyles.labelSmall.copyWith(
-                              fontSize: 10,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            margin: const EdgeInsets.only(top: 3),
-                            width: isSelected ? 5 : 0,
-                            height: isSelected ? 5 : 0,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}

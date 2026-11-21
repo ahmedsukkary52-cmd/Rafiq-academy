@@ -92,8 +92,8 @@ class _AdminAddMemberPageState extends State<AdminAddMemberPage> {
   Widget build(BuildContext context) {
     final issued = _issued;
     return AdminSubpageScaffold(
-      title: 'إضافة شخص',
-      subtitle: 'حساب جديد بدون إعادة الاستيراد',
+      title: 'إضافة معلم / ولي / مشرف',
+      subtitle: 'إنشاء حساب موظف أو ولي أمر — الطلاب عبر مسار منفصل',
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.paddingL),
         children: issued != null
@@ -122,6 +122,18 @@ class _AdminAddMemberPageState extends State<AdminAddMemberPage> {
                 OutlinedButton(onPressed: _another, child: const Text('إضافة شخص آخر')),
               ]
             : [
+                Text(
+                  'هذه الصفحة تنشئ حساب معلم أو ولي أمر أو مشرف أو مساعد فقط. '
+                  'دور الطالب غير متاح هنا لأن الطالب يُنشأ مع ولي أمر وحلقة '
+                  'من «تسجيل طالب جديد»، وربط ولي أمر بطالب موجود من '
+                  '«ربط ولي أمر بطالب».',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Text('النوع', style: AppTextStyles.titleMedium),
                 const SizedBox(height: 8),
                 Wrap(
@@ -143,7 +155,7 @@ class _AdminAddMemberPageState extends State<AdminAddMemberPage> {
                     TextButton(
                       key: const Key('add-member-student'),
                       onPressed: () => widget.navigator.addStudent(context),
-                      child: const Text('طالب؟ سجّله مع ولي أمره'),
+                      child: const Text('طالب؟ سجّله من «تسجيل طالب جديد»'),
                     ),
                     TextButton(
                       key: const Key('add-member-admin'),

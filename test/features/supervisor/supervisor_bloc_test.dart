@@ -96,7 +96,14 @@ class _Register extends Fake implements RegisterNewStudentUseCase {
 
 class _UnusedReport extends Fake implements SubmitSupervisorReportUseCase {}
 
-class _UnusedAdmit extends Fake implements AdmitStudentToHalaqaUseCase {}
+class _Admit extends Fake implements AdmitStudentToHalaqaUseCase {
+  final params = <AdmitStudentParams>[];
+  @override
+  Future<_E<Unit>> call(AdmitStudentParams p) async {
+    params.add(p);
+    return const Right(unit);
+  }
+}
 
 class _UnusedTransfer extends Fake
     implements TransferStudentBetweenHalaqatUseCase {}
@@ -111,6 +118,7 @@ class _Harness {
   final absence = _Absence();
   final issue = _Issue();
   final register = _Register();
+  final admit = _Admit();
 
   late final bloc = SupervisorBloc(
     getSupervisedHalaqat: halaqat,
@@ -118,7 +126,7 @@ class _Harness {
     getSupervisedAbsenceRequests: absence,
     issueAchievement: issue,
     submitSupervisorReport: _UnusedReport(),
-    admitStudentToHalaqa: _UnusedAdmit(),
+    admitStudentToHalaqa: admit,
     transferStudentBetweenHalaqat: _UnusedTransfer(),
     getSupervisedPayments: _UnusedPayments(),
     reviewPaymentProof: _UnusedReview(),
@@ -126,7 +134,8 @@ class _Harness {
   );
 }
 
-Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 10));
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 10));
 
 void main() {
   late _Harness h;
@@ -221,7 +230,9 @@ void main() {
     });
 
     test('admit student passes halaqa and student through', () async {
-      h.bloc.add(const RegisterNewStudentEvent(halaqaId: 'h1', studentId: 's9'));
+      h.bloc.add(
+        const RegisterNewStudentEvent(halaqaId: 'h1', studentId: 's9'),
+      );
       await _settle();
 
       expect(h.register.s.params.single.halaqaId, 'h1');
@@ -229,9 +240,29 @@ void main() {
       expect(h.bloc.state.registerStudentStatus, SubmissionStatus.success);
     });
 
+    test('admit refreshes the shared roster before success', () async {
+      h.bloc.add(
+        const AdmitStudentToHalaqaEvent(
+          supervisorId: 'sup1',
+          halaqaId: 'h1',
+          studentId: 's9',
+        ),
+      );
+      await _settle();
+
+      expect(h.admit.params.single.studentId, 's9');
+      expect(h.admit.params.single.halaqaId, 'h1');
+      expect(h.halaqat.s.params.single.supervisorId, 'sup1');
+      expect(h.bloc.state.admitStudentStatus, SubmissionStatus.success);
+      expect(h.bloc.state.admitStudentRosterRefreshFailed, isFalse);
+      expect(h.bloc.state.halaqatStatus, SectionStatus.loaded);
+    });
+
     test('admit failure keeps the error until reset', () async {
       h.register.s.respond = (_) => const Left(ServerFailure('الطالب مسجل'));
-      h.bloc.add(const RegisterNewStudentEvent(halaqaId: 'h1', studentId: 's9'));
+      h.bloc.add(
+        const RegisterNewStudentEvent(halaqaId: 'h1', studentId: 's9'),
+      );
       await _settle();
       expect(h.bloc.state.registerStudentStatus, SubmissionStatus.error);
       expect(h.bloc.state.registerStudentError, 'الطالب مسجل');

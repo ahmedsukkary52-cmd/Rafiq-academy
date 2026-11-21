@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Shared search field chrome. Query logic stays in the caller.
+///
+/// App-wide standard: fixed height 48, bordered surface, clear affordance.
 class AppSearchField extends StatelessWidget {
   final TextEditingController? controller;
   final String hint;
@@ -10,6 +12,8 @@ class AppSearchField extends StatelessWidget {
   final VoidCallback? onClear;
   final bool showClear;
   final bool autofocus;
+  final bool enabled;
+  final Widget? trailing;
 
   const AppSearchField({
     super.key,
@@ -19,75 +23,96 @@ class AppSearchField extends StatelessWidget {
     this.onClear,
     this.showClear = true,
     this.autofocus = false,
+    this.enabled = true,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
-    final field = TextField(
-      controller: controller,
-      onChanged: onChanged,
-      autofocus: autofocus,
-      textAlign: TextAlign.right,
-      textDirection: TextDirection.rtl,
-      style: AppTextStyles.bodyMedium.copyWith(
-        color: AppColors.textPrimary,
-        fontSize: 13,
-      ),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textHint,
-          fontSize: 13,
+    final field = SizedBox(
+      height: 48,
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        onChanged: onChanged,
+        autofocus: autofocus,
+        textInputAction: TextInputAction.search,
+        textAlign: TextAlign.right,
+        textDirection: TextDirection.rtl,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textPrimary,
         ),
-        prefixIcon: const Icon(
-          Icons.search_rounded,
-          color: AppColors.textHint,
-          size: 20,
-        ),
-        suffixIcon: showClear && controller != null
-            ? ListenableBuilder(
-                listenable: controller!,
-                builder: (context, _) {
-                  if (controller!.text.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return IconButton(
-                    tooltip: 'مسح',
-                    onPressed: () {
-                      controller?.clear();
-                      onChanged?.call('');
-                      onClear?.call();
-                    },
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: AppColors.textHint,
-                    ),
-                  );
-                },
-              )
-            : null,
-        filled: true,
-        fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textHint,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            size: 22,
+            color: AppColors.textSecondary,
+          ),
+          suffixIcon: showClear && controller != null
+              ? ListenableBuilder(
+                  listenable: controller!,
+                  builder: (context, _) {
+                    if (controller!.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return IconButton(
+                      tooltip: 'مسح',
+                      onPressed: () {
+                        controller?.clear();
+                        onChanged?.call('');
+                        onClear?.call();
+                      },
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: AppColors.textHint,
+                      ),
+                    );
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: AppColors.surface,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 1.5,
+            ),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
         ),
       ),
     );
 
-    return field;
+    if (trailing == null) return field;
+
+    return Row(
+      children: [
+        trailing!,
+        const SizedBox(width: 10),
+        Expanded(child: field),
+      ],
+    );
   }
 }

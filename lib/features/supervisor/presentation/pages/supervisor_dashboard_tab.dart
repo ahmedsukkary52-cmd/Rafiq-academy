@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hijri/hijri_calendar.dart';
 
+import '../../../../core/constants/academy_branding.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
@@ -276,7 +277,7 @@ class _SupervisorHomeHeader extends StatelessWidget {
   }
 
   String _roleSubtitle() {
-    if (halaqatCount <= 0) return 'مشرف أكاديمية رفيق';
+    if (halaqatCount <= 0) return 'مشرف ${AcademyBranding.displayName}';
     return 'مشرف — ${_easternDigits('$halaqatCount')} حلقات';
   }
 
@@ -522,7 +523,7 @@ class _Body extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           _QuickActions(onSwitchTab: onSwitchTab),
           const SizedBox(height: 22),
           _AlertsSection(
@@ -667,7 +668,7 @@ class _StatsGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 1.18,
+        childAspectRatio: 1.2,
       ),
       itemBuilder: (context, i) => _StatCard(item: items[i]),
     );
@@ -712,7 +713,7 @@ class _StatCard extends StatelessWidget {
         onTap: item.onTap,
         borderRadius: BorderRadius.circular(AppSizes.radiusL),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSizes.radiusL),
             border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
@@ -726,12 +727,13 @@ class _StatCard extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Align(
                 alignment: Alignment.centerRight,
                 child: Container(
-                  width: 40,
-                  height: 40,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: item.iconBg,
                     borderRadius: BorderRadius.circular(12),
@@ -791,11 +793,17 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = <(IconData, Color, String, VoidCallback)>[
+    final row1 = <(IconData, Color, String, VoidCallback)>[
       (
         Icons.person_add_alt_1_rounded,
         AppColors.primaryDark,
-        'قبول طالب',
+        'إضافة طالب',
+        () => SupervisorDestinations.onboardStudent(context),
+      ),
+      (
+        Icons.how_to_reg_rounded,
+        AppColors.primary,
+        'إسناد موجود',
         () => SupervisorDestinations.register(context),
       ),
       (
@@ -810,15 +818,15 @@ class _QuickActions extends StatelessWidget {
         'الجوائز',
         () => SupervisorDestinations.awardsHub(context),
       ),
+    ];
+
+    final row2 = <(IconData, Color, String, VoidCallback)>[
       (
         Icons.warning_amber_rounded,
         AppColors.error,
         'طلاب في خطر',
         () => SupervisorDestinations.followUp(context),
       ),
-    ];
-
-    final more = <(IconData, Color, String, VoidCallback)>[
       (
         Icons.campaign_outlined,
         AppColors.awardWeekly,
@@ -843,14 +851,14 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            for (var i = 0; i < actions.length; i++) ...[
+            for (var i = 0; i < row1.length; i++) ...[
               if (i > 0) const SizedBox(width: 8),
               Expanded(
                 child: _QuickActionTile(
-                  icon: actions[i].$1,
-                  color: actions[i].$2,
-                  label: actions[i].$3,
-                  onTap: actions[i].$4,
+                  icon: row1[i].$1,
+                  color: row1[i].$2,
+                  label: row1[i].$3,
+                  onTap: row1[i].$4,
                 ),
               ),
             ],
@@ -859,19 +867,17 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            for (var i = 0; i < more.length; i++) ...[
+            for (var i = 0; i < row2.length; i++) ...[
               if (i > 0) const SizedBox(width: 8),
               Expanded(
                 child: _QuickActionTile(
-                  icon: more[i].$1,
-                  color: more[i].$2,
-                  label: more[i].$3,
-                  onTap: more[i].$4,
+                  icon: row2[i].$1,
+                  color: row2[i].$2,
+                  label: row2[i].$3,
+                  onTap: row2[i].$4,
                 ),
               ),
             ],
-            const Expanded(child: SizedBox()),
-            const SizedBox(width: 8),
             const Expanded(child: SizedBox()),
           ],
         ),
@@ -1015,9 +1021,9 @@ class _AlertsSection extends StatelessWidget {
                 subtitle: 'طالب في خطر · ${row.halaqaLabel}',
                 icon: Icons.person_outline_rounded,
                 iconColor: AppColors.error,
-                actionLabel: 'تواصل',
+                actionLabel: 'متابعة',
                 actionColor: AppColors.error,
-                onAction: () => onSwitchTab(SupervisorHomeNav.messagesIndex),
+                onAction: () => SupervisorDestinations.followUp(context),
                 onTap: () => SupervisorDestinations.studentProfile(
                   context,
                   studentId: row.studentId,
@@ -1353,7 +1359,7 @@ class _HalaqaCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
         ],
       ),
     );

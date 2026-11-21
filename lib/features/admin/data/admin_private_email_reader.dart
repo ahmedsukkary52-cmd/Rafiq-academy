@@ -26,6 +26,37 @@ class AdminPrivateEmailReader {
     }
   }
 
+  /// Parallel private-email reads for a registration / directory page.
+  ///
+  /// `userPrivate` is get-only (no `list` / `whereIn`), so each uid is still
+  /// one document get — batched with [Future.wait] to cut wall-clock latency.
+  Future<Map<String, String?>> emailsOf(
+    Iterable<String> uids, {
+    int parallel = 12,
+  }) async {
+    final ids = <String>[];
+    final seen = <String>{};
+    for (final raw in uids) {
+      final id = raw.trim();
+      if (id.isEmpty || !seen.add(id)) continue;
+      ids.add(id);
+    }
+    final out = <String, String?>{};
+    for (var i = 0; i < ids.length; i += parallel) {
+      final slice = ids.sublist(
+        i,
+        i + parallel > ids.length ? ids.length : i + parallel,
+      );
+      final pairs = await Future.wait(
+        slice.map((id) async => MapEntry(id, await emailOf(id))),
+      );
+      for (final e in pairs) {
+        out[e.key] = e.value;
+      }
+    }
+    return out;
+  }
+
   /// Transition order: private email first, then the legacy `users.email`
   /// until the separately approved migration removes it.
   static String? preferPrivate(

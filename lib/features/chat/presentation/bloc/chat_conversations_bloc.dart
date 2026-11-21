@@ -67,12 +67,20 @@ class ChatConversationsBloc
   List<ConversationEntity> _older = const [];
   bool _olderExhausted = false;
 
+  /// Firestore-order cursor for the next older page.
+  ///
+  /// Must track the tip of the last *raw* page (live window or fetchAfter
+  /// result), not `state.conversations.last` after client re-sort of
+  /// `_older` — equal `lastMessageAt` values otherwise skip/duplicate.
+  String? _olderPageCursorId;
+
   void _resetPaging(int? pageSize, String? participant) {
     _pageSize = pageSize;
     _pageParticipant = participant;
     _live = const [];
     _older = const [];
     _olderExhausted = false;
+    _olderPageCursorId = null;
   }
 
   static int _byRecency(ConversationEntity a, ConversationEntity b) {
@@ -94,6 +102,7 @@ class ChatConversationsBloc
       _live = const [];
       _older = const [];
       _olderExhausted = true;
+      _olderPageCursorId = null;
       return const [];
     }
     final liveIds = {for (final c in live) c.id};
@@ -106,6 +115,11 @@ class ChatConversationsBloc
     }
     _live = live;
     _older = olderById.values.toList()..sort(_byRecency);
+    // Until the first LoadMore, the next cursor is the live window tip
+    // (Firestore order from the snapshots query — do not re-sort live).
+    if (_older.isEmpty || _olderPageCursorId == null) {
+      _olderPageCursorId = live.isEmpty ? null : live.last.id;
+    }
     return [..._live, ..._older];
   }
 
@@ -190,8 +204,10 @@ class ChatConversationsBloc
   ) async {
     final uid = _currentUid;
     final pageSize = _pageSize;
+    final cursorId = _olderPageCursorId;
     if (uid == null ||
         pageSize == null ||
+        cursorId == null ||
         !state.hasMoreConversations ||
         state.loadingMoreConversations ||
         state.conversations.isEmpty) {
@@ -202,7 +218,7 @@ class ChatConversationsBloc
     final result = await watchConversations.repository.fetchConversationsAfter(
       participantUid: _pageParticipant,
       viewerUid: uid,
-      afterConversationId: state.conversations.last.id,
+      afterConversationId: cursorId,
       limit: pageSize,
     );
     if (generation != _sessionGeneration || _currentUid != uid) return;
@@ -215,6 +231,11 @@ class ChatConversationsBloc
       ),
       (page) {
         final known = {for (final c in state.conversations) c.id};
+        // Advance cursor from the raw Firestore page tip before any
+        // client re-sort of `_older` (equal lastMessageAt safety).
+        if (page.isNotEmpty) {
+          _olderPageCursorId = page.last.id;
+        }
         _older = [
           ..._older,
           ...page.where((c) => !known.contains(c.id)),

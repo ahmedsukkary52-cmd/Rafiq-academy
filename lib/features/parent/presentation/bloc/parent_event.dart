@@ -52,6 +52,11 @@ class LoadPaymentsEvent extends ParentEvent {
   List<Object?> get props => [parentId];
 }
 
+/// الصفحة التالية من سجل المدفوعات (cursor).
+class LoadMorePaymentsEvent extends ParentEvent {
+  const LoadMorePaymentsEvent();
+}
+
 /// إعادة تحميل وسائل الدفع المعتمدة فقط (academySettings/paymentPublic)
 class LoadPaymentDestinationsEvent extends ParentEvent {
   const LoadPaymentDestinationsEvent();

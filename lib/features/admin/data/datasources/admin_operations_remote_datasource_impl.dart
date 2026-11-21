@@ -4,11 +4,13 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../core/firebase/callable_invoke.dart';
 import '../../../../shared/data/payment_review_callable.dart';
 import '../../../../shared/domain/payment_review_amounts.dart';
 import '../../../../shared/domain/parent_payment_proof.dart';
 import '../../../../shared/data/models/halaqa_model.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/utils/firestore_in_query.dart';
 import '../../domain/entities/admin_operations_entities.dart';
 import 'admin_operations_remote_datasource.dart';
 
@@ -26,17 +28,8 @@ class AdminOperationsRemoteDatasourceImpl
   Future<Map<String, dynamic>> _call(
     String name,
     Map<String, dynamic> payload,
-  ) async {
-    try {
-      final result = await functions.httpsCallable(name).call(payload);
-      final data = result.data;
-      return data is Map ? Map<String, dynamic>.from(data) : const {};
-    } on FirebaseFunctionsException catch (e) {
-      throw ServerException(e.message ?? e.code);
-    } catch (e) {
-      throw ServerException(e.toString());
-    }
-  }
+  ) =>
+      invokeCallable(functions, name, payload);
 
   Future<T> _guard<T>(Future<T> Function() body) async {
     try {
@@ -200,38 +193,51 @@ class AdminOperationsRemoteDatasourceImpl
             .collection(FirestoreCollections.halaqat)
             .where('supervisorId', isEqualTo: reviewerUid)
             .get();
-        final studentIds = <String>{
+        final studentIds = FirestoreInQuery.normalizeIds([
           for (final h in halaqat.docs)
             ...((h.data()['studentIds'] as List?)?.whereType<String>() ??
                 const <String>[]),
-        };
-        for (final studentId in studentIds) {
-          try {
-            final snap = await _pending
-                .where('studentId', isEqualTo: studentId)
-                .get();
-            items.addAll(
-              snap.docs.map((d) => paymentReviewItemFromMap(d.id, d.data())),
-            );
-          } on FirebaseException catch (e) {
-            // Student's primary Halaqa is supervised by someone else.
-            if (e.code != 'permission-denied') rethrow;
+        ]);
+        // Parallelize per-student pending queries (bounded concurrency via
+        // whereIn-sized chunks) — avoids serial N+1 latency.
+        const parallel = 8;
+        for (var i = 0; i < studentIds.length; i += parallel) {
+          final slice = studentIds.sublist(
+            i,
+            i + parallel > studentIds.length
+                ? studentIds.length
+                : i + parallel,
+          );
+          final pages = await Future.wait(
+            slice.map((studentId) async {
+              try {
+                final snap = await _pending
+                    .where('studentId', isEqualTo: studentId)
+                    .get();
+                return snap.docs
+                    .map((d) => paymentReviewItemFromMap(d.id, d.data()))
+                    .toList();
+              } on FirebaseException catch (e) {
+                // Student's primary Halaqa is supervised by someone else.
+                if (e.code == 'permission-denied') {
+                  return const <PaymentReviewItem>[];
+                }
+                rethrow;
+              }
+            }),
+          );
+          for (final page in pages) {
+            items.addAll(page);
           }
         }
       }
-      final named = <PaymentReviewItem>[];
-      final names = <String, String>{};
-      for (final item in items) {
-        final id = item.studentId;
-        if (id.isNotEmpty && !names.containsKey(id)) {
-          final user = await firestore
-              .collection(FirestoreCollections.users)
-              .doc(id)
-              .get();
-          names[id] = (user.data()?['name'] as String?)?.trim() ?? '';
-        }
-        named.add(item.withStudentName(names[id] ?? ''));
-      }
+      final names = await _studentNames(
+        items.map((item) => item.studentId),
+      );
+      final named = [
+        for (final item in items)
+          item.withStudentName(names[item.studentId] ?? ''),
+      ];
       named.sort((a, b) {
         final ta = a.proofSubmittedAt ?? DateTime(2000);
         final tb = b.proofSubmittedAt ?? DateTime(2000);
@@ -239,6 +245,21 @@ class AdminOperationsRemoteDatasourceImpl
       });
       return named;
     });
+  }
+
+  /// Batch `users` name reads via `whereIn` chunks (no per-student get).
+  Future<Map<String, String>> _studentNames(Iterable<String> ids) async {
+    final out = <String, String>{};
+    for (final chunk in FirestoreInQuery.chunkIds(ids)) {
+      final snap = await firestore
+          .collection(FirestoreCollections.users)
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final d in snap.docs) {
+        out[d.id] = (d.data()['name'] as String?)?.trim() ?? '';
+      }
+    }
+    return out;
   }
 
   @override

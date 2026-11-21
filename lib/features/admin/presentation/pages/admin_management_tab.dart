@@ -44,12 +44,8 @@ class AdminManagementTab extends StatelessWidget {
           route: AppRoutes.adminPayments,
           wired: true,
         ),
-        _HubTile(
-          icon: Icons.lock_open_rounded,
-          label: AdminHomePage.actionLabels[5],
-          route: AppRoutes.adminAccess,
-          wired: true,
-        ),
+        // Access reactivation also appears under Settings with a clearer
+        // payments subtitle — keep a single entry there to avoid duplicates.
         const _HubTile(
           icon: Icons.account_balance_wallet_outlined,
           label: 'وسائل الدفع',
@@ -110,7 +106,7 @@ class AdminManagementTab extends StatelessWidget {
         ),
         _HubTile(
           icon: Icons.person_add_outlined,
-          label: 'إضافة فرد',
+          label: 'إضافة معلم أو ولي',
           route: AppRoutes.adminAddMember,
           wired: true,
         ),
@@ -121,7 +117,7 @@ class AdminManagementTab extends StatelessWidget {
       tiles: [
         _HubTile(
           icon: Icons.person_add_alt_1_outlined,
-          label: 'طلبات التسجيل',
+          label: 'طلبات تعيين الطلاب',
           route: AppRoutes.adminRegistration,
           wired: true,
         ),
@@ -163,25 +159,15 @@ class AdminManagementTab extends StatelessWidget {
         ),
         _HubTile(
           icon: Icons.upload_file_rounded,
-          label: 'استيراد بيانات الأكاديمية',
+          label: 'استيراد بيانات',
           page: (_) => const AdminAcademyImportPage(),
           wired: true,
         ),
-      ],
-    ),
-    _HubSection(
-      title: 'الحلقات',
-      tiles: [
+        // Halaqa create lives inside «الحلقات والمواعيد» — no duplicate tile.
         _HubTile(
           icon: Icons.groups_outlined,
           label: 'دليل الحلقات',
           route: AppRoutes.adminHalaqatDirectory,
-          wired: true,
-        ),
-        _HubTile(
-          icon: Icons.add_circle_outline,
-          label: 'إنشاء حلقة',
-          route: AppRoutes.adminCreateHalaqa,
           wired: true,
         ),
       ],
@@ -199,6 +185,7 @@ class AdminManagementTab extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
+          bottom: false,
           child: CustomScrollView(
             slivers: [
               const SliverToBoxAdapter(
@@ -223,7 +210,8 @@ class AdminManagementTab extends StatelessWidget {
                           physics: const NeverScrollableScrollPhysics(),
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
-                          childAspectRatio: 1.45,
+                          // Taller tiles so 2-line Arabic labels + «متاح» never overflow.
+                          childAspectRatio: 1.2,
                           children: section.tiles
                               .map(
                                 (t) => AdminHubTile(

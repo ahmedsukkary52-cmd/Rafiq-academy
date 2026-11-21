@@ -8,7 +8,6 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/utils/attendance_policy.dart';
-import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/app_stat_tile.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../analytics/domain/usecases/analytics_usecases.dart';
@@ -28,6 +27,7 @@ import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/pages/chat_room.dart';
 import '../../../staff/contact_parent/contact_student_parent.dart';
 import '../../../../shared/domain/student_parent_links.dart';
+import '../../domain/read_models/teacher_day_agenda.dart';
 import '../tasks/teacher_tasks_tab.dart';
 import '../utils/assign_sheet_deep_link_gate.dart';
 import '../utils/teacher_surface_navigation.dart';
@@ -86,6 +86,7 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
       armed: widget.openAssignSheet && canWrite,
     );
     context.read<TeacherBloc>().add(LoadHalaqaStudentsEvent(widget.halaqaId));
+    context.read<TeacherBloc>().add(const LoadTodayAgendaEvent());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final state = context.read<TeacherBloc>().state;
@@ -355,6 +356,17 @@ class _TeacherClassDetailPageState extends State<TeacherClassDetailPage>
                               clipBehavior: Clip.antiAlias,
                               child: Column(
                                 children: [
+                                  _SessionDayChecklist(
+                                    halaqaId: widget.halaqaId,
+                                    onAttendance: () =>
+                                        _tabController.animateTo(1),
+                                    onEvaluations: () =>
+                                        _tabController.animateTo(2),
+                                    onHomework: () => _openSendAssignmentSheet(
+                                      context,
+                                      studentCount: studentCount,
+                                    ),
+                                  ),
                                   Material(
                                     color: AppColors.surface,
                                     child: TabBar(
@@ -548,6 +560,124 @@ class _ClassDetailHeader extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Checklist for today's session ops — attendance / homework / reviews.
+/// Derived from [TeacherDayAgenda] (resets each calendar day automatically).
+class _SessionDayChecklist extends StatelessWidget {
+  final String halaqaId;
+  final VoidCallback onAttendance;
+  final VoidCallback onEvaluations;
+  final VoidCallback onHomework;
+
+  const _SessionDayChecklist({
+    required this.halaqaId,
+    required this.onAttendance,
+    required this.onEvaluations,
+    required this.onHomework,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TeacherBloc, TeacherState>(
+      buildWhen: (p, c) =>
+          p.todayAgenda != c.todayAgenda ||
+          p.todayAgendaStatus != c.todayAgendaStatus,
+      builder: (context, state) {
+        TeacherAgendaItem? item;
+        for (final i in state.todayAgenda.items) {
+          if (i.halaqaId == halaqaId) {
+            item = i;
+            break;
+          }
+        }
+        if (item == null || item.pendingActions.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        String label(TeacherAgendaAction a) => switch (a) {
+          TeacherAgendaAction.takeAttendance => 'تسجيل الحضور لجلسة اليوم',
+          TeacherAgendaAction.sendHomework => 'واجب الحصة (حفظ ومراجعة)',
+          TeacherAgendaAction.reviewRecitations => 'مراجعة التسميعات المعلقة',
+        };
+        VoidCallback action(TeacherAgendaAction a) => switch (a) {
+          TeacherAgendaAction.takeAttendance => onAttendance,
+          TeacherAgendaAction.sendHomework => onHomework,
+          TeacherAgendaAction.reviewRecitations => onEvaluations,
+        };
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primaryLight,
+                AppColors.primary.withValues(alpha: 0.12),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(AppSizes.radiusL),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'مطلوب لجلسة اليوم',
+                style: AppTextStyles.labelLarge.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'بعد كل حلقة: حضور + تقييم/مراجعة + واجب — ثم تُحسب لليوم التالي من جديد.',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final a in item.pendingActions)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: InkWell(
+                    onTap: action(a),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 4,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.radio_button_unchecked,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              label(a),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_left_rounded,
+                            color: AppColors.textHint,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

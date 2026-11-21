@@ -199,6 +199,59 @@ class ParentRemoteDatasourceImpl implements ParentRemoteDatasource {
   }
 
   @override
+  Future<({List<PaymentModel> items, String? nextCursorId, bool hasMore})>
+  getPaymentsPage({
+    required String parentId,
+    int limit = 30,
+    String? afterPaymentId,
+  }) async {
+    try {
+      final id = parentId.trim();
+      if (id.isEmpty) {
+        return (items: const <PaymentModel>[], nextCursorId: null, hasMore: false);
+      }
+      final pageSize = limit < 1 ? 30 : limit;
+      Query<Map<String, dynamic>> q = firestore
+          .collection(FirestoreCollections.payments)
+          .where('parentId', isEqualTo: id)
+          .orderBy('dueDate', descending: true)
+          .limit(pageSize);
+      final cursorId = afterPaymentId?.trim() ?? '';
+      if (cursorId.isNotEmpty) {
+        final cursor = await firestore
+            .collection(FirestoreCollections.payments)
+            .doc(cursorId)
+            .get();
+        if (!cursor.exists) {
+          return (
+            items: const <PaymentModel>[],
+            nextCursorId: null,
+            hasMore: false,
+          );
+        }
+        // Ownership guard: never page from another parent's invoice tip.
+        final cursorParent =
+            (cursor.data()?['parentId'] as String?)?.trim() ?? '';
+        if (cursorParent != id) {
+          throw const ServerException('سجل الدفع غير تابع لولي الأمر');
+        }
+        q = q.startAfterDocument(cursor);
+      }
+      final snapshot = await q.get();
+      final items = snapshot.docs.map(PaymentModel.fromFirestore).toList();
+      final hasMore = items.length >= pageSize;
+      return (
+        items: items,
+        nextCursorId: hasMore && items.isNotEmpty ? items.last.id : null,
+        hasMore: hasMore,
+      );
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
   Future<PaymentPublicSettingsEntity> getPaymentPublicSettings() async {
     try {
       final doc = await firestore

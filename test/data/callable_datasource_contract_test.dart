@@ -446,7 +446,8 @@ void main() {
     });
 
     test('review decision omits blank notes and never sends amounts', () async {
-      functions.handlers['reviewPaymentProof'] = (_) => null;
+      // Real callable returns a result map; null is not a valid wire response.
+      functions.handlers['reviewPaymentProof'] = (_) => <String, dynamic>{};
 
       await ds.reviewPaymentProof(
         command: PaymentReviewCommand(
@@ -469,7 +470,7 @@ void main() {
     test(
       'partial review sends mode + value, never amountPaidConfirmed',
       () async {
-        functions.handlers['reviewPaymentProof'] = (_) => null;
+        functions.handlers['reviewPaymentProof'] = (_) => <String, dynamic>{};
 
         await ds.reviewPaymentProof(
           command: PaymentReviewCommand(

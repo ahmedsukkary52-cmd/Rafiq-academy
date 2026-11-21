@@ -5,8 +5,8 @@ import '../theme/app_theme.dart';
 
 /// Production-safe Back affordance for Arabic RTL (UI-1).
 ///
-/// Uses a chevron that points toward the leading edge exit direction:
-/// RTL → [Icons.chevron_right_rounded], LTR → [Icons.chevron_left_rounded].
+/// Uses a chevron that points toward the leading edge (the exit direction):
+/// [Icons.chevron_left_rounded], which [Icon] mirrors under RTL (see [iconFor]).
 /// Prefer this over raw [Icons.arrow_back] / mixed chevrons.
 class AppBackButton extends StatelessWidget {
   /// Optional override; defaults to router/navigator pop.
@@ -42,10 +42,12 @@ class AppBackButton extends StatelessWidget {
   }) : circular = false,
        size = kToolbarHeight;
 
+  /// [Icons.chevron_left_rounded] has `matchTextDirection: true`, so [Icon]
+  /// mirrors it under RTL: it points right (toward the leading edge) in RTL
+  /// and left in LTR. Picking chevron_right for RTL would be mirrored to
+  /// point left, i.e. reversed.
   static IconData iconFor(TextDirection direction) {
-    return direction == TextDirection.rtl
-        ? Icons.chevron_right_rounded
-        : Icons.chevron_left_rounded;
+    return Icons.chevron_left_rounded;
   }
 
   static void pop(BuildContext context) {
@@ -64,14 +66,19 @@ class AppBackButton extends StatelessWidget {
     final handle = onPressed ?? () => pop(context);
 
     if (circular) {
+      // Light icons on dark headers need translucent chrome — solid white
+      // reads as an empty square when the chevron contrast fails.
+      final onDark = resolvedColor.computeLuminance() > 0.72;
       return Tooltip(
         message: tooltip,
         child: Material(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSizes.radiusM),
+          color: onDark
+              ? Colors.white.withValues(alpha: 0.16)
+              : AppColors.surface,
+          shape: const CircleBorder(),
           child: InkWell(
             onTap: handle,
-            borderRadius: BorderRadius.circular(AppSizes.radiusM),
+            customBorder: const CircleBorder(),
             child: SizedBox(
               width: size,
               height: size,

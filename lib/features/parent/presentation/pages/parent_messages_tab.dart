@@ -5,7 +5,6 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -13,6 +12,7 @@ import '../../../chat/domain/entities/chat_entities.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
+import '../../../chat/presentation/widgets/chat_inbox_load_more.dart';
 import '../../domain/parent_household.dart';
 import '../bloc/parent_bloc.dart';
 import '../parent_destinations.dart';
@@ -41,10 +41,12 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
   String _query = '';
   _ChatIntent _intent = _ChatIntent.none;
   final _seededUids = <String>{};
+  late final ChatInboxLoadMoreBinding _inboxPaging;
 
   @override
   void initState() {
     super.initState();
+    _inboxPaging = ChatInboxLoadMoreBinding();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final chat = sl<ChatConversationsBloc>().state;
@@ -135,6 +137,12 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
   }
 
   @override
+  void dispose() {
+    _inboxPaging.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthBloc>().state;
     final uid = auth is AuthAuthenticated ? auth.user.uid : '';
@@ -206,68 +214,83 @@ class _ParentMessagesTabState extends State<ParentMessagesTab> {
         builder: (context, state) {
           return Scaffold(
             backgroundColor: AppColors.background,
+            resizeToAvoidBottomInset: true,
             appBar: AppBar(
               title: const Text('الرسائل'),
               automaticallyImplyLeading: false,
             ),
             body: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Row(
+                SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (var i = 0; i < _tabs.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: Text(_tabs[i].label),
-                          selected: _tab == i,
-                          onSelected: (_) {
-                            if (_tab == i) return;
-                            setState(() => _tab = i);
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (!mounted) return;
-                              final chat = sl<ChatConversationsBloc>().state;
-                              if (chat.conversationsStatus !=
-                                  SectionStatus.loaded) {
-                                return;
-                              }
-                              _seedLinkedChats(
-                                uid: _uid,
-                                contacts: _roleContacts(
-                                  context
-                                      .read<ParentBloc>()
-                                      .state
-                                      .staffContacts,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (var i = 0; i < _tabs.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: Text(_tabs[i].label),
+                                  selected: _tab == i,
+                                  onSelected: (_) {
+                                    if (_tab == i) return;
+                                    setState(() => _tab = i);
+                                    WidgetsBinding.instance.addPostFrameCallback((
+                                      _,
+                                    ) {
+                                      if (!mounted) return;
+                                      final chat =
+                                          sl<ChatConversationsBloc>().state;
+                                      if (chat.conversationsStatus !=
+                                          SectionStatus.loaded) {
+                                        return;
+                                      }
+                                      _seedLinkedChats(
+                                        uid: _uid,
+                                        contacts: _roleContacts(
+                                          context
+                                              .read<ParentBloc>()
+                                              .state
+                                              .staffContacts,
+                                        ),
+                                        conversations: chat.conversations,
+                                      );
+                                    });
+                                  },
                                 ),
-                                conversations: chat.conversations,
-                              );
-                            });
-                          },
+                              ],
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: AppSearchField(
+                          hint: 'بحث في المحادثات...',
+                          onChanged: (v) => setState(() => _query = v.trim()),
+                        ),
+                      ),
                     ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: AppSearchField(
-                    hint: 'بحث في المحادثات...',
-                    showClear: false,
-                    onChanged: (v) => setState(() => _query = v.trim()),
                   ),
                 ),
                 Expanded(
                   child: _ConversationsBody(
-                    uid: uid,
-                    query: _query,
-                    role: _tabs[_tab].role,
-                    roleLabel: _tabs[_tab].label,
-                    contacts: roleContacts,
-                    children: children,
-                    state: state,
-                    seeding: _intent == _ChatIntent.seed,
+                      uid: uid,
+                      query: _query,
+                      role: _tabs[_tab].role,
+                      roleLabel: _tabs[_tab].label,
+                      contacts: roleContacts,
+                      children: children,
+                      state: state,
+                      seeding: _intent == _ChatIntent.seed,
+                      inboxPaging: _inboxPaging,
+                    ),
                   ),
-                ),
               ],
             ),
           );
@@ -311,6 +334,7 @@ class _ConversationsBody extends StatelessWidget {
   final List<ParentChildSnapshot> children;
   final ChatConversationsState state;
   final bool seeding;
+  final ChatInboxLoadMoreBinding inboxPaging;
 
   const _ConversationsBody({
     required this.uid,
@@ -321,6 +345,7 @@ class _ConversationsBody extends StatelessWidget {
     required this.children,
     required this.state,
     required this.seeding,
+    required this.inboxPaging,
   });
 
   @override
@@ -334,7 +359,10 @@ class _ConversationsBody extends StatelessWidget {
         message: state.conversationsError ?? 'تعذر تحميل الرسائل',
         onRetry: () {
           if (uid.isEmpty) return;
-          sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
+          sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(
+            uid,
+            pageSize: ChatConversationsBloc.defaultInboxPageSize,
+          ));
         },
       );
     }
@@ -367,11 +395,21 @@ class _ConversationsBody extends StatelessWidget {
       );
     }
 
+    final footer =
+        state.hasMoreConversations || state.loadingMoreConversations;
     return ListView.separated(
+      controller: inboxPaging.controller,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      itemCount: items.length,
+      itemCount: items.length + (footer ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
+        if (index >= items.length) {
+          return ChatInboxLoadMoreFooter(
+            loading: state.loadingMoreConversations,
+            onPressed: inboxPaging.requestLoadMore,
+          );
+        }
         final conversation = items[index];
         final other = conversation.otherParticipant(uid);
         return _ConversationTile(
@@ -457,7 +495,7 @@ class _ConversationTile extends StatelessWidget {
             const SizedBox(width: 8),
             _UnreadBadge(count: conversation.unreadCount),
           ],
-          const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
         ],
       ),
     );

@@ -236,10 +236,19 @@ test("policy accepts plain HTTPS links from any provider, including digit hosts 
     "https://us02web.example.test/j/83012345678",
     "https://01012345678.example.test/room",
     "  https://meet.example.test/room  ",
+    "https://us05web.zoom.us/j/01123456789?pwd=AbCd",
+    "https://meet.google.com/abc-defg-hij",
+    "meet.google.com/abc-defg-hij",
+    "http://us02web.zoom.us/j/83012345678",
+    "Join Zoom Meeting https://us02web.zoom.us/j/83012345678?pwd=x",
   ]) {
     assert.equal(link.meetingLinkIssue(ok), null, ok);
   }
   assert.equal(link.validateMeetingLink("  https://meet.example.test/x "), "https://meet.example.test/x");
+  assert.equal(
+    link.validateMeetingLink("us05web.zoom.us/j/01123456789"),
+    "https://us05web.zoom.us/j/01123456789",
+  );
 });
 
 test("policy rejects malformed, non-HTTPS, credential, whitespace and over-long links", () => {
@@ -256,11 +265,17 @@ test("policy rejects malformed, non-HTTPS, credential, whitespace and over-long 
     ["https:///meet.example.test", "invalid_host"],
     ["https://user:pass@meet.example.test/room", "credentials"],
     ["https://user@meet.example.test/room", "credentials"],
-    ["https://meet.example.test/ro om", "whitespace"],
+    // Accidental spaces / tabs / NBSP: between alnum → `-`, else stripped.
+    ["https://meet.example.test/ro om", null],
     ["https://meet.example.test/room\n", null],
-    ["https://meet.example.test/\troom", "whitespace"],
+    ["https://meet.example.test/\troom", null],
+    ["https://meet.example.test/\u00a0room", null],
     ["https://meet.example.test/\u0000room", "whitespace"],
-    ["https://meet.example.test/\u202eroom", "whitespace"],
+    // Invisible RTL marks are stripped — not rejected as whitespace.
+    ["https://meet.example.test/\u202eroom", null],
+    ["https://meet.google.com/xed-aobs-zkz", null],
+    ["\u202ahttps://meet.google.com/xed-aobs-zkz\u200b", null],
+    ["https://meet.google.com/xed\u00a0aobs\u2013zkz", null],
     ["https://meet.example.test/غرفة", "unsupported_characters"],
     ["https://localhost/room", "invalid_host"],
     ["https://-bad.example.test", "invalid_host"],
@@ -493,7 +508,7 @@ test("omitting the link is rejected instead of clearing it", async () => {
 test("invalid links are rejected before any write", async () => {
   const db = fakeDb(dataset());
   for (const [bad, reason] of [
-    ["not a url", "whitespace"],
+    ["not a url", "not_https"],
     ["http://meet.example.test/room", "not_https"],
     ["https://user:pw@meet.example.test", "credentials"],
     ["https://meet.example.test/\u0007", "whitespace"],

@@ -9,6 +9,8 @@ import 'package:injectable/injectable.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exception.dart';
+import '../../../../core/error/user_facing_error.dart';
+import '../../../../shared/domain/halaqa_group_chat_contract.dart';
 import '../../domain/entities/chat_entities.dart';
 import '../../domain/policies/chat_media_policy.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -36,6 +38,7 @@ abstract class ChatRemoteDatasource {
     String conversationId, {
     required int limit,
   });
+
   /// One page of messages older than [beforeMessageId], ascending by `sentAt`
   /// then document id. Uses a document cursor so the live listener limit stays
   /// fixed (BASMA-103).
@@ -51,6 +54,7 @@ abstract class ChatRemoteDatasource {
     required String conversationId,
     required List<String> messageIds,
   });
+
   Future<ConversationModel> getOrCreateConversation({
     required ChatParticipantEntity currentUser,
     required ChatParticipantEntity otherUser,
@@ -160,43 +164,23 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     required String observerUid,
     int? limit,
   }) {
-    // Server-created conversations always carry `lastMessageAt` (null until
-    // the first message, which sorts last when descending).
-    if (limit != null) {
-      return _conversationsRef
-          .orderBy('lastMessageAt', descending: true)
-          .limit(limit)
-          .snapshots()
-          .map(
-            (snapshot) => snapshot.docs
-                .map(
-                  (doc) => ConversationModel.fromFirestore(
-                    doc,
-                    currentUid: observerUid,
-                  ),
-                )
-                .toList(),
-          );
-    }
-    // Unbounded legacy stream: no orderBy so docs without `lastMessageAt`
-    // are still listed; sorted client-side.
-    return _conversationsRef.snapshots().map((snapshot) {
-      final list = snapshot.docs
-          .map(
-            (doc) =>
-                ConversationModel.fromFirestore(doc, currentUid: observerUid),
-          )
-          .toList();
-      list.sort((a, b) {
-        final aAt = a.lastMessageAt;
-        final bAt = b.lastMessageAt;
-        if (aAt == null && bAt == null) return 0;
-        if (aAt == null) return 1;
-        if (bAt == null) return -1;
-        return bAt.compareTo(aAt);
-      });
-      return list;
-    });
+    // Always bound (BASMA-104 / D2). Null limit defaults to the same window
+    // as role inboxes; older threads use fetchConversationsAfter.
+    final page = limit ?? 40;
+    return _conversationsRef
+        .orderBy('lastMessageAt', descending: true)
+        .limit(page)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => ConversationModel.fromFirestore(
+                  doc,
+                  currentUid: observerUid,
+                ),
+              )
+              .toList(),
+        );
   }
 
   @override
@@ -208,6 +192,11 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         .orderBy('sentAt', descending: true)
         .limit(limit)
         .snapshots()
+        .handleError(
+          (error, _) => throw ServerException(
+            _messagesStreamError(error, conversationId),
+          ),
+        )
         .map(
           (snapshot) => snapshot.docs.reversed
               .map(
@@ -228,9 +217,9 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
   }) async {
     if (limit <= 0) return const [];
     try {
-      final cursor = await _messagesRef(conversationId)
-          .doc(beforeMessageId)
-          .get();
+      final cursor = await _messagesRef(
+        conversationId,
+      ).doc(beforeMessageId).get();
       if (!cursor.exists) return const [];
 
       final snapshot = await _messagesRef(conversationId)
@@ -241,16 +230,14 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
 
       return snapshot.docs.reversed
           .map(
-            (doc) => MessageModel.fromFirestore(
-              doc,
-              conversationId: conversationId,
-            ),
+            (doc) =>
+                MessageModel.fromFirestore(doc, conversationId: conversationId),
           )
           .toList();
-    } on FirebaseException catch (e) {
-      throw ServerException(e.message ?? e.code);
+    } on FirebaseException catch (error) {
+      throw ServerException(_messagesStreamError(error, conversationId));
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText(e.toString()));
     }
   }
 
@@ -275,12 +262,35 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         );
       }
       return out;
-    } on FirebaseException catch (e) {
-      throw ServerException(e.message ?? e.code);
+    } on FirebaseException catch (error) {
+      throw ServerException(_messagesStreamError(error, conversationId));
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText(e.toString()));
     }
   }
+
+  static String _messagesStreamError(Object error, String conversationId) {
+    if (error is FirebaseException) {
+      if (error.code == 'permission-denied') {
+        return _halaqaGroupAccessDenied(conversationId) ??
+            'لم يعد لديك وصول إلى هذه المحادثة';
+      }
+      if (error.code == 'unavailable' || error.code == 'deadline-exceeded') {
+        return 'تعذر تحميل الرسائل. تحقق من الاتصال.';
+      }
+      final msg = error.message?.trim() ?? '';
+      if (RegExp(r'[\u0600-\u06FF]').hasMatch(msg)) return msg;
+    }
+    return 'تعذر تحميل الرسائل. تحقق من الاتصال.';
+  }
+
+  static String? _halaqaGroupAccessDenied(String conversationId) {
+    if (!HalaqaGroupChatContract.isHalaqaGroupConversationId(conversationId)) {
+      return null;
+    }
+    return 'لست عضواً في مجموعة هذه الحلقة. تأكد من إسنادك كمشرف للحلقة؛ تتم مزامنة الأعضاء تلقائياً عند تحديث بيانات الحلقة.';
+  }
+
   @override
   Future<ConversationModel> getOrCreateConversation({
     required ChatParticipantEntity currentUser,
@@ -292,11 +302,11 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
       final result = await callable.call(<String, dynamic>{
         'otherUid': otherUser.uid.trim(),
       });
-      final data = result.data;
-      if (data is! Map) {
+      final data = _callableMap(result.data);
+      if (data == null) {
         throw const ServerException('تعذر إنشاء المحادثة: رد غير متوقع');
       }
-      final conversationId = data['conversationId']?.toString() ?? '';
+      final conversationId = data['conversationId']?.toString().trim() ?? '';
       if (conversationId.isEmpty) {
         throw const ServerException('تعذر إنشاء المحادثة');
       }
@@ -322,11 +332,13 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
         unreadCount: 0,
       );
     } on FirebaseFunctionsException catch (e) {
-      throw ServerException(e.message ?? e.code);
+      throw ServerException(
+        _callableMessage(e, 'تعذر إنشاء المحادثة. تحقق من الاتصال.'),
+      );
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText(e.toString()));
     }
   }
 
@@ -355,10 +367,21 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
           },
       });
     } on FirebaseFunctionsException catch (e) {
-      throw ServerException(_callableMessage(e, 'تعذر إرسال الرسالة'));
+      throw ServerException(_sendMessageError(e, conversationId));
     } catch (e) {
       throw const ServerException('تعذر إرسال الرسالة. تحقق من الاتصال.');
     }
+  }
+
+  static String _sendMessageError(
+    FirebaseFunctionsException e,
+    String conversationId,
+  ) {
+    if (e.code == 'permission-denied') {
+      final groupDenied = _halaqaGroupAccessDenied(conversationId);
+      if (groupDenied != null) return groupDenied;
+    }
+    return _callableMessage(e, 'تعذر إرسال الرسالة');
   }
 
   @override
@@ -424,7 +447,17 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     return switch (e.code) {
       'unavailable' || 'deadline-exceeded' => '$fallback. تحقق من الاتصال.',
       'permission-denied' => 'غير مسموح بهذا الإجراء في هذه المحادثة',
+      'not-found' => 'خدمة المحادثة غير متاحة حالياً',
+      'failed-precondition' => message.isNotEmpty ? message : fallback,
       _ => fallback,
+    };
+  }
+
+  /// Firebase callables often return `Map<Object?, Object?>` — normalize keys.
+  static Map<String, dynamic>? _callableMap(Object? raw) {
+    if (raw is! Map) return null;
+    return <String, dynamic>{
+      for (final e in raw.entries) e.key.toString(): e.value,
     };
   }
 
@@ -446,7 +479,7 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
 
       await conversationRef.update({'unreadCounts.$uid': 0});
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 
@@ -525,7 +558,7 @@ class ChatRemoteDatasourceImpl implements ChatRemoteDatasource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(e.toString());
+      throw ServerException(userFacingErrorText('$e'));
     }
   }
 }

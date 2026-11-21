@@ -112,24 +112,141 @@ class StudentRemoteDatasourceImpl implements StudentRemoteDatasource {
       final collection = firestore.collection(
         FirestoreCollections.achievements,
       );
-      final results = await Future.wait([
-        collection.where('studentId', isEqualTo: studentId).get(),
-        collection
+      // Query separately so a missing index / secondary failure still returns
+      // the primary studentId list instead of a generic red error.
+      final byStudentId = <AchievementModel>[];
+      final byRecipients = <AchievementModel>[];
+      // Full merge for readers that need the complete set (badges stats,
+      // supervisor reader). Paged UI uses [getAchievementsPage].
+      try {
+        final snap = await collection
+            .where('studentId', isEqualTo: studentId)
+            .get();
+        for (final doc in snap.docs) {
+          byStudentId.add(AchievementModel.fromFirestore(doc));
+        }
+      } catch (_) {
+        // continue — try recipients query
+      }
+      try {
+        final snap = await collection
             .where(
               AchievementsFirestoreContract.recipientStudentIdsField,
               arrayContains: studentId,
             )
-            .get(),
-      ]);
-
-      final byStudentId = results[0].docs.map(AchievementModel.fromFirestore);
-      final byRecipients = results[1].docs.map(AchievementModel.fromFirestore);
+            .get();
+        for (final doc in snap.docs) {
+          byRecipients.add(AchievementModel.fromFirestore(doc));
+        }
+      } catch (_) {
+        // optional secondary path
+      }
+      if (byStudentId.isEmpty && byRecipients.isEmpty) {
+        // Both failed or empty — probe once more; empty is OK, hard fail only
+        // when the primary path throws and we have nothing.
+        final snap = await collection
+            .where('studentId', isEqualTo: studentId)
+            .get();
+        for (final doc in snap.docs) {
+          byStudentId.add(AchievementModel.fromFirestore(doc));
+        }
+      }
       return mergeStudentAchievements(
         byStudentId,
         byRecipients,
       ).whereType<AchievementModel>().toList();
+    } on ServerException {
+      rethrow;
     } catch (e) {
-      throw ServerException(e.toString());
+      throw const ServerException('تعذر تحميل الإنجازات. حاول مرة أخرى.');
+    }
+  }
+
+  @override
+  Future<
+    ({
+      List<AchievementModel> items,
+      String? studentCursorId,
+      String? recipientsCursorId,
+      bool hasMoreStudent,
+      bool hasMoreRecipients,
+    })
+  >
+  getAchievementsPage({
+    required String studentId,
+    int limit = 20,
+    String? afterStudentAchievementId,
+    String? afterRecipientsAchievementId,
+  }) async {
+    try {
+      final uid = studentId.trim();
+      if (uid.isEmpty) {
+        return (
+          items: const <AchievementModel>[],
+          studentCursorId: null,
+          recipientsCursorId: null,
+          hasMoreStudent: false,
+          hasMoreRecipients: false,
+        );
+      }
+      final pageSize = limit < 1 ? 20 : limit;
+      final collection = firestore.collection(
+        FirestoreCollections.achievements,
+      );
+
+      Future<QuerySnapshot<Map<String, dynamic>>> page({
+        required Query<Map<String, dynamic>> base,
+        required String? afterId,
+      }) async {
+        var q = base.orderBy('date', descending: true).limit(pageSize);
+        final tip = afterId?.trim() ?? '';
+        if (tip.isNotEmpty) {
+          final cursor = await collection.doc(tip).get();
+          if (cursor.exists) q = q.startAfterDocument(cursor);
+        }
+        return q.get();
+      }
+
+      final studentSnap = await page(
+        base: collection.where('studentId', isEqualTo: uid),
+        afterId: afterStudentAchievementId,
+      );
+      final recipientsSnap = await page(
+        base: collection.where(
+          AchievementsFirestoreContract.recipientStudentIdsField,
+          arrayContains: uid,
+        ),
+        afterId: afterRecipientsAchievementId,
+      );
+
+      final byStudent = [
+        for (final d in studentSnap.docs) AchievementModel.fromFirestore(d),
+      ];
+      final byRecipients = [
+        for (final d in recipientsSnap.docs) AchievementModel.fromFirestore(d),
+      ];
+      final items = mergeStudentAchievements(
+        byStudent,
+        byRecipients,
+      ).whereType<AchievementModel>().toList();
+
+      return (
+        items: items,
+        studentCursorId: studentSnap.docs.isEmpty
+            ? afterStudentAchievementId
+            : studentSnap.docs.last.id,
+        recipientsCursorId: recipientsSnap.docs.isEmpty
+            ? afterRecipientsAchievementId
+            : recipientsSnap.docs.last.id,
+        hasMoreStudent: studentSnap.docs.length >= pageSize,
+        hasMoreRecipients: recipientsSnap.docs.length >= pageSize,
+      );
+    } on FirebaseException catch (e) {
+      throw ServerException(e.message ?? 'تعذر تحميل الإنجازات. حاول مرة أخرى.');
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw const ServerException('تعذر تحميل الإنجازات. حاول مرة أخرى.');
     }
   }
 

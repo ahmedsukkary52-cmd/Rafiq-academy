@@ -200,7 +200,7 @@ void main() {
     expect(csv, contains(ReportTable.truncatedNotice));
     expect(csv, contains('أحمد,"دفعة, جزئية"'));
     expect(csv, contains('الإجمالي,10 جنيه'));
-    expect(t.fileStem, 'rafiq_finance_2026-10-01_2026-10-31');
+    expect(t.fileStem, 'basma_finance_2026-10-01_2026-10-31');
   });
 
   group('bundled report font', () {
@@ -337,7 +337,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('report-export-csv')));
       await tester.pumpAndSettle();
-      expect(saved.single.$1, 'rafiq_finance_2026-10-01_2026-10-20.csv');
+      expect(saved.single.$1, 'basma_finance_2026-10-01_2026-10-20.csv');
       expect(saved.single.$2.sublist(0, 3), [0xEF, 0xBB, 0xBF]);
       final csv = utf8.decode(saved.single.$2);
       expect(csv, contains('الحالة: متأخر'));
@@ -366,7 +366,7 @@ void main() {
         await Future<void>.delayed(const Duration(seconds: 2));
       });
       await tester.pumpAndSettle();
-      expect(shared, ['rafiq_finance_2026-10-01_2026-10-20.pdf']);
+      expect(shared, ['basma_finance_2026-10-01_2026-10-20.pdf']);
       expect(find.text(reportFontUnavailableMessage), findsNothing);
       expect(find.text('تعذر إنشاء ملف PDF'), findsNothing);
 

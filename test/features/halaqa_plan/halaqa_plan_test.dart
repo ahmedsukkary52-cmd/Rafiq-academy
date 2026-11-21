@@ -121,7 +121,7 @@ void main() {
       );
     }
 
-    testWidgets('renders both tracks with the four Arabic sections', (
+    testWidgets('renders three plan buckets without percent fabrication', (
       tester,
     ) async {
       await pump(
@@ -135,10 +135,10 @@ void main() {
         ),
       );
       expect(find.text('الجديد'), findsOneWidget);
-      expect(find.text('المراجعة'), findsOneWidget);
-      for (final title in StudentHalaqaPlanView.sectionTitles.take(3)) {
-        expect(find.text(title), findsNWidgets(2));
-      }
+      expect(find.text('الماضي القريب'), findsOneWidget);
+      expect(find.text('المراجعة الجديدة'), findsOneWidget);
+      expect(find.text('البقرة 6-10'), findsOneWidget);
+      expect(find.text('الفلق'), findsOneWidget);
       expect(find.textContaining('%'), findsNothing);
     });
 

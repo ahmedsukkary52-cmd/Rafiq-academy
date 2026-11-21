@@ -76,16 +76,21 @@ const PINNED = {
 };
 
 /**
- * Reviewed: they run on seeded users / studentProfiles and only upsert or
- * delete studentSearch/{id}, a derived projection the seeder neither writes
- * nor checks after writing. syncAdminGroupOnUserWrite only updates an
- * already existing conversations/admin_internal_group (never creates it), so
- * a seed run into a fresh emulator writes nothing.
+ * Reviewed: triggers that can fire when seed v4 writes its interconnected
+ * graph. studentSearch projections may create derived docs; chat group sync
+ * on halaqat may create/update halaqa group conversations; assignment /
+ * evaluation notification triggers may write notifications. None of these
+ * overwrite the seeder's create()-only docs.
  */
 const TRIGGERS_ON_SEEDED_DATA = [
+  "notifyOnAssignmentCreated",
+  "notifyOnPaymentUpdated",
+  "notifyParentsOnEvaluation",
+  "projectStudentSearchOnHalaqaWrite",
   "projectStudentSearchOnProfileWrite",
   "projectStudentSearchOnUserWrite",
   "syncAdminGroupOnUserWrite",
+  "syncHalaqaGroupOnWrite",
 ];
 const DERIVED_COLLECTIONS = ["studentSearch"];
 
@@ -150,7 +155,24 @@ test("layer 3: source definitions exported from index.ts equal the compiled endp
 
 test("only the reviewed triggers fire on seeded or derived collections", () => {
   const seeded = [...new Set([...buildDemoDataset().documents.map((d) => d.collection), SEED_META.collection])].sort();
-  assert.deepEqual(seeded, ["_seedMeta", "parentProfiles", "studentProfiles", "teacherProfiles", "userPrivate", "users"]);
+  assert.deepEqual(seeded, [
+    "_seedMeta",
+    "academySettings",
+    "assignments",
+    "attendanceRecords",
+    "conversations",
+    "halaqaMeetingLinks",
+    "halaqat",
+    "notifications",
+    "parentProfiles",
+    "payments",
+    "pricingRules",
+    "recitationRecords",
+    "studentProfiles",
+    "teacherProfiles",
+    "userPrivate",
+    "users",
+  ]);
   const watched = new Set([...seeded, ...DERIVED_COLLECTIONS]);
   const firing = Object.entries(compiledManifest().events)
     .filter(([, { document }]) => {

@@ -8,11 +8,17 @@ import 'package:rafiq_academy/core/firebase/app_flavor.dart';
 import 'package:rafiq_academy/features/notifications/data/services/offline_notification_open_port.dart';
 
 void main() {
+  bool routingAllowed(AppFlavor flavor, bool emulator, bool debug) {
+    if (flavor == AppFlavor.prod) return false;
+    if (flavor == AppFlavor.trial) return !emulator;
+    return emulator && debug;
+  }
+
   group('assertFirebaseRouting matrix', () {
     for (final flavor in AppFlavor.values) {
       for (final emulator in [false, true]) {
         for (final debug in [false, true]) {
-          final allowed = flavor != AppFlavor.prod && emulator && debug;
+          final allowed = routingAllowed(flavor, emulator, debug);
           test('${flavor.name} emulator=$emulator debug=$debug '
               '-> ${allowed ? 'allowed' : 'throws'}', () {
             void run() => assertFirebaseRouting(
@@ -112,7 +118,7 @@ void main() {
   group('static wiring', () {
     String read(String p) => File(p).readAsStringSync();
 
-    test('no lib file imports the real generated firebase_options.dart', () {
+    test('only app_firebase imports the generated firebase_options.dart', () {
       final offenders = Directory('lib')
           .listSync(recursive: true)
           .whereType<File>()
@@ -129,37 +135,33 @@ void main() {
                 !p.replaceAll('\\', '/').endsWith('lib/firebase_options.dart'),
           )
           .toList();
-      expect(offenders, isEmpty);
+      expect(
+        offenders.map((p) => p.replaceAll('\\', '/')),
+        ['lib/core/firebase/app_firebase.dart'],
+      );
     });
 
-    test('app_firebase has no non-emulator initializeApp path', () {
+    test('trial flavor may use DefaultFirebaseOptions; local flavors cannot', () {
       final src = read('lib/core/firebase/app_firebase.dart');
-      final calls = RegExp(
-        r'Firebase\.initializeApp\(([^)]*)\)',
-      ).allMatches(src).map((m) => m.group(1)!).toList();
-      expect(calls, hasLength(2));
-      for (final args in calls) {
-        expect(args, contains('options: firebaseEmulatorOptions'));
-      }
-      expect(calls.where((a) => a.contains('name:')).toList(), [
-        contains('name: _emulatorAppName'),
-      ]);
-      expect(src, isNot(contains('DefaultFirebaseOptions')));
+      expect(src, contains('AppFlavor.trial'));
+      expect(
+        src,
+        contains(
+          'options: generated.DefaultFirebaseOptions.currentPlatform',
+        ),
+      );
+      expect(src, contains('trialFirebaseProjectId'));
       expect(
         src.indexOf('assertFirebaseRouting('),
-        lessThan(src.indexOf('Firebase.initializeApp(')),
-      );
-      expect(
-        src.indexOf('assertLoopbackEmulatorHost(firebaseEmulatorHost)'),
-        lessThan(src.indexOf('Firebase.initializeApp(')),
+        lessThan(src.indexOf('if (flavor == AppFlavor.trial)')),
       );
     });
 
     test('[DEFAULT] app gets the fake options and the emulators before the '
-        'named app is created', () {
+        'named app is created (local flavors only)', () {
       final src = read('lib/core/firebase/app_firebase.dart');
       final init = src.substring(
-        src.indexOf('Future<void> initializeAppFirebase() async {'),
+        src.indexOf('assertLoopbackEmulatorHost(firebaseEmulatorHost);'),
         src.indexOf('Future<void> _useEmulators('),
       );
       final ordered = [

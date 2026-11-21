@@ -45,6 +45,30 @@ export function notificationId(observerId: string, eventId: string): string {
   return `${observerId.trim()}_${eventId.trim()}`;
 }
 
+/** Role broadcasts — not a user document. */
+export const ROLE_NOTIFICATION_AUDIENCES = [
+  "all",
+  "admin",
+  "supervisor",
+  "teacher",
+  "parent",
+  "student",
+] as const;
+
+/**
+ * Matches Firestore `hasActiveProfile`: missing `isActive` is legacy-active;
+ * `isActive == false` or a pending first-login password change is not eligible
+ * to receive a notification. A missing user document fails closed.
+ */
+export function isEligibleNotificationRecipient(
+  user: Record<string, unknown> | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.isActive === false) return false;
+  if (user.passwordChangeRequired === true) return false;
+  return true;
+}
+
 const STUDENT_FALLBACK_LABEL = "الطالب";
 
 function label(studentName: string | undefined): string {

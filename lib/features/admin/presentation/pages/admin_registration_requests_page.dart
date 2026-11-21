@@ -78,9 +78,16 @@ class _AdminRegistrationRequestsPageState
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'قبول ${request.name}',
+                    'تعيين ${request.name} لحلقة',
                     style: AppTextStyles.titleLarge.copyWith(
                       fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'طلب وارد بانتظار التعيين — ليس موافقة على طالب أنشأته أنت.',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -134,7 +141,7 @@ class _AdminRegistrationRequestsPageState
                   ),
                   const SizedBox(height: 20),
                   AppButton(
-                    label: 'تأكيد القبول',
+                    label: 'تأكيد التعيين',
                     onPressed: halaqaId == null
                         ? null
                         : () {
@@ -176,8 +183,8 @@ class _AdminRegistrationRequestsPageState
         }
       },
       child: AdminSubpageScaffold(
-        title: 'طلبات التسجيل',
-        subtitle: 'بانتظار الموافقة',
+        title: 'طلبات تعيين الطلاب',
+        subtitle: 'طلبات واردة بانتظار حلقة — غير إنشاء طالب جديد',
         body: BlocBuilder<AdminBloc, AdminState>(
           builder: (context, state) {
             if (state.registrationStatus == SectionStatus.loading) {
@@ -193,53 +200,75 @@ class _AdminRegistrationRequestsPageState
             }
 
             final pending = state.registrationRequests;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              children: [
-                AdminGradientHeroCard(
-                  eyebrow: 'الانتظار',
-                  headline: '${formatAdminCount(pending.length)} طلب',
-                  metrics: [
-                    AdminHeroMetric(
-                      value: '${adminFormatCount(pending.length)}',
-                      label: 'بانتظار التعيين',
-                    ),
-                    AdminHeroMetric(
-                      value: pending.isEmpty ? '—' : 'نشط',
-                      label: 'مسار القبول',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                if (pending.isEmpty)
-                  const AdminPlaceholderCard(
-                    icon: Icons.inbox_outlined,
-                    title: 'لا طلبات معلقة',
-                    message: 'لا توجد طلبات تسجيل بانتظار التعيين حالياً.',
-                  )
-                else
-                  ...pending.map(
-                    (r) => _RequestCard(
-                      request: r,
-                      busy:
-                          state.registrationActionStatus ==
-                          SubmissionStatus.submitting,
-                      onApprove: () => _showApproveSheet(r),
-                      onReject: () {
-                        context.read<AdminBloc>().add(
-                          RejectRegistrationRequestEvent(
-                            studentId: r.studentId,
+            final busy =
+                state.registrationActionStatus == SubmissionStatus.submitting;
+            // D4: lazy registration request rows.
+            return CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      AdminGradientHeroCard(
+                        eyebrow: 'الانتظار',
+                        headline: '${formatAdminCount(pending.length)} طلب',
+                        metrics: [
+                          AdminHeroMetric(
+                            value: '${adminFormatCount(pending.length)}',
+                            label: 'بانتظار التعيين',
                           ),
-                        );
-                      },
+                          AdminHeroMetric(
+                            value: pending.isEmpty ? '—' : 'نشط',
+                            label: 'مسار التعيين',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (pending.isEmpty)
+                        const AdminPlaceholderCard(
+                          icon: Icons.inbox_outlined,
+                          title: 'لا طلبات بانتظار التعيين',
+                          message:
+                              'لا توجد طلبات واردة حالياً. لإنشاء طالب جديد مع ولي '
+                              'أمر وحلقة استخدم «تسجيل طالب جديد».',
+                        ),
+                    ]),
+                  ),
+                ),
+                if (pending.isNotEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final r = pending[index];
+                          return _RequestCard(
+                            request: r,
+                            busy: busy,
+                            onApprove: () => _showApproveSheet(r),
+                            onReject: () {
+                              context.read<AdminBloc>().add(
+                                RejectRegistrationRequestEvent(
+                                  studentId: r.studentId,
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        childCount: pending.length,
+                      ),
                     ),
                   ),
-                const SizedBox(height: 16),
-                AppButton(
-                  key: const Key('registration-open-onboarding'),
-                  label: 'تسجيل طالب جديد',
-                  onPressed: () =>
-                      context.push(AppRoutes.adminOnboardStudent),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  sliver: SliverToBoxAdapter(
+                    child: AppButton(
+                      key: const Key('registration-open-onboarding'),
+                      label: 'تسجيل طالب جديد',
+                      onPressed: () =>
+                          context.push(AppRoutes.adminOnboardStudent),
+                    ),
+                  ),
                 ),
               ],
             );
@@ -320,13 +349,15 @@ class _RequestCard extends StatelessWidget {
                 Expanded(
                   child: AppButton(
                     label: busy ? '…' : 'رفض',
+                    backgroundColor: AppColors.error.withValues(alpha: 0.12),
+                    textColor: AppColors.error,
                     onPressed: busy ? null : onReject,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: AppButton(
-                    label: busy ? '…' : 'قبول وتعيين',
+                    label: busy ? '…' : 'تعيين لحلقة',
                     onPressed: busy ? null : onApprove,
                   ),
                 ),

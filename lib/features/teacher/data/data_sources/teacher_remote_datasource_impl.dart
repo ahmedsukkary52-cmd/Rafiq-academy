@@ -90,6 +90,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         ),
       );
 
+      // Same calendar window as attendance: roster cards only need recent
+      // risk marks + latest grade in-window (D2 — avoid lifetime history reads).
       final parallel = await Future.wait([
         firestore
             .collection(FirestoreCollections.attendanceRecords)
@@ -99,6 +101,8 @@ class TeacherRemoteDatasourceImpl implements TeacherRemoteDatasource {
         firestore
             .collection(FirestoreCollections.recitationRecords)
             .where('halaqaId', isEqualTo: halaqaId)
+            .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
+            .orderBy('date', descending: true)
             .get(),
         _loadProgressByStudentId(studentIds),
       ]);

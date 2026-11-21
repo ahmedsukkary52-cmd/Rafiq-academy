@@ -9,6 +9,7 @@ import 'package:rafiq_academy/features/teacher/presentation/pages/teacher_profil
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_floating_bottom_nav.dart';
 import '../../../assistant/presentation/teacher_cover_banner.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -53,7 +54,10 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       StartWatchingNotificationsEvent(uid: uid, role: AppRoles.teacher),
     );
 
-    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
+    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(
+      uid,
+      pageSize: ChatConversationsBloc.defaultInboxPageSize,
+    ));
   }
 
   void _switchTab(int index) {
@@ -65,118 +69,37 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          const TeacherCoverBanner(),
-          Expanded(
-            child: IndexedStack(
-              index: _currentTab,
-              children: [
-                TeacherDashboardTab(
-                  onSwitchTab: _switchTab,
-                  tabStudents: _tabStudents,
-                  tabMessages: _tabMessages,
-                  tabProfile: _tabProfile,
-                ),
-                const TeacherClassesPage(),
-                const TeacherAwardsTab(),
-                const TeacherMessagesTab(),
-                const TeacherProfileTab(),
-              ],
+      resizeToAvoidBottomInset: true,
+      extendBody: true,
+      body: AppFloatingBottomNav.padBody(
+        context,
+        child: Column(
+          children: [
+            const TeacherCoverBanner(),
+            Expanded(
+              child: IndexedStack(
+                index: _currentTab,
+                children: [
+                  TeacherDashboardTab(
+                    onSwitchTab: _switchTab,
+                    tabStudents: _tabStudents,
+                    tabMessages: _tabMessages,
+                    tabProfile: _tabProfile,
+                  ),
+                  const TeacherClassesPage(),
+                  const TeacherAwardsTab(),
+                  const TeacherMessagesTab(),
+                  const TeacherProfileTab(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-      bottomNavigationBar: _TeacherBottomNav(
+      bottomNavigationBar: AppFloatingBottomNav(
         selected: _currentTab,
         onChanged: _switchTab,
-      ),
-    );
-  }
-}
-
-class _TeacherBottomNav extends StatelessWidget {
-  final int selected;
-  final void Function(int) onChanged;
-
-  const _TeacherBottomNav({required this.selected, required this.onChanged});
-
-  static const _icons = [
-    Icons.home_rounded,
-    Icons.groups_rounded,
-    Icons.emoji_events_outlined,
-    Icons.chat_bubble_outline,
-    Icons.person_outline,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 12,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: AppSizes.bottomNavHeight,
-          child: Row(
-            children: List.generate(TeacherHomeNav.labels.length, (i) {
-              final label = TeacherHomeNav.labels[i];
-              final isSelected = i == selected;
-
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _icons[i],
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                        size: AppSizes.iconL,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.labelSmall.copyWith(
-                          fontSize: 10,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
+        destinations: AppNavIcons.teacher(TeacherHomeNav.labels),
       ),
     );
   }

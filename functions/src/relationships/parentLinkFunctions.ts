@@ -17,7 +17,7 @@ import {
   AUDIT_LOGS_COLLECTION,
   AUDIT_TARGET_TYPE,
 } from "../audit/auditLogContract";
-import { adminActor, buildAuditLogEntry } from "../audit/auditLogWrite";
+import { adminActor, buildAuditLogEntry, supervisorActor } from "../audit/auditLogWrite";
 import {
   loadCallerRole,
   requireCallerUid,
@@ -70,15 +70,39 @@ export async function adminLinkParentChildCore(
   db: admin.firestore.Firestore,
   callerUid: string | undefined,
   data: Record<string, unknown>,
+  options: { allowSupervisor?: boolean } = {},
 ): Promise<ParentLinkResult> {
   const uid = requireCallerUid(callerUid);
   const parentId = requireText(data.parentId, "parentId");
   const studentId = requireText(data.studentId, "studentId");
   const operation = parseParentLinkOperation(data.operation);
 
-  if ((await loadCallerRole(db, uid)) !== "admin") {
+  const role = await loadCallerRole(db, uid);
+  const supervisorAllowed = options.allowSupervisor === true && role === "supervisor";
+  if (role !== "admin" && !supervisorAllowed) {
     throw new HttpsError("permission-denied", "ربط ولي الأمر بالطالب متاح للمسؤول فقط");
   }
+  // Supervisors may only link (never unlink) during scoped onboarding.
+  if (supervisorAllowed && operation !== "link") {
+    throw new HttpsError("permission-denied", "المشرف يمكنه ربط ولي الأمر أثناء التسجيل فقط");
+  }
+
+  // Candidate co-guardians are discovered before the transaction: the emulator
+  // cannot safely follow an `array-contains` query with further transaction
+  // reads. They are re-read inside the transaction as the unlink commits, so a
+  // concurrent unlink, replacement or deactivation of any candidate conflicts
+  // and the decision is re-made against the committed state.
+  const coGuardianIds =
+    operation === "unlink"
+      ? (
+          await db
+            .collection("parentProfiles")
+            .where("childrenIds", "array-contains", studentId)
+            .get()
+        ).docs
+          .map((d) => d.id)
+          .filter((id) => id !== parentId)
+      : [];
 
   const parentUserRef = db.collection("users").doc(parentId);
   const studentUserRef = db.collection("users").doc(studentId);
@@ -121,19 +145,48 @@ export async function adminLinkParentChildCore(
     // Every student keeps at least one guardian (adminOnboardStudent always
     // links one); moving the last one goes through adminReplaceParentLink.
     // A link to a missing or non-student account can still be cleaned up.
+    // An active student must additionally keep an ELIGIBLE (active) guardian,
+    // so unlinking the last active Parent is refused even when an inactive
+    // account is still linked — the same invariant Parent deactivation holds.
     if (
       operation === "unlink" &&
       next.changed &&
       studentUser.exists &&
       studentUser.data()?.role === "student"
     ) {
-      const guardians = await tx.get(
-        db.collection("parentProfiles").where("childrenIds", "array-contains", studentId),
-      );
-      if (guardians.docs.every((d) => d.id === parentId)) {
+      if (coGuardianIds.length === 0) {
         throw new HttpsError(
           "failed-precondition",
           "لا يمكن فك ارتباط ولي الأمر الوحيد للطالب؛ استخدم استبدال ولي الأمر",
+        );
+      }
+      const coRefs = coGuardianIds.flatMap((id) => [
+        db.collection("users").doc(id),
+        db.collection("parentProfiles").doc(id),
+      ]);
+      const coDocs = await tx.getAll(...coRefs);
+      let hasEligibleGuardian = false;
+      for (let index = 0; index < coGuardianIds.length; index++) {
+        const coUser = coDocs[index * 2];
+        const coProfile = coDocs[index * 2 + 1];
+        if (
+          coUser.exists &&
+          coUser.get("role") === "parent" &&
+          coUser.get("isActive") !== false &&
+          Array.isArray(coProfile.get("childrenIds")) &&
+          coProfile.get("childrenIds").includes(studentId)
+        ) {
+          hasEligibleGuardian = true;
+          break;
+        }
+      }
+      const activeStudent =
+        studentUser.get("isActive") !== false &&
+        normalizeLifecycle(studentProfile.get("lifecycle")) !== LIFECYCLE_ARCHIVED;
+      if (activeStudent && !hasEligibleGuardian) {
+        throw new HttpsError(
+          "failed-precondition",
+          "لا يمكن فك ارتباط ولي الأمر الوحيد النشط للطالب؛ عيّن ولي أمر بديلاً أولاً",
         );
       }
     }
@@ -142,16 +195,20 @@ export async function adminLinkParentChildCore(
         childrenIds: next.childrenIds,
         updatedAt: FieldValue.serverTimestamp(),
       });
+      const actorRole = role === "supervisor" ? "supervisor" : "admin";
       tx.set(
         db.collection(AUDIT_LOGS_COLLECTION).doc(),
         buildAuditLogEntry(
           {
-            actor: adminActor(uid),
+            actor: actorRole === "supervisor" ? supervisorActor(uid) : adminActor(uid),
             action: AUDIT_ACTION.relationshipChildrenChange,
             targetType: AUDIT_TARGET_TYPE.parentProfile,
             targetId: parentId,
             metadata: { parentId, studentId, operation },
-            source: "adminLinkParentChild",
+            source:
+              actorRole === "supervisor"
+                ? "supervisorOnboardStudent"
+                : "adminLinkParentChild",
           },
           FieldValue.serverTimestamp(),
         ),
@@ -160,7 +217,7 @@ export async function adminLinkParentChildCore(
         kind: RELATIONSHIP_KIND.parentChild,
         operation,
         actorId: uid,
-        actorRole: "admin",
+        actorRole,
         parentId,
         studentId,
       });

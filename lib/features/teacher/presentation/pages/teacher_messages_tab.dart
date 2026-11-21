@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,24 +10,26 @@ import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../chat/domain/entities/chat_entities.dart';
-import '../../../chat/domain/policies/chat_permission_policy.dart';
 import '../../../chat/domain/usecases/chat_usecases.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
+import '../../../chat/presentation/widgets/chat_inbox_load_more.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
+import '../../../../shared/domain/student_parent_links.dart';
 import '../bloc/teacher_bloc.dart';
+import '../bloc/teacher_event.dart';
+import '../chat/teacher_chat_contacts.dart';
 
 /// Teacher Messages inbox — Figma 09 (`1:1314`).
 ///
-/// Filters are presentation-only over existing conversations. Parent chats are
-/// allowed by [ChatPermissionPolicy] and usually started from roster/profile
-/// via [contactStudentParent]; the inbox filter surfaces those threads.
+/// Filters are presentation-only over existing conversations. Related people
+/// (students, parents, supervisors of assigned halaqat) are offered from Plus;
+/// roster/profile [contactStudentParent] remains for a known student link.
 class TeacherMessagesTab extends StatefulWidget {
   const TeacherMessagesTab({super.key});
 
@@ -37,16 +41,21 @@ enum _InboxFilter { all, parents, supervisors, admin }
 
 class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
   final _searchCtrl = TextEditingController();
+  late final ChatInboxLoadMoreBinding _inboxPaging;
   _InboxFilter _filter = _InboxFilter.all;
   String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _inboxPaging = ChatInboxLoadMoreBinding();
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
       sl<ChatConversationsBloc>().add(
-        StartWatchingConversationsEvent(authState.user.uid),
+        StartWatchingConversationsEvent(
+          authState.user.uid,
+          pageSize: ChatConversationsBloc.defaultInboxPageSize,
+        ),
       );
     }
     _searchCtrl.addListener(() {
@@ -59,6 +68,7 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _inboxPaging.dispose();
     super.dispose();
   }
 
@@ -66,7 +76,10 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) return;
     sl<ChatConversationsBloc>().add(
-      StartWatchingConversationsEvent(authState.user.uid),
+      StartWatchingConversationsEvent(
+        authState.user.uid,
+        pageSize: ChatConversationsBloc.defaultInboxPageSize,
+      ),
     );
   }
 
@@ -77,8 +90,29 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
       return;
     }
 
+    final teacherBloc = context.read<TeacherBloc>();
+    var halaqat = teacherBloc.state.halaqat;
+    if (halaqat.isEmpty &&
+        teacherBloc.state.halaqatStatus != SectionStatus.loading) {
+      teacherBloc.add(LoadTeacherHalaqatEvent(auth.user.uid));
+      try {
+        await teacherBloc.stream
+            .firstWhere(
+              (s) =>
+                  s.halaqatStatus == SectionStatus.loaded ||
+                  s.halaqatStatus == SectionStatus.error,
+            )
+            .timeout(const Duration(seconds: 12));
+      } on Object {
+        // Sheet still opens; empty/error copy guides retry.
+      }
+      if (!mounted) return;
+      halaqat = teacherBloc.state.halaqat;
+    }
+
+    if (!mounted) return;
     final selected = await showModalBottomSheet<ChatParticipantEntity>(
-      context: context,
+      context: this.context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
@@ -87,7 +121,7 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
       builder: (_) => _NewChatPickerSheet(
         teacherUid: auth.user.uid,
         teacherRole: auth.user.role,
-        halaqat: context.read<TeacherBloc>().state.halaqat,
+        halaqat: halaqat,
       ),
     );
     if (selected == null || !mounted) return;
@@ -138,8 +172,9 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
     List<ConversationEntity> all,
     String currentUid,
   ) {
-    Iterable<ConversationEntity> list = all;
-    list = list.where((c) {
+    Iterable<ConversationEntity> list = all.where((c) {
+      // Halaqa/custom groups are not 1:1 peers — only show under "الكل".
+      if (c.isGroup) return _filter == _InboxFilter.all;
       final role = c.otherParticipant(currentUid).role;
       return switch (_filter) {
         _InboxFilter.all => true,
@@ -151,8 +186,11 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
       list = list.where((c) {
-        final other = c.otherParticipant(currentUid);
-        final hay = '${other.name} ${c.lastMessage ?? ''}'.toLowerCase();
+        final hay = c.isGroup
+            ? '${c.displayTitle(currentUid)} ${c.lastMessage ?? ''}'
+                .toLowerCase()
+            : '${c.otherParticipant(currentUid).name} ${c.lastMessage ?? ''}'
+                .toLowerCase();
         return hay.contains(q);
       });
     }
@@ -167,22 +205,28 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5FAFB),
+        resizeToAvoidBottomInset: true,
         body: Column(
           children: [
-            _MessagesHeader(
-              topPadding: top,
-              onNewTap: () => _openNewChatPicker(context),
-            ),
-            _FilterTabs(
-              selected: _filter,
-              onChanged: (f) => setState(() => _filter = f),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: AppSearchField(
-                controller: _searchCtrl,
-                hint: 'بحث في المحادثات...',
-              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MessagesHeader(
+                  topPadding: top,
+                  onNewTap: () => _openNewChatPicker(context),
+                ),
+                _FilterTabs(
+                  selected: _filter,
+                  onChanged: (f) => setState(() => _filter = f),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: AppSearchField(
+                    controller: _searchCtrl,
+                    hint: 'بحث في المحادثات...',
+                  ),
+                ),
+              ],
             ),
             Expanded(
               child: BlocBuilder<ChatConversationsBloc, ChatConversationsState>(
@@ -190,7 +234,9 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                 buildWhen: (p, c) =>
                     p.conversationsStatus != c.conversationsStatus ||
                     p.conversations != c.conversations ||
-                    p.conversationsError != c.conversationsError,
+                    p.conversationsError != c.conversationsError ||
+                    p.hasMoreConversations != c.hasMoreConversations ||
+                    p.loadingMoreConversations != c.loadingMoreConversations,
                 builder: (context, state) {
                   final authState = context.read<AuthBloc>().state;
                   final currentUid = authState is AuthAuthenticated
@@ -226,14 +272,18 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                           ? 'لا محادثات مع أولياء الأمور'
                           : 'لا نتائج',
                       message: _filter == _InboxFilter.parents
-                          ? 'تواصل مع ولي الأمر من الملف الشخصي للطالب'
+                          ? 'ابدأ محادثة من زر + أو من ملف الطالب'
                           : 'جرّب بحثاً أو تصنيفاً آخر',
                     );
                   }
 
+                  final footer = state.hasMoreConversations ||
+                      state.loadingMoreConversations;
                   return ListView.separated(
+                    controller: _inboxPaging.controller,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
-                    itemCount: items.length,
+                    itemCount: items.length + (footer ? 1 : 0),
                     separatorBuilder: (_, __) => const Divider(
                       height: 1,
                       thickness: 0.8,
@@ -242,17 +292,32 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                       endIndent: 16,
                     ),
                     itemBuilder: (context, i) {
+                      if (i >= items.length) {
+                        return ChatInboxLoadMoreFooter(
+                          loading: state.loadingMoreConversations,
+                          onPressed: _inboxPaging.requestLoadMore,
+                        );
+                      }
                       final conv = items[i];
+                      final isGroup = conv.isGroup;
                       final other = conv.otherParticipant(currentUid);
+                      final title = isGroup
+                          ? conv.displayTitle(currentUid)
+                          : other.name;
                       return _ConversationTile(
-                        name: other.name,
-                        roleLabel: _roleLabel(other.role),
+                        name: title,
+                        roleLabel: isGroup
+                            ? (conv.kind == ConversationKinds.halaqaGroup
+                                ? 'مجموعة الحلقة'
+                                : 'مجموعة')
+                            : _roleLabel(other.role),
                         snippet: conv.lastMessage ?? '',
                         timeLabel: conv.lastMessageAt == null
                             ? ''
                             : _timeAgo(conv.lastMessageAt!),
                         unread: conv.unreadCount,
-                        imageUrl: other.profileImageUrl,
+                        imageUrl: isGroup ? null : other.profileImageUrl,
+                        isGroup: isGroup,
                         highlighted: i == 0 && conv.unreadCount > 0,
                         onTap: () => context.push(
                           AppRoutes.teacherChat.replaceFirst(
@@ -260,8 +325,8 @@ class _TeacherMessagesTabState extends State<TeacherMessagesTab> {
                             conv.id,
                           ),
                           extra: <String, String?>{
-                            'name': other.name,
-                            'image': other.profileImageUrl,
+                            'name': title,
+                            'image': isGroup ? null : other.profileImageUrl,
                           },
                         ),
                       );
@@ -444,6 +509,7 @@ class _ConversationTile extends StatelessWidget {
   final String timeLabel;
   final int unread;
   final String? imageUrl;
+  final bool isGroup;
   final bool highlighted;
   final VoidCallback onTap;
 
@@ -454,6 +520,7 @@ class _ConversationTile extends StatelessWidget {
     required this.timeLabel,
     required this.unread,
     required this.imageUrl,
+    this.isGroup = false,
     required this.highlighted,
     required this.onTap,
   });
@@ -471,14 +538,24 @@ class _ConversationTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _LetterAvatar(name: name, imageUrl: imageUrl),
+              if (isGroup)
+                const CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primaryLight,
+                  child: Icon(
+                    Icons.groups_rounded,
+                    color: AppColors.primaryDark,
+                  ),
+                )
+              else
+                _LetterAvatar(name: name, imageUrl: imageUrl),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      '$name — $roleLabel',
+                      isGroup ? name : '$name — $roleLabel',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.right,
@@ -489,6 +566,19 @@ class _ConversationTile extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
+                    if (isGroup) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        roleLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textHint,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                     if (snippet.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
@@ -665,9 +755,9 @@ class _MessagesListSkeletonState extends State<_MessagesListSkeleton>
   }
 }
 
-/// Policy-filtered contacts for teacher `+` (students + supervisors of halaqat).
-/// Parents are opened from roster/profile ([contactStudentParent]), not listed
-/// here as a free-form directory (ownership / known student link only).
+/// Related-people picker for teacher `+`: students, linked parents, and
+/// supervisors of assigned halaqat. Search is local. Backend still enforces
+/// relationships via `createDirectConversation`.
 class _NewChatPickerSheet extends StatefulWidget {
   final String teacherUid;
   final String teacherRole;
@@ -684,14 +774,27 @@ class _NewChatPickerSheet extends StatefulWidget {
 }
 
 class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
+  final _searchCtrl = TextEditingController();
   bool _loading = true;
   String? _error;
-  List<ChatParticipantEntity> _contacts = const [];
+  List<TeacherChatContactCandidate> _all = const [];
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() {
+      final q = _searchCtrl.text;
+      if (q == _query) return;
+      setState(() => _query = q);
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -700,63 +803,33 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
       _error = null;
     });
 
-    final uids = <String>{};
-    for (final h in widget.halaqat) {
-      uids.addAll(h.studentIds);
-      if (h.supervisorId.trim().isNotEmpty) {
-        uids.add(h.supervisorId.trim());
-      }
-    }
-    uids.remove(widget.teacherUid);
-
-    if (uids.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _contacts = const [];
-      });
-      return;
-    }
-
-    final getParticipant = sl<GetChatParticipantUseCase>();
-    final results = await Future.wait(
-      uids.map((uid) => getParticipant(ChatUidParams(uid))),
+    final result = await loadTeacherChatContacts(
+      halaqat: widget.halaqat,
+      teacherUid: widget.teacherUid,
+      teacherRole: widget.teacherRole,
+      getParticipant: sl<GetChatParticipantUseCase>(),
+      parentLinks: sl<StudentParentLinkReader>(),
     );
 
-    final contacts = <ChatParticipantEntity>[];
-    for (final either in results) {
-      either.fold((_) {}, (p) {
-        if (ChatPermissionPolicy.canChat(widget.teacherRole, p.role)) {
-          contacts.add(p);
-        }
-      });
-    }
-    contacts.sort((a, b) {
-      final roleCmp = a.role.compareTo(b.role);
-      if (roleCmp != 0) return roleCmp;
-      return a.name.compareTo(b.name);
-    });
-
     if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _contacts = contacts;
-      if (contacts.isEmpty && uids.isNotEmpty) {
+    result.fold(
+      (f) => setState(() {
+        _loading = false;
+        _error = 'تعذر تحميل الأشخاص المتاحين. حاول مرة أخرى.';
+        _all = const [];
+      }),
+      (contacts) => setState(() {
+        _loading = false;
+        _all = contacts;
         _error = null;
-      }
-    });
+      }),
+    );
   }
-
-  String _roleLabel(String role) => switch (role) {
-    AppRoles.student => 'طالب',
-    AppRoles.supervisor => 'مشرف',
-    AppRoles.admin => 'إدارة',
-    _ => role,
-  };
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final visible = filterTeacherChatContacts(_all, _query);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: SafeArea(
@@ -782,16 +855,48 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
                   ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: AppSearchField(
+                  controller: _searchCtrl,
+                  hint: 'بحث عن طالب أو ولي أمر أو مشرف...',
+                  enabled: !_loading && _error == null,
+                ),
+              ),
               Expanded(
                 child: _loading
                     ? const _NewChatPickerSkeleton()
-                    : _contacts.isEmpty
+                    : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: _load,
+                                child: const Text('إعادة المحاولة'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _all.isEmpty
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            _error ??
-                                'لا يوجد طلاب أو مشرفون متاحون للمحادثة من حلقاتك',
+                            widget.halaqat.isEmpty
+                                ? 'لا توجد حلقات مسندة بعد لعرض الأشخاص المرتبطين'
+                                : 'لا يوجد طلاب أو أولياء أمور أو مشرفون متاحون من حلقاتك',
                             textAlign: TextAlign.center,
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: AppColors.textSecondary,
@@ -799,13 +904,23 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
                           ),
                         ),
                       )
+                    : visible.isEmpty
+                    ? Center(
+                        child: Text(
+                          'لا نتائج لهذا البحث',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      )
                     : ListView.separated(
                         padding: EdgeInsets.fromLTRB(8, 4, 8, bottom + 16),
-                        itemCount: _contacts.length,
+                        itemCount: visible.length,
                         separatorBuilder: (_, __) =>
                             const Divider(height: 1, indent: 72),
                         itemBuilder: (context, i) {
-                          final p = _contacts[i];
+                          final c = visible[i];
+                          final p = c.participant;
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: AppColors.primary.withValues(
@@ -820,7 +935,7 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
                                   p.profileImageUrl == null ||
                                       p.profileImageUrl!.isEmpty
                                   ? Text(
-                                      p.name.isNotEmpty ? p.name[0] : '?',
+                                      p.name.isNotEmpty ? p.name[0] : '؟',
                                       style: AppTextStyles.labelLarge.copyWith(
                                         color: AppColors.primary,
                                         fontWeight: FontWeight.w700,
@@ -835,7 +950,7 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
                               ),
                             ),
                             subtitle: Text(
-                              _roleLabel(p.role),
+                              c.caption,
                               style: AppTextStyles.labelSmall.copyWith(
                                 color: AppColors.textSecondary,
                               ),

@@ -87,6 +87,7 @@ export {
 export { notifyOnPaymentUpdated } from "./notifications/paymentNotificationFunctions";
 export {
   adminOnboardStudent,
+  supervisorOnboardStudent,
   adminResetMemberPassword,
   completeFirstLogin,
 } from "./accounts/onboardingFunctions";

@@ -105,15 +105,13 @@ class _CreateHalaqaActivitySheetState extends State<CreateHalaqaActivitySheet> {
 
     String teacherId = '';
     String teacherName = 'المعلم';
-    try {
-      final auth = context.read<AuthBloc>().state;
-      if (auth is AuthAuthenticated) {
-        teacherId = auth.user.uid;
-        if (auth.user.name.trim().isNotEmpty) {
-          teacherName = auth.user.name.trim();
-        }
+    final auth = context.read<AuthBloc>().state;
+    if (auth is AuthAuthenticated) {
+      teacherId = auth.user.uid;
+      if (auth.user.name.trim().isNotEmpty) {
+        teacherName = auth.user.name.trim();
       }
-    } catch (_) {}
+    }
     if (teacherId.isEmpty) {
       AppSnackBar.showError(context, 'يجب تسجيل الدخول لنشر المهمة');
       return;

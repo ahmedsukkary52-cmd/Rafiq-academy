@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_floating_bottom_nav.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -47,7 +48,10 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
     sl<NotificationsBloc>().add(
       StartWatchingNotificationsEvent(uid: uid, role: AppRoles.supervisor),
     );
-    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
+    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(
+      uid,
+      pageSize: ChatConversationsBloc.defaultInboxPageSize,
+    ));
   }
 
   void _switchTab(int index) {
@@ -97,90 +101,24 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
         textDirection: TextDirection.rtl,
         child: Scaffold(
           backgroundColor: AppColors.background,
-          body: IndexedStack(
-            index: _currentTab,
-            children: [
-              SupervisorDashboardTab(onSwitchTab: _switchTab),
-              SupervisorStudentsTab(onSwitchTab: _switchTab),
-              const SupervisorMessagesTab(),
-              SupervisorReportsTab(onSwitchTab: _switchTab),
-              const SupervisorAccountTab(),
-            ],
+          extendBody: true,
+          body: AppFloatingBottomNav.padBody(
+            context,
+            child: IndexedStack(
+              index: _currentTab,
+              children: [
+                SupervisorDashboardTab(onSwitchTab: _switchTab),
+                SupervisorStudentsTab(onSwitchTab: _switchTab),
+                const SupervisorMessagesTab(),
+                SupervisorReportsTab(onSwitchTab: _switchTab),
+                const SupervisorAccountTab(),
+              ],
+            ),
           ),
-          bottomNavigationBar: _SupervisorBottomNav(
+          bottomNavigationBar: AppFloatingBottomNav(
             selected: _currentTab,
             onChanged: _switchTab,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SupervisorBottomNav extends StatelessWidget {
-  final int selected;
-  final ValueChanged<int> onChanged;
-
-  const _SupervisorBottomNav({required this.selected, required this.onChanged});
-
-  static const _icons = [
-    Icons.home_rounded,
-    Icons.groups_rounded,
-    Icons.chat_bubble_outline,
-    Icons.insights_outlined,
-    Icons.person_outline,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 12,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: AppSizes.bottomNavHeight,
-          child: Row(
-            children: List.generate(_icons.length, (i) {
-              final isSelected = selected == i;
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onChanged(i),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _icons[i],
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        SupervisorHomeNav.labels[i],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                          fontFamily: 'NotoNaskhArabic',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
+            destinations: AppNavIcons.supervisor(SupervisorHomeNav.labels),
           ),
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/error/exception.dart';
+import '../../../core/error/user_facing_error.dart';
 import '../../../shared/domain/arabic_search_normalizer.dart';
 import '../domain/onboarding_models.dart';
 
@@ -30,15 +31,22 @@ class AcademyAccountsRepository {
     } on FirebaseFunctionsException catch (e) {
       throw ServerException(e.message ?? 'تعذر إكمال العملية');
     } catch (_) {
-      throw const ServerException('تعذر الاتصال بالخادم، أعد المحاولة');
+      throw const ServerException(connectionErrorText);
     }
   }
 
-  Future<OnboardingResult> onboardStudent(OnboardStudentRequest request) async =>
-      OnboardingResult.fromMap(
-        await _call('adminOnboardStudent', request.toPayload()),
-      );
+  Future<OnboardingResult> onboardStudent(
+    OnboardStudentRequest request,
+  ) async => OnboardingResult.fromMap(
+    await _call('adminOnboardStudent', request.toPayload()),
+  );
 
+  /// Supervisor-scoped onboard (halaqa must belong to the caller).
+  Future<OnboardingResult> supervisorOnboardStudent(
+    OnboardStudentRequest request,
+  ) async => OnboardingResult.fromMap(
+    await _call('supervisorOnboardStudent', request.toPayload()),
+  );
 
   Future<IssuedCredential> resetMemberPassword({
     required String userId,

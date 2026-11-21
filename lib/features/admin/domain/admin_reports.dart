@@ -1,8 +1,8 @@
+import '../../../shared/domain/academy_currency.dart';
 import '../../../shared/domain/payment_review_amounts.dart';
-import '../../../shared/presentation/academy_currency_label.dart';
+import '../../../shared/domain/payment_status_label.dart';
 import '../data/staff_lifecycle_repository.dart' show StaffStatus;
 import 'entities/admin_halaqa_roster_entity.dart';
-import '../../../shared/domain/payment_status_label.dart';
 import 'entities/admin_payment_record.dart';
 import 'entities/teacher_management_entity.dart';
 
@@ -99,7 +99,8 @@ class ReportTable {
   static const truncatedNotice =
       'تجاوزت البيانات الحد الأقصى للتقرير؛ ضيّق الفترة أو أضف عاملاً للتصفية';
 
-  String get fileStem => 'rafiq_${_slug(title)}_${range.fromKey}_${range.toKey}';
+  String get fileStem =>
+      'basma_${_slug(title)}_${range.fromKey}_${range.toKey}';
 
   /// UTF-8 BOM so spreadsheet apps read Arabic correctly.
   String toCsv() {
@@ -234,7 +235,8 @@ ReportTable buildTeachersReport({
   final today = reportYmd(now);
   final byTeacher = <String, Map<String, int>>{};
   for (final s in sessions) {
-    if (s.date.compareTo(range.fromKey) < 0 || s.date.compareTo(range.toKey) > 0) {
+    if (s.date.compareTo(range.fromKey) < 0 ||
+        s.date.compareTo(range.toKey) > 0) {
       continue;
     }
     final bucket = switch (s.status) {
@@ -312,10 +314,13 @@ ReportTable buildFinanceReport({
     PaymentLedgerFilter.overdue => p.status == 'overdue',
     PaymentLedgerFilter.paid => p.status == 'paid',
   };
-  final list = payments
-      .where((p) => p.dueDate != null && range.contains(p.dueDate!) && keep(p))
-      .toList()
-    ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+  final list =
+      payments
+          .where(
+            (p) => p.dueDate != null && range.contains(p.dueDate!) && keep(p),
+          )
+          .toList()
+        ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
   var invoiced = 0.0, collected = 0.0, outstanding = 0.0, overdue = 0.0;
   var awaiting = 0;
   final rows = <List<String>>[];
@@ -345,9 +350,7 @@ ReportTable buildFinanceReport({
   return ReportTable(
     title: 'التقرير المالي',
     range: range,
-    filters: [
-      if (filter != PaymentLedgerFilter.all) 'الحالة: ${filter.label}',
-    ],
+    filters: [if (filter != PaymentLedgerFilter.all) 'الحالة: ${filter.label}'],
     headers: const [
       'الطالب',
       'ولي الأمر',

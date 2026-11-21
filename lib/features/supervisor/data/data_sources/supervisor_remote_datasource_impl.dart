@@ -69,22 +69,48 @@ class SupervisorRemoteDatasourceImpl implements SupervisorRemoteDatasource {
   }
 
   @override
-  // H6 / A-H16: write-only ops path — product UI removed; no in-app reader.
+  // Persists the report and fans out an in-app signal to the admin audience.
   Future<void> submitReport(SupervisorReportEntity report) async {
     try {
-      await firestore.collection(FirestoreCollections.supervisorReports).add({
+      final reportRef =
+          firestore.collection(FirestoreCollections.supervisorReports).doc();
+      final preview = report.content.trim();
+      final body = preview.length > 120
+          ? '${preview.substring(0, 120)}…'
+          : preview;
+      final batch = firestore.batch();
+      batch.set(reportRef, {
         'supervisorId': report.supervisorId,
         if (report.halaqaId != null) 'halaqaId': report.halaqaId,
         if (report.teacherId != null) 'teacherId': report.teacherId,
         'type': report.type,
         'content': report.content,
         'date': Timestamp.fromDate(report.date),
+        'createdAt': FieldValue.serverTimestamp(),
       });
+      batch.set(
+        firestore
+            .collection(FirestoreCollections.notifications)
+            .doc('admin_supervisor_report_${reportRef.id}'),
+        {
+          'audience': 'admin',
+          'title': 'تقرير مشرف جديد',
+          'body': body.isEmpty ? 'وصلك تقرير من المشرف' : body,
+          'type': 'supervisor_report',
+          'data': {
+            'reportId': reportRef.id,
+            'supervisorId': report.supervisorId,
+            if (report.halaqaId != null) 'halaqaId': report.halaqaId,
+          },
+          'createdAt': FieldValue.serverTimestamp(),
+          'readBy': <String>[],
+        },
+      );
+      await batch.commit();
     } catch (e) {
       throw ServerException(e.toString());
     }
   }
-
 
   /// Academy Admission via the admitStudentToHalaqa callable: supervised-halaqa
   /// scope, student role, duplicate and max-2 cap are enforced transactionally.

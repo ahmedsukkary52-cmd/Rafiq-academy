@@ -125,6 +125,17 @@ test("journey 9: direct conversation with replies, reactions, edit and the delet
   await rejects(react(ADMIN, "angry"), "invalid-argument");
   await rejects(react(PARENT, "like"), "permission-denied");
 
+  // Deactivated participant must not mutate reactions even while still listed
+  // on participantIds (activeRoleOf returns "").
+  await db.doc(`users/${TEACHER}`).set({ name: "الأستاذ أحمد", role: "teacher", isActive: false });
+  const reactionsBeforeDeactivated = (await data(`conversations/${conv}/messages/${first}`)).reactions;
+  await rejects(react(TEACHER, "heart"), "permission-denied");
+  assert.deepEqual(
+    (await data(`conversations/${conv}/messages/${first}`)).reactions,
+    reactionsBeforeDeactivated,
+  );
+  await db.doc(`users/${TEACHER}`).set({ name: "الأستاذ أحمد", role: "teacher", isActive: true });
+
   await auth.editChatMessageCore(db, TEACHER, { conversationId: conv, messageId: first, text: "السلام عليكم ورحمة الله" });
   await rejects(
     auth.editChatMessageCore(db, ADMIN, { conversationId: conv, messageId: first, text: "تعديل" }),

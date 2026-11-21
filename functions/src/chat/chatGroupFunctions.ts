@@ -264,6 +264,12 @@ export async function reactToChatMessageCore(
   data: Record<string, unknown>,
 ): Promise<{ reaction: ChatReaction | null }> {
   const uid = requireCallerUid(callerUid);
+  // Match send/edit/delete: participantIds alone is not enough — deactivated /
+  // first-login-blocked accounts must not mutate reactions.
+  const role = await loadUserRole(db, uid);
+  if (!role) {
+    throw new HttpsError("permission-denied", "الحساب غير مفعّل");
+  }
   const conversationId = text(data.conversationId);
   const messageId = text(data.messageId);
   if (!conversationId || !messageId || conversationId.includes("/") || messageId.includes("/")) {

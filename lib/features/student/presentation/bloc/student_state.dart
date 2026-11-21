@@ -41,6 +41,11 @@ class StudentState extends Equatable {
   final SectionStatus achievementsStatus;
   final List<AchievementEntity> achievements;
   final String? achievementsError;
+  final bool achievementsHasMore;
+  final bool achievementsLoadingMore;
+  final String? achievementsStudentCursorId;
+  final String? achievementsRecipientsCursorId;
+  final String achievementsStudentId;
 
   // ── الحلقة (الموعد ورابط الزوم) ───────────────────────────────────────
   final SectionStatus halaqaStatus;
@@ -69,6 +74,11 @@ class StudentState extends Equatable {
     this.achievementsStatus = SectionStatus.initial,
     this.achievements = const [],
     this.achievementsError,
+    this.achievementsHasMore = false,
+    this.achievementsLoadingMore = false,
+    this.achievementsStudentCursorId,
+    this.achievementsRecipientsCursorId,
+    this.achievementsStudentId = '',
     this.halaqaStatus = SectionStatus.initial,
     this.halaqa,
     this.halaqaError,
@@ -98,6 +108,11 @@ class StudentState extends Equatable {
     SectionStatus? achievementsStatus,
     List<AchievementEntity>? achievements,
     Object? achievementsError = _unset,
+    bool? achievementsHasMore,
+    bool? achievementsLoadingMore,
+    Object? achievementsStudentCursorId = _unset,
+    Object? achievementsRecipientsCursorId = _unset,
+    String? achievementsStudentId,
     SectionStatus? halaqaStatus,
     Object? halaqa = _unset,
     Object? halaqaError = _unset,
@@ -130,6 +145,19 @@ class StudentState extends Equatable {
       achievementsError: identical(achievementsError, _unset)
           ? this.achievementsError
           : achievementsError as String?,
+      achievementsHasMore: achievementsHasMore ?? this.achievementsHasMore,
+      achievementsLoadingMore:
+          achievementsLoadingMore ?? this.achievementsLoadingMore,
+      achievementsStudentCursorId:
+          identical(achievementsStudentCursorId, _unset)
+          ? this.achievementsStudentCursorId
+          : achievementsStudentCursorId as String?,
+      achievementsRecipientsCursorId:
+          identical(achievementsRecipientsCursorId, _unset)
+          ? this.achievementsRecipientsCursorId
+          : achievementsRecipientsCursorId as String?,
+      achievementsStudentId:
+          achievementsStudentId ?? this.achievementsStudentId,
       halaqaStatus: halaqaStatus ?? this.halaqaStatus,
       halaqa: identical(halaqa, _unset) ? this.halaqa : halaqa as HalaqaEntity?,
       halaqaError: identical(halaqaError, _unset)
@@ -164,6 +192,11 @@ class StudentState extends Equatable {
     achievementsStatus,
     achievements,
     achievementsError,
+    achievementsHasMore,
+    achievementsLoadingMore,
+    achievementsStudentCursorId,
+    achievementsRecipientsCursorId,
+    achievementsStudentId,
     halaqaStatus,
     halaqa,
     halaqaError,

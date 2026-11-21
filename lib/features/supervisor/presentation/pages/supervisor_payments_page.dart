@@ -26,6 +26,35 @@ enum _PaymentFilter { all, awaiting, reviewed }
 
 String _money(double v) => academyMoneyLabel(v);
 
+String _period(DateTime d) => '${d.year}/${d.month.toString().padLeft(2, '0')}';
+
+String _formatSubmittedAt(DateTime at) {
+  final local = at.toLocal();
+  final hh = local.hour.toString().padLeft(2, '0');
+  final mm = local.minute.toString().padLeft(2, '0');
+  return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} · $hh:$mm';
+}
+
+String _reviewLabel(PaymentEntity p) {
+  if (p.hasProofAwaitingReview) return 'بانتظار المراجعة';
+  return switch (p.reviewStatus) {
+    ParentPaymentProofContract.approved => 'مقبول',
+    ParentPaymentProofContract.rejected => 'مرفوض',
+    ParentPaymentProofContract.partial => 'جزئي',
+    _ => p.status == PaymentStatus.paid ? 'مدفوع' : 'بدون إثبات',
+  };
+}
+
+Color _reviewColor(PaymentEntity p) {
+  if (p.hasProofAwaitingReview) return AppColors.warning;
+  return switch (p.reviewStatus) {
+    ParentPaymentProofContract.approved => AppColors.success,
+    ParentPaymentProofContract.rejected => AppColors.error,
+    ParentPaymentProofContract.partial => AppColors.secondaryDeep,
+    _ => AppColors.textSecondary,
+  };
+}
+
 /// Supervisor payment submissions — review external-pay proofs.
 class SupervisorPaymentsPage extends StatefulWidget {
   const SupervisorPaymentsPage({super.key});
@@ -103,29 +132,6 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
       _PaymentFilter.reviewed =>
         all.where((p) => p.hasSupervisorReview).toList(),
       _PaymentFilter.all => all,
-    };
-  }
-
-  String _period(DateTime d) =>
-      '${d.year}/${d.month.toString().padLeft(2, '0')}';
-
-  String _reviewLabel(PaymentEntity p) {
-    if (p.hasProofAwaitingReview) return 'بانتظار المراجعة';
-    return switch (p.reviewStatus) {
-      ParentPaymentProofContract.approved => 'مقبول',
-      ParentPaymentProofContract.rejected => 'مرفوض',
-      ParentPaymentProofContract.partial => 'جزئي',
-      _ => p.status == PaymentStatus.paid ? 'مدفوع' : 'بدون إثبات',
-    };
-  }
-
-  Color _reviewColor(PaymentEntity p) {
-    if (p.hasProofAwaitingReview) return AppColors.warning;
-    return switch (p.reviewStatus) {
-      ParentPaymentProofContract.approved => AppColors.success,
-      ParentPaymentProofContract.rejected => AppColors.error,
-      ParentPaymentProofContract.partial => AppColors.secondaryDeep,
-      _ => AppColors.textSecondary,
     };
   }
 
@@ -243,144 +249,192 @@ class _SupervisorPaymentsPageState extends State<SupervisorPaymentsPage> {
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => _load(force: true),
-              child: ListView(
+              // D4: lazy payment rows (visible list can grow with roster size).
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _KpiChip(
-                          value: '$awaiting',
-                          label: 'بانتظار المراجعة',
-                          color: AppColors.warning,
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _KpiChip(
+                                value: '$awaiting',
+                                label: 'بانتظار المراجعة',
+                                color: AppColors.warning,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _KpiChip(
+                                value: '$reviewed',
+                                label: 'تمت مراجعتها',
+                                color: AppColors.success,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _KpiChip(
+                                value: '${all.length}',
+                                label: 'إجمالي السجلات',
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _KpiChip(
-                          value: '$reviewed',
-                          label: 'تمت مراجعتها',
-                          color: AppColors.success,
+                        const SizedBox(height: 14),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final f in _PaymentFilter.values)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: ChoiceChip(
+                                    label: Text(switch (f) {
+                                      _PaymentFilter.all => 'الكل',
+                                      _PaymentFilter.awaiting =>
+                                        'بانتظار المراجعة',
+                                      _PaymentFilter.reviewed => 'مُراجعة',
+                                    }),
+                                    selected: _filter == f,
+                                    onSelected: (_) =>
+                                        setState(() => _filter = f),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _KpiChip(
-                          value: '${all.length}',
-                          label: 'إجمالي السجلات',
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final f in _PaymentFilter.values)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: ChoiceChip(
-                              label: Text(switch (f) {
-                                _PaymentFilter.all => 'الكل',
-                                _PaymentFilter.awaiting => 'بانتظار المراجعة',
-                                _PaymentFilter.reviewed => 'مُراجعة',
-                              }),
-                              selected: _filter == f,
-                              onSelected: (_) => setState(() => _filter = f),
+                        const SizedBox(height: 12),
+                        if (visible.isEmpty)
+                          AppCard(
+                            child: Text(
+                              'لا توجد مدفوعات مطابقة',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textHint,
+                              ),
                             ),
                           ),
-                      ],
+                      ]),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  if (visible.isEmpty)
-                    AppCard(
-                      child: Text(
-                        'لا توجد مدفوعات مطابقة',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textHint,
+                  if (visible.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final p = visible[index];
+                            final studentName =
+                                _names[p.studentId] ?? 'طالب';
+                            final parentName =
+                                _names[p.parentId] ?? 'ولي أمر';
+                            final color = _reviewColor(p);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: AppCard(
+                                onTap: () => _openReview(p),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor:
+                                          color.withValues(alpha: 0.12),
+                                      child: Icon(
+                                        Icons.receipt_long_rounded,
+                                        color: color,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Text(
+                                            studentName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTextStyles.titleMedium
+                                                .copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          Text(
+                                            'من: $parentName',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTextStyles.labelSmall
+                                                .copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_money(p.amount)} · ${_period(p.dueDate)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTextStyles.labelSmall
+                                                .copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          if (p.method != null)
+                                            Text(
+                                              p.method ==
+                                                      ParentPaymentProofContract
+                                                          .externalMethod
+                                                  ? 'فودافون كاش (خارجي)'
+                                                  : p.method!,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTextStyles.labelSmall
+                                                  .copyWith(
+                                                color: AppColors.textHint,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: color.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(
+                                            AppSizes.radiusFull,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _reviewLabel(p),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: AppTextStyles.labelSmall
+                                              .copyWith(
+                                            color: color,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          childCount: visible.length,
                         ),
                       ),
                     )
                   else
-                    ...visible.map((p) {
-                      final name = _names[p.studentId] ?? 'طالب';
-                      final color = _reviewColor(p);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: AppCard(
-                          onTap: () => _openReview(p),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: color.withValues(alpha: 0.12),
-                                child: Icon(
-                                  Icons.receipt_long_rounded,
-                                  color: color,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Text(
-                                      name,
-                                      style: AppTextStyles.titleMedium.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${_money(p.amount)} · ${_period(p.dueDate)}',
-                                      style: AppTextStyles.labelSmall.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    if (p.method != null)
-                                      Text(
-                                        p.method ==
-                                                ParentPaymentProofContract
-                                                    .externalMethod
-                                            ? 'فودافون كاش (خارجي)'
-                                            : p.method!,
-                                        style: AppTextStyles.labelSmall
-                                            .copyWith(
-                                              color: AppColors.textHint,
-                                            ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(
-                                    AppSizes.radiusFull,
-                                  ),
-                                ),
-                                child: Text(
-                                  _reviewLabel(p),
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: color,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
+                    const SliverToBoxAdapter(child: SizedBox(height: 28)),
                 ],
               ),
             );
@@ -633,9 +687,23 @@ class _PaymentReviewPageState extends State<_PaymentReviewPage> {
                       if (p.proofSubmittedAt != null)
                         _InfoRow(
                           label: 'وقت الإرسال',
-                          value: p.proofSubmittedAt!.toLocal().toString(),
+                          value: _formatSubmittedAt(p.proofSubmittedAt!),
+                        ),
+                      if (p.reviewStatus != null &&
+                          p.reviewStatus !=
+                              ParentPaymentProofContract.pendingReview)
+                        _InfoRow(
+                          label: 'حالة المراجعة',
+                          value: _reviewLabel(p),
                         ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'المراجعات تُحفظ في سجل دائم ولا تُحذف من الواجهة بعد الاعتماد.',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textHint,
                   ),
                 ),
                 const SizedBox(height: 12),

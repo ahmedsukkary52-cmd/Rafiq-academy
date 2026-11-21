@@ -28,8 +28,8 @@ workflows:
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Test
         script: flutter test
-      - name: Build dev debug APK (rafiq-academy)
-        script: flutter build apk --flavor dev --debug
+      - name: Build dev debug APK (Firebase Emulator)
+        script: flutter build apk --flavor dev --debug --dart-define=USE_FIREBASE_EMULATOR=true
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
 

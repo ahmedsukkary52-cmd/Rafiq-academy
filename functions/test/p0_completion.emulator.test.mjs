@@ -74,6 +74,7 @@ test.beforeEach(async () => {
     "users/teacher2": user("teacher"),
     "users/parent1": user("parent"),
     "users/parent2": user("parent"),
+    "users/parent3": user("parent"),
     "users/student1": user("student", "Student One"),
     "users/student2": user("student", "Student Two"),
     "users/student3": user("student", "Student Three"),
@@ -91,6 +92,7 @@ test.beforeEach(async () => {
     "studentProfiles/archived1": { uid: "archived1", lifecycle: "archived" },
     "parentProfiles/parent1": { uid: "parent1", childrenIds: [] },
     "parentProfiles/parent2": { uid: "parent2", childrenIds: ["student2"] },
+    "parentProfiles/parent3": { uid: "parent3", childrenIds: ["student3"] },
   });
 });
 
@@ -476,6 +478,8 @@ test("P0-04 hard conflicts: same Halaqa, same Teacher; adjacent and Supervisor o
 });
 
 test("P0-04 add slot: student roster intersection is a hard conflict", async () => {
+  // The admission boundary requires the student's eligible guardian link.
+  await db.doc("parentProfiles/parent1").update({ childrenIds: ["student1"] });
   const created = await create("admin1", newHalaqa({ supervisorId: "" }));
   await membership.admitStudentToHalaqaCore(db, "admin1", {
     studentId: "student1",

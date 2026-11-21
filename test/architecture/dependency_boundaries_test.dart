@@ -109,8 +109,6 @@ const _clampedAllowlist = {
   'shared/widgets/student_progress_widget.dart -> shared/theme/app_theme.dart',
   'shared/widgets/student_quick_action_widget.dart -> '
       'shared/theme/app_theme.dart',
-  'shared/widgets/student_session_card_widget.dart -> '
-      'shared/theme/app_theme.dart',
 };
 
 const _diConfig = 'core/di/injection_container.config.dart';
@@ -404,12 +402,20 @@ void main() {
       return out;
     }
 
-    test('only the 4 known core files import role or staff modules', () {
+    // EQ DI (0889682): composition root also registers a few concrete repos
+    // manually so injectable codegen (EQ-M-06) stays deferred. Those edges
+    // belong on `_diContainer`, not as a new core→role leak class.
+    test('only the known core files import role or staff modules', () {
       expect(coreRoleImports().keys.toSet(), {
         _diConfig,
+        _diContainer,
         _diModule,
         _router,
         _clearSession,
+      });
+      // Pin the sole role import from the manual composition root.
+      expect(coreRoleImports()[_diContainer]!.map((e) => e.target).toSet(), {
+        'features/admin/data/admin_reports_repository.dart',
       });
     });
 
@@ -420,9 +426,23 @@ void main() {
         }),
         isNull,
       );
+      // Manual GetIt registrations (EQ-P1-05/06, EQ-3, EQ-4) keep feature
+      // data repos out of the generated config until EQ-M-06. Allow exactly
+      // those six project-local imports plus the generated config part.
       expect(
         exactEdgeDiff(graph.importsOf(_diContainer), {
           '$_diContainer -> $_diConfig',
+          '$_diContainer -> '
+              'features/accounts/data/academy_accounts_repository.dart',
+          '$_diContainer -> '
+              'features/admin/data/admin_reports_repository.dart',
+          '$_diContainer -> '
+              'features/assistant/data/cover_duty_repository.dart',
+          '$_diContainer -> features/chat/data/chat_groups_repository.dart',
+          '$_diContainer -> '
+              'features/complaints/data/complaints_repository.dart',
+          '$_diContainer -> '
+              'features/directory/data/academy_directory_repository.dart',
         }),
         isNull,
       );
@@ -825,10 +845,7 @@ void main() {
 
     test('schedule reads the profile through CurrentStudentProfile', () {
       final source = _lib(_studentSchedulePage);
-      expect(
-        referencedNames(source, ['StudentBloc', 'StudentState']),
-        isEmpty,
-      );
+      expect(referencedNames(source, ['StudentBloc', 'StudentState']), isEmpty);
       expect(referencedNames(source, ['CurrentStudentProfile']), {
         'CurrentStudentProfile',
       });

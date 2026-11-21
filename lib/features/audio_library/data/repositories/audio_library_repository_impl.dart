@@ -1,10 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../../../core/error/exception.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/error/user_facing_error.dart';
 import '../../domain/entities/audio_entities.dart';
 import '../../domain/repositories/audio_library_repository.dart';
 import '../datasources/audio_library_remote_datasource.dart';
@@ -23,7 +23,7 @@ class AudioLibraryRepositoryImpl implements AudioLibraryRepository {
   String get _userId {
     final uid = firebaseAuth.currentUser?.uid;
     if (uid == null) {
-      throw const ServerException('User not authenticated');
+      throw const ServerException(signedOutErrorText);
     }
     return uid;
   }
@@ -31,27 +31,15 @@ class AudioLibraryRepositoryImpl implements AudioLibraryRepository {
   @override
   Future<Either<Failure, List<ReciterEntity>>> getReciters() async {
     try {
-      print('[Repository] Getting reciters');
-      // Get all reciters
       final reciters = await remoteDatasource.getReciters();
-      print(
-        '[Repository] Got ${reciters.length} reciters from remote datasource',
-      );
-      // Get followed reciter IDs
       final followedIds = await remoteDatasource.getFollowedReciterIds(_userId);
-      print('[Repository] Followed reciter IDs: $followedIds');
 
-      // Just update the isFollowing flag
       final recitersWithFollowing = reciters.map((reciter) {
         return reciter.copyWith(isFollowing: followedIds.contains(reciter.id));
       }).toList();
 
-      print(
-        '[Repository] Returning ${recitersWithFollowing.length} reciters with isFollowing updated',
-      );
       return Right(recitersWithFollowing);
     } on ServerException catch (e) {
-      print('[Repository] Error getting reciters: $e');
       return Left(ServerFailure(e.message));
     }
   }

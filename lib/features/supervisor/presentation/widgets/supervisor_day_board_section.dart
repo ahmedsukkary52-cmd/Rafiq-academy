@@ -334,7 +334,7 @@ class _GapEscalationGuidance extends StatelessWidget {
             children: [
               if (guidance.canNavigate)
                 const Icon(
-                  Icons.chevron_left_rounded,
+                  Icons.chevron_right_rounded,
                   color: AppColors.textSecondary,
                 )
               else

@@ -55,6 +55,25 @@ class _FakeStudentRepository implements StudentRepository {
   ) async => achievementsResult;
 
   @override
+  Future<Either<Failure, StudentAchievementsPage>> getAchievementsPage({
+    required String studentId,
+    int limit = StudentAchievementsPage.defaultLimit,
+    String? afterStudentAchievementId,
+    String? afterRecipientsAchievementId,
+  }) async {
+    final list = achievementsResult.fold((_) => <AchievementEntity>[], (v) => v);
+    return Right(
+      StudentAchievementsPage(
+        items: list,
+        studentCursorId: null,
+        recipientsCursorId: null,
+        hasMoreStudent: false,
+        hasMoreRecipients: false,
+      ),
+    );
+  }
+
+  @override
   Future<Either<Failure, HalaqaEntity>> getStudentHalaqa(
     String halaqaId,
   ) async => Right(

@@ -130,7 +130,7 @@ class CreateHalaqaUseCase extends UseCase<String, CreateHalaqaParams> {
       final error = validateSlotInput(slot);
       if (error != null) return Future.value(Left(ValidationFailure(error)));
     }
-    final link = params.meetingLink?.trim() ?? '';
+    final link = normalizeMeetingLinkInput(params.meetingLink ?? '');
     final linkError = link.isEmpty ? null : meetingLinkErrorText(link);
     if (linkError != null) {
       return Future.value(Left(ValidationFailure(linkError)));
@@ -139,7 +139,7 @@ class CreateHalaqaUseCase extends UseCase<String, CreateHalaqaParams> {
       name: params.name.trim(),
       teacherId: params.teacherId.trim(),
       supervisorId: params.supervisorId?.trim(),
-      meetingLink: params.meetingLink?.trim(),
+      meetingLink: link.isEmpty ? null : link,
       schedule: params.schedule,
       requestId: params.requestId,
     );
@@ -214,11 +214,12 @@ class SetHalaqaMeetingLinkUseCase
     if (params.clear) {
       return repository.setHalaqaMeetingLink(halaqaId: halaqaId, clear: true);
     }
-    final error = meetingLinkErrorText(params.meetingLink);
+    final link = normalizeMeetingLinkInput(params.meetingLink);
+    final error = meetingLinkErrorText(link);
     if (error != null) return Future.value(Left(ValidationFailure(error)));
     return repository.setHalaqaMeetingLink(
       halaqaId: halaqaId,
-      meetingLink: params.meetingLink.trim(),
+      meetingLink: link,
     );
   }
 }

@@ -15,13 +15,14 @@ import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
 import '../../../chat/presentation/bloc/chat_conversations_event.dart';
 import '../../../chat/presentation/bloc/chat_conversations_state.dart';
 import '../../../chat/presentation/pages/chat_room.dart';
+import '../../../chat/presentation/widgets/chat_inbox_load_more.dart';
 import '../../../../shared/domain/student_parent_links.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../widgets/supervisor_loading_skeletons.dart';
 
-/// Supervisor inbox — teachers / parents / admin only (no students, no groups).
+/// Supervisor inbox — direct chats with teachers / parents / admin, plus halaqa groups.
 class SupervisorMessagesTab extends StatefulWidget {
   const SupervisorMessagesTab({super.key});
 
@@ -33,16 +34,21 @@ enum _InboxFilter { all, teachers, parents, admin }
 
 class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
   final _searchCtrl = TextEditingController();
+  late final ChatInboxLoadMoreBinding _inboxPaging;
   _InboxFilter _filter = _InboxFilter.all;
   String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _inboxPaging = ChatInboxLoadMoreBinding();
     final auth = context.read<AuthBloc>().state;
     if (auth is AuthAuthenticated) {
       sl<ChatConversationsBloc>().add(
-        StartWatchingConversationsEvent(auth.user.uid),
+        StartWatchingConversationsEvent(
+          auth.user.uid,
+          pageSize: ChatConversationsBloc.defaultInboxPageSize,
+        ),
       );
     }
     _searchCtrl.addListener(() {
@@ -55,6 +61,7 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _inboxPaging.dispose();
     super.dispose();
   }
 
@@ -62,7 +69,10 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) return;
     sl<ChatConversationsBloc>().add(
-      StartWatchingConversationsEvent(auth.user.uid),
+      StartWatchingConversationsEvent(
+        auth.user.uid,
+        pageSize: ChatConversationsBloc.defaultInboxPageSize,
+      ),
     );
   }
 
@@ -152,8 +162,11 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
     String currentUid,
   ) {
     Iterable<ConversationEntity> list = all.where((c) {
+      if (c.kind == ConversationKinds.halaqaGroup) {
+        return _filter == _InboxFilter.all;
+      }
       final role = c.otherParticipant(currentUid).role;
-      // Supervisor inbox never lists students.
+      // Supervisor inbox never lists students in direct chats.
       if (role == AppRoles.student) return false;
       return switch (_filter) {
         _InboxFilter.all =>
@@ -168,8 +181,10 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
       list = list.where((c) {
-        final other = c.otherParticipant(currentUid);
-        final hay = '${other.name} ${c.lastMessage ?? ''}'.toLowerCase();
+        final hay = c.isGroup
+            ? '${c.displayTitle(currentUid)} ${c.lastMessage ?? ''}'.toLowerCase()
+            : '${c.otherParticipant(currentUid).name} ${c.lastMessage ?? ''}'
+                .toLowerCase();
         return hay.contains(q);
       });
     }
@@ -221,7 +236,9 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
                 buildWhen: (p, c) =>
                     p.conversationsStatus != c.conversationsStatus ||
                     p.conversations != c.conversations ||
-                    p.conversationsError != c.conversationsError,
+                    p.conversationsError != c.conversationsError ||
+                    p.hasMoreConversations != c.hasMoreConversations ||
+                    p.loadingMoreConversations != c.loadingMoreConversations,
                 builder: (context, state) {
                   final authState = context.read<AuthBloc>().state;
                   final uid = authState is AuthAuthenticated
@@ -264,25 +281,40 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
                     );
                   }
 
+                  final footer = state.hasMoreConversations ||
+                      state.loadingMoreConversations;
                   return ListView.separated(
+                    controller: _inboxPaging.controller,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(bottom: 24),
-                    itemCount: items.length,
+                    itemCount: items.length + (footer ? 1 : 0),
                     separatorBuilder: (_, __) =>
                         const Divider(height: 1, indent: 78, endIndent: 16),
                     itemBuilder: (context, i) {
+                      if (i >= items.length) {
+                        return ChatInboxLoadMoreFooter(
+                          loading: state.loadingMoreConversations,
+                          onPressed: _inboxPaging.requestLoadMore,
+                        );
+                      }
                       final conv = items[i];
+                      final isGroup = conv.kind == ConversationKinds.halaqaGroup;
                       final other = conv.otherParticipant(uid);
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: AppColors.primaryLight,
-                          backgroundImage:
-                              other.profileImageUrl != null &&
+                          backgroundImage: !isGroup &&
+                                  other.profileImageUrl != null &&
                                   other.profileImageUrl!.isNotEmpty
                               ? NetworkImage(other.profileImageUrl!)
                               : null,
-                          child:
-                              other.profileImageUrl == null ||
-                                  other.profileImageUrl!.isEmpty
+                          child: isGroup
+                              ? const Icon(
+                                  Icons.groups_rounded,
+                                  color: AppColors.primaryDark,
+                                )
+                              : other.profileImageUrl == null ||
+                                      other.profileImageUrl!.isEmpty
                               ? Text(
                                   other.name.isNotEmpty ? other.name[0] : '؟',
                                   style: AppTextStyles.labelLarge.copyWith(
@@ -293,7 +325,9 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
                               : null,
                         ),
                         title: Text(
-                          '${other.name} — ${_roleLabel(other.role)}',
+                          isGroup
+                              ? conv.displayTitle(uid)
+                              : '${other.name} — ${_roleLabel(other.role)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.titleMedium.copyWith(
@@ -325,8 +359,9 @@ class _SupervisorMessagesTabState extends State<SupervisorMessagesTab> {
                         onTap: () => _openRoom(
                           context,
                           conversationId: conv.id,
-                          name: other.name,
-                          imageUrl: other.profileImageUrl,
+                          name: isGroup ? conv.displayTitle(uid) : other.name,
+                          imageUrl:
+                              isGroup ? null : other.profileImageUrl,
                         ),
                       );
                     },
@@ -451,13 +486,26 @@ class _NewChatPickerSheet extends StatefulWidget {
 }
 
 class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
+  final _searchCtrl = TextEditingController();
   bool _loading = true;
   List<ChatParticipantEntity> _contacts = const [];
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() {
+      final q = _searchCtrl.text;
+      if (q == _query) return;
+      setState(() => _query = q);
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -540,9 +588,21 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
     _ => role,
   };
 
+  List<ChatParticipantEntity> get _visible {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return _contacts;
+    return _contacts
+        .where((p) {
+          final hay = '${p.name} ${_roleLabel(p.role)} ${p.role}'.toLowerCase();
+          return hay.contains(q);
+        })
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final visible = _visible;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: SafeArea(
@@ -568,6 +628,14 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
                   ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: AppSearchField(
+                  controller: _searchCtrl,
+                  hint: 'بحث عن معلم أو ولي أمر...',
+                  enabled: !_loading,
+                ),
+              ),
               Expanded(
                 child: _loading
                     ? const SupervisorCenteredListSkeleton()
@@ -584,13 +652,22 @@ class _NewChatPickerSheetState extends State<_NewChatPickerSheet> {
                           ),
                         ),
                       )
+                    : visible.isEmpty
+                    ? Center(
+                        child: Text(
+                          'لا نتائج لهذا البحث',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      )
                     : ListView.separated(
                         padding: EdgeInsets.fromLTRB(8, 4, 8, bottom + 16),
-                        itemCount: _contacts.length,
+                        itemCount: visible.length,
                         separatorBuilder: (_, __) =>
                             const Divider(height: 1, indent: 72),
                         itemBuilder: (context, i) {
-                          final p = _contacts[i];
+                          final p = visible[i];
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: AppColors.primaryLight,

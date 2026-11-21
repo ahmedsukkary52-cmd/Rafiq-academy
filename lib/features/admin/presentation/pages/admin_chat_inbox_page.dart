@@ -242,31 +242,39 @@ class _AdminChatInboxPageState extends State<AdminChatInboxPage> {
     }
 
     final chatBloc = sl<ChatConversationsBloc>();
-    chatBloc.add(const ResetStartConversationEvent());
-    chatBloc.add(StartConversationEvent(currentUser: current, otherUser: other));
-    final startState = await chatBloc.stream.firstWhere(
-      (s) =>
-          s.startConversationStatus == SubmissionStatus.success ||
-          s.startConversationStatus == SubmissionStatus.error,
-    );
-    if (!mounted) return;
-    final conv = startState.startedConversation;
-    chatBloc.add(const ResetStartConversationEvent());
-    if (startState.startConversationStatus == SubmissionStatus.error ||
-        conv == null) {
-      AppSnackBar.showError(
-        context,
-        startState.startConversationError ?? 'تعذر فتح المحادثة',
+    try {
+      chatBloc.add(const ResetStartConversationEvent());
+      chatBloc.add(
+        StartConversationEvent(currentUser: current, otherUser: other),
       );
-      return;
+      final startState = await chatBloc.stream.firstWhere(
+        (s) =>
+            s.startConversationStatus == SubmissionStatus.success ||
+            s.startConversationStatus == SubmissionStatus.error,
+      );
+      if (!mounted) return;
+      final conv = startState.startedConversation;
+      chatBloc.add(const ResetStartConversationEvent());
+      if (startState.startConversationStatus == SubmissionStatus.error ||
+          conv == null) {
+        AppSnackBar.showError(
+          context,
+          startState.startConversationError ?? 'تعذر فتح المحادثة',
+        );
+        return;
+      }
+      context.push(
+        '${AppRoutes.admin}/chat/${conv.id}',
+        extra: {
+          ChatRouteExtra.nameKey: other.name,
+          ChatRouteExtra.imageKey: other.profileImageUrl,
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      chatBloc.add(const ResetStartConversationEvent());
+      AppSnackBar.showError(context, 'تعذر فتح المحادثة. حاول مرة أخرى.');
     }
-    context.push(
-      '${AppRoutes.admin}/chat/${conv.id}',
-      extra: {
-        ChatRouteExtra.nameKey: other.name,
-        ChatRouteExtra.imageKey: other.profileImageUrl,
-      },
-    );
   }
 
   @override

@@ -88,11 +88,18 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
       setState(() {
         _history = entries;
         _historyLoading = false;
+        _historyError = null;
       });
     } catch (e) {
       if (!mounted) return;
+      // Soft-empty loaders return []; only real failures reach here.
+      final message = switch (e) {
+        final AdminRewardsHistoryLoadException x => x.message,
+        final String s => s,
+        _ => 'تعذر تحميل سجل الجوائز',
+      };
       setState(() {
-        _historyError = e is String ? e : 'تعذر تحميل سجل الجوائز';
+        _historyError = message;
         _historyLoading = false;
       });
     }
@@ -280,7 +287,7 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
             state.grantRewardStatus == SubmissionStatus.submitting;
         return AdminFeatureShell(
           title: 'مركز التحفيز والمكافآت',
-          subtitle: 'منح لطالب أو حلقة',
+          subtitle: 'منح نجمة أو شارة أو شهادة لطالب أو حلقة',
           sections: [
             if (pinned != null || problem != null) ...[
               UnresolvedAwardPanel(
@@ -291,6 +298,8 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
               ),
               const SizedBox(height: 12),
             ],
+            const _RewardTypeLegend(),
+            const SizedBox(height: 16),
             IgnorePointer(
               ignoring: locked,
               child: Opacity(
@@ -316,11 +325,12 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
                         _selectedStudentHalaqaId = null;
                       }),
                     ),
-                    const SizedBox(height: 12),
-                    AdminSectionHeader(title: 'نوع الجائزة'),
+                    const SizedBox(height: 16),
+                    const AdminSectionHeader(title: 'نوع الجائزة'),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
+                      runSpacing: 8,
                       children:
                           [
                             ('star', 'نجمة'),
@@ -335,23 +345,13 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
                             );
                           }).toList(),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     if (_target == AdminRewardTargetKind.student) ...[
-                      TextField(
+                      AdminSearchField(
                         key: const Key('reward-student-search'),
                         controller: _studentSearchCtrl,
+                        hint: 'ابحث عن طالب بالاسم',
                         onChanged: (v) => setState(() => _studentQuery = v),
-                        decoration: InputDecoration(
-                          labelText: 'ابحث عن طالب بالاسم',
-                          prefixIcon: const Icon(Icons.search),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusL,
-                            ),
-                          ),
-                        ),
                       ),
                       if (_studentQuery.trim().isNotEmpty &&
                           filterRewardStudents(
@@ -539,7 +539,7 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
                     },
             ),
             const SizedBox(height: 24),
-            const AdminSectionHeader(title: 'آخر الجوائز الممنوحة'),
+            const AdminSectionHeader(title: 'آخر الإنجازات الممنوحة'),
             const SizedBox(height: 8),
             if (_historyLoading)
               const Padding(
@@ -553,11 +553,24 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
                 onRetry: _reloadHistory,
               )
             else if (_history.isEmpty)
-              Text(
-                'لم تُمنح جوائز بعد',
+              AppCard(
                 key: const Key('reward-history-empty'),
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textHint,
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.emoji_events_outlined,
+                      color: AppColors.textSecondary,
+                      size: 28,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'لا توجد إنجازات ممنوحة بعد',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
@@ -565,6 +578,76 @@ class _AdminRewardsPageState extends State<AdminRewardsPage> {
           ],
         );
       },
+    );
+  }
+}
+
+class _RewardTypeLegend extends StatelessWidget {
+  const _RewardTypeLegend();
+
+  static const _items = <(IconData, String, String)>[
+    (Icons.star_rounded, 'نجمة', 'تشجيع سريع على أداء أو حفظ مميز'),
+    (Icons.military_tech_rounded, 'شارة', 'إنجاز مرحلي أو مهارة مكتسبة'),
+    (Icons.workspace_premium_rounded, 'شهادة', 'تكريم رسمي بإتمام مرحلة أو جزء'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'الفرق بين أنواع الجوائز',
+            textAlign: TextAlign.right,
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (var i = 0; i < _items.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    _items[i].$1,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _items[i].$2,
+                        style: AppTextStyles.labelLarge.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        _items[i].$3,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

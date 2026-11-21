@@ -1,6 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Required for Auth/Firestore/Functions/Storage/FCM and other network
+         I/O in release. Declared here so release does not depend only on a
+         transitive plugin merge (debug/profile already declare INTERNET). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 13+ (API 33) will not display FCM or local notifications
+         without this runtime permission. The app requests it at sign-in. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Chat voice messages (record plugin). Requested at runtime on first use. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 

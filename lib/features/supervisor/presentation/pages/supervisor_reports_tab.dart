@@ -24,21 +24,21 @@ import '../supervisor_destinations.dart';
 import '../supervisor_home_nav.dart';
 import '../widgets/supervisor_loading_skeletons.dart';
 
-enum _ReportPeriod { weekly, monthly, term }
+enum _ReportPeriod { weekly, monthly }
 
 class _AggregatedAnalytics {
   final double attendancePercent;
   final double averagePerformancePercent;
   final int totalStudents;
   final Map<String, int> performanceDistribution;
-  final Map<String, double> weeklyAttendance;
+  final Map<String, double> attendanceSeries;
 
   const _AggregatedAnalytics({
     required this.attendancePercent,
     required this.averagePerformancePercent,
     required this.totalStudents,
     required this.performanceDistribution,
-    required this.weeklyAttendance,
+    required this.attendanceSeries,
   });
 
   static const empty = _AggregatedAnalytics(
@@ -46,7 +46,7 @@ class _AggregatedAnalytics {
     averagePerformancePercent: 0,
     totalStudents: 0,
     performanceDistribution: {},
-    weeklyAttendance: {},
+    attendanceSeries: {},
   );
 }
 
@@ -63,6 +63,7 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
   _ReportPeriod _period = _ReportPeriod.monthly;
   bool _loading = false;
   String? _error;
+  String? _analyticsWarning;
   _AggregatedAnalytics _analytics = _AggregatedAnalytics.empty;
   int _loadGen = 0;
   String _halaqaKey = '';
@@ -79,7 +80,6 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
   Duration _periodDuration(_ReportPeriod p) => switch (p) {
     _ReportPeriod.weekly => const Duration(days: 7),
     _ReportPeriod.monthly => const Duration(days: 30),
-    _ReportPeriod.term => const Duration(days: 90),
   };
 
   void _sync(SupervisorState state) {
@@ -110,6 +110,7 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
     setState(() {
       _loading = true;
       _error = null;
+      _analyticsWarning = null;
     });
 
     if (halaqat.isEmpty) {
@@ -128,6 +129,7 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
 
     final byHalaqa = <String, List<HalaqaStudentSummaryEntity>>{};
     final analyticsList = <HalaqaAnalyticsEntity>[];
+    var analyticsFailures = 0;
 
     await Future.wait(
       halaqat.map((h) async {
@@ -137,7 +139,7 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
         final analytics = await getAnalytics(
           HalaqaAnalyticsParams(halaqaId: h.id, from: from, to: now),
         );
-        analytics.fold((_) {}, analyticsList.add);
+        analytics.fold((_) => analyticsFailures++, analyticsList.add);
       }),
     );
 
@@ -149,7 +151,9 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
     );
 
     final mergedDist = <String, int>{};
-    final weeklyBuckets = <String, List<double>>{};
+    final seriesBuckets = <String, List<({double value, int weight})>>{};
+    // Preserve first-seen label order across halaqat (chronological from API).
+    final seriesOrder = <String>[];
     var attendanceWeighted = 0.0;
     var performanceWeighted = 0.0;
     var weightSum = 0;
@@ -163,16 +167,38 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
         mergedDist[e.key] = (mergedDist[e.key] ?? 0) + e.value;
       }
       for (final e in a.weeklyAttendance.entries) {
-        weeklyBuckets.putIfAbsent(e.key, () => []).add(e.value);
+        if (!seriesBuckets.containsKey(e.key)) seriesOrder.add(e.key);
+        seriesBuckets
+            .putIfAbsent(e.key, () => [])
+            .add((value: e.value, weight: w));
       }
     }
 
-    final weeklyMerged = <String, double>{
-      for (final e in weeklyBuckets.entries)
-        e.key: e.value.isEmpty
-            ? 0
-            : e.value.reduce((a, b) => a + b) / e.value.length,
+    final seriesMerged = <String, double>{
+      for (final key in seriesOrder)
+        key: () {
+          final points = seriesBuckets[key] ?? const [];
+          if (points.isEmpty) return 0.0;
+          var weighted = 0.0;
+          var totalWeight = 0;
+          for (final p in points) {
+            weighted += p.value * p.weight;
+            totalWeight += p.weight;
+          }
+          return totalWeight > 0 ? weighted / totalWeight : 0.0;
+        }(),
     };
+
+    String? analyticsWarning;
+    if (analyticsFailures > 0) {
+      if (analyticsList.isEmpty) {
+        analyticsWarning =
+            'تعذر تحميل تحليلات كل الحلقات ($analyticsFailures). تحقق من الاتصال وأعد المحاولة.';
+      } else {
+        analyticsWarning =
+            'تعذر تحميل تحليلات $analyticsFailures من ${halaqat.length} حلقة؛ الأرقام المعروضة مبنية على الحلقات التي نجح تحميلها فقط.';
+      }
+    }
 
     setState(() {
       _analytics = _AggregatedAnalytics(
@@ -182,10 +208,11 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
             : 0,
         totalStudents: roster.length,
         performanceDistribution: mergedDist,
-        weeklyAttendance: weeklyMerged,
+        attendanceSeries: seriesMerged,
       );
       _loading = false;
       _error = null;
+      _analyticsWarning = analyticsWarning;
     });
   }
 
@@ -392,12 +419,13 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(context)),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       _PeriodTabs(
                         period: _period,
                         onChanged: (p) {
+                          if (p == _period) return;
                           setState(() => _period = p);
                           _halaqaKey = '';
                           _load(context.read<SupervisorBloc>().state.halaqat);
@@ -418,10 +446,15 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
                           },
                         )
                       else ...[
+                        if (_analyticsWarning != null) ...[
+                          _PartialAnalyticsBanner(message: _analyticsWarning!),
+                          const SizedBox(height: 12),
+                        ],
                         _PerformanceCard(analytics: _analytics),
                         const SizedBox(height: 14),
-                        _WeeklyAttendanceCard(
-                          weeklyData: _analytics.weeklyAttendance,
+                        _AttendanceSeriesCard(
+                          period: _period,
+                          series: _analytics.attendanceSeries,
                           rate: _analytics.attendancePercent,
                         ),
                         const SizedBox(height: 14),
@@ -451,9 +484,20 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
   Widget _buildHeader(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
     final a = _analytics;
+    final periodLabel = switch (_period) {
+      _ReportPeriod.weekly => 'آخر ٧ أيام',
+      _ReportPeriod.monthly => 'آخر ٣٠ يوم',
+    };
 
     return Container(
-      color: AppColors.dark,
+      decoration: const BoxDecoration(
+        color: AppColors.dark,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(AppSizes.radiusXL),
+          bottomRight: Radius.circular(AppSizes.radiusXL),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Padding(
@@ -482,9 +526,16 @@ class _SupervisorReportsTabState extends State<SupervisorReportsTab> {
               ],
             ),
           ),
+          Text(
+            periodLabel,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 12),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 22),
             child: _loading
                 ? Text(
                     'جاري…',
@@ -583,9 +634,8 @@ class _PeriodTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(_ReportPeriod, String)>[
-      (_ReportPeriod.monthly, 'شهري'),
       (_ReportPeriod.weekly, 'أسبوعي'),
-      (_ReportPeriod.term, 'فصلي'),
+      (_ReportPeriod.monthly, 'شهري'),
     ];
 
     return Container(
@@ -593,31 +643,42 @@ class _PeriodTabs extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceGrey,
         borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(width: 4),
             Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(items[i].$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: period == items[i].$1
-                        ? AppColors.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                  ),
-                  child: Text(
-                    items[i].$2,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.labelMedium.copyWith(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => onChanged(items[i].$1),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    decoration: BoxDecoration(
                       color: period == items[i].$1
-                          ? AppColors.onPrimary
-                          : AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                    ),
+                    child: Text(
+                      items[i].$2,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: period == items[i].$1
+                            ? AppColors.onPrimary
+                            : AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -769,15 +830,24 @@ class _DistributionDonutPainter extends CustomPainter {
   bool shouldRepaint(_DistributionDonutPainter old) => true;
 }
 
-class _WeeklyAttendanceCard extends StatelessWidget {
-  final Map<String, double> weeklyData;
+class _AttendanceSeriesCard extends StatelessWidget {
+  final _ReportPeriod period;
+  final Map<String, double> series;
   final double rate;
 
-  const _WeeklyAttendanceCard({required this.weeklyData, required this.rate});
+  const _AttendanceSeriesCard({
+    required this.period,
+    required this.series,
+    required this.rate,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const dayOrder = ['سب', 'أح', 'إث', 'ثل', 'أر', 'خم', 'جم'];
+    final title = switch (period) {
+      _ReportPeriod.weekly => 'الحضور اليومي',
+      _ReportPeriod.monthly => 'الحضور حسب الأسبوع',
+    };
+    final entries = series.entries.toList();
 
     return AppCard(
       child: Column(
@@ -794,7 +864,7 @@ class _WeeklyAttendanceCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'الحضور الأسبوعي',
+                title,
                 style: AppTextStyles.titleLarge.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -802,52 +872,66 @@ class _WeeklyAttendanceCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 132,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: dayOrder.map((day) {
-                final value = weeklyData[day] ?? 0;
-                final barHeight = (value / 100) * 96;
-                final color = value >= 70
-                    ? AppColors.primaryDark
-                    : value >= 40
-                    ? AppColors.gradeGood
-                    : AppColors.primary.withValues(alpha: 0.35);
+          if (entries.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Text(
+                'لا توجد سجلات حضور في هذه الفترة',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textHint,
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 132,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: entries.map((e) {
+                  final value = e.value;
+                  final barHeight = (value / 100) * 96;
+                  final color = value >= 70
+                      ? AppColors.primaryDark
+                      : value >= 40
+                      ? AppColors.gradeGood
+                      : AppColors.primary.withValues(alpha: 0.35);
 
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 400),
-                          width: double.infinity,
-                          height: value <= 0 ? 4 : barHeight.clamp(8, 96),
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(8),
-                              bottom: Radius.circular(2),
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            width: double.infinity,
+                            height: value <= 0 ? 4 : barHeight.clamp(8, 96),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(8),
+                                bottom: Radius.circular(2),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          day,
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(height: 8),
+                          Text(
+                            e.key,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -900,57 +984,104 @@ class _ReportsGrid extends StatelessWidget {
       ),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.15,
-      ),
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return Material(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: item.$5,
+    return Column(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          Material(
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: item.$2.withValues(alpha: 0.14),
-                      shape: BoxShape.circle,
+            child: InkWell(
+              onTap: items[i].$5,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: items[i].$2.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(items[i].$1, color: items[i].$2, size: 22),
                     ),
-                    child: Icon(item.$1, color: item.$2, size: 22),
-                  ),
-                  const Spacer(),
-                  Text(
-                    item.$3,
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            items[i].$3,
+                            style: AppTextStyles.titleMedium.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            items[i].$4,
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    item.$4,
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.textHint,
+                    Icon(
+                      Icons.chevron_left_rounded,
+                      color: AppColors.textHint.withValues(alpha: 0.8),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        );
-      },
+        ],
+      ],
+    );
+  }
+}
+
+class _PartialAnalyticsBanner extends StatelessWidget {
+  final String message;
+
+  const _PartialAnalyticsBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: AppColors.secondaryDeep,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

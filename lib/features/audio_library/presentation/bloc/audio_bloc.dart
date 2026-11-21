@@ -69,11 +69,15 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
       // Mid-load pause/stop can leave processingState on buffering with
       // playing=false. Clear the spinner unless we ourselves are still
       // awaiting play()/resume().
+      final completed =
+          playerState.processingState == ProcessingState.completed;
       final isLoading = _playRequestInFlight
           ? true
           : buffering && playerState.playing;
 
-      add(_UpdatePlaybackStateEvent(isLoading: isLoading));
+      add(
+        _UpdatePlaybackStateEvent(isLoading: isLoading, completed: completed),
+      );
     });
 
     _positionSub = audioPlayerService.positionStream.listen((position) {
@@ -108,7 +112,6 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
     LoadAudioLibraryEvent event,
     Emitter<AudioLibraryState> emit,
   ) async {
-    print('[AudioLibraryBloc] Loading audio library');
     emit(
       state.copyWith(
         recitersStatus: SectionStatus.loading,
@@ -147,8 +150,6 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
         ),
       ),
       (reciters) {
-        print('[AudioLibraryBloc] Loaded ${reciters.length} all reciters');
-
         // حدد القارئ الافتراضي:
         // 1) لو فيه شيخ محفوظ من قبل ولسه موجود -> استخدمه
         // 2) غير كده، مشاري (mp3quran id: 123) هو الافتراضي
@@ -177,9 +178,6 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
     favoritesResult.fold(
       (failure) => emit(state.copyWith(recitersError: failure.message)),
       (favorites) {
-        print(
-          '[AudioLibraryBloc] Loaded ${favorites.length} favorite reciters',
-        );
         emit(state.copyWith(favoriteReciters: favorites));
       },
     );
@@ -193,7 +191,6 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
         ),
       ),
       (surahs) {
-        print('[AudioLibraryBloc] Loaded ${surahs.length} surah audios');
         emit(
           state.copyWith(
             surahAudiosStatus: SectionStatus.loaded,
@@ -395,7 +392,6 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
     SearchAudioLibraryEvent event,
     Emitter<AudioLibraryState> emit,
   ) {
-    print('[AudioLibraryBloc] Searching for: "${event.query}"');
     emit(state.copyWith(searchQuery: event.query));
   }
 
@@ -419,10 +415,29 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
     }
   }
 
-  void _onUpdatePlaybackState(
+  Future<void> _onUpdatePlaybackState(
     _UpdatePlaybackStateEvent event,
     Emitter<AudioLibraryState> emit,
-  ) {
+  ) async {
+    if (event.completed) {
+      // Keep the singleton player alive and loaded, but expose a stopped UI
+      // state and reset the seek position so the next play starts clearly.
+      _cancelLoadingWatchdog();
+      try {
+        await audioPlayerService.seek(Duration.zero);
+      } catch (_) {
+        // The stream state remains authoritative even if a platform seek fails.
+      }
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isPlaying: false,
+          position: Duration.zero,
+        ),
+      );
+      return;
+    }
+
     final wasLoading = state.isLoading;
     emit(state.copyWith(isLoading: event.isLoading));
     if (event.isLoading) {
@@ -540,11 +555,15 @@ class AudioLibraryBloc extends Bloc<AudioLibraryEvent, AudioLibraryState> {
 // Internal events
 class _UpdatePlaybackStateEvent extends AudioLibraryEvent {
   final bool isLoading;
+  final bool completed;
 
-  const _UpdatePlaybackStateEvent({required this.isLoading});
+  const _UpdatePlaybackStateEvent({
+    required this.isLoading,
+    this.completed = false,
+  });
 
   @override
-  List<Object?> get props => [isLoading];
+  List<Object?> get props => [isLoading, completed];
 }
 
 class _UpdatePositionEvent extends AudioLibraryEvent {

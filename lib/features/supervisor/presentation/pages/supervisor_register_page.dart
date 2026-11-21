@@ -114,9 +114,18 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
       listenWhen: (p, c) => p.admitStudentStatus != c.admitStudentStatus,
       listener: (context, state) {
         if (state.admitStudentStatus == SubmissionStatus.success) {
-          AppSnackBar.showSuccess(context, 'تم قبول الطالب في الحلقة');
-          context.read<SupervisorBloc>().add(const ResetAdmitStudentEvent());
-          Navigator.of(context).maybePop();
+          if (state.admitStudentRosterRefreshFailed) {
+            AppSnackBar.showInfo(
+              context,
+              'تم قبول الطالب، لكن تعذر تحديث القائمة: ${state.halaqatError ?? 'حاول التحديث لاحقاً'}',
+            );
+            // Keep the form open so the supervisor can retry or refresh.
+            context.read<SupervisorBloc>().add(const ResetAdmitStudentEvent());
+          } else {
+            AppSnackBar.showSuccess(context, 'تم قبول الطالب في الحلقة');
+            context.read<SupervisorBloc>().add(const ResetAdmitStudentEvent());
+            Navigator.of(context).maybePop();
+          }
         } else if (state.admitStudentStatus == SubmissionStatus.error) {
           AppSnackBar.showError(
             context,
@@ -126,7 +135,7 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
         }
       },
       child: SupervisorSubpageScaffold(
-        title: 'قبول طالب موجود',
+        title: 'إسناد طالب موجود',
         body: BlocBuilder<SupervisorBloc, SupervisorState>(
           buildWhen: (p, c) =>
               p.halaqat != c.halaqat ||
@@ -148,7 +157,7 @@ class _SupervisorRegisterPageState extends State<SupervisorRegisterPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'قبول طالب مسجّل مسبقاً',
+                        'إسناد طالب مسجّل مسبقاً لحلقة تشرف عليها',
                         style: AppTextStyles.titleLarge.copyWith(
                           fontWeight: FontWeight.w800,
                         ),

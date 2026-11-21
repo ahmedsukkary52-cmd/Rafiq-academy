@@ -93,7 +93,7 @@ class _FirstLoginPageState extends State<FirstLoginPage> {
                 children: [
                   const SizedBox(height: 24),
                   const AuthBrandHeader(
-                    title: 'تعيين كلمة مرور جديدة',
+                    title: 'خطوة أمان مطلوبة',
                     icon: Icons.lock_person_rounded,
                   ),
                   const SizedBox(height: 32),
@@ -106,11 +106,28 @@ class _FirstLoginPageState extends State<FirstLoginPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          const AuthMessageBanner(
+                            tone: AuthBannerTone.info,
+                            message:
+                                'إدارة الأكاديمية أعطتك كلمة مرور مؤقتة للدخول '
+                                'لأول مرة. لأمان حسابك يجب استبدالها الآن بكلمة '
+                                'مرور خاصة بك، ثم تدخل إلى التطبيق مباشرة.',
+                          ),
+                          const SizedBox(height: 14),
                           Text(
-                            'هذه أول مرة تسجّل فيها الدخول بكلمة المرور المؤقتة. '
-                            'اختر كلمة مرور خاصة بك لا يعرفها غيرك.',
+                            'ماذا أفعل؟',
                             textAlign: TextAlign.right,
-                            style: AppTextStyles.bodyMedium,
+                            style: AppTextStyles.titleMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '1) اكتب كلمة مرور جديدة (8 أحرف على الأقل، حروف وأرقام).\n'
+                            '2) أكّدها في الحقل الثاني.\n'
+                            '3) اضغط «حفظ ومتابعة» للدخول إلى حسابك.',
+                            textAlign: TextAlign.right,
+                            style: AppTextStyles.bodyMedium.copyWith(height: 1.55),
                           ),
                           const SizedBox(height: 16),
                           if (_error != null) ...[
@@ -121,7 +138,7 @@ class _FirstLoginPageState extends State<FirstLoginPage> {
                           const SizedBox(height: 6),
                           AppTextField(
                             key: const Key('first-login-password'),
-                            hint: '••••••••',
+                            hint: 'مثال: Basma2026',
                             controller: _password,
                             enabled: !_busy,
                             obscureText: true,
@@ -132,7 +149,7 @@ class _FirstLoginPageState extends State<FirstLoginPage> {
                           const SizedBox(height: 6),
                           AppTextField(
                             key: const Key('first-login-confirm'),
-                            hint: '••••••••',
+                            hint: 'أعد كتابة كلمة المرور',
                             controller: _confirm,
                             enabled: !_busy,
                             obscureText: true,
@@ -145,6 +162,12 @@ class _FirstLoginPageState extends State<FirstLoginPage> {
                             label: 'حفظ ومتابعة',
                             isLoading: _busy,
                             onPressed: _busy ? null : _save,
+                            leading: _busy
+                                ? null
+                                : const AppForwardIcon(
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                           ),
                           const SizedBox(height: 8),
                           TextButton(

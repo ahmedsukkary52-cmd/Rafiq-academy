@@ -1,7 +1,9 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../../core/error/failure.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../core/usecases/usecases.dart';
 import '../../domain/entities/admin_directory_entity.dart';
@@ -55,6 +57,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
   final GetAllHalaqatUseCase getAllHalaqat;
   final GetAllSupervisorsUseCase getAllSupervisors;
   final UpdateComplaintUseCase updateComplaint;
+
   /// No Admin screen uses these any more; the generated DI config still
   /// passes them, so the constructor keeps both parameters.
   final GetCommunicationSettingsUseCase getCommunicationSettings;
@@ -315,6 +318,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     ToggleAccountStatusEvent event,
     Emitter<AdminState> emit,
   ) async {
+    // Emit submitting state
     emit(
       state.copyWith(
         toggleAccountStatus: SubmissionStatus.submitting,
@@ -322,20 +326,74 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
       ),
     );
 
+    // Call backend callable
     final result = await toggleAccountStatus(
       ToggleAccountParams(uid: event.uid, isActive: event.isActive),
     );
 
+    await result.fold(
+      // Callable failure: report error, do not refresh roster
+      (failure) async {
+        emit(
+          state.copyWith(
+            toggleAccountStatus: SubmissionStatus.error,
+            toggleAccountError: failure.message,
+          ),
+        );
+      },
+      // Callable success: attempt roster refresh, keep submitting until done
+      (_) async {
+        // Refresh roster while keeping toggle status as submitting
+        final rosterResult = await _loadRoster(emit);
+        // Determine final outcome based on roster result
+        rosterResult.fold(
+          (rosterFailure) {
+            // Partial success: toggle succeeded, roster failed
+            emit(
+              state.copyWith(
+                toggleAccountStatus: SubmissionStatus.success,
+                rosterStatus: SectionStatus.error,
+                rosterError: rosterFailure.message,
+              ),
+            );
+          },
+          (_) {
+            // Full success: both toggle and roster succeeded
+            emit(
+              state.copyWith(
+                toggleAccountStatus: SubmissionStatus.success,
+                rosterStatus: SectionStatus.loaded,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Private helper to load the student roster
+  Future<Either<Failure, Unit>> _loadRoster(Emitter<AdminState> emit) async {
+    // Emit loading UI while we fetch
+    emit(
+      state.copyWith(rosterStatus: SectionStatus.loading, rosterError: null),
+    );
+    final result = await getAcademyStudentRoster(NoParams());
+    // Propagate the result via the provided emitter
     result.fold(
       (failure) => emit(
         state.copyWith(
-          toggleAccountStatus: SubmissionStatus.error,
-          toggleAccountError: failure.message,
+          rosterStatus: SectionStatus.error,
+          rosterError: failure.message,
         ),
       ),
-      (_) =>
-          emit(state.copyWith(toggleAccountStatus: SubmissionStatus.success)),
+      (roster) => emit(
+        state.copyWith(
+          rosterStatus: SectionStatus.loaded,
+          studentRoster: roster,
+        ),
+      ),
     );
+    return result.map((_) => unit);
   }
 
   void _onResetToggleAccount(

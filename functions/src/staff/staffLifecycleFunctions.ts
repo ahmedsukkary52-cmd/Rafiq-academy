@@ -109,6 +109,22 @@ export function staffStatusOf(data: admin.firestore.DocumentData | undefined): S
   return data?.isActive === false ? STAFF_STATUS.deactivated : STAFF_STATUS.active;
 }
 
+/**
+ * A freshly provisioned Teacher is created inactive with
+ * `pendingHalaqaAssignment === true` and no lifecycle `staffStatus` yet; the
+ * first valid assignment activates them (Halaqa creation or reassignment).
+ * Accounts that went through the explicit lifecycle — including the teacher
+ * deactivated after their last Halaqa was reassigned — always carry a
+ * `staffStatus` and are never auto-activated by an assignment.
+ */
+function isPendingFirstAssignment(data: admin.firestore.DocumentData | undefined): boolean {
+  return (
+    text(data?.staffStatus) === "" &&
+    data?.isActive === false &&
+    data?.pendingHalaqaAssignment === true
+  );
+}
+
 function isOpenHalaqa(data: admin.firestore.DocumentData | undefined): boolean {
   const status = text(data?.status);
   return status !== "archived" && status !== "closed";
@@ -299,6 +315,7 @@ export async function adminReassignHalaqaStaffCore(
     const base = { halaqaId, role, previousStaffId, newStaffId };
     if (previousStaffId === newStaffId) return { ...base, changed: false, sessionsUpdated: 0 };
 
+    let activatePendingTeacher = false;
     if (newStaffId) {
       const next = await tx.get(db.collection("users").doc(newStaffId));
       if (!next.exists || next.get("role") !== role) {
@@ -307,7 +324,10 @@ export async function adminReassignHalaqaStaffCore(
           role === "teacher" ? "المعلم المحدد غير صالح" : "المشرف المحدد غير صالح",
         );
       }
-      if (staffStatusOf(next.data()) !== STAFF_STATUS.active) {
+      // A pending first assignment may activate an otherwise inactive teacher;
+      // explicitly deactivated / archived / deleted staff stay rejected.
+      activatePendingTeacher = isPendingFirstAssignment(next.data());
+      if (!activatePendingTeacher && staffStatusOf(next.data()) !== STAFF_STATUS.active) {
         throw new HttpsError("failed-precondition", "لا يمكن الإسناد إلى حساب غير نشط");
       }
       if (role === "teacher" && text(snap.get("coverTeacherId")) === newStaffId) {
@@ -315,6 +335,20 @@ export async function adminReassignHalaqaStaffCore(
           "failed-precondition",
           "هذا المعلم يغطي الحلقة مؤقتاً؛ أنهِ التغطية المؤقتة قبل جعله المعلم الأساسي",
         );
+      }
+    }
+
+    let deactivatePreviousTeacher = false;
+    if (role === "teacher" && previousStaffId) {
+      const assignedElsewhere = await tx.get(
+        db.collection("halaqat").where("teacherId", "==", previousStaffId),
+      );
+      const hasOtherActiveHalaqa = assignedElsewhere.docs.some((halaqa) =>
+        halaqa.id !== halaqaId && (!text(halaqa.get("status")) || text(halaqa.get("status")) === "active"),
+      );
+      if (!hasOtherActiveHalaqa) {
+        const previousTeacher = await tx.get(db.collection("users").doc(previousStaffId));
+        deactivatePreviousTeacher = previousTeacher.exists && previousTeacher.get("isActive") !== false;
       }
     }
 
@@ -370,12 +404,49 @@ export async function adminReassignHalaqaStaffCore(
           { halaqatIds: FieldValue.arrayRemove(halaqaId) },
           { merge: true },
         );
+        if (deactivatePreviousTeacher) {
+          tx.update(db.collection("users").doc(previousStaffId), {
+            isActive: false,
+            staffStatus: STAFF_STATUS.deactivated,
+            pendingHalaqaAssignment: true,
+            staffStatusUpdatedAt: FieldValue.serverTimestamp(),
+            staffStatusUpdatedBy: adminUid,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          tx.set(
+            db.collection(AUDIT_LOGS_COLLECTION).doc(),
+            buildAuditLogEntry(
+              {
+                actor: adminActor(adminUid),
+                action: AUDIT_ACTION.staffStatusChange,
+                targetType: AUDIT_TARGET_TYPE.user,
+                targetId: previousStaffId,
+                metadata: {
+                  role: "teacher",
+                  previousStatus: STAFF_STATUS.active,
+                  newStatus: STAFF_STATUS.deactivated,
+                  operation: "deactivate_after_last_halaqa_reassignment",
+                  halaqaId,
+                },
+                source: "adminReassignHalaqaStaff",
+              },
+              FieldValue.serverTimestamp(),
+            ),
+          );
+        }
       }
       tx.set(
         db.collection("teacherProfiles").doc(newStaffId),
         { halaqatIds: FieldValue.arrayUnion(halaqaId) },
         { merge: true },
       );
+      if (activatePendingTeacher) {
+        tx.update(db.collection("users").doc(newStaffId), {
+          isActive: true,
+          pendingHalaqaAssignment: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
       for (const ref of lockRefs) {
         tx.set(ref, {
           teacherId: ref.id.slice("teacher_".length),

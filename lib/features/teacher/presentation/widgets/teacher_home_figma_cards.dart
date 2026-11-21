@@ -272,21 +272,18 @@ class TeacherHomeSessionCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            // ── CTA area (always present — enabled or muted) ───────────
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Opacity(
-                opacity: ctaEnabled ? 1 : 0.4,
-                child: IgnorePointer(
-                  ignoring: !ctaEnabled,
-                  child: _StartSessionButton(
-                    label: ctaLabel,
-                    onTap: onStart ?? () {},
-                  ),
+            // Empty state: no fake "ابدأ الجلسة" affordance (trial UX).
+            // Error/retry and real sessions keep the CTA.
+            if (ctaEnabled) ...[
+              const SizedBox(height: 20),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: _StartSessionButton(
+                  label: ctaLabel,
+                  onTap: onStart!,
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -689,7 +686,7 @@ class _AnalyticsSummaryLoaded extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    Icons.chevron_left_rounded,
+                    Icons.chevron_right_rounded,
                     color: AppColors.textHint.withValues(alpha: 0.9),
                     size: 22,
                   ),

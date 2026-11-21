@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/domain/evaluation_policy.dart';
 import '../../../../shared/domain/evaluation_service.dart';
@@ -1096,8 +1097,32 @@ class _TeacherEvaluationSheetState extends State<_TeacherEvaluationSheet> {
             prev.recitationSubmissionStatus != curr.recitationSubmissionStatus,
         listener: (context, state) {
           if (state.recitationSubmissionStatus == SubmissionStatus.success) {
+            final offerAssign =
+                _model.mode != EvaluationSheetMode.edit &&
+                TeacherWorkflowOwnership.canExecute(context) &&
+                _model.halaqaId.trim().isNotEmpty;
+            final halaqaId = _model.halaqaId.trim();
             Navigator.pop(context);
             AppSnackBar.showSuccess(context, 'تم حفظ التقييم بنجاح');
+            if (offerAssign && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'يمكنك الآن تكليف الحفظ أو المراجعة للحلقة',
+                  ),
+                  action: SnackBarAction(
+                    label: 'تكليف واجب',
+                    onPressed: () {
+                      final path = AppRoutes.teacherHalaqa.replaceFirst(
+                        ':halaqaId',
+                        Uri.encodeComponent(halaqaId),
+                      );
+                      context.push('$path?assign=1');
+                    },
+                  ),
+                ),
+              );
+            }
             context.read<TeacherBloc>().add(
               const ResetRecitationSubmissionEvent(),
             );

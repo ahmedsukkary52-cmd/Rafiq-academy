@@ -66,13 +66,26 @@ abstract class DiModule {
   /// region لازم يطابق الـ region اللي اتنشرت بيه الـ Cloud Functions
   /// (حطيناها europe-west1 في functions/src/paymob/*.ts) - لو
   /// مش متطابقين هياخد رد "not-found" مع إن الـ function منشورة فعلاً.
+  ///
+  /// Emulator: re-apply [useFunctionsEmulator] on every resolve. A cached
+  /// [FirebaseFunctions] without `_origin` silently hits production and the
+  /// Android SDK surfaces that as `FirebaseFunctionsException.code == unknown`.
   @lazySingleton
-  FirebaseFunctions get firebaseFunctions => useFirebaseEmulator
-      ? FirebaseFunctions.instanceFor(
-          app: firebaseEmulatorApp,
-          region: functionsRegion,
-        )
-      : FirebaseFunctions.instanceFor(region: 'europe-west1');
+  FirebaseFunctions get firebaseFunctions {
+    if (!useFirebaseEmulator) {
+      return FirebaseFunctions.instanceFor(region: functionsRegion);
+    }
+    final functions = FirebaseFunctions.instanceFor(
+      app: firebaseEmulatorApp,
+      region: functionsRegion,
+    );
+    functions.useFunctionsEmulator(
+      firebaseEmulatorHost,
+      functionsEmulatorPort,
+      automaticHostMapping: false,
+    );
+    return functions;
+  }
 
   @lazySingleton
   InternetConnection get internetConnection => InternetConnection();

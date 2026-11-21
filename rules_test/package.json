@@ -15,9 +15,11 @@
     "test:deactivated": "node --test deactivated_access.firestore.rules.test.mjs",
     "test:deactivated:storage": "node --test deactivated_access.storage.rules.test.mjs",
     "test:private-email": "node --test private_email.firestore.rules.test.mjs",
+    "test:d0:isolation": "node --test --test-concurrency=1 d0_trial_isolation.firestore.rules.test.mjs",
+    "test:d0:storage": "node --test --test-concurrency=1 d0_payment_proof.storage.rules.test.mjs",
     "test:all": "node --test firestore.rules.test.mjs storage.rules.test.mjs",
-    "test:all:firestore": "node --test --test-concurrency=1 firestore.rules.test.mjs ph01_authorization.rules.test.mjs ph02_backend_authority.rules.test.mjs p0_completion.rules.test.mjs media_hardening.firestore.rules.test.mjs deactivated_access.firestore.rules.test.mjs private_email.firestore.rules.test.mjs b14_meeting_links.rules.test.mjs",
-    "test:all:storage": "node --test --test-concurrency=1 storage.rules.test.mjs ph01_storage.rules.test.mjs p0_storage.rules.test.mjs media_hardening.storage.rules.test.mjs deactivated_access.storage.rules.test.mjs"
+    "test:all:firestore": "node --test --test-concurrency=1 firestore.rules.test.mjs ph01_authorization.rules.test.mjs ph02_backend_authority.rules.test.mjs p0_completion.rules.test.mjs media_hardening.firestore.rules.test.mjs deactivated_access.firestore.rules.test.mjs private_email.firestore.rules.test.mjs b14_meeting_links.rules.test.mjs d0_trial_isolation.firestore.rules.test.mjs",
+    "test:all:storage": "node --test --test-concurrency=1 storage.rules.test.mjs ph01_storage.rules.test.mjs p0_storage.rules.test.mjs media_hardening.storage.rules.test.mjs deactivated_access.storage.rules.test.mjs d0_payment_proof.storage.rules.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

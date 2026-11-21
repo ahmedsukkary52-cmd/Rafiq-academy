@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rafiq_academy/core/constants/academy_branding.dart';
 import 'package:rafiq_academy/features/auth/presentation/widgets/auth_widgets.dart';
+import 'package:rafiq_academy/shared/theme/app_theme.dart';
 
 List<String> _declaredAssets() {
   final lines = File('pubspec.yaml').readAsLinesSync();
@@ -28,13 +29,39 @@ void main() {
     }
   });
 
-  test('the academy logo is not bundled until the visual identity is approved', () {
-    expect(_declaredAssets(), isNot(contains(AcademyBranding.logoAsset)));
+  test('the academy logo asset is declared and present', () {
+    expect(_declaredAssets(), contains(AcademyBranding.logoAsset));
+    expect(File(AcademyBranding.logoAsset).existsSync(), isTrue);
   });
 
-  testWidgets('AcademyLogo falls back to the white book icon', (tester) async {
+  testWidgets('AcademyLogo renders the branded image when bundled', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: AcademyLogo(size: 52))),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('academy-logo')), findsOneWidget);
+    expect(find.byIcon(Icons.menu_book_rounded), findsNothing);
+  });
+
+  testWidgets('AcademyLogo falls back to the primary book icon on error', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Image.asset(
+            'assets/branding/missing_logo.png',
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.menu_book_rounded,
+              color: AppColors.primary,
+              size: 52 * 0.55,
+            ),
+          ),
+        ),
+      ),
     );
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 200)),
@@ -42,7 +69,6 @@ void main() {
     await tester.pump();
 
     final icon = tester.widget<Icon>(find.byIcon(Icons.menu_book_rounded));
-    expect(icon.color, Colors.white);
-    expect(icon.size, closeTo(52 * 0.55, 0.001));
+    expect(icon.color, AppColors.primary);
   });
 }

@@ -89,11 +89,27 @@ class _Household extends Fake implements GetParentHouseholdUseCase {
 }
 
 class _Payments extends Fake implements GetPaymentsUseCase {
+  /// Shared script for [call] (household path) and [page] (subscriptions).
   late final s = _Script<ParentIdParams, _E<List<PaymentEntity>>>(
     (_) => Right([_invoice]),
   );
   @override
   Future<_E<List<PaymentEntity>>> call(ParentIdParams p) => s.run(p);
+
+  @override
+  Future<_E<ParentPaymentsPage>> page(ParentPaymentsPageParams p) async {
+    final result = await s.run(ParentIdParams(p.parentId));
+    return result.fold(
+      Left.new,
+      (items) => Right(
+        ParentPaymentsPage(
+          items: items,
+          nextCursorId: null,
+          hasMore: false,
+        ),
+      ),
+    );
+  }
 }
 
 class _PublicSettings extends Fake implements GetPaymentPublicSettingsUseCase {

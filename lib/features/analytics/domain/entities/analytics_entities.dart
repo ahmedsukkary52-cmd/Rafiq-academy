@@ -21,8 +21,8 @@ class HalaqaAnalyticsEntity extends Equatable {
 
   // مثال: {'ممتاز': 19, 'جيد جداً': 13, 'جيد': 6, 'يحتاج تحسين': 4}
 
-  /// حضور كل يوم في الأسبوع الأخير (للـ bar chart)
-  /// key = اسم اليوم، value = نسبة الحضور
+  /// حضور مجمّع للفترة (للـ bar chart).
+  /// نافذة قصيرة: مفتاح = اختصار اليوم؛ أطول: أ١/أ٢… لأسابيع الفترة.
   final Map<String, double> weeklyAttendance;
 
   const HalaqaAnalyticsEntity({

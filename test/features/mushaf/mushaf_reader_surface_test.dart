@@ -33,9 +33,16 @@ void main() {
 
     test('body line height targets sustained reading comfort', () {
       final style = MushafReaderTokens.paper.bodyStyle(fontSize: 23);
-      expect(style.height, greaterThanOrEqualTo(1.85));
-      expect(style.height, lessThanOrEqualTo(2.15));
+      expect(style.height, closeTo(1.45, 0.01));
       expect(style.letterSpacing, 0);
+    });
+
+    test('styleOf maps preset ids', () {
+      expect(MushafReaderTokens.styleOf('paper'), MushafReaderTokens.paper);
+      expect(MushafReaderTokens.styleOf('night'), MushafReaderTokens.night);
+      expect(MushafReaderTokens.styleOf('emerald'), MushafReaderTokens.emerald);
+      expect(MushafReaderTokens.styleOf('sepia'), MushafReaderTokens.sepia);
+      expect(MushafReaderTokens.styleOf('unknown'), MushafReaderTokens.paper);
     });
   });
 

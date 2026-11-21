@@ -142,6 +142,15 @@ void main() {
   });
 
   group('UI-3 ParentPaymentAccessBanner', () {
+    test('due-warning copy mentions both payment methods', () {
+      final message = ParentPaymentAccessLabels.message(
+        _access(PaymentAccessContract.statusDueWarning),
+      );
+      expect(message, contains('فودافون كاش'));
+      expect(message, contains('إنستاباي'));
+      expect(message, isNot(contains('عبر فودافون كاش ورفع')));
+    });
+
     testWidgets('shows pay + contact for suspended', (tester) async {
       var pay = false;
       var admin = false;

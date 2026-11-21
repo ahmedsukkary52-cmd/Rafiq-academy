@@ -3,10 +3,6 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../domain/recitation_record_entity.dart';
 
-// ══════════════════════════════════════════════════════════════════════════════
-// StudentLastEvaluationWidget - آخر تقييم
-// ══════════════════════════════════════════════════════════════════════════════
-
 class StudentLastEvaluationWidget extends StatelessWidget {
   final RecitationRecordEntity record;
   final VoidCallback onDetailsTap;
@@ -19,94 +15,126 @@ class StudentLastEvaluationWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GestureDetector(
-                onTap: onDetailsTap,
-                child: Text(
-                  'التفاصيل',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.primary,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: AppColors.secondary,
+                    size: 20,
                   ),
                 ),
-              ),
-              Row(
-                children: [
-                  Text('آخر تقييم', style: AppTextStyles.titleMedium),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.star_outline_rounded,
-                    color: AppColors.secondary,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // تاريخ التقييم
-          Text(_formatDate(record.date), style: AppTextStyles.labelSmall),
-
-          const SizedBox(height: 8),
-
-          // الدرجات الثلاث
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              GradeChip(label: record.behaviorGrade.displayLabel),
-              const SizedBox(width: 8),
-              GradeChip(label: record.grade.displayLabel),
-              const SizedBox(width: 8),
-              // بادج درجة الحفظ (الأعلى)
-              _OverallGradeBadge(grade: record.grade),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // ملاحظة المعلم
-          if (record.notes?.isNotEmpty == true)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    record.notes!,
-                    style: AppTextStyles.bodyMedium,
-                    textAlign: TextAlign.right,
+                    'آخر تقييم',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.info_outline_rounded,
-                  color: AppColors.textSecondary,
-                  size: 16,
+                TextButton(
+                  onPressed: onDetailsTap,
+                  child: Text(
+                    'التفاصيل',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
-
-          const SizedBox(height: 8),
-
-          // النجوم
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: List.generate(4, (i) {
-              final filled = i < _starsForGrade(record.grade);
-              return Icon(
-                filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: filled ? AppColors.secondary : AppColors.textHint,
-                size: 20,
-              );
-            }),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              _formatDate(record.date),
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.start,
+              children: [
+                _OverallGradeBadge(grade: record.grade),
+                GradeChip(label: record.grade.displayLabel),
+                GradeChip(label: record.behaviorGrade.displayLabel),
+              ],
+            ),
+            if (record.notes?.isNotEmpty == true) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.primaryDark,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        record.notes!,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: List.generate(4, (i) {
+                final filled = i < _starsForGrade(record.grade);
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  child: Icon(
+                    filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: filled ? AppColors.secondary : AppColors.textHint,
+                    size: 22,
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -160,9 +188,7 @@ class _OverallGradeBadge extends StatelessWidget {
       ),
       child: Text(
         grade.displayLabel,
-        style: const TextStyle(
-          fontFamily: 'NotoNaskhArabic',
-          fontSize: 13,
+        style: AppTextStyles.labelMedium.copyWith(
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
@@ -171,22 +197,17 @@ class _OverallGradeBadge extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// StudentHadithWidget - حديث اليوم
-// ══════════════════════════════════════════════════════════════════════════════
-
 class StudentHadithWidget extends StatelessWidget {
   const StudentHadithWidget({super.key});
 
-  // أحاديث تشجيعية ثابتة تتغيّر يومياً حسب تاريخ الجهاز (محتوى محلي وليس Firestore).
   static const _hadiths = [
-    ('«خيركم من تعلّم القرآن وعلّمه»', 'صحيح البخاري - رقم ٥٠٢٧'),
+    ('«خيركم من تعلّم القرآن وعلّمه»', 'صحيح البخاري'),
     ('«من قرأ حرفاً من كتاب الله فله به حسنة»', 'رواه الترمذي'),
     ('«اقرؤوا القرآن فإنه يأتي يوم القيامة شفيعاً لأصحابه»', 'رواه مسلم'),
-    (
-      '«الذي يقرأ القرآن وهو ماهر به مع السفرة الكرام البررة»',
-      'رواه البخاري',
-    ),
+    ('«الذي يقرأ القرآن وهو ماهر به مع السفرة الكرام البررة»', 'رواه البخاري'),
+    ('«الماهر بالقرآن مع السفرة الكرام البررة»', 'متفق عليه'),
+    ('«إن هذا القرآن مأدبة الله فتعلّموا مأدبته»', 'رواه الحاكم'),
+    ('«يقال لصاحب القرآن: اقرأ وارتقِ ورتّل»', 'رواه أبو داود'),
   ];
 
   @override
@@ -194,64 +215,78 @@ class StudentHadithWidget extends StatelessWidget {
     final index = DateTime.now().day % _hadiths.length;
     final (text, source) = _hadiths[index];
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [Color(0xFFFFD54F), Color(0xFFF5B800)],
-        ),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFF5B800).withValues(alpha: 0.28),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(
-                'حديث اليوم',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text('📢', style: TextStyle(fontSize: 14)),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              AppColors.secondary,
+              AppColors.secondaryDeep,
+              Color(0xFFE07A00),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            text,
-            style: const TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1.65,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.secondaryDeep.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
-            textAlign: TextAlign.right,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            source,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.85),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'حديث اليوم',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              text,
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.65,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.right,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              source,
+              textAlign: TextAlign.right,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: Colors.white.withValues(alpha: 0.88),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

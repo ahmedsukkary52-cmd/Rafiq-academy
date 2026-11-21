@@ -5,6 +5,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import {
   buildHomeworkReviewedNotification,
   decideHomeworkReviewed,
+  isEligibleNotificationRecipient,
 } from "./academyNotifications";
 import {
   loadParentIdsByStudent,
@@ -92,12 +93,13 @@ export async function handleRecitationRecordWrite(params: {
   if (!decision.notify) return;
 
   const parentIds = await loadParentIds(db, decision.facts.studentId);
-  if (parentIds.length === 0) return;
+  const eligibleParents = await filterEligibleParents(db, parentIds);
+  if (eligibleParents.length === 0) return;
 
   const names = await loadStudentNames(db, [decision.facts.studentId]);
   const studentName = names.get(decision.facts.studentId) ?? "";
 
-  for (const parentId of parentIds) {
+  for (const parentId of eligibleParents) {
     await deliverToParent({
       db,
       parentId,
@@ -124,7 +126,12 @@ async function fanOutHomeworkReviewed(params: {
   const { db, recordId, studentId, halaqaId, grade } = params;
   const parentsByStudent = await loadParentIdsByStudent(db, [studentId]);
   const names = await loadStudentNames(db, [studentId]);
-  const observers = [studentId, ...(parentsByStudent.get(studentId) ?? [])];
+  const studentSnap = await db.collection("users").doc(studentId).get();
+  const studentEligible = isEligibleNotificationRecipient(studentSnap.data());
+  const observers = [
+    ...(studentEligible ? [studentId] : []),
+    ...(parentsByStudent.get(studentId) ?? []),
+  ];
   await writeInAppNotifications(
     db,
     observers.map((observerId) =>
@@ -138,6 +145,18 @@ async function fanOutHomeworkReviewed(params: {
       }),
     ),
   );
+}
+
+async function filterEligibleParents(
+  db: admin.firestore.Firestore,
+  parentIds: readonly string[],
+): Promise<string[]> {
+  const out: string[] = [];
+  for (const parentId of parentIds) {
+    const snap = await db.collection("users").doc(parentId).get();
+    if (isEligibleNotificationRecipient(snap.data())) out.push(parentId);
+  }
+  return out;
 }
 
 /** C11.3 step 3 — parent audience from the childrenIds relationship only. */

@@ -29,7 +29,6 @@ class _ProvisionForm extends StatefulWidget {
 
 class _ProvisionFormState extends State<_ProvisionForm> {
   static const _roles = <String, String>{
-    AppRoles.student: 'طالب',
     AppRoles.parent: 'ولي أمر',
     AppRoles.teacher: 'معلم',
     AppRoles.supervisor: 'مشرف',
@@ -40,7 +39,7 @@ class _ProvisionFormState extends State<_ProvisionForm> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  String _role = AppRoles.student;
+  String _role = AppRoles.parent;
 
   /// Admin access is never implied: it needs this explicit acknowledgement.
   bool _adminConfirmed = false;
@@ -79,7 +78,8 @@ class _ProvisionFormState extends State<_ProvisionForm> {
         children: [
           AdminSectionCard(
             title: 'بيانات الحساب',
-            subtitle: 'يُنشأ الحساب على الخادم مع ملف الدور المناسب',
+            subtitle:
+                'يُنشأ الحساب على الخادم مع ملف الدور المناسب. يُسجّل الطالب من شاشة الطلاب مع ولي أمر وحلقة.',
             children: [
               DropdownButtonFormField<String>(
                 key: const Key('provision-role'),

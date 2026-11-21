@@ -216,16 +216,26 @@ class TeacherStudentsRosterSkeleton extends StatelessWidget {
 }
 
 /// Attendance / evaluation roster rows.
+///
+/// Use [shrinkWrap] when the skeleton sits inside a non-expanded [Column]
+/// (e.g. pending-absence strip) so the ListView does not demand unbounded height.
 class TeacherRosterRowsSkeleton extends StatelessWidget {
   final int itemCount;
+  final bool shrinkWrap;
 
-  const TeacherRosterRowsSkeleton({super.key, this.itemCount = 6});
+  const TeacherRosterRowsSkeleton({
+    super.key,
+    this.itemCount = 6,
+    this.shrinkWrap = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TeacherPulse(
       builder: (context, bone) {
         return ListView.separated(
+          shrinkWrap: shrinkWrap,
+          physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           itemCount: itemCount,
           separatorBuilder: (_, __) => const SizedBox(height: 10),

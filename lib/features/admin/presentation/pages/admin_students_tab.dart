@@ -207,7 +207,7 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
                   ),
                 ),
                 const Icon(
-                  Icons.chevron_left_rounded,
+                  Icons.chevron_right_rounded,
                   color: AppColors.textHint,
                 ),
               ],
@@ -222,109 +222,163 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: BlocBuilder<AdminBloc, AdminState>(
-            buildWhen: (p, c) =>
-                p.rosterStatus != c.rosterStatus ||
-                p.studentRoster != c.studentRoster ||
-                p.stats != c.stats,
-            builder: (context, state) {
-              final total =
-                  state.stats?.totalStudents ??
-                  _totalStudents(state.studentRoster);
-              final roster = _filtered(state.studentRoster);
+      child: BlocListener<AdminBloc, AdminState>(
+        listenWhen: (previous, current) =>
+            previous.toggleAccountStatus != current.toggleAccountStatus ||
+            previous.rosterStatus != current.rosterStatus,
+        listener: (context, state) {
+          if (state.toggleAccountStatus == SubmissionStatus.success) {
+            if (state.rosterStatus == SectionStatus.loaded) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('تم تفعيل/تعطيل الطالب بنجاح')),
+              );
+            } else if (state.rosterStatus == SectionStatus.error) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'تم تغيير الحالة، لكن فشل تحديث القائمة: ${state.rosterError}',
+                  ),
+                ),
+              );
+            }
+          } else if (state.toggleAccountStatus == SubmissionStatus.error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('فشل تغيير الحالة: ${state.toggleAccountError}'),
+              ),
+            );
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          resizeToAvoidBottomInset: true,
+          body: SafeArea(
+            bottom: false,
+            child: BlocBuilder<AdminBloc, AdminState>(
+              buildWhen: (p, c) =>
+                  p.rosterStatus != c.rosterStatus ||
+                  p.studentRoster != c.studentRoster ||
+                  p.stats != c.stats,
+              builder: (context, state) {
+                final total =
+                    state.stats?.totalStudents ??
+                    _totalStudents(state.studentRoster);
+                final roster = _filtered(state.studentRoster);
 
-              return CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              IconButton(
-                                tooltip: 'الإشعارات',
-                                onPressed: () => context.push(
-                                  '${AppRoutes.admin}/notifications',
-                                ),
-                                icon: const Icon(
-                                  Icons.notifications_none_rounded,
-                                ),
-                              ),
-                              const Spacer(),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'إدارة الطلاب',
-                                    style: AppTextStyles.headlineMedium
-                                        .copyWith(fontWeight: FontWeight.w800),
+                return CustomScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'إدارة الطلاب',
+                                        textAlign: TextAlign.right,
+                                        style: AppTextStyles.headlineMedium
+                                            .copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                      ),
+                                      Text(
+                                        '${formatAdminCount(total)} طالب في ${formatAdminCount(state.studentRoster.length)} حلقة',
+                                        textAlign: TextAlign.right,
+                                        style: AppTextStyles.labelSmall
+                                            .copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    '${formatAdminCount(total)} طالب في ${formatAdminCount(state.studentRoster.length)} حلقة',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: AppColors.textSecondary,
+                                ),
+                                IconButton(
+                                  tooltip: 'الإشعارات',
+                                  onPressed: () => context.push(
+                                    '${AppRoutes.admin}/notifications',
+                                  ),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            AdminSearchField(
+                              key: const Key('admin-students-search'),
+                              controller: _searchCtrl,
+                              hint: 'ابحث باسم الطالب أو الحلقة',
+                              onChanged: _onQueryChanged,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppButton(
+                                    key: const Key('students-open-onboarding'),
+                                    label: 'تسجيل طالب جديد',
+                                    onPressed: () => context.push(
+                                      AppRoutes.adminOnboardStudent,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          AdminSearchField(
-                            key: const Key('admin-students-search'),
-                            controller: _searchCtrl,
-                            hint: 'ابحث باسم الطالب أو الحلقة',
-                            onChanged: _onQueryChanged,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: AppButton(
-                                  label: 'طلبات التسجيل',
-                                  onPressed: () =>
-                                      context.push(AppRoutes.adminRegistration),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: AppButton(
-                                  key: const Key('students-open-onboarding'),
-                                  label: 'تسجيل طالب جديد',
-                                  onPressed: () => context.push(
-                                    AppRoutes.adminOnboardStudent,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: AppButton(
+                                    label: 'طلبات التعيين',
+                                    onPressed: () => context.push(
+                                      AppRoutes.adminRegistration,
+                                    ),
                                   ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'الطالب يُنشأ مع ولي أمر وحلقة من «تسجيل طالب جديد». '
+                              'طلبات التعيين للطلبات الواردة من خارج الإنشاء المباشر.',
+                              textAlign: TextAlign.right,
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: AppColors.textSecondary,
+                                height: 1.45,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          ..._directorySection(state.studentRoster),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (state.rosterStatus == SectionStatus.loading)
-                    const SliverFillRemaining(
-                      child: AdminStudentsRosterSkeleton(),
-                    )
-                  else if (state.rosterStatus == SectionStatus.error)
-                    SliverFillRemaining(
-                      child: AppErrorWidget(
-                        message: state.rosterError ?? 'تعذر تحميل القائمة',
-                        onRetry: () => context.read<AdminBloc>().add(
-                          const LoadStudentRosterEvent(),
+                            ),
+                            const SizedBox(height: 16),
+                            ..._directorySection(state.studentRoster),
+                          ],
                         ),
                       ),
-                    )
-                  else if (roster.isEmpty)
-                    SliverFillRemaining(
-                      child: Center(
+                    ),
+                    if (state.rosterStatus == SectionStatus.loading)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: AdminStudentsRosterSkeleton(),
+                        ),
+                      )
+                    else if (state.rosterStatus == SectionStatus.error)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: AppErrorWidget(
+                            message: state.rosterError ?? 'تعذر تحميل القائمة',
+                            onRetry: () => context.read<AdminBloc>().add(
+                              const LoadStudentRosterEvent(),
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (roster.isEmpty)
+                      SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: AdminPlaceholderCard(
@@ -335,125 +389,129 @@ class _AdminStudentsTabState extends State<AdminStudentsTab> {
                                 : 'لا توجد حلقات أو طلاب مطابقون للبحث.',
                           ),
                         ),
-                      ),
-                    )
-                  else
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final h = roster[index];
-                        final expanded = _expanded.contains(h.id);
-                        return Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            20,
-                            index == 0 ? 0 : 8,
-                            20,
-                            index == roster.length - 1 ? 24 : 0,
-                          ),
-                          child: AppCard(
-                            padding: EdgeInsets.zero,
-                            child: Column(
-                              children: [
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(
-                                    AppSizes.radiusL,
-                                  ),
-                                  onTap: () => setState(() {
-                                    if (expanded) {
-                                      _expanded.remove(h.id);
-                                    } else {
-                                      _expanded.add(h.id);
-                                    }
-                                  }),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primaryLight,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                      )
+                    else
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final h = roster[index];
+                          final expanded = _expanded.contains(h.id);
+                          return Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              20,
+                              index == 0 ? 0 : 8,
+                              20,
+                              index == roster.length - 1 ? 24 : 0,
+                            ),
+                            child: AppCard(
+                              padding: EdgeInsets.zero,
+                              child: Column(
+                                children: [
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(
+                                      AppSizes.radiusL,
+                                    ),
+                                    onTap: () => setState(() {
+                                      if (expanded) {
+                                        _expanded.remove(h.id);
+                                      } else {
+                                        _expanded.add(h.id);
+                                      }
+                                    }),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primaryLight,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Icon(
+                                              Icons.menu_book_outlined,
+                                              color: AppColors.primary,
                                             ),
                                           ),
-                                          child: const Icon(
-                                            Icons.menu_book_outlined,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                h.name,
-                                                style: AppTextStyles.titleMedium
-                                                    .copyWith(
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                    ),
-                                              ),
-                                              Text(
-                                                '${formatAdminCount(h.students.length)} طالب',
-                                                style: AppTextStyles.labelSmall
-                                                    .copyWith(
-                                                      color: AppColors
-                                                          .textSecondary,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        AdminStatusBadge(
-                                          label: h.status == 'active'
-                                              ? 'نشطة'
-                                              : 'غير نشطة',
-                                          color: h.status == 'active'
-                                              ? AppColors.success
-                                              : AppColors.warning,
-                                          bg: h.status == 'active'
-                                              ? AppColors.successBg
-                                              : AppColors.warning.withValues(
-                                                  alpha: 0.12,
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  h.name,
+                                                  style: AppTextStyles
+                                                      .titleMedium
+                                                      .copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                      ),
                                                 ),
-                                        ),
-                                        Icon(
-                                          expanded
-                                              ? Icons.expand_less
-                                              : Icons.expand_more,
-                                          color: AppColors.textHint,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (expanded && h.students.isNotEmpty)
-                                  ...h.students.map(
-                                    (s) =>
-                                        _StudentRow(student: s, halaqaId: h.id),
-                                  ),
-                                if (expanded && h.students.isEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Text(
-                                      'لا يوجد طلاب في هذه الحلقة',
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: AppColors.textSecondary,
+                                                Text(
+                                                  '${formatAdminCount(h.students.length)} طالب',
+                                                  style: AppTextStyles
+                                                      .labelSmall
+                                                      .copyWith(
+                                                        color: AppColors
+                                                            .textSecondary,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          AdminStatusBadge(
+                                            label: h.status == 'active'
+                                                ? 'نشطة'
+                                                : 'غير نشطة',
+                                            color: h.status == 'active'
+                                                ? AppColors.success
+                                                : AppColors.warning,
+                                            bg: h.status == 'active'
+                                                ? AppColors.successBg
+                                                : AppColors.warning.withValues(
+                                                    alpha: 0.12,
+                                                  ),
+                                          ),
+                                          Icon(
+                                            expanded
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                            color: AppColors.textHint,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                              ],
+                                  if (expanded && h.students.isNotEmpty)
+                                    ...h.students.map(
+                                      (s) => _StudentRow(
+                                        student: s,
+                                        halaqaId: h.id,
+                                      ),
+                                    ),
+                                  if (expanded && h.students.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Text(
+                                        'لا يوجد طلاب في هذه الحلقة',
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      }, childCount: roster.length),
-                    ),
-                ],
-              );
-            },
+                          );
+                        }, childCount: roster.length),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -513,7 +571,33 @@ class _StudentRow extends StatelessWidget {
                     : const Color(0xFFFFF3E0),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+              // Toggle active/inactive button
+              BlocBuilder<AdminBloc, AdminState>(
+                buildWhen: (previous, current) =>
+                    previous.toggleAccountStatus != current.toggleAccountStatus,
+                builder: (context, state) => IconButton(
+                  icon: Icon(
+                    student.isActive ? Icons.lock_open : Icons.lock,
+                    color: student.isActive
+                        ? AppColors.success
+                        : AppColors.warning,
+                  ),
+                  tooltip: student.isActive ? 'تعطيل الحساب' : 'تفعيل الحساب',
+                  onPressed:
+                      state.toggleAccountStatus == SubmissionStatus.submitting
+                      ? null
+                      : () => context.read<AdminBloc>().add(
+                          ToggleAccountStatusEvent(
+                            uid: student.uid,
+                            isActive: !student.isActive,
+                          ),
+                        ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textHint,
+              ),
             ],
           ),
         ),

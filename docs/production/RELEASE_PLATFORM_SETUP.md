@@ -38,18 +38,23 @@ To add prod later (owner creates the project first):
 ## 2. Android signing
 
 Implemented locally in `android/app/build.gradle.kts`:
-- dev and staging: debug key (never uploaded to a store).
-- prod: the Play upload key, from `android/key.properties` or, when that file is absent, from Codemagic's `CM_KEYSTORE_PATH`, `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD`.
-- Without a complete upload key, any prod release artifact task (`assemble`, `bundle`, `package` or `install` + `ProdRelease`) stops the build with a message. The prod release can no longer be debug-signed or left unsigned. dev and staging builds are unaffected.
-- `android/.gitignore` ignores `key.properties`, `**/*.jks` and `**/*.keystore`.
+- **dev**, **staging**, and **trial**: debug key (local / non-store only; never uploaded to a store).
+- **prod**: the Play **upload** key, from `android/key.properties` or, when that file is absent, from Codemagic's `CM_KEYSTORE_PATH`, `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD` (injected when `android_signing: [basma_upload_key]` is set).
+- Without a complete upload key, any prod **release** artifact task (`assemble`, `bundle`, `package` or `install` + `ProdRelease`) stops the build with a message. Prod release cannot be debug-signed or left unsigned. Other flavors are unaffected.
+- Ignore rules: `android/.gitignore` and the repo root `.gitignore` both ignore `key.properties` / `*.jks` / `*.keystore`.
+- **Upload key vs Play App Signing key:** with Play App Signing, Google holds the app signing key that users' devices trust; the team keeps the **upload** keystore used only to sign AABs uploaded to Play. Losing the upload key is recoverable via Play support; losing an enrolled app signing key (if you managed it yourself without Play App Signing) is catastrophic. Prefer Play App Signing at first upload.
+- Full readiness audit: `docs/engineering-audit/BASMA_RB17_ANDROID_SIGNING_AUDIT.md`.
 
-Owner steps (no secret goes into Git or chat):
-1. Create the upload keystore on a trusted machine, for example
+Owner steps (no secret goes into Git or chat — never paste passwords or private keys into issues/chat):
+1. Confirm the prod `applicationId` (provisionally `com.basmaacademy.app`) **before** the first Play Console upload.
+2. Create the upload keystore on a trusted machine, for example
    `keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`.
-2. Back it up with its passwords in a password manager. Losing the upload key requires a Play support reset.
-3. Local signing: create `android/key.properties` with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. `storeFile` is relative to `android/app` or absolute.
-4. CI signing: upload the keystore in Codemagic (Team settings → Code signing identities → Android keystores) with the reference name `basma_upload_key`.
-5. Enroll the app in Play App Signing at first upload (Google holds the app signing key; the team keeps the upload key).
+3. Store the `.jks` **outside** the repo; record store password, key alias, and key password in a password manager; keep an offline encrypted backup.
+4. Verify fingerprints locally (do not commit the output files if they embed paths you care about):
+   `keytool -list -v -keystore <path-to-upload-keystore.jks>`.
+5. Local signing: create `android/key.properties` with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. `storeFile` is relative to `android/app` or absolute. File stays git-ignored.
+6. CI signing: upload the keystore in Codemagic (Team settings → Code signing identities → Android keystores) with the reference name **`basma_upload_key`** (must match `codemagic.yaml`).
+7. Enroll the app in Play App Signing at first upload (Google holds the app signing key; the team keeps the upload key). Register the upload (and later Play) SHA-1/SHA-256 on the prod Firebase Android app.
 
 Versioning: `pubspec.yaml` `version: 1.0.0+2` (J.10; earlier builds were `+1`) feeds `versionName` / `versionCode`. `kAppBuildNumber` must equal the `+N` (test-enforced) because the minimum-version gate uses it. Bump both in the repo for every store build; do not override with `--build-number`.
 

@@ -80,6 +80,10 @@ function fakeAdmin({ users = [], docs = {}, failOn = {}, projectId = "demo-rafiq
     const path = `${collection}/${id}`;
     return {
       path,
+      // Nested paths (e.g. conversations/{id}/messages/{msgId}) used by seed v4.
+      collection: (sub) => ({
+        doc: (subId) => ref(`${collection}/${id}/${sub}`, subId),
+      }),
       async create(data) {
         record(`create ${path}`);
         return act(`create ${path}`, () => {

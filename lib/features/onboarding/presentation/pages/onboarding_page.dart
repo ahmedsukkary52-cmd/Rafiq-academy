@@ -2,54 +2,71 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/shared_widgets.dart';
 
 const String onboardingSeenPrefKey = 'onboarding_seen';
 
 class _OnboardingSlide {
   final IconData icon;
-  final Color bgColor;
+  final Color canvasColor;
   final Color accentColor;
-  final String title;
+  final Color accentDeep;
+  final String titleLead;
+  final String titleAccent;
   final String subtitle;
   final String ctaLabel;
 
   const _OnboardingSlide({
     required this.icon,
-    required this.bgColor,
+    required this.canvasColor,
     required this.accentColor,
-    required this.title,
+    required this.accentDeep,
+    required this.titleLead,
+    required this.titleAccent,
     required this.subtitle,
     required this.ctaLabel,
   });
+
+  Gradient get buttonGradient => LinearGradient(
+        begin: Alignment.centerRight,
+        end: Alignment.centerLeft,
+        colors: [accentDeep, accentColor],
+      );
 }
 
 const _slides = [
   _OnboardingSlide(
-    icon: Icons.mosque_rounded,
-    bgColor: AppColors.primaryLight,
-    accentColor: AppColors.primary,
-    title: 'ابدأ رحلتك مع القرآن الكريم 📖',
+    icon: Icons.menu_book_rounded,
+    canvasColor: AppColors.primaryLight,
+    accentColor: AppColors.primaryGradientMid,
+    accentDeep: AppColors.primaryGradientStart,
+    titleLead: 'ابدأ رحلتك مع ',
+    titleAccent: 'أكاديمية بصمة',
     subtitle:
-        'تعلم الحفظ والتجويد بطريقة ممتعة وتفاعلية تناسب الأطفال من كل الأعمار',
+        'إدارة الحلقات والطلاب وأولياء الأمور في مكان واحد بطريقة واضحة ومنظّمة',
     ctaLabel: 'التالي',
   ),
   _OnboardingSlide(
     icon: Icons.emoji_events_rounded,
-    bgColor: AppColors.secondaryBg,
+    canvasColor: AppColors.secondaryBg,
     accentColor: AppColors.secondary,
-    title: 'اكسب النقاط والجوائز 🌟',
+    accentDeep: AppColors.secondaryDeep,
+    titleLead: 'تابع ',
+    titleAccent: 'التقدم والجوائز',
     subtitle:
-        'احفظ سورة جديدة كل يوم وابن عاداتك بطريقة ممتعة. اكسب نجوماً وعملات واكتشف كنوزاً مخفية!',
+        'حضور، تقييمات، ونقاط — كل دور يرى ما يخصه بوضوح ويدعم استمرار التعلم',
     ctaLabel: 'التالي',
   ),
   _OnboardingSlide(
     icon: Icons.groups_2_rounded,
-    bgColor: AppColors.primaryLight,
-    accentColor: AppColors.primary,
-    title: 'تواصل مع معلمك وتابع تقدمك 👨‍🏫',
+    canvasColor: AppColors.primaryLight,
+    accentColor: AppColors.primaryGradientMid,
+    accentDeep: AppColors.primaryGradientStart,
+    titleLead: 'تواصل ومتابعة ',
+    titleAccent: 'أولياء الأمور',
     subtitle:
-        'راجع تقييماتك، تواصل مع معلمك مباشرة، وخلّي أهلك يتابعوا رحلتك خطوة بخطوة',
-    ctaLabel: 'ابدأ الآن',
+        'رسائل، جداول، واشتراكات — رحلة مترابطة بين الطالب والمعلم وولي الأمر',
+    ctaLabel: 'تسجيل الدخول',
   ),
 ];
 
@@ -63,14 +80,13 @@ class OnboardingPage extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
+  // LTR PageView so "next" animates toward the left (الشمال) in Arabic UI.
   final _controller = PageController();
   int _index = 0;
 
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(onboardingSeenPrefKey, true);
-    // بيحدّث الـ notifier اللي الراوتر بيراقبه عشان الـ redirect
-    // يسمح بالخروج من الأونبوردنج فورًا.
     widget.onboardingSeen.value = true;
   }
 
@@ -80,8 +96,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
     _controller.nextPage(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
     );
   }
 
@@ -93,7 +109,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final slide = _slides[_index];
     return Scaffold(
+      backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -107,10 +125,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 children: [
                   TextButton(
                     onPressed: _finish,
-                    child: const Text(
+                    child: Text(
                       'تخطى',
-                      style: TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
+                      style: AppTextStyles.labelLarge.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -121,16 +138,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
+                      color: slide.canvasColor,
                       borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                     ),
                     child: Text(
                       '${_index + 1}/${_slides.length}',
-                      style: const TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDark,
+                      style: AppTextStyles.labelMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: slide.accentDeep,
                       ),
                     ),
                   ),
@@ -138,17 +153,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
             Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _slides.length,
-                onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (context, i) => _SlideView(slide: _slides[i]),
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _slides.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (context, i) => Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: _SlideView(slide: _slides[i]),
+                  ),
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.paddingL,
-                vertical: AppSizes.paddingL,
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.paddingL,
+                8,
+                AppSizes.paddingL,
+                AppSizes.paddingL,
               ),
               child: Column(
                 children: [
@@ -159,61 +182,40 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       return AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: isActive ? 24 : 8,
+                        width: isActive ? 28 : 8,
                         height: 8,
                         decoration: BoxDecoration(
                           color: isActive
-                              ? _slides[_index].accentColor
+                              ? slide.accentColor
                               : AppColors.border,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
                     }),
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _next,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _slides[_index].accentColor,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppSizes.radiusL),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _slides[_index].ctaLabel,
-                            style: const TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.arrow_back_rounded, size: 18),
-                        ],
-                      ),
+                  const SizedBox(height: 22),
+                  AppButton(
+                    label: slide.ctaLabel,
+                    onPressed: _next,
+                    gradient: slide.buttonGradient,
+                    leading: const AppForwardIcon(
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
                   if (_index == 0) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: _finish,
-                      child: const Text(
+                      child: Text(
                         'أو تسجيل الدخول',
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
+                        style: AppTextStyles.labelLarge.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                     ),
-                  ],
+                  ] else
+                    const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -239,81 +241,142 @@ class _SlideView extends StatelessWidget {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: slide.bgColor,
+                color: slide.canvasColor,
                 borderRadius: BorderRadius.circular(AppSizes.radiusXL),
               ),
-              child: Stack(
-                children: [
-                  const Positioned(
-                    top: 24,
-                    left: 24,
-                    child: Icon(
-                      Icons.auto_awesome_rounded,
-                      color: Colors.amber,
-                      size: 22,
-                    ),
-                  ),
-                  const Positioned(
-                    top: 40,
-                    right: 32,
-                    child: Icon(
-                      Icons.star_rounded,
-                      color: Colors.amber,
-                      size: 26,
-                    ),
-                  ),
-                  const Positioned(
-                    bottom: 32,
-                    right: 40,
-                    child: Icon(
-                      Icons.nightlight_round,
-                      color: Colors.amber,
-                      size: 24,
-                    ),
-                  ),
-                  Center(
-                    child: Container(
-                      width: 160,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        color: slide.accentColor.withOpacity(0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        slide.icon,
-                        size: 72,
-                        color: slide.accentColor,
-                      ),
-                    ),
-                  ),
-                ],
+              child: Center(
+                child: _ModernHeroCard(
+                  accent: slide.accentColor,
+                  accentDeep: slide.accentDeep,
+                  icon: slide.icon,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 32),
-          Text(
-            slide.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              height: 1.4,
+          const SizedBox(height: 28),
+          Text.rich(
+            TextSpan(
+              style: AppTextStyles.headlineMedium.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                height: 1.35,
+              ),
+              children: [
+                TextSpan(text: slide.titleLead),
+                TextSpan(
+                  text: slide.titleAccent,
+                  style: TextStyle(color: slide.accentDeep),
+                ),
+              ],
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           Text(
             slide.subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 14,
+            style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,
-              height: 1.6,
+              height: 1.65,
+              fontSize: 14,
             ),
           ),
+          const SizedBox(height: 8),
         ],
+      ),
+    );
+  }
+}
+
+/// Soft modern illustration card — no decorative stars/crescents.
+class _ModernHeroCard extends StatelessWidget {
+  final Color accent;
+  final Color accentDeep;
+  final IconData icon;
+
+  const _ModernHeroCard({
+    required this.accent,
+    required this.accentDeep,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 168,
+      height: 168,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            accent.withValues(alpha: 0.22),
+            accent.withValues(alpha: 0.05),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: 112,
+          height: 132,
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: accentDeep.withValues(alpha: 0.14),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 8,
+                margin: const EdgeInsets.only(left: 24),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.28),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 8,
+                margin: const EdgeInsets.only(left: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const Spacer(),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [accentDeep, accent],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 24),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

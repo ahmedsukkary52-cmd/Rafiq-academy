@@ -18,4 +18,18 @@ class GetAchievementsUseCase
   Future<Either<Failure, List<AchievementEntity>>> call(
     StudentUidParams params,
   ) => repository.getAchievements(params.uid);
+
+  /// Cursor page for the student achievements list (D2 deferred pagination).
+  Future<Either<Failure, StudentAchievementsPage>> page({
+    required String studentId,
+    int limit = StudentAchievementsPage.defaultLimit,
+    String? afterStudentAchievementId,
+    String? afterRecipientsAchievementId,
+  }) =>
+      repository.getAchievementsPage(
+        studentId: studentId,
+        limit: limit,
+        afterStudentAchievementId: afterStudentAchievementId,
+        afterRecipientsAchievementId: afterRecipientsAchievementId,
+      );
 }

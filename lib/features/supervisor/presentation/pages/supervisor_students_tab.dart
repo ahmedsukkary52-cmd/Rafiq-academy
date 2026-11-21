@@ -18,13 +18,13 @@ import '../../../../shared/domain/parent_payment_proof.dart';
 import '../../../../shared/domain/halaqa_entity.dart';
 import '../../../../shared/domain/halaqa_students_summary_entity.dart';
 import '../../../../shared/domain/halaqa_roster.dart';
+import '../../../../shared/domain/student_parent_links.dart';
 import '../../domain/repositories/parent_repository.dart';
 import '../../domain/supervisor_roster.dart';
 import '../bloc/supervisor_bloc.dart';
 import '../bloc/supervisor_event.dart';
 import '../bloc/supervisor_state.dart';
 import '../supervisor_destinations.dart';
-import '../supervisor_home_nav.dart';
 import '../widgets/supervisor_loading_skeletons.dart';
 
 String _eastern(String input) {
@@ -130,8 +130,10 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
       );
     }
 
+    // Empty roster fingerprints as '' which matches the initial key — still
+    // must run summaries once so `_loading` clears when there are no halaqat.
     final key = SupervisorRoster.membershipFingerprint(state.halaqat);
-    if (key == _halaqaKey) return;
+    if (key == _halaqaKey && !_loading && _error == null) return;
     _loadSummaries(state);
   }
 
@@ -265,6 +267,82 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
     return map;
   }
 
+  Future<void> _messageParent(SupervisorStudentRow row) async {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) {
+      AppSnackBar.showInfo(context, 'يجب تسجيل الدخول أولاً');
+      return;
+    }
+    final parentsEither = await sl<StudentParentLinkReader>()
+        .getParentIdsByStudentIds([row.studentId]);
+    if (!mounted) return;
+    final parentIds = parentsEither.fold<List<String>?>((_) {
+      AppSnackBar.showInfo(context, 'تعذر التحقق من ولي الأمر حالياً');
+      return null;
+    }, (map) => map[row.studentId] ?? const <String>[]);
+    if (parentIds == null) return;
+    if (parentIds.isEmpty) {
+      AppSnackBar.showInfo(context, 'لا يوجد ولي أمر مرتبط بهذا الطالب');
+      return;
+    }
+
+    final participant = await sl<GetChatParticipantUseCase>()(
+      ChatUidParams(parentIds.first),
+    );
+    final other = participant.fold<ChatParticipantEntity?>(
+      (_) => null,
+      (p) => p,
+    );
+    if (other == null) {
+      if (!mounted) return;
+      AppSnackBar.showInfo(context, 'تعذر تحميل بيانات ولي الأمر');
+      return;
+    }
+
+    final chatBloc = sl<ChatConversationsBloc>();
+    chatBloc.add(const ResetStartConversationEvent());
+    chatBloc.add(
+      StartConversationEvent(
+        currentUser: ChatParticipantEntity(
+          uid: auth.user.uid,
+          name: auth.user.name,
+          role: AppRoles.supervisor,
+          profileImageUrl: auth.user.profileImageUrl,
+        ),
+        otherUser: other,
+      ),
+    );
+
+    final startState = await chatBloc.stream.firstWhere(
+      (s) =>
+          s.startConversationStatus == SubmissionStatus.success ||
+          s.startConversationStatus == SubmissionStatus.error,
+    );
+    if (!mounted) return;
+
+    if (startState.startConversationStatus == SubmissionStatus.error ||
+        startState.startedConversation == null) {
+      AppSnackBar.showInfo(
+        context,
+        startState.startConversationError ?? 'تعذر فتح المحادثة',
+      );
+      chatBloc.add(const ResetStartConversationEvent());
+      return;
+    }
+
+    final conversation = startState.startedConversation!;
+    chatBloc.add(const ResetStartConversationEvent());
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatRoomPage(
+          conversationId: conversation.id,
+          otherUserName: other.name,
+          otherUserImage: other.profileImageUrl,
+        ),
+      ),
+    );
+  }
+
   Future<void> _messageTeacher(SupervisorStudentRow row) async {
     final auth = context.read<AuthBloc>().state;
     if (auth is! AuthAuthenticated) {
@@ -354,22 +432,18 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
         child: Scaffold(
           backgroundColor: AppColors.background,
           floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => SupervisorDestinations.register(context),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => SupervisorDestinations.onboardStudent(context),
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
-            child: const Icon(Icons.add_rounded),
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            label: const Text('إضافة طالب'),
           ),
           body: Column(
             children: [
               _TopBar(
                 top: top,
                 onSearchFocus: () => _searchFocus.requestFocus(),
-                onFilterHint: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('استخدم الفلاتر أسفل البحث')),
-                  );
-                },
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
@@ -427,6 +501,7 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
       );
     }
     if (_rows.isEmpty) {
+      final noHalaqat = _halaqat.isEmpty;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -434,13 +509,15 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.school_outlined,
+                noHalaqat ? Icons.hub_outlined : Icons.school_outlined,
                 size: 44,
                 color: AppColors.textHint.withValues(alpha: 0.55),
               ),
               const SizedBox(height: 12),
               Text(
-                'لا يوجد طلاب في حلقاتك بعد',
+                noHalaqat
+                    ? 'لا توجد حلقات تحت إشرافك بعد'
+                    : 'لا يوجد طلاب في حلقاتك بعد',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.titleMedium.copyWith(
                   fontWeight: FontWeight.w700,
@@ -448,7 +525,9 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
               ),
               const SizedBox(height: 6),
               Text(
-                'سجّل طالبًا أو انتظر تعيين حلقات تحت إشرافك',
+                noHalaqat
+                    ? 'اطلب من الإدارة إسناد حلقة لك، ثم ستظهر هنا الطلاب والمواعيد'
+                    : 'أضف طالبًا جديدًا أو أسند طالبًا موجودًا لإحدى حلقاتك',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
@@ -497,13 +576,8 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
               preselectedStudentId: row.studentId,
               preselectedHalaqaId: halaqaId,
             ),
-            onContactParents: () {
-              widget.onSwitchTab?.call(SupervisorHomeNav.messagesIndex);
-              if (widget.onSwitchTab == null) {
-                AppSnackBar.showInfo(context, 'افتح تبويب الرسائل للتواصل');
-              }
-            },
-            onWarn: () => SupervisorDestinations.followUp(context),
+            onContactParents: () => _messageParent(row),
+            onFollowUp: () => SupervisorDestinations.followUp(context),
           );
         },
       ),
@@ -514,12 +588,10 @@ class _SupervisorStudentsTabState extends State<SupervisorStudentsTab> {
 class _TopBar extends StatelessWidget {
   final double top;
   final VoidCallback onSearchFocus;
-  final VoidCallback onFilterHint;
 
   const _TopBar({
     required this.top,
     required this.onSearchFocus,
-    required this.onFilterHint,
   });
 
   @override
@@ -530,16 +602,10 @@ class _TopBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(12, top + 8, 12, 10),
       child: Row(
         children: [
-          _RoundIconButton(
-            icon: Icons.arrow_forward_ios_rounded,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('أنت في تبويب الطلاب')),
-            ),
-          ),
           Expanded(
             child: Text(
-              'قاعدة بيانات الطلاب',
-              textAlign: TextAlign.center,
+              'الطلاب',
+              textAlign: TextAlign.right,
               style: AppTextStyles.titleLarge.copyWith(
                 fontWeight: FontWeight.w800,
                 fontSize: 17,
@@ -547,8 +613,6 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           _RoundIconButton(icon: Icons.search_rounded, onTap: onSearchFocus),
-          const SizedBox(width: 8),
-          _RoundIconButton(icon: Icons.tune_rounded, onTap: onFilterHint),
         ],
       ),
     );
@@ -967,7 +1031,7 @@ class _StudentCard extends StatelessWidget {
   final VoidCallback onMessage;
   final VoidCallback onAward;
   final VoidCallback onContactParents;
-  final VoidCallback onWarn;
+  final VoidCallback onFollowUp;
 
   const _StudentCard({
     required this.row,
@@ -975,7 +1039,7 @@ class _StudentCard extends StatelessWidget {
     required this.onMessage,
     required this.onAward,
     required this.onContactParents,
-    required this.onWarn,
+    required this.onFollowUp,
   });
 
   _StudentTone get _tone {
@@ -1135,50 +1199,32 @@ class _StudentCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 12),
-              if (tone == _StudentTone.atRisk)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _OutlineAction(label: 'الملف', onTap: onProfile),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _OutlineAction(label: 'الملف', onTap: onProfile),
+                  if (tone == _StudentTone.atRisk) ...[
+                    _FilledAction(
+                      label: 'تواصل مع الأهل',
+                      color: AppColors.warning,
+                      onTap: onContactParents,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: _FilledAction(
-                        label: 'تواصل مع الأهل',
-                        color: AppColors.warning,
-                        onTap: onContactParents,
-                      ),
+                    _FilledAction(
+                      label: 'متابعة',
+                      color: AppColors.error,
+                      onTap: onFollowUp,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: _FilledAction(
-                        label: 'تحذير',
-                        color: AppColors.error,
-                        onTap: onWarn,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: _OutlineAction(label: 'الملف', onTap: onProfile),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: _OutlineAction(label: 'رسالة', onTap: onMessage),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: _FilledAction(
-                        label: 'منح جائزة',
-                        color: AppColors.secondary,
-                        onTap: onAward,
-                      ),
+                  ] else ...[
+                    _OutlineAction(label: 'رسالة للمعلم', onTap: onMessage),
+                    _FilledAction(
+                      label: 'منح جائزة',
+                      color: AppColors.secondary,
+                      onTap: onAward,
                     ),
                   ],
-                ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1257,13 +1303,20 @@ class _FilledAction extends StatelessWidget {
     required this.onTap,
   });
 
+  Color get _foreground {
+    if (color == AppColors.warning || color == AppColors.secondary) {
+      return AppColors.textPrimary;
+    }
+    return AppColors.onPrimary;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: onTap,
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
-        foregroundColor: AppColors.onPrimary,
+        foregroundColor: _foreground,
         elevation: 0,
         minimumSize: const Size(0, 36),
         padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -1275,7 +1328,10 @@ class _FilledAction extends StatelessWidget {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.w800),
+        style: AppTextStyles.labelSmall.copyWith(
+          fontWeight: FontWeight.w800,
+          color: _foreground,
+        ),
       ),
     );
   }

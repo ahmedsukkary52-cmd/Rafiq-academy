@@ -90,7 +90,7 @@ void main() {
       loading: false,
     );
     expect(h.level, AdminHealthLevel.pending);
-    expect(h.headline, '1 طلب بانتظار الموافقة');
+    expect(h.headline, '1 طلب بانتظار التعيين');
     expect(h.detail, '3 إيصالات قيد مراجعة المشرفين');
   });
 

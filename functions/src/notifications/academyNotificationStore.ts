@@ -5,7 +5,11 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
-import type { InAppNotification } from "./academyNotifications";
+import {
+  isEligibleNotificationRecipient,
+  ROLE_NOTIFICATION_AUDIENCES,
+  type InAppNotification,
+} from "./academyNotifications";
 import { assertSafeDataPayload } from "./evaluationNotification";
 import {
   NOTIFICATIONS_COLLECTION,
@@ -77,16 +81,45 @@ export async function loadStudentNames(
   return out;
 }
 
+const ROLE_AUDIENCES = new Set<string>(ROLE_NOTIFICATION_AUDIENCES);
+
+/** Drops uid audiences whose profile is deactivated or pending first login. */
+export async function retainEligibleNotifications(
+  db: admin.firestore.Firestore,
+  notifications: readonly InAppNotification[],
+): Promise<InAppNotification[]> {
+  const uids = uniqueIds(
+    notifications
+      .map((n) => n.audience.trim())
+      .filter((audience) => audience !== "" && !ROLE_AUDIENCES.has(audience)),
+  );
+  if (uids.length === 0) return [...notifications];
+  const eligible = new Set<string>();
+  const refs = uids.map((id) => db.collection(USERS_COLLECTION).doc(id));
+  for (const chunk of chunks(refs, 100)) {
+    const snaps = await db.getAll(...chunk);
+    for (const snap of snaps) {
+      if (isEligibleNotificationRecipient(snap.data())) eligible.add(snap.id);
+    }
+  }
+  return notifications.filter((n) => {
+    const audience = n.audience.trim();
+    return ROLE_AUDIENCES.has(audience) || eligible.has(audience);
+  });
+}
+
 /**
  * Deterministic-id upsert. Re-publishing the same fact replaces its content
  * and makes it unread again (same semantics as the retired client path).
+ * Deactivated and first-login-pending uid audiences are omitted.
  */
 export async function writeInAppNotifications(
   db: admin.firestore.Firestore,
   notifications: readonly InAppNotification[],
 ): Promise<number> {
+  const eligible = await retainEligibleNotifications(db, notifications);
   const byId = new Map<string, InAppNotification>();
-  for (const n of notifications) {
+  for (const n of eligible) {
     if (n.audience.trim() === "") continue;
     assertSafeDataPayload(n.data);
     byId.set(n.notificationId, n);

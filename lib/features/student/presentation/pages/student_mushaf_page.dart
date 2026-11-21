@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -135,6 +136,9 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   /// Recitation-mode panel only; reading mode uses the audio bar.
   bool _showBottomPanel = false;
   double _fontSize = 23;
+  double _lineHeight = 1.45;
+  String _mushafStyleId = 'paper';
+  String _lastDayStyleId = 'paper';
 
   bool _isLoadingData = true;
   String _errorLoading = '';
@@ -204,16 +208,34 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     } catch (_) {
       _audio = null;
     }
-    _restoreNightPreference();
+    _restoreReaderPreferences();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureInitialized());
   }
 
-  Future<void> _restoreNightPreference() async {
+  Future<void> _restoreReaderPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    final night = prefs.getBool(kMushafNightModePrefsKey) ?? false;
+    final savedStyle = prefs.getString(kMushafStylePrefsKey);
+    final nightLegacy = prefs.getBool(kMushafNightModePrefsKey) ?? false;
+    final lineHeight = prefs.getDouble(kMushafLineHeightPrefsKey);
+
+    var styleId = savedStyle ?? (nightLegacy ? 'night' : 'paper');
+    if (!MushafReaderTokens.styleIds.contains(styleId)) {
+      styleId = nightLegacy ? 'night' : 'paper';
+    }
+
     if (!mounted) return;
-    setState(() => _isDarkMode = night);
-    _syncNightToBloc(night);
+    final tokens = MushafReaderTokens.styleOf(styleId);
+    setState(() {
+      _mushafStyleId = styleId;
+      _isDarkMode = tokens.isNight;
+      if (!tokens.isNight) {
+        _lastDayStyleId = styleId;
+      }
+      if (lineHeight != null) {
+        _lineHeight = lineHeight.clamp(1.25, 1.9);
+      }
+    });
+    _syncNightToBloc(tokens.isNight);
   }
 
   void _syncNightToBloc(bool isNight) {
@@ -223,10 +245,45 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   }
 
   Future<void> _setNightMode(bool isNight) async {
-    setState(() => _isDarkMode = isNight);
+    setState(() {
+      if (isNight) {
+        if (!_isDarkMode) {
+          _lastDayStyleId = _mushafStyleId;
+        }
+        _mushafStyleId = 'night';
+        _isDarkMode = true;
+      } else {
+        _mushafStyleId = _lastDayStyleId;
+        _isDarkMode = false;
+      }
+    });
     _syncNightToBloc(isNight);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(kMushafNightModePrefsKey, isNight);
+    await prefs.setString(kMushafStylePrefsKey, _mushafStyleId);
+  }
+
+  Future<void> _setMushafStyle(String id) async {
+    if (!MushafReaderTokens.styleIds.contains(id)) return;
+    final tokens = MushafReaderTokens.styleOf(id);
+    setState(() {
+      _mushafStyleId = id;
+      _isDarkMode = tokens.isNight;
+      if (!tokens.isNight) {
+        _lastDayStyleId = id;
+      }
+    });
+    _syncNightToBloc(tokens.isNight);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kMushafStylePrefsKey, id);
+    await prefs.setBool(kMushafNightModePrefsKey, tokens.isNight);
+  }
+
+  Future<void> _setLineHeight(double value) async {
+    final clamped = value.clamp(1.25, 1.9);
+    setState(() => _lineHeight = clamped);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(kMushafLineHeightPrefsKey, clamped);
   }
 
   void _ensureInitialized() {
@@ -322,7 +379,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         }
         client.close();
       } catch (e) {
-        debugPrint('Quran API error: $e');
+        if (kDebugMode) debugPrint('Quran API error: $e');
         if (mounted) {
           setState(() {
             _errorLoading = 'تعذر تحميل المصحف. يرجى المحاولة مجدداً.';
@@ -620,7 +677,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
         });
       }
     } catch (e) {
-      debugPrint('Recording start error: $e');
+      if (kDebugMode) debugPrint('Recording start error: $e');
       if (mounted) {
         AppSnackBar.showError(context, 'فشل بدء تسجيل الصوت');
       }
@@ -679,7 +736,7 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = MushafReaderTokens.of(isNight: _isDarkMode);
+    final tokens = MushafReaderTokens.styleOf(_mushafStyleId);
     final canPop = Navigator.canPop(context);
 
     Widget reader = Directionality(
@@ -692,7 +749,14 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
               child: GestureDetector(
                 onTap: _onScreenTap,
                 behavior: HitTestBehavior.translucent,
-                child: _buildAyahsBody(tokens),
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: _chromeVisible
+                        ? MediaQuery.paddingOf(context).top + 48
+                        : 0,
+                  ),
+                  child: _buildAyahsBody(tokens),
+                ),
               ),
             ),
             Positioned(
@@ -757,7 +821,17 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
           prev.isNightMode != next.isNightMode,
       listener: (context, state) {
         if (state.isNightMode != _isDarkMode) {
-          setState(() => _isDarkMode = state.isNightMode);
+          setState(() {
+            _isDarkMode = state.isNightMode;
+            if (state.isNightMode) {
+              if (_mushafStyleId != 'night') {
+                _lastDayStyleId = _mushafStyleId;
+              }
+              _mushafStyleId = 'night';
+            } else if (_mushafStyleId == 'night') {
+              _mushafStyleId = _lastDayStyleId;
+            }
+          });
         }
         if (state.status == SectionStatus.loaded && state.quran != null) {
           final needsFullHydrate =
@@ -849,7 +923,10 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
     List<AyahModel> pageAyahs,
   ) {
     final highlightBg = tokens.selection;
-    final baseStyle = tokens.bodyStyle(fontSize: _fontSize);
+    final baseStyle = tokens.bodyStyle(
+      fontSize: _fontSize,
+      lineHeight: _lineHeight,
+    );
 
     final children = <Widget>[];
     final allSpans = <InlineSpan>[];
@@ -1013,6 +1090,13 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
   }
 
   void _showFontSizeSheet(Color surfaceColor, Color textColor) {
+    const styleOptions = <String, String>{
+      'paper': 'ورقي',
+      'night': 'ليلي',
+      'emerald': 'زمردي',
+      'sepia': 'عتيقة',
+    };
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: surfaceColor,
@@ -1027,19 +1111,59 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'حجم خط المصحف',
+                'إعدادات القراءة',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: textColor,
-                ),
+                style: AppTextStyles.titleMedium.copyWith(color: textColor),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'مظهر الصفحة',
+                style: AppTextStyles.labelMedium.copyWith(color: textColor),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: styleOptions.entries.map((entry) {
+                  final selected = _mushafStyleId == entry.key;
+                  return FilterChip(
+                    selected: selected,
+                    showCheckmark: false,
+                    label: Text(
+                      entry.value,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: selected ? AppColors.onPrimary : textColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: textColor.withValues(alpha: 0.08),
+                    side: BorderSide(
+                      color: selected
+                          ? AppColors.primary
+                          : textColor.withValues(alpha: 0.2),
+                    ),
+                    onSelected: (_) async {
+                      await _setMushafStyle(entry.key);
+                      setModalState(() {});
+                    },
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 20),
+              Text(
+                'حجم الخط',
+                style: AppTextStyles.labelMedium.copyWith(color: textColor),
+              ),
+              const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.font_download_outlined, size: 14),
+                  Icon(
+                    Icons.font_download_outlined,
+                    size: 14,
+                    color: textColor.withValues(alpha: 0.7),
+                  ),
                   Expanded(
                     child: Slider(
                       activeColor: AppColors.primary,
@@ -1052,9 +1176,43 @@ class _StudentMushafPageState extends State<StudentMushafPage> {
                       },
                     ),
                   ),
-                  const Icon(Icons.font_download, size: 24),
+                  Icon(Icons.font_download, size: 24, color: textColor),
                 ],
               ),
+              const SizedBox(height: 8),
+              Text(
+                'تباعد السطور',
+                style: AppTextStyles.labelMedium.copyWith(color: textColor),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.format_line_spacing,
+                    size: 16,
+                    color: textColor.withValues(alpha: 0.7),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      activeColor: AppColors.primary,
+                      value: _lineHeight,
+                      min: 1.25,
+                      max: 1.9,
+                      divisions: 13,
+                      label: _lineHeight.toStringAsFixed(2),
+                      onChanged: (val) {
+                        setModalState(() => _lineHeight = val);
+                        _setLineHeight(val);
+                      },
+                    ),
+                  ),
+                  Text(
+                    _lineHeight.toStringAsFixed(2),
+                    style: AppTextStyles.labelSmall.copyWith(color: textColor),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),

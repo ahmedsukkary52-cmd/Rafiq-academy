@@ -12,6 +12,7 @@ import '../domain/directory_models.dart';
 import 'directory_navigation.dart';
 import 'directory_pickers.dart';
 
+/// Composition-root default: GetIt-registered directory repository.
 AcademyDirectoryRepository defaultDirectoryRepository() =>
     sl<AcademyDirectoryRepository>();
 
@@ -357,117 +358,162 @@ class _PeopleTabState extends State<_PeopleTab>
   Widget build(BuildContext context) {
     super.build(context);
     final role = widget.role;
-    return ListView(
-      padding: const EdgeInsets.all(AppSizes.paddingM),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: Key('dir-search-${role.wire}'),
-                controller: _query,
-                onChanged: _onQuery,
-                textDirection: TextDirection.rtl,
-                decoration: InputDecoration(
-                  hintText: 'ابحث بالاسم أو رقم الأكاديمية',
-                  prefixIcon: const Icon(Icons.search),
-                ),
+    // D4: lazy rows — directory pages grow via "load more" / search results.
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            AppSizes.paddingM,
+            AppSizes.paddingM,
+            0,
+          ),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: Key('dir-search-${role.wire}'),
+                      controller: _query,
+                      onChanged: _onQuery,
+                      textDirection: TextDirection.rtl,
+                      decoration: InputDecoration(
+                        hintText: 'ابحث بالاسم أو رقم الأكاديمية',
+                        prefixIcon: const Icon(Icons.search),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    key: Key('dir-add-${role.wire}'),
+                    onPressed: _add,
+                    icon: const Icon(Icons.person_add_alt_1, size: 18),
+                    label: Text('إضافة ${role.label}'),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              key: Key('dir-add-${role.wire}'),
-              onPressed: _add,
-              icon: const Icon(Icons.person_add_alt_1, size: 18),
-              label: Text('إضافة ${role.label}'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            for (final s in DirectoryStatusFilter.values)
-              ChoiceChip(
-                key: Key('dir-status-${role.wire}-${s.name}'),
-                label: Text(s.label),
-                selected: _status == s,
-                onSelected: (_) {
-                  setState(() => _status = s);
-                  reload();
-                },
-              ),
-            for (final r in _relations)
-              FilterChip(
-                key: Key('dir-relation-${r.name}'),
-                label: Text(r.label),
-                selected: _relation == r,
-                onSelected: (on) {
-                  setState(() {
-                    _relation = on ? r : DirectoryRelationFilter.none;
-                    if (on) _halaqa = null;
-                  });
-                  reload();
-                },
-              ),
-            if (role == DirectoryRole.student)
-              InputChip(
-                key: const Key('dir-halaqa-filter'),
-                avatar: const Icon(Icons.groups_outlined, size: 18),
-                label: Text(_halaqa == null ? 'حسب الحلقة' : _halaqa!.displayName),
-                selected: _halaqa != null,
-                onPressed: _pickHalaqa,
-                onDeleted: _halaqa == null
-                    ? null
-                    : () {
-                        setState(() => _halaqa = null);
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final s in DirectoryStatusFilter.values)
+                    ChoiceChip(
+                      key: Key('dir-status-${role.wire}-${s.name}'),
+                      label: Text(s.label),
+                      selected: _status == s,
+                      onSelected: (_) {
+                        setState(() => _status = s);
                         reload();
                       },
+                    ),
+                  for (final r in _relations)
+                    FilterChip(
+                      key: Key('dir-relation-${r.name}'),
+                      label: Text(r.label),
+                      selected: _relation == r,
+                      onSelected: (on) {
+                        setState(() {
+                          _relation = on ? r : DirectoryRelationFilter.none;
+                          if (on) _halaqa = null;
+                        });
+                        reload();
+                      },
+                    ),
+                  if (role == DirectoryRole.student)
+                    InputChip(
+                      key: const Key('dir-halaqa-filter'),
+                      avatar: const Icon(Icons.groups_outlined, size: 18),
+                      label: Text(
+                        _halaqa == null ? 'حسب الحلقة' : _halaqa!.displayName,
+                      ),
+                      selected: _halaqa != null,
+                      onPressed: _pickHalaqa,
+                      onDeleted: _halaqa == null
+                          ? null
+                          : () {
+                              setState(() => _halaqa = null);
+                              reload();
+                            },
+                    ),
+                ],
               ),
-          ],
+              if (_searchMode &&
+                  (_relation != DirectoryRelationFilter.none ||
+                      _halaqa != null))
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'البحث يشمل كل ${role.plural}؛ امسح البحث لتطبيق تصفية العلاقة أو الحلقة.',
+                    style: AppTextStyles.labelMedium,
+                  ),
+                ),
+              const SizedBox(height: 8),
+              if (_error != null) _Retry(message: _error!, onRetry: reload),
+              if (!_loading && _error == null && _items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AppSizes.paddingL),
+                  child: Text(
+                    _searchMode
+                        ? 'لا توجد نتائج مطابقة'
+                        : 'لا يوجد ${role.plural} ضمن هذه التصفية',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ]),
+          ),
         ),
-        if (_searchMode && (_relation != DirectoryRelationFilter.none || _halaqa != null))
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'البحث يشمل كل ${role.plural}؛ امسح البحث لتطبيق تصفية العلاقة أو الحلقة.',
-              style: AppTextStyles.labelMedium,
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final p = _items[index];
+                return Card(
+                  child: ListTile(
+                    key: Key(
+                      'dir-person-${p.academyRef.isEmpty ? p.name : p.academyRef}',
+                    ),
+                    leading: CircleAvatar(
+                      child: Text(p.displayName.characters.first),
+                    ),
+                    title: Text(p.displayName),
+                    subtitle: Text(p.caption),
+                    trailing: p.isActive
+                        ? const Icon(Icons.chevron_right)
+                        : const Chip(label: Text('غير نشط')),
+                    onTap: () => widget.navigator.openPerson(context, p.uid),
+                  ),
+                );
+              },
+              childCount: _items.length,
             ),
           ),
-        const SizedBox(height: 8),
-        if (_error != null) _Retry(message: _error!, onRetry: reload),
-        if (!_loading && _error == null && _items.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(AppSizes.paddingL),
-            child: Text(
-              _searchMode ? 'لا توجد نتائج مطابقة' : 'لا يوجد ${role.plural} ضمن هذه التصفية',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        for (final p in _items)
-          Card(
-            child: ListTile(
-              key: Key('dir-person-${p.academyRef.isEmpty ? p.name : p.academyRef}'),
-              leading: CircleAvatar(child: Text(p.displayName.characters.first)),
-              title: Text(p.displayName),
-              subtitle: Text(p.caption),
-              trailing: p.isActive
-                  ? const Icon(Icons.chevron_left)
-                  : const Chip(label: Text('غير نشط')),
-              onTap: () => widget.navigator.openPerson(context, p.uid),
-            ),
-          ),
-        if (_loading) const Padding(
-          padding: EdgeInsets.all(AppSizes.paddingM),
-          child: Center(child: CircularProgressIndicator()),
         ),
-        if (!_loading && _hasMore && !_searchMode)
-          TextButton(
-            key: Key('dir-more-${role.wire}'),
-            onPressed: () => _loadPage(reset: false),
-            child: const Text('تحميل المزيد'),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            0,
+            AppSizes.paddingM,
+            AppSizes.paddingM,
           ),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(AppSizes.paddingM),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (!_loading && _hasMore && !_searchMode)
+                TextButton(
+                  key: Key('dir-more-${role.wire}'),
+                  onPressed: () => _loadPage(reset: false),
+                  child: const Text('تحميل المزيد'),
+                ),
+            ]),
+          ),
+        ),
       ],
     );
   }
@@ -559,73 +605,114 @@ class _HalaqatTabState extends State<_HalaqatTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return ListView(
-      padding: const EdgeInsets.all(AppSizes.paddingM),
-      children: [
-        TextField(
-          key: const Key('dir-search-halaqat'),
-          controller: _query,
-          onChanged: (_) {
-            _debounce?.cancel();
-            _debounce = Timer(const Duration(milliseconds: 350), reload);
-          },
-          textDirection: TextDirection.rtl,
-          decoration: const InputDecoration(
-            hintText: 'ابحث باسم الحلقة أو رمزها',
-            prefixIcon: Icon(Icons.search),
+    // D4: lazy halaqa rows for paginated directory browse.
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            AppSizes.paddingM,
+            AppSizes.paddingM,
+            0,
           ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final f in HalaqaListFilter.values)
-              ChoiceChip(
-                key: Key('dir-halaqa-filter-${f.name}'),
-                label: Text(f.label),
-                selected: _filter == f,
-                onSelected: (_) {
-                  setState(() => _filter = f);
-                  reload();
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              TextField(
+                key: const Key('dir-search-halaqat'),
+                controller: _query,
+                onChanged: (_) {
+                  _debounce?.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 350), reload);
                 },
+                textDirection: TextDirection.rtl,
+                decoration: const InputDecoration(
+                  hintText: 'ابحث باسم الحلقة أو رمزها',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_error != null) _Retry(message: _error!, onRetry: reload),
-        if (!_loading && _error == null && _items.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(AppSizes.paddingL),
-            child: Text('لا توجد حلقات ضمن هذه التصفية', textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final f in HalaqaListFilter.values)
+                    ChoiceChip(
+                      key: Key('dir-halaqa-filter-${f.name}'),
+                      label: Text(f.label),
+                      selected: _filter == f,
+                      onSelected: (_) {
+                        setState(() => _filter = f);
+                        reload();
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_error != null) _Retry(message: _error!, onRetry: reload),
+              if (!_loading && _error == null && _items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(AppSizes.paddingL),
+                  child: Text(
+                    'لا توجد حلقات ضمن هذه التصفية',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ]),
           ),
-        for (final h in _items)
-          Card(
-            child: ListTile(
-              key: Key('dir-halaqa-${h.name}'),
-              leading: const Icon(Icons.groups_outlined),
-              title: Text(h.academyRef.isEmpty ? h.displayName : '${h.displayName} · ${h.academyRef}'),
-              subtitle: Text(
-                'المعلم: ${h.teacherName.isEmpty ? 'غير معيّن' : h.teacherName}'
-                ' — المشرف: ${h.supervisorName.isEmpty ? 'غير معيّن' : h.supervisorName}'
-                ' — ${h.studentCount} طالب'
-                '${h.assistantCount > 0 ? ' — ${h.assistantCount} مساعد' : ''}'
-                '${h.hasActiveCover ? ' — تغطية مؤقتة نشطة' : ''}'
-                '${h.isOpen ? '' : ' — مغلقة'}',
-              ),
-              onTap: () => widget.navigator.openHalaqa(context, h.id),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSizes.paddingM),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final h = _items[index];
+                return Card(
+                  child: ListTile(
+                    key: Key('dir-halaqa-${h.name}'),
+                    leading: const Icon(Icons.groups_outlined),
+                    title: Text(
+                      h.academyRef.isEmpty
+                          ? h.displayName
+                          : '${h.displayName} · ${h.academyRef}',
+                    ),
+                    subtitle: Text(
+                      'المعلم: ${h.teacherName.isEmpty ? 'غير معيّن' : h.teacherName}'
+                      ' — المشرف: ${h.supervisorName.isEmpty ? 'غير معيّن' : h.supervisorName}'
+                      ' — ${h.studentCount} طالب'
+                      '${h.assistantCount > 0 ? ' — ${h.assistantCount} مساعد' : ''}'
+                      '${h.hasActiveCover ? ' — تغطية مؤقتة نشطة' : ''}'
+                      '${h.isOpen ? '' : ' — مغلقة'}',
+                    ),
+                    onTap: () => widget.navigator.openHalaqa(context, h.id),
+                  ),
+                );
+              },
+              childCount: _items.length,
             ),
           ),
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.all(AppSizes.paddingM),
-            child: Center(child: CircularProgressIndicator()),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.paddingM,
+            0,
+            AppSizes.paddingM,
+            AppSizes.paddingM,
           ),
-        if (!_loading && _hasMore)
-          TextButton(
-            key: const Key('dir-more-halaqat'),
-            onPressed: () => _load(reset: false),
-            child: const Text('تحميل المزيد'),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(AppSizes.paddingM),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (!_loading && _hasMore)
+                TextButton(
+                  key: const Key('dir-more-halaqat'),
+                  onPressed: () => _load(reset: false),
+                  child: const Text('تحميل المزيد'),
+                ),
+            ]),
           ),
+        ),
       ],
     );
   }

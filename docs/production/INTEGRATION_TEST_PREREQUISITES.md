@@ -1,53 +1,67 @@
 # Integration Test Prerequisites (`integration_test`)
 
-**Status:** Not started — blocked on environment (2026-10-07, Release Readiness Fix Pass, Phase 12).
+**Status:** Bootstrap implemented (2026-11-21) — device run still requires Android Emulator + local Firebase Emulator Suite.
 
-## Why it was not implemented
+## Why it was blocked historically
 
-- `lib/main.dart` always calls `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`,
-  which targets the **production** project `rafiq-academy`. There is no emulator hook and no
-  staging project.
-- An on-device `integration_test` run would therefore sign in, write attendance, evaluations,
-  chat messages and payment proofs against **production data**. That is unsafe.
-- The fix pass explicitly forbids adding a permanent emulator switch or changing the
-  environment architecture, so the safe paths below were not built.
-- `integration_test` is not in `pubspec.yaml` and no `integration_test/` directory exists.
+Older notes claimed `main.dart` always initialized the Production `rafiq-academy` project. That is **obsolete**.
+
+Current fail-closed routing (`lib/core/firebase/app_firebase.dart` + `app_flavor.dart`):
+
+- Local flavors (`dev` / `staging`) **require** `--dart-define=USE_FIREBASE_EMULATOR=true` and debug builds.
+- Emulator options are fake keys for project **`demo-rafiq-rules`** only.
+- Every Auth / Firestore / Functions / Storage client is wired to `127.0.0.1` with `automaticHostMapping: false`.
+- Trial/prod flavors refuse Emulator routing.
+
+What was still missing (and is now added):
+
+- `integration_test` package + `integration_test/` journeys
+- Emulator health probe that **fails closed** if ports are down
+- Seed fixture script for a fresh Emulator session
+- Runner script documenting `adb reverse` (required because the app uses `127.0.0.1`, not `10.0.2.2`)
 
 ## What already covers the backend today
 
-- Firestore rules: `npm --prefix rules_test run test:all:firestore` (emulator, project `demo-rafiq-rules`).
-- Storage rules: `npm --prefix rules_test run test:all:storage`.
-- Functions unit/contract: `npm --prefix functions test`.
-- Functions emulator suite: `npx firebase emulators:exec --project demo-rafiq-rules --only auth,firestore,functions,storage "<the four *.emulator.test.mjs files>"`.
-- Flutter: Bloc, repository/datasource contract and widget tests under `test/` (hand-written fakes).
+- Firestore / Storage rules suites on `demo-rafiq-rules`
+- Functions Emulator suites
+- Flutter unit / bloc / widget tests under `test/`
 
-## Prerequisites (one of the following must exist first)
+## How to run Flutter ↔ Emulator integration
 
-1. **Emulator entry point (recommended for CI)**
-   - A separate test-only entry point (e.g. `integration_test/app_test.dart` calling a
-     `bootstrapForTest()` that runs `useAuthEmulator` / `useFirestoreEmulator` /
-     `useFunctionsEmulator('…', 5001)` / `useStorageEmulator` before `runApp`).
-   - Must not change `lib/main.dart` behaviour for release builds.
-   - Seed script for the `demo-rafiq-rules` emulator: one admin, teacher, supervisor,
-     parent, linked student, halaqa with schedule, invoice.
-   - Android emulator host mapping (`10.0.2.2`) and cleartext allowance for debug only.
-   - Requires an explicit decision, because it is a (test-only) environment switch.
-2. **Staging Firebase project**
-   - Depends on the paused environment-split work (separate project, `google-services.json`
-     / `GoogleService-Info.plist` per flavor, `.firebaserc` alias, deployed rules/indexes/
-     Functions, billing checklist).
+```powershell
+# Terminal A — Emulator Suite (demo-rafiq-rules only)
+npm --prefix functions run serve
 
-## Critical journeys to cover once unblocked
+# Terminal B — seed once on an empty session
+$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
+$env:FIREBASE_AUTH_EMULATOR_HOST="127.0.0.1:9099"
+$env:FIREBASE_STORAGE_EMULATOR_HOST="127.0.0.1:9199"
+$env:FIREBASE_FUNCTIONS_EMULATOR_HOST="127.0.0.1:5001"
+$env:GCLOUD_PROJECT="demo-rafiq-rules"
+node functions/scripts/seed-integration-fixture.mjs
 
-- Login per role → correct home (incl. deactivated-account rejection).
-- Teacher: open halaqa → save attendance → live evaluation → parent receives notification.
-- Supervisor: issue achievement; admit student; review payment proof.
-- Parent: submit payment proof (Storage upload) → status reflects review.
-- Chat: start allowed conversation, send text/image/voice, edit, delete; denied pair rejected.
-- Student: homework complete → coins awarded server-side.
+# Terminal C — Android Emulator + reverse + tests
+flutter emulators --launch Pixel_9_Pro
+# wait until device is online
+powershell -File tool/run_flutter_emulator_integration.ps1
+```
 
-## Tooling
+Or a single-device invocation:
 
-- Add `integration_test: sdk: flutter` to `dev_dependencies`.
-- Run with `flutter test integration_test --no-pub -d <device>` (emulators running first).
-- Firebase Test Lab is out of scope for this pass.
+```text
+flutter test integration_test --flavor dev --dart-define=USE_FIREBASE_EMULATOR=true -d <android-id>
+```
+
+## Journeys covered by bootstrap
+
+1. Auth + role routing (student / parent / wrong password)
+2. Student home loads Firestore profile name
+3. Parent payments surface loads from Emulator
+
+## Hard rules
+
+- Never run without `USE_FIREBASE_EMULATOR=true`
+- Never use trial/prod flavors for these tests
+- Never weaken Rules / Functions AuthZ for the suite
+- Never seed against a non-empty Emulator session (fixture refuses)
+- Never point at Production credentials or `rafiq-academy` Cloud

@@ -12,16 +12,16 @@ import '../widgets/admin_subpage_scaffold.dart';
 
 abstract final class AdminPaymentDestinationsText {
   static const String title = 'وسائل الدفع';
-  static const String subtitle = 'وجهات الدفع الرسمية التي يراها أولياء الأمور';
+  static const String subtitle = 'أرقام الدفع الرسمية التي يراها أولياء الأمور';
   static const String businessNotice =
-      'أدخل وجهات الدفع الرسمية الخاصة بالأكاديمية فقط. لا تُدخل أرقاماً أو '
-      'حسابات شخصية. كل طريقة مستقلة عن الأخرى ولا تُستخدم قيمة إحداهما للأخرى.';
+      'أدخل أرقام المحافظ الرسمية الخاصة بالأكاديمية فقط. لا تُدخل أرقاماً شخصية. '
+      'فودافون كاش وإنستاباي مستقلان — يظهر كلاهما لولي الأمر ليختار طريقة التحويل.';
   static const String vodafoneCashTitle = 'فودافون كاش';
   static const String vodafoneCashLabel = 'رقم محفظة فودافون كاش';
   static const String vodafoneCashHint = '010XXXXXXXX';
   static const String instapayTitle = 'إنستاباي';
-  static const String instapayLabel = 'عنوان إنستاباي أو رابط الدفع';
-  static const String instapayHint = 'name@instapay أو https://…';
+  static const String instapayLabel = 'رقم إنستاباي';
+  static const String instapayHint = '01XXXXXXXXX';
   static const String clearHelper =
       'اترك الحقل فارغاً ثم احفظ لإيقاف إظهار هذه الطريقة لأولياء الأمور.';
   static const String confirmBusiness =
@@ -202,6 +202,28 @@ class _DestinationEditorState extends State<_DestinationEditor> {
   bool get _isVodafone => widget.method == AcademyPaymentMethod.vodafoneCash;
   String get _prefix => _isVodafone ? 'vodafone-cash' : 'instapay';
 
+  bool get _dirty {
+    final current = AcademyPaymentDestinations.normalize(
+      widget.method,
+      _controller.text,
+    );
+    final saved = AcademyPaymentDestinations.normalize(
+      widget.method,
+      widget.saved,
+    );
+    return current != saved;
+  }
+
+  @override
+  void didUpdateWidget(covariant _DestinationEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.saved != widget.saved) {
+      _controller.text = widget.saved;
+      _confirmed = false;
+      _error = null;
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -223,6 +245,7 @@ class _DestinationEditorState extends State<_DestinationEditor> {
       setState(() => _error = AdminPaymentDestinationsText.confirmRequired);
       return;
     }
+    if (!_dirty) return;
     setState(() => _error = null);
     context.read<AdminPaymentDestinationsBloc>().add(
       SavePaymentDestinationEvent(method: widget.method, value: value),
@@ -232,9 +255,15 @@ class _DestinationEditorState extends State<_DestinationEditor> {
   @override
   Widget build(BuildContext context) {
     final saved = widget.saved.trim();
-    final savedValid =
-        saved.isEmpty ||
-        AcademyPaymentDestinations.validate(widget.method, saved) == null;
+    // Display status: legacy InstaPay address/link remain readable even though
+    // new admin saves accept Egyptian mobile only.
+    final savedValid = saved.isEmpty ||
+        switch (widget.method) {
+          AcademyPaymentMethod.vodafoneCash =>
+            AcademyPaymentDestinations.isValidVodafoneCash(saved),
+          AcademyPaymentMethod.instapay =>
+            AcademyPaymentDestinations.instapayKind(saved) != null,
+        };
     final status = saved.isEmpty
         ? AdminPaymentDestinationsText.notConfigured
         : savedValid
@@ -269,15 +298,13 @@ class _DestinationEditorState extends State<_DestinationEditor> {
             controller: _controller,
             enabled: !widget.busy,
             textDirection: TextDirection.ltr,
-            keyboardType: _isVodafone
-                ? TextInputType.number
-                : TextInputType.url,
+            keyboardType: TextInputType.phone,
             maxLength: _isVodafone
                 ? AcademyPaymentDestinations.vodafoneCashMaxLength
                 : AcademyPaymentDestinations.instapayMaxLength,
-            onChanged: (_) {
-              if (_error != null) setState(() => _error = null);
-            },
+            onChanged: (_) => setState(() {
+              if (_error != null) _error = null;
+            }),
             decoration: InputDecoration(
               labelText: _isVodafone
                   ? AdminPaymentDestinationsText.vodafoneCashLabel
@@ -292,7 +319,6 @@ class _DestinationEditorState extends State<_DestinationEditor> {
               counterText: '',
             ),
           ),
-          // ListTiles paint ink on the nearest Material, not on the card.
           Material(
             type: MaterialType.transparency,
             child: CheckboxListTile(
@@ -318,6 +344,7 @@ class _DestinationEditorState extends State<_DestinationEditor> {
             key: Key('$_prefix-save'),
             label: AdminPaymentDestinationsText.save,
             isLoading: widget.saving,
+            // Keep tappable while editing; _save no-ops when !_dirty.
             onPressed: widget.busy ? null : _save,
           ),
         ],

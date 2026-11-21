@@ -81,12 +81,85 @@ export const MEETING_LINK_MESSAGES: Readonly<Record<MeetingLinkIssue, string>> =
     contact_info: CONTACT_INFO_REJECTION_MESSAGE,
   });
 
-const WHITESPACE_OR_CONTROL =
-  /[\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]/;
+/** Real gaps / controls that survive normalize (NUL etc.). */
+const HARD_WHITESPACE = /[\s\u0000-\u001f\u007f-\u009f]/;
+/** Invisible paste junk from RTL UIs / Calendar — strip, don't reject. */
+const INVISIBLE_PASTE_MARKS =
+  /[\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060\u2066-\u2069\ufeff\u00ad]/g;
+/** Unicode / ASCII whitespace — meeting URLs never need spaces. */
+const ANY_WHITESPACE = /\s/g;
+/** Space between alphanumerics (Meet code paste) → hyphen, not join. */
+const WHITESPACE_BETWEEN_ALNUM = /(?<=[A-Za-z0-9])\s+(?=[A-Za-z0-9])/g;
+/** Fancy dashes from Meet/WhatsApp/Office — look like `-` but aren't ASCII. */
+const UNICODE_DASHES = /[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\ufe58\ufe63\uff0d]/g;
 const PRINTABLE_ASCII = /^[\x21-\x7e]+$/;
 const HTTPS_PREFIX = /^https:\/\//i;
 const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const PORT = /^\d{1,5}$/;
+/** Extract first https URL when the user pastes invite text around it. */
+const EMBEDDED_HTTPS_URL = /https:\/\/[^\s<>"'{}|\\^`\[\]]+/i;
+const BARE_MEETING_HOST =
+  /^(?:meet\.google\.com|(?:[\w-]+\.)?zoom\.(?:us|com)|teams\.microsoft\.com|(?:[\w-]+\.)?webex\.com|meet\.jit\.si)(?:[/:?#]|$)/i;
+
+/**
+ * Zoom / Google Meet / Teams meeting IDs are long digit runs. Treating them as
+ * phone numbers wrongly rejects real room links (e.g. `/j/0112…`).
+ */
+export function isKnownMeetingHost(hostname: string): boolean {
+  const h = hostname.trim().toLowerCase();
+  if (!h) return false;
+  if (h === "meet.google.com" || h.endsWith(".meet.google.com")) return true;
+  if (h === "zoom.us" || h.endsWith(".zoom.us")) return true;
+  if (h === "zoom.com" || h.endsWith(".zoom.com")) return true;
+  if (h === "teams.microsoft.com" || h.endsWith(".teams.microsoft.com")) {
+    return true;
+  }
+  if (h === "webex.com" || h.endsWith(".webex.com")) return true;
+  if (h === "meet.jit.si") return true;
+  return false;
+}
+
+/**
+ * Normalize common paste shapes before policy checks:
+ * surrounding quotes, invite text, bare host, http→https for known hosts.
+ */
+export function normalizeMeetingLinkInput(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  let value = raw
+    .replace(INVISIBLE_PASTE_MARKS, "")
+    .replace(UNICODE_DASHES, "-");
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+  // Invite paste — only strip leading junk before the first https://.
+  // Never truncate a lone URL that already starts with https://.
+  const httpsAt = value.toLowerCase().indexOf("https://");
+  if (httpsAt > 0) {
+    const embedded = value.slice(httpsAt).match(EMBEDDED_HTTPS_URL);
+    if (embedded) value = embedded[0];
+  }
+  // After URL extract: Meet-code spaces → `-`, then drop leftover whitespace.
+  value = value
+    .replace(WHITESPACE_BETWEEN_ALNUM, "-")
+    .replace(ANY_WHITESPACE, "");
+  if (!/^https?:\/\//i.test(value) && BARE_MEETING_HOST.test(value)) {
+    value = `https://${value}`;
+  }
+  if (/^http:\/\//i.test(value)) {
+    try {
+      const asHttps = new URL(`https://${value.slice("http://".length)}`);
+      if (isKnownMeetingHost(asHttps.hostname)) {
+        value = asHttps.toString();
+      }
+    } catch {
+      // keep original; policy will reject
+    }
+  }
+  return value;
+}
 
 function hostIssue(authority: string): MeetingLinkIssue | null {
   if (authority.includes("@")) return "credentials";
@@ -108,14 +181,14 @@ function hostIssue(authority: string): MeetingLinkIssue | null {
 
 /**
  * First policy issue of [raw] or null when it is an acceptable link.
- * Only outer whitespace is trimmed; nothing is ever prefixed or rewritten.
+ * Input is normalized (trim / extract URL / known-host https) first.
  */
 export function meetingLinkIssue(raw: unknown): MeetingLinkIssue | null {
   if (typeof raw !== "string") return "malformed";
-  const value = raw.trim();
+  const value = normalizeMeetingLinkInput(raw);
   if (value.length === 0) return "empty";
   if (value.length > MAX_MEETING_LINK_LENGTH) return "too_long";
-  if (WHITESPACE_OR_CONTROL.test(value)) return "whitespace";
+  if (HARD_WHITESPACE.test(value)) return "whitespace";
   if (!PRINTABLE_ASCII.test(value)) return "unsupported_characters";
   if (!HTTPS_PREFIX.test(value)) return "not_https";
   if (value.includes("\\")) return "malformed";
@@ -136,17 +209,22 @@ export function meetingLinkIssue(raw: unknown): MeetingLinkIssue | null {
   if (parsed.protocol !== "https:") return "not_https";
   if (parsed.username !== "" || parsed.password !== "") return "credentials";
 
-  // WhatsApp / tel links anywhere; phone-number digit runs only outside the
-  // host, so a provider host containing digits is never rejected for them.
+  // Always block WhatsApp / tel: schemes. Phone digit runs in the path are
+  // skipped for known meeting hosts (Zoom room IDs look like mobiles).
   const anywhere = detectContactInfo(value);
   if (anywhere === "whatsapp_link" || anywhere === "phone_link") {
     return "contact_info";
   }
-  if (detectContactInfo(rest) !== null) return "contact_info";
+  if (
+    !isKnownMeetingHost(parsed.hostname) &&
+    detectContactInfo(rest) !== null
+  ) {
+    return "contact_info";
+  }
   return null;
 }
 
-/** Returns the trimmed link or throws a value-free `invalid-argument`. */
+/** Returns the normalized link or throws a value-free `invalid-argument`. */
 export function validateMeetingLink(raw: unknown): string {
   const issue = meetingLinkIssue(raw);
   if (issue) {
@@ -155,7 +233,7 @@ export function validateMeetingLink(raw: unknown): string {
       reason: issue,
     });
   }
-  return (raw as string).trim();
+  return normalizeMeetingLinkInput(raw);
 }
 
 /** Create-time variant: missing or blank means "no link". */

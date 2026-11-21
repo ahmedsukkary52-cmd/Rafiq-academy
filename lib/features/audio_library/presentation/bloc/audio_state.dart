@@ -67,24 +67,16 @@ class AudioLibraryState extends Equatable {
   // Getters for filtered results
   List<ReciterEntity> get filteredReciters {
     if (searchQuery.isEmpty) {
-      final result = favoriteReciters.isEmpty ? allReciters : favoriteReciters;
-      print(
-        '[AudioLibraryState] No search query, returning ${result.length} reciters (${favoriteReciters.isEmpty ? "all" : "favorites"})',
-      );
-      return result;
+      return favoriteReciters.isEmpty ? allReciters : favoriteReciters;
     }
     final query = searchQuery.toLowerCase();
-    final result = allReciters
+    return allReciters
         .where(
           (reciter) =>
               reciter.name.toLowerCase().contains(query) ||
               reciter.recitationStyle.toLowerCase().contains(query),
         )
         .toList();
-    print(
-      '[AudioLibraryState] Searching for "$query", found ${result.length} reciters',
-    );
-    return result;
   }
 
   List<SurahAudioEntity> get filteredSurahAudios {

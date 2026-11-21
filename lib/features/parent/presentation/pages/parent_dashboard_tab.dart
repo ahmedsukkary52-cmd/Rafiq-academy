@@ -178,13 +178,13 @@ class _DashboardBody extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           const _QuickActionsCard(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           _SectionTitle(
             title: 'مركز التنبيهات الذكية',
             actionLabel: 'الكل',
             onAction: () => ParentDestinations.notifications(context),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (state.alerts.isEmpty)
             const _AlertsEmptyCard()
           else
@@ -194,13 +194,13 @@ class _DashboardBody extends StatelessWidget {
                 child: _AlertCard(alert: alert),
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _SectionTitle(
             title: 'مركز المتابعة السريع',
             actionLabel: 'مشاهدة الكل',
             onAction: () => onSwitchTab(ParentHomeNav.childrenIndex),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (state.childrenIds.isEmpty)
             const _ChildrenEmptyBanner()
           else
@@ -254,7 +254,7 @@ class _ParentHomeHeader extends StatelessWidget {
           top: MediaQuery.paddingOf(context).top + 12,
           left: 20,
           right: 20,
-          bottom: 36,
+          bottom: 28,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -405,9 +405,9 @@ class _HeaderSquareButton extends StatelessWidget {
             children: [
               Icon(icon, color: AppColors.onPrimary, size: 20),
               if (showDot)
-                const Positioned(
+                const PositionedDirectional(
                   top: 8,
-                  right: 8,
+                  start: 8,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: AppColors.secondary,
@@ -729,7 +729,7 @@ class _ChildrenCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 268,
+      height: 228,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: snapshots.length,
@@ -769,53 +769,62 @@ class _ChildFollowUpCard extends StatelessWidget {
     final attendancePct = parentPercentLabel(child.attendancePercentInWindow);
 
     return _SurfaceCard(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              ParentUserAvatar(
-                name: name,
-                imageUrl: child.profileImageUrl,
-                radius: 20,
-                backgroundColor: AppColors.secondaryBg,
-                foregroundColor: AppColors.secondaryDeep,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.titleLarge.copyWith(height: 1.2),
-                    ),
-                    Text(
-                      halaqa.isEmpty ? 'لم تُحدد حلقة بعد' : halaqa,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: AppColors.textHint,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+          InkWell(
+            onTap: () => ParentDestinations.childProfile(
+              context,
+              studentId: child.studentId,
+              studentName: name,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                ParentUserAvatar(
+                  name: name,
+                  imageUrl: child.profileImageUrl,
+                  radius: 22,
+                  backgroundColor: AppColors.secondaryBg,
+                  foregroundColor: AppColors.secondaryDeep,
                 ),
-              ),
-              const SizedBox(width: 6),
-              AppStatusChip(
-                label: child.isAtRisk ? 'يحتاج متابعة' : 'متابعة جيدة',
-                tone: child.isAtRisk
-                    ? AppStatusTone.warning
-                    : AppStatusTone.success,
-                maxWidth: 96,
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.titleLarge.copyWith(height: 1.2),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        halaqa.isEmpty ? 'لم تُحدد حلقة بعد' : halaqa,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textHint,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                AppStatusChip(
+                  label: child.isAtRisk ? 'يحتاج متابعة' : 'متابعة جيدة',
+                  tone: child.isAtRisk
+                      ? AppStatusTone.warning
+                      : AppStatusTone.success,
+                  maxWidth: 110,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             children: [
               if (AppCapabilities.memorizationProgressAvailable) ...[
@@ -845,23 +854,25 @@ class _ChildFollowUpCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(AppSizes.radiusM),
-            ),
-            child: Text(
-              halaqa.isEmpty ? 'لا توجد حلقة مرتبطة اليوم' : 'الحلقة: $halaqa',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.primaryDark,
-                fontWeight: FontWeight.w600,
+          if (halaqa.isEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(AppSizes.radiusM),
+              ),
+              child: Text(
+                'لا توجد حلقة مرتبطة اليوم',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.primaryDark,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
+          ],
           if (payment.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -899,7 +910,7 @@ class _ChildFollowUpCard extends StatelessWidget {
               ),
             ),
           ],
-          const Spacer(),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(

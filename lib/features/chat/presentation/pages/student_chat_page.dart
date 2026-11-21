@@ -53,8 +53,8 @@ class _StudentChatPageState extends State<StudentChatPage> {
     if (teacherUid == null || teacherUid.isEmpty) {
       setState(() {
         _error = resolved.hasHalaqa
-            ? 'تعذّر تحديد معلم الحلقة'
-            : 'لم يتم تعيينك لحلقة بعد — تواصل مع الإدارة';
+            ? 'لا يوجد ارتباط بينك وبين معلم حالياً.\nحلقتك موجودة لكن لم يُربط بها معلم بعد — اطلب من المشرف أو الإدارة تعيين معلم للحلقة.'
+            : 'لا يوجد ارتباط بينك وبين معلم.\nلم تُسجَّل في حلقة بعد، لذلك لا يمكن فتح محادثة مع معلم. تواصل مع الإدارة لإضافتك لحلقة.';
       });
       return;
     }
@@ -76,7 +76,10 @@ class _StudentChatPageState extends State<StudentChatPage> {
     );
 
     final bloc = sl<ChatConversationsBloc>();
-    bloc.add(StartWatchingConversationsEvent(auth.user.uid));
+    bloc.add(StartWatchingConversationsEvent(
+      auth.user.uid,
+      pageSize: ChatConversationsBloc.defaultInboxPageSize,
+    ));
     bloc.add(const ResetStartConversationEvent());
     bloc.add(
       StartConversationEvent(currentUser: currentUser, otherUser: teacher),
@@ -109,7 +112,10 @@ class _StudentChatPageState extends State<StudentChatPage> {
       listener: (context, state) {
         if (state.startConversationStatus == SubmissionStatus.error) {
           setState(() {
-            _error = state.startConversationError ?? 'فشل فتح المحادثة';
+            final raw = state.startConversationError?.trim();
+            _error = (raw == null || raw.isEmpty)
+                ? 'تعذر فتح المحادثة الآن.\nتحقق من الاتصال ثم أعد المحاولة.'
+                : raw;
           });
           return;
         }
@@ -137,9 +143,20 @@ class _StudentChatPageState extends State<StudentChatPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
+                        'تعذر التواصل مع المعلم',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.titleLarge.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: AppTextStyles.bodyMedium,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.6,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton(
@@ -147,6 +164,10 @@ class _StudentChatPageState extends State<StudentChatPage> {
                           _navigated = false;
                           _bootstrap();
                         },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                        ),
                         child: const Text('إعادة المحاولة'),
                       ),
                     ],

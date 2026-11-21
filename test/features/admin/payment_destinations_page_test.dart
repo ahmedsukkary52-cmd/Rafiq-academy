@@ -176,14 +176,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(_k('instapay-field'), kDevPlaceholderInstapayLink);
+    await tester.enterText(_k('instapay-field'), kDevPlaceholderInstapayMobile);
     await tester.tap(_k('instapay-confirm'));
     await tester.pump();
     await tester.tap(_k('instapay-save'));
     await tester.pump();
 
     expect(repo.writes, [
-      (vodafoneCash: null, instapay: kDevPlaceholderInstapayLink),
+      (vodafoneCash: null, instapay: kDevPlaceholderInstapayMobile),
     ]);
     expect(find.text(AdminPaymentDestinationsText.saved), findsNothing);
 
@@ -197,7 +197,7 @@ void main() {
     );
     expect(
       bloc.state.settings!.instapayDestination,
-      kDevPlaceholderInstapayLink,
+      kDevPlaceholderInstapayMobile,
     );
     await tester.pumpAndSettle(const Duration(seconds: 5));
     await _close(tester, bloc);

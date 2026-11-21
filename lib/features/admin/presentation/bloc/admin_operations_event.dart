@@ -37,10 +37,14 @@ class LinkParentChildEvent extends AdminOperationsEvent {
 
 class CreateHalaqaEvent extends AdminOperationsEvent {
   final CreateHalaqaParams params;
-  const CreateHalaqaEvent(this.params);
+
+  /// Optional students to admit into the new halaqa after create succeeds.
+  final List<String> admitStudentIds;
+
+  const CreateHalaqaEvent(this.params, {this.admitStudentIds = const []});
 
   @override
-  List<Object?> get props => [params];
+  List<Object?> get props => [params, admitStudentIds];
 }
 
 class AddHalaqaSlotEvent extends AdminOperationsEvent {

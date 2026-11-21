@@ -54,7 +54,7 @@ class _Participant extends Fake implements GetChatParticipantUseCase {
   ) async => Right(
     ChatParticipantEntity(
       uid: params.uid,
-      name: 'ولي الأمر',
+      name: params.uid == 'p2' ? 'ولي الأمر الثاني' : 'ولي الأمر',
       role: AppRoles.parent,
     ),
   );
@@ -315,6 +315,27 @@ void main() {
 
       expect(find.text('لا يوجد ولي أمر مرتبط بهذا الطالب'), findsOneWidget);
       expect(h.chat.started, isEmpty);
+    });
+
+    testWidgets('multi-parent picker starts chat with selected parent', (
+      tester,
+    ) async {
+      final h = await _pump(
+        tester,
+        role: AppRoles.teacher,
+        parentIds: const ['p1', 'p2'],
+      );
+      await _tapContact(tester);
+
+      expect(find.text('اختر ولي الأمر'), findsOneWidget);
+      expect(find.text('ولي الأمر الثاني'), findsOneWidget);
+      expect(h.chat.started, isEmpty);
+
+      await tester.tap(find.text('ولي الأمر الثاني'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TEACHER CHAT c1'), findsOneWidget);
+      expect(h.chat.started.single.otherUser.uid, 'p2');
     });
   });
 

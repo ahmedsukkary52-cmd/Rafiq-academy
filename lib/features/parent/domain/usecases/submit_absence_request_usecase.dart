@@ -36,9 +36,7 @@ class SubmitAbsenceRequestUseCase extends UseCase<Unit, AbsenceRequestEntity> {
     if (requestedBy.isEmpty) {
       return const Left(ValidationFailure('معرّف ولي الأمر مطلوب'));
     }
-    if (reason.isEmpty) {
-      return const Left(ValidationFailure('سبب الاستئذان مطلوب'));
-    }
+    // Reason is optional — this is an informational notice, not a gate.
 
     final childrenEither = await repository.getChildrenIds(requestedBy);
     final childrenFailure = childrenEither.fold<Failure?>(
@@ -71,7 +69,7 @@ class SubmitAbsenceRequestUseCase extends UseCase<Unit, AbsenceRequestEntity> {
       halaqaId: halaqaId,
       requestedBy: requestedBy,
       date: day,
-      reason: reason,
+      reason: reason.isEmpty ? 'بدون ذكر السبب' : reason,
       status: AbsenceRequestStatus.pending,
     );
 

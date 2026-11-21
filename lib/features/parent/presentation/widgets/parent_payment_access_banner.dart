@@ -32,7 +32,8 @@ class ParentPaymentAccessLabels {
     PaymentAccessContract.statusReminded =>
       'يوجد مستحقات تحتاج متابعة. يمكنك السداد من تبويب المدفوعات.',
     PaymentAccessContract.statusDueWarning =>
-      'اقترب موعد السداد. يُرجى إتمام الدفع عبر فودافون كاش ورفع إثبات الدفع.',
+      'اقترب موعد السداد. يُرجى إتمام الدفع عبر الطريقة المتاحة '
+          '(فودافون كاش أو إنستاباي) ورفع إثبات الدفع.',
     PaymentAccessContract.statusInGrace =>
       'ما زال الوصول متاحاً خلال فترة السماح، لكن السداد مطلوب قريباً.',
     PaymentAccessContract.statusSuspended =>

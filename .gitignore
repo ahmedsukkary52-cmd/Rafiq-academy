@@ -58,3 +58,13 @@ functions/.env.local
 functions/.secret.local
 *service-account*.json
 *serviceAccountKey*.json
+
+# Local emulator export backups (may contain demo Auth hashes / PII-like demo data)
+/_backups/
+
+# Android upload / signing material (also ignored under android/.gitignore).
+# Never commit keystores or key.properties — see docs/production/RELEASE_PLATFORM_SETUP.md.
+*.jks
+*.keystore
+key.properties
+**/key.properties

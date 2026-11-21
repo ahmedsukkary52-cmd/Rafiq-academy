@@ -48,7 +48,8 @@ const INVALID = {
   not_https: `http://meet.example.test/${MARK}-nh`,
   credentials: `https://user:pw@meet.example.test/${MARK}-cr`,
   invalid_host: `https://localhost/${MARK}-ih`,
-  whitespace: `https://meet.example.test/${MARK} ws`,
+  // Real gap whitespace is normalized; only hard controls (e.g. NUL) stay invalid.
+  whitespace: `https://meet.example.test/${MARK}\u0000ws`,
   unsupported_characters: `https://meet.example.test/${MARK}-\u00e9`,
   too_long: `https://meet.example.test/${MARK}-${"a".repeat(500)}`,
   malformed: `https://meet.example.test\\${MARK}-ml`,

@@ -4,7 +4,7 @@ import '../../../../core/constants/academy_branding.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../domain/academy_login_identifier.dart';
 
-/// Rounded primary-colour backdrop shared by the Auth pages.
+/// Gradient header backdrop shared by the Auth pages.
 class AuthHeaderBackdrop extends StatelessWidget {
   const AuthHeaderBackdrop({super.key});
 
@@ -17,7 +17,7 @@ class AuthHeaderBackdrop extends StatelessWidget {
       height: MediaQuery.of(context).size.height * 0.36,
       child: const DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          gradient: AppColors.primaryGradient,
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(32),
             bottomRight: Radius.circular(32),
@@ -104,7 +104,7 @@ class AcademyLogo extends StatelessWidget {
       semanticLabel: AcademyBranding.displayName,
       errorBuilder: (_, __, ___) => Icon(
         Icons.menu_book_rounded,
-        color: Colors.white,
+        color: AppColors.primary,
         size: size * 0.55,
       ),
     );
@@ -190,9 +190,9 @@ abstract final class AuthValidators {
 
   static String? loginIdentifier(String? value) {
     final v = value?.trim() ?? '';
-    if (v.isEmpty) return 'أدخل اسم المستخدم أو البريد الإلكتروني';
+    if (v.isEmpty) return 'أدخل اسم المستخدم';
     if (AcademyLoginIdentifier.toAuthEmail(v) == null) {
-      return 'اسم المستخدم أو البريد الإلكتروني غير صالح';
+      return 'اسم المستخدم غير صالح';
     }
     return null;
   }

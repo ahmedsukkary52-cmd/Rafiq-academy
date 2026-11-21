@@ -8,6 +8,9 @@ import 'package:rafiq_academy/core/di/injection_container.dart';
 import 'package:rafiq_academy/core/error/failure.dart';
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations_bloc.dart';
 import 'package:rafiq_academy/features/chat/presentation/bloc/chat_conversations_state.dart';
+import 'package:rafiq_academy/features/homework/domain/entities/homework_entity.dart';
+import 'package:rafiq_academy/features/homework/domain/repositories/homework_repository.dart';
+import 'package:rafiq_academy/features/homework/domain/usecases/homework_usecases.dart';
 import 'package:rafiq_academy/features/parent/domain/repositories/parent_repositories.dart';
 import 'package:rafiq_academy/features/parent/domain/usecases/get_child_achievements_usecase.dart';
 import 'package:rafiq_academy/features/parent/presentation/bloc/parent_bloc.dart';
@@ -75,6 +78,11 @@ class _FakeStudentRepository extends Fake implements StudentRepository {
   ) async => const Right(<RecitationRecordEntity>[]);
 }
 
+class _FakeHomeworkRepository extends Fake implements HomeworkRepository {
+  @override
+  Future<HomeworkEntity?> getLatestHomework(String studentId) async => null;
+}
+
 typedef _Responder =
     Future<Either<Failure, List<AchievementEntity>>> Function(String studentId);
 
@@ -127,6 +135,9 @@ void main() {
     _replace<GetChildAchievementsUseCase>(
       GetChildAchievementsUseCase(parentRepo),
     );
+    _replace<GetLatestHomeworkUseCase>(
+      GetLatestHomeworkUseCase(_FakeHomeworkRepository()),
+    );
     _replace<ChatConversationsBloc>(_FakeChatBloc());
     bloc = _FakeParentBloc(
       const ParentState(parentId: 'parent1', childrenIds: ['s1', 's2']),
@@ -137,6 +148,7 @@ void main() {
     _remove<StudentProfileSummaryReader>();
     _remove<RecitationRecordsReader>();
     _remove<GetChildAchievementsUseCase>();
+    _remove<GetLatestHomeworkUseCase>();
     _remove<ChatConversationsBloc>();
   });
 

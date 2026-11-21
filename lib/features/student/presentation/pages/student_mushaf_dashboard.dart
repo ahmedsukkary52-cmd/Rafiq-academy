@@ -208,7 +208,7 @@ class StudentMushafDashboard extends StatelessWidget {
                                   ),
                                 ),
                                 Icon(
-                                  Icons.chevron_left_rounded,
+                                  Icons.chevron_right_rounded,
                                   color: Colors.white,
                                 ),
                               ],
@@ -285,7 +285,7 @@ class StudentMushafDashboard extends StatelessWidget {
                                   ),
                                 ),
                                 Icon(
-                                  Icons.chevron_left_rounded,
+                                  Icons.chevron_right_rounded,
                                   color: Colors.white,
                                 ),
                               ],

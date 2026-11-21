@@ -18,7 +18,12 @@ class AchievementModel extends AchievementEntity {
   });
 
   factory AchievementModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final raw = doc.data();
+    final data = raw is Map
+        ? <String, dynamic>{
+            for (final e in raw.entries) e.key.toString(): e.value,
+          }
+        : <String, dynamic>{};
     final recipients = AchievementsFirestoreContract.resolveRecipientStudentIds(
       data,
     );

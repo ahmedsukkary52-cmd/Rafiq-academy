@@ -28,6 +28,7 @@ const auth = admin.auth();
 const { Timestamp } = require("firebase-admin/firestore");
 
 const staff = require("../lib/staff/staffLifecycleFunctions.js");
+const schedule = require("../lib/halaqa/halaqaScheduleFunctions.js");
 
 const ADMIN = "admin_staff";
 const PASSWORD = "Synthetic-Pass-42";
@@ -209,8 +210,10 @@ test("journey 13: deactivate / archive / delete are distinct, gated and audited"
   await rejects(setStatus(ADMIN, { uid: "t1", action: "archive" }), "failed-precondition", "عطّل الحساب أولاً");
 
   await staff.adminReassignHalaqaStaffCore(db, ADMIN, { halaqaId: "h1", role: "teacher", newStaffId: "t2" });
+  // Reassignment deactivates the last-unassigned teacher in the same
+  // transaction; retrying the lifecycle action completes the Auth disable.
   const off = await setStatus(ADMIN, { uid: "t1", action: "deactivate" });
-  assert.deepEqual(off, { uid: "t1", status: "deactivated", changed: true });
+  assert.deepEqual(off, { uid: "t1", status: "deactivated", changed: false });
   const t1 = await data("users/t1");
   assert.equal(t1.isActive, false);
   assert.equal(t1.staffStatus, "deactivated");
@@ -261,4 +264,96 @@ test("reactivation restores sign-in; legacy inactive accounts follow the same li
   assert.equal(staff.staffStatusOf(await data("users/tLegacyOff")), "deactivated");
   assert.equal((await setStatus({ uid: "tLegacyOff", action: "archive" })).status, "archived");
   await rejects(setStatus({ uid: "t4", action: "archive" }), "failed-precondition", "عطّل الحساب أولاً");
+});
+
+test("first assignment activates a pending Teacher — via Halaqa creation and via reassignment alike", async () => {
+  // A freshly provisioned Teacher: inactive, awaiting a first Halaqa, and with
+  // no lifecycle `staffStatus` yet.
+  const pending = "tPending";
+  await db.doc(`users/${pending}`).set({
+    name: "معلم جديد",
+    role: "teacher",
+    isActive: false,
+    pendingHalaqaAssignment: true,
+  });
+  await auth.createUser({ uid: pending, email: email(pending), password: PASSWORD, displayName: "معلم جديد" });
+
+  // (1) Activated through Halaqa creation.
+  const created = await schedule.adminCreateHalaqaCore(db, ADMIN, {
+    name: "حلقة جديدة",
+    teacherId: pending,
+    schedule: [slot("الثلاثاء", "18:00", "19:00", "slot_new")],
+  });
+  const afterCreate = await data(`users/${pending}`);
+  assert.equal(afterCreate.isActive, true, "a first Halaqa assignment activates the Teacher");
+  assert.equal(afterCreate.pendingHalaqaAssignment, undefined, "the pending flag is cleared");
+  assert.deepEqual((await data(`teacherProfiles/${pending}`)).halaqatIds, [created.halaqaId]);
+
+  // (2) A second pending Teacher is activated by reassigning an existing Halaqa.
+  const pending2 = "tPending2";
+  await db.doc(`users/${pending2}`).set({
+    name: "معلم ثانٍ",
+    role: "teacher",
+    isActive: false,
+    pendingHalaqaAssignment: true,
+  });
+  await auth.createUser({ uid: pending2, email: email(pending2), password: PASSWORD, displayName: "معلم ثانٍ" });
+
+  const moved = await staff.adminReassignHalaqaStaffCore(db, ADMIN, {
+    halaqaId: "h1",
+    role: "teacher",
+    newStaffId: pending2,
+  });
+  assert.equal(moved.changed, true);
+  const afterReassign = await data(`users/${pending2}`);
+  assert.equal(afterReassign.isActive, true, "reassignment activates a pending Teacher too");
+  assert.equal(afterReassign.pendingHalaqaAssignment, undefined, "the pending flag is cleared");
+  assert.deepEqual((await data(`teacherProfiles/${pending2}`)).halaqatIds, ["h1"]);
+
+  // Previous Teacher lifecycle stays correct: their last Halaqa was reassigned
+  // away, so the same transaction deactivates them.
+  const previous = await data("users/t1");
+  assert.equal(previous.isActive, false);
+  assert.equal(previous.staffStatus, "deactivated");
+  assert.equal(previous.pendingHalaqaAssignment, true);
+  assert.deepEqual((await data("teacherProfiles/t1")).halaqatIds, []);
+});
+
+test("reassignment refuses ineligible staff and never auto-activates a lifecycle-managed Teacher", async () => {
+  // Deactivated after their last reassignment: pendingHalaqaAssignment is set,
+  // but the lifecycle `staffStatus` proves they are not a fresh first assignment.
+  await db.doc("users/tLifecycle").set({
+    name: "معلم موقوف",
+    role: "teacher",
+    isActive: false,
+    staffStatus: "deactivated",
+    pendingHalaqaAssignment: true,
+  });
+  await db.doc("users/tArchived").set({
+    name: "معلم مؤرشف",
+    role: "teacher",
+    isActive: false,
+    staffStatus: "archived",
+  });
+
+  const before = {
+    halaqa: await data("halaqat/h1"),
+    t1: await data("users/t1"),
+    t1Profile: await data("teacherProfiles/t1"),
+  };
+
+  const reassign = (newStaffId) =>
+    staff.adminReassignHalaqaStaffCore(db, ADMIN, { halaqaId: "h1", role: "teacher", newStaffId });
+  await rejects(reassign("tLegacyOff"), "failed-precondition", "غير نشط");
+  await rejects(reassign("tLifecycle"), "failed-precondition", "غير نشط");
+  await rejects(reassign("tArchived"), "failed-precondition", "غير نشط");
+
+  // A failed reassignment leaves every related record unchanged.
+  assert.deepEqual(await data("halaqat/h1"), before.halaqa);
+  assert.deepEqual(await data("users/t1"), before.t1);
+  assert.deepEqual(await data("teacherProfiles/t1"), before.t1Profile);
+  assert.equal((await audits("halaqa_staff_reassign")).length, 0);
+  assert.equal((await audits("staff_status_change")).length, 0);
+  assert.equal((await data("users/tLifecycle")).isActive, false);
+  assert.equal((await data("users/tArchived")).isActive, false);
 });

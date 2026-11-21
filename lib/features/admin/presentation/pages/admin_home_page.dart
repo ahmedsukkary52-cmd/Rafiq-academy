@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_floating_bottom_nav.dart';
 import '../admin_home_nav.dart';
 import 'admin_dashboard_tab.dart';
 import 'admin_finance_tab.dart';
@@ -14,13 +15,13 @@ class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
 
   /// P0-02 callable-backed operations, surfaced on the management tab.
+  /// Access reactivation lives only under Settings (not duplicated here).
   static const actionLabels = <String>[
-    'إنشاء حساب',
+    'إنشاء حساب موظف',
     'ربط ولي أمر بطالب',
     'الحلقات والمواعيد',
-    'قبول ونقل الطلاب',
+    'تعيين طالب لحلقة',
     'مراجعة إيصالات الدفع',
-    'إعادة تفعيل الوصول',
   ];
 
   @override
@@ -41,15 +42,19 @@ class _AdminHomePageState extends State<AdminHomePage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: IndexedStack(
-          index: _currentTab,
-          children: [
-            AdminDashboardTab(onSwitchTab: _switchTab),
-            const AdminStudentsTab(),
-            const AdminManagementTab(),
-            const AdminFinanceTab(),
-            const AdminSettingsTab(),
-          ],
+        extendBody: true,
+        body: AppFloatingBottomNav.padBody(
+          context,
+          child: IndexedStack(
+            index: _currentTab,
+            children: [
+              AdminDashboardTab(onSwitchTab: _switchTab),
+              const AdminStudentsTab(),
+              const AdminManagementTab(),
+              const AdminFinanceTab(),
+              const AdminSettingsTab(),
+            ],
+          ),
         ),
         bottomNavigationBar: AdminBottomNav(
           selected: _currentTab,

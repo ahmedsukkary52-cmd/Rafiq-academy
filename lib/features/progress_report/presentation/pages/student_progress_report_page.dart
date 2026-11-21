@@ -3,12 +3,11 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/presentation/bloc_status.dart';
 import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/app_back_button.dart';
 import '../../../../shared/widgets/shared_widgets.dart';
 import '../../../../shared/widgets/student_page_skeletons.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -57,73 +56,7 @@ class _ProgressReportView extends StatelessWidget {
           builder: (context, state) {
             return CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(
-                  child: Container(
-                    padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top + 8,
-                      bottom: 20,
-                      left: 16,
-                      right: 16,
-                    ),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.primary, AppColors.primaryDark],
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                      ),
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(24),
-                        bottomRight: Radius.circular(24),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => context.pop(),
-                              icon: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.chevron_right,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            const Icon(
-                              Icons.bar_chart_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'تقرير التقدم',
-                              style: TextStyle(
-                                fontFamily: 'NotoNaskhArabic',
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const Spacer(),
-                            const SizedBox(width: 48),
-                          ],
-                        ),
-                        Text(
-                          'آخر ٣٠ يوماً',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                const SliverToBoxAdapter(child: _ProgressHero()),
                 if (state.status == SectionStatus.loading ||
                     state.status == SectionStatus.initial)
                   const SliverFillRemaining(child: StudentHomeBodySkeleton())
@@ -158,11 +91,11 @@ class _ProgressReportView extends StatelessWidget {
     final notes = report.teacherNotes.trim();
 
     return SliverPadding(
-      padding: const EdgeInsets.all(AppSizes.paddingM),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
           _SummaryRow(report: report),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (!hasAttendanceActivity)
             AppCard(
               child: Text(
@@ -173,7 +106,7 @@ class _ProgressReportView extends StatelessWidget {
             )
           else
             _AttendanceCard(report: report),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (!hasWeeklyActivity)
             AppCard(
               child: Column(
@@ -197,13 +130,131 @@ class _ProgressReportView extends StatelessWidget {
             )
           else
             _WeeklyChartCard(values: report.weeklyVersesPerDay),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _TeacherNotesCard(
             notes: notes.isEmpty ? 'لا توجد ملاحظات من المعلم حالياً' : notes,
             isPlaceholder: notes.isEmpty,
           ),
           const SizedBox(height: 24),
         ]),
+      ),
+    );
+  }
+}
+
+class _ProgressHero extends StatelessWidget {
+  const _ProgressHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        20,
+        MediaQuery.of(context).padding.top + 12,
+        20,
+        26,
+      ),
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const AppBackButton(
+                color: AppColors.onPrimary,
+                circular: true,
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.onPrimaryOverlay,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.onPrimaryMuted),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('✨', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'آخر ٣٠ يوماً',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.onPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              const SizedBox(width: 48),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'تقرير التقدم',
+            style: AppTextStyles.titleLarge.copyWith(
+              color: AppColors.onPrimary,
+              fontWeight: FontWeight.w900,
+              fontSize: 22,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'شوف إنجازاتك و حضورك بكل فرح! 🎉',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.onPrimary.withValues(alpha: 0.92),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JoyCardShell extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const _JoyCardShell({required this.child, this.padding = const EdgeInsets.all(16)});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            AppColors.primaryGradientMid.withValues(alpha: 0.35),
+            AppColors.primaryGradientEnd.withValues(alpha: 0.12),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGradientStart.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(1.5),
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20.5),
+        ),
+        child: child,
       ),
     );
   }
@@ -221,40 +272,72 @@ class _SummaryRow extends StatelessWidget {
         // D11: this value is memorization progress, never «دقة الحفظ».
         if (AppCapabilities.memorizationProgressAvailable) ...[
           Expanded(
-            child: AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('⭐', style: TextStyle(fontSize: 18)),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${report.memorizationAccuracyPercent.toStringAsFixed(0)}٪',
-                    style: AppTextStyles.headlineMedium,
-                  ),
-                  Text('نسبة الحفظ', style: AppTextStyles.labelSmall),
-                ],
-              ),
+            child: _SummaryStatCard(
+              emoji: '⭐',
+              value: '${report.memorizationAccuracyPercent.toStringAsFixed(0)}٪',
+              label: 'نسبة الحفظ',
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
         ],
         Expanded(
-          child: AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('📖', style: TextStyle(fontSize: 18)),
-                const SizedBox(height: 8),
-                Text(
-                  '${report.attendedSessions}',
-                  style: AppTextStyles.headlineMedium,
-                ),
-                Text('حصة محضورة', style: AppTextStyles.labelSmall),
-              ],
-            ),
+          child: _SummaryStatCard(
+            emoji: '📖',
+            value: '${report.attendedSessions}',
+            label: 'حصة محضورة',
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SummaryStatCard extends StatelessWidget {
+  final String emoji;
+  final String value;
+  final String label;
+
+  const _SummaryStatCard({
+    required this.emoji,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _JoyCardShell(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(emoji, style: const TextStyle(fontSize: 18)),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: AppTextStyles.headlineMedium.copyWith(
+              fontWeight: FontWeight.w900,
+              color: AppColors.primaryGradientStart,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -267,17 +350,40 @@ class _AttendanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = (report.monthlyAttendancePercent / 100).clamp(0.0, 1.0);
-    return AppCard(
+    return _JoyCardShell(
       child: Column(
         children: [
           Align(
             alignment: AlignmentDirectional.centerStart,
-            child: Text('معدل الحضور الشهري', style: AppTextStyles.titleMedium),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.onPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'معدل الحضور الشهري',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           SizedBox(
-            width: 140,
-            height: 140,
+            width: 148,
+            height: 148,
             child: CustomPaint(
               painter: _RingPainter(p),
               child: Center(
@@ -287,21 +393,33 @@ class _AttendanceCard extends StatelessWidget {
                     Text(
                       '${report.monthlyAttendancePercent.toStringAsFixed(0)}٪',
                       style: AppTextStyles.headlineMedium.copyWith(
-                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                        foreground: Paint()
+                          ..shader = const LinearGradient(
+                            colors: [
+                              AppColors.primaryGradientStart,
+                              AppColors.primaryGradientMid,
+                            ],
+                          ).createShader(const Rect.fromLTWH(0, 0, 80, 30)),
                       ),
                     ),
-                    Text('معدل الحضور', style: AppTextStyles.labelSmall),
+                    Text(
+                      'معدل الحضور',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _LegendDot(
-                color: AppColors.primary,
+                gradient: AppColors.primaryGradient,
                 label: 'حضور: ${report.attendanceDays} يوم',
               ),
               const SizedBox(width: 16),
@@ -311,7 +429,7 @@ class _AttendanceCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             'الحضور يشمل التأخر',
             style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
@@ -324,22 +442,36 @@ class _AttendanceCard extends StatelessWidget {
 }
 
 class _LegendDot extends StatelessWidget {
-  final Color color;
+  final Color? color;
+  final Gradient? gradient;
   final String label;
 
-  const _LegendDot({required this.color, required this.label});
+  const _LegendDot({
+    this.color,
+    this.gradient,
+    required this.label,
+  }) : assert(color != null || gradient != null);
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: color,
+            gradient: gradient,
+            shape: BoxShape.circle,
+          ),
         ),
         const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.labelSmall),
+        Text(
+          label,
+          style: AppTextStyles.labelSmall.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -364,16 +496,24 @@ class _RingPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 14,
     );
+    final progress = Paint()
+      ..shader = const SweepGradient(
+        startAngle: -math.pi / 2,
+        colors: [
+          AppColors.primaryGradientStart,
+          AppColors.primaryGradientMid,
+          AppColors.primaryGradientEnd,
+        ],
+      ).createShader(Rect.fromCircle(center: c, radius: r))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.round;
     canvas.drawArc(
       Rect.fromCircle(center: c, radius: r),
       -math.pi / 2,
       math.pi * 2 * percent,
       false,
-      Paint()
-        ..color = AppColors.primary
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 14
-        ..strokeCap = StrokeCap.round,
+      progress,
     );
   }
 
@@ -393,25 +533,55 @@ class _WeeklyChartCard extends StatelessWidget {
     final maxY = ((values.isEmpty ? 10.0 : values.reduce(math.max)) + 2)
         .toDouble();
 
-    return AppCard(
+    return _JoyCardShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Text('الحفظ الأسبوعي', style: AppTextStyles.titleMedium),
-              const Spacer(),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.auto_graph_rounded,
+                  color: AppColors.onPrimary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
               Text(
-                'تسميعات/يوم',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.primary,
+                'الحفظ الأسبوعي',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primaryGradientMid.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Text(
+                  'تسميعات/يوم',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.primaryGradientStart,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           SizedBox(
-            height: 160,
+            height: 168,
             child: BarChart(
               BarChartData(
                 maxY: maxY,
@@ -435,7 +605,12 @@ class _WeeklyChartCard extends StatelessWidget {
                         if (i < 0 || i >= labels.length) {
                           return const SizedBox.shrink();
                         }
-                        return Text(labels[i], style: AppTextStyles.labelSmall);
+                        return Text(
+                          labels[i],
+                          style: AppTextStyles.labelSmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -447,11 +622,30 @@ class _WeeklyChartCard extends StatelessWidget {
                     barRods: [
                       BarChartRodData(
                         toY: values[i],
-                        width: 14,
-                        borderRadius: BorderRadius.circular(6),
-                        color: high
-                            ? AppColors.primary
-                            : AppColors.primary.withValues(alpha: 0.25),
+                        width: 16,
+                        borderRadius: BorderRadius.circular(8),
+                        gradient: high
+                            ? const LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  AppColors.primaryGradientStart,
+                                  AppColors.primaryGradientMid,
+                                  AppColors.primaryGradientEnd,
+                                ],
+                              )
+                            : LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  AppColors.primaryGradientMid.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  AppColors.primaryGradientEnd.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                ],
+                              ),
                       ),
                     ],
                   );
@@ -473,33 +667,57 @@ class _TeacherNotesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return _JoyCardShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.chat_bubble_outline,
-                color: AppColors.textSecondary,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: AppColors.onPrimary,
+                  size: 20,
+                ),
               ),
-              const SizedBox(width: 8),
-              Text('ملاحظات المعلم', style: AppTextStyles.titleMedium),
+              const SizedBox(width: 10),
+              Text(
+                'ملاحظات المعلم',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.surfaceGrey,
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [
+                  AppColors.primaryLight.withValues(alpha: 0.65),
+                  AppColors.surfaceGrey,
+                ],
+              ),
               borderRadius: BorderRadius.circular(AppSizes.radiusM),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: AppColors.primaryGradientMid.withValues(alpha: 0.25),
+              ),
             ),
             child: Text(
               notes,
               textAlign: TextAlign.right,
               style: AppTextStyles.bodyMedium.copyWith(
+                height: 1.55,
                 color: isPlaceholder
                     ? AppColors.textSecondary
                     : AppColors.textPrimary,

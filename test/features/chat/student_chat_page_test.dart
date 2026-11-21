@@ -143,7 +143,7 @@ void main() {
     _resolver.next = const StudentChatTeacher(hasHalaqa: false);
     await _pump(tester);
     expect(
-      find.text('لم يتم تعيينك لحلقة بعد — تواصل مع الإدارة'),
+      find.textContaining('لم تُسجَّل في حلقة بعد'),
       findsOneWidget,
     );
     expect(_repo.requested, isEmpty);
@@ -155,7 +155,10 @@ void main() {
   ) async {
     _resolver.next = const StudentChatTeacher(teacherUid: '', hasHalaqa: true);
     await _pump(tester);
-    expect(find.text('تعذّر تحديد معلم الحلقة'), findsOneWidget);
+    expect(
+      find.textContaining('لم يُربط بها معلم بعد'),
+      findsOneWidget,
+    );
     expect(_repo.requested, isEmpty);
   });
 
@@ -166,7 +169,10 @@ void main() {
     expect(_resolver.calls, 1);
     expect(_repo.requested, ['t1']);
     expect(_conversations.events, [
-      const StartWatchingConversationsEvent('s1'),
+      const StartWatchingConversationsEvent(
+        's1',
+        pageSize: ChatConversationsBloc.defaultInboxPageSize,
+      ),
       const ResetStartConversationEvent(),
       const StartConversationEvent(
         currentUser: ChatParticipantEntity(

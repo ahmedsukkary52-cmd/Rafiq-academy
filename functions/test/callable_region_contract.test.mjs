@@ -33,11 +33,29 @@ function dartFiles(dir) {
 }
 
 function clientRegion() {
+  const appFirebase = readFileSync(
+    join(flutterLib, "core", "firebase", "app_firebase.dart"),
+    "utf8",
+  );
+  const regionConst = appFirebase.match(
+    /const\s+String\s+functionsRegion\s*=\s*'([^']+)'/,
+  );
+  assert.ok(regionConst, "functionsRegion must be declared in app_firebase.dart");
+  const declaredRegion = regionConst[1];
+
   const di = readFileSync(join(flutterLib, "core", "di", "di_module.dart"), "utf8");
-  const regions = [...di.matchAll(/FirebaseFunctions\.instanceFor\(\s*region:\s*'([^']+)'/g)]
+  // Accept either a string literal or the shared `functionsRegion` constant.
+  const literalRegions = [...di.matchAll(/FirebaseFunctions\.instanceFor\(\s*region:\s*'([^']+)'/g)]
     .map((m) => m[1]);
-  assert.equal(regions.length, 1, "exactly one FirebaseFunctions instance must be configured");
-  return regions[0];
+  const constRegions = [...di.matchAll(/FirebaseFunctions\.instanceFor\([\s\S]*?region:\s*functionsRegion/g)]
+    .map(() => declaredRegion);
+  const regions = [...literalRegions, ...constRegions];
+  assert.ok(regions.length >= 1, "exactly one FirebaseFunctions instance must be configured");
+  assert.ok(
+    regions.every((r) => r === declaredRegion),
+    `DI regions must all be ${declaredRegion}, got ${JSON.stringify(regions)}`,
+  );
+  return declaredRegion;
 }
 
 function clientCallableNames() {

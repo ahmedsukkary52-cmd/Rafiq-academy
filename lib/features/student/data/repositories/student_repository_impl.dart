@@ -80,6 +80,35 @@ class StudentRepositoryImpl implements StudentRepository {
   }
 
   @override
+  Future<Either<Failure, StudentAchievementsPage>> getAchievementsPage({
+    required String studentId,
+    int limit = StudentAchievementsPage.defaultLimit,
+    String? afterStudentAchievementId,
+    String? afterRecipientsAchievementId,
+  }) async {
+    if (!await networkInfo.isConnected) return const Left(NetworkFailure());
+    try {
+      final page = await remoteDatasource.getAchievementsPage(
+        studentId: studentId,
+        limit: limit,
+        afterStudentAchievementId: afterStudentAchievementId,
+        afterRecipientsAchievementId: afterRecipientsAchievementId,
+      );
+      return Right(
+        StudentAchievementsPage(
+          items: page.items,
+          studentCursorId: page.studentCursorId,
+          recipientsCursorId: page.recipientsCursorId,
+          hasMoreStudent: page.hasMoreStudent,
+          hasMoreRecipients: page.hasMoreRecipients,
+        ),
+      );
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
   Future<Either<Failure, AssignmentEntity?>> getLatestAssignment(
     String studentId,
   ) async {

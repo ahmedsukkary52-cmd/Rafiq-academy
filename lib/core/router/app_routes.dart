@@ -23,7 +23,6 @@ class AppRoutes {
 
   // Student
   static const String student = '/student';
-  static const String studentEvals = '/student/evaluations';
   static const String studentSchedule = '/student/schedule';
   static const String studentReviewSchedule = '/student/review-schedule';
   static const String studentHomework = '/student/homework';
@@ -51,7 +50,6 @@ class AppRoutes {
   static const String teacherHalaqa = '/teacher/halaqa/:halaqaId';
   static const String teacherAttend = '/teacher/attendance/:halaqaId';
   static const String teacherEvals = '/teacher/halaqa/:halaqaId/evaluations';
-  static const String teacherStudent = '/teacher/student/:studentId';
 
   /// Teacher Student Profile. Pass [halaqaId] when opening from Class Details.
   static String teacherStudentProfile(String studentId, {String? halaqaId}) {
@@ -135,6 +133,12 @@ class AppRoutes {
 
   /// Read-only list of `payments` documents.
   static const String adminPaymentsOverview = '/admin/payments-overview';
+
+  /// Admin monthly pricing rules (halaqa / student / academy default).
+  static const String adminPricing = '/admin/pricing';
+
+  /// Admin issues a student invoice (`adminGenerateInvoice`).
+  static const String adminIssueInvoice = '/admin/issue-invoice';
   static const String adminSupervisors = '/admin/supervisors';
 
   /// Read-only academy-wide halaqat directory.

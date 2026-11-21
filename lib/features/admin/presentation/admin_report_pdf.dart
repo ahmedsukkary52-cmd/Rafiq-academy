@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../core/constants/academy_branding.dart';
 import '../domain/admin_reports.dart';
 
 typedef ReportFonts = ({pw.Font base, pw.Font bold});
@@ -62,7 +63,7 @@ Future<Uint8List> buildReportPdf(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            reportPdfText('أكاديمية رفيق - ${table.title}'),
+            reportPdfText('${AcademyBranding.displayName} - ${table.title}'),
             style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 4),

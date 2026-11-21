@@ -35,6 +35,8 @@ const economy = require("../lib/economy/economyFunctions.js");
 const awards = require("../lib/awards/awardFunctions.js");
 const evalFanOut = require("../lib/notifications/evaluationNotificationFunctions.js");
 const assignmentFanOut = require("../lib/notifications/assignmentNotificationFunctions.js");
+const parentLink = require("../lib/relationships/parentLinkFunctions.js");
+const status = require("../lib/accounts/memberStatusFunctions.js");
 
 const MONDAY = "2026-09-28";
 const SCHEDULE = [
@@ -85,6 +87,7 @@ test.beforeEach(async () => {
     "users/teacher2": user("teacher"),
     "users/parent1": user("parent"),
     "users/parent2": user("parent"),
+    "users/parent3": user("parent"),
     "users/student1": user("student", "Student One"),
     "users/student2": user("student", "Student Two"),
     "users/student3": user("student", "Student Three"),
@@ -114,6 +117,7 @@ test.beforeEach(async () => {
     "studentProfiles/student3": { uid: "student3", points: 0 },
     "parentProfiles/parent1": { uid: "parent1", childrenIds: ["student1"] },
     "parentProfiles/parent2": { uid: "parent2", childrenIds: ["student2"] },
+    "parentProfiles/parent3": { uid: "parent3", childrenIds: ["student3"] },
   });
 });
 
@@ -1172,6 +1176,7 @@ test("PH02 FCM: retry after a transient failure skips devices already reached", 
 });
 
 test("PH02 FCM: no linked parent → nothing sent; forged recipient impossible", async () => {
+  await db.doc("parentProfiles/parent3").delete();
   await seedDevices();
   const { calls, sender } = fakeSender();
   await evalFanOut.handleRecitationRecordWrite({
@@ -1250,6 +1255,39 @@ test("PH02 fan-out: assignment author must be the halaqa teacher", async () => {
 
 // ── Halaqa membership (max 2) ──────────────────────────────────────────────
 
+test("R1 invariant: admission requires an eligible active Parent and active Halaqa before activation", async () => {
+  await seed({
+    "users/student4": { ...user("student", "Student Four"), isActive: false },
+    "studentProfiles/student4": { uid: "student4", halaqaId: null },
+    "users/invalidGuard": user("teacher"),
+    "parentProfiles/invalidGuard": { uid: "invalidGuard", childrenIds: ["student4"] },
+    "users/pendingGuard": { ...user("parent"), isActive: false },
+    "parentProfiles/pendingGuard": { uid: "pendingGuard", childrenIds: ["student4"] },
+    "halaqat/inactive": { name: "Inactive", status: "archived", supervisorId: "sup1", studentIds: [] },
+  });
+
+  await expectCode(membership.admitStudentToHalaqaCore(db, "admin1", {
+    studentId: "student4", halaqaId: "h1",
+  }), "failed-precondition");
+  assert.equal((await data("users/student4")).isActive, false);
+  assert.deepEqual((await data("halaqat/h1")).studentIds, ["student1", "student2"]);
+
+  await expectCode(membership.admitStudentToHalaqaCore(db, "admin1", {
+    studentId: "student4", halaqaId: "inactive",
+  }), "failed-precondition");
+  assert.equal((await data("users/student4")).isActive, false);
+  assert.deepEqual((await data("halaqat/inactive")).studentIds, []);
+
+  await db.doc("users/pendingGuard").update({ isActive: true });
+  const admitted = await membership.admitStudentToHalaqaCore(db, "admin1", {
+    studentId: "student4", halaqaId: "h1",
+  });
+  assert.equal(admitted.primaryHalaqaId, "h1");
+  assert.equal((await data("users/student4")).isActive, true);
+  assert.equal((await data("studentProfiles/student4")).halaqaId, "h1");
+  assert.ok((await data("halaqat/h1")).studentIds.includes("student4"));
+});
+
 test("PH02 membership: 1st + 2nd allowed, 3rd rejected, duplicate rejected", async () => {
   const first = await membership.admitStudentToHalaqaCore(db, "admin1", {
     studentId: "student3",
@@ -1315,11 +1353,199 @@ test("PH02 membership: concurrent admissions cannot exceed the cap", async () =>
       membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId }),
     ),
   );
-  assert.equal(results.filter((r) => r.status === "fulfilled").length, 2);
+  assert.equal(
+    results.filter((r) => r.status === "fulfilled").length,
+    2,
+    results.map((result) => result.status === "fulfilled" ? "ok" : `${result.reason?.code}: ${result.reason?.message}`).join(" | "),
+  );
   const joined = (
     await db.collection("halaqat").where("studentIds", "array-contains", "student3").get()
   ).size;
   assert.equal(joined, 2);
+});
+
+// ── Halaqa membership × Parent guardianship (Student/Parent integrity) ──────
+
+const authStub = { revokeRefreshTokens: async () => {} };
+const memberDeps = { db, auth: authStub };
+const setActive = (caller, uid, isActive) =>
+  status.adminSetMemberActiveCore(memberDeps, caller, { uid, isActive });
+const linkChild = (parentId, studentId, operation = "link") =>
+  parentLink.adminLinkParentChildCore(db, "admin1", { parentId, studentId, operation });
+
+async function membershipsOf(studentId) {
+  const snap = await db
+    .collection("halaqat")
+    .where("studentIds", "array-contains", studentId)
+    .get();
+  return snap.docs.map((d) => d.id).sort();
+}
+
+async function eligibleParentCount(studentId) {
+  const guardians = await db
+    .collection("parentProfiles")
+    .where("childrenIds", "array-contains", studentId)
+    .get();
+  let count = 0;
+  for (const guardian of guardians.docs) {
+    const snap = await db.collection("users").doc(guardian.id).get();
+    if (snap.exists && snap.get("role") === "parent" && snap.get("isActive") !== false) count += 1;
+  }
+  return count;
+}
+
+/**
+ * The invariant every successful admission/transfer/deactivation must keep:
+ * an active Student with a halaqa membership has an eligible active Parent.
+ */
+async function assertGuardianInvariant(studentId) {
+  if ((await membershipsOf(studentId)).length === 0) return;
+  const snap = await db.collection("users").doc(studentId).get();
+  if (!snap.exists || snap.get("isActive") === false) return;
+  assert.ok(
+    (await eligibleParentCount(studentId)) > 0,
+    `${studentId} has an active halaqa membership but no eligible active Parent`,
+  );
+}
+
+test("parent deactivation: the sole eligible guardian of an active Student is protected", async () => {
+  await expectCode(setActive("admin1", "parent1", false), "failed-precondition");
+  assert.equal((await data("users/parent1")).isActive, true);
+  assert.equal(await auditCount("account_active_change"), 0);
+});
+
+test("parent deactivation: allowed when another eligible active guardian exists", async () => {
+  await linkChild("parent2", "student1");
+  assert.equal((await setActive("admin1", "parent1", false)).changed, true);
+  assert.equal((await data("users/parent1")).isActive, false);
+  assert.equal((await data("users/parent2")).isActive, true);
+  assert.equal(await auditCount("account_active_change"), 1);
+});
+
+test("parent deactivation: allowed when every linked Student is inactive or archived", async () => {
+  await db.doc("users/student3").update({ isActive: false });
+  assert.equal((await setActive("admin1", "parent3", false)).changed, true);
+
+  await db.doc("studentProfiles/student1").update({ lifecycle: "archived" });
+  assert.equal((await setActive("admin1", "parent1", false)).changed, true);
+});
+
+test("parent deactivation: blocked when any affected Student would lose their last eligible guardian", async () => {
+  await linkChild("parent1", "student2"); // parent1 now guards student1 + student2
+  await linkChild("parent2", "student1"); // student1 gets a second guardian
+  await linkChild("parent2", "student2", "unlink"); // student2 left with parent1 only
+
+  await expectCode(setActive("admin1", "parent1", false), "failed-precondition");
+  assert.equal((await data("users/parent1")).isActive, true);
+
+  await linkChild("parent3", "student2"); // student2 gets another eligible guardian
+  assert.equal((await setActive("admin1", "parent1", false)).changed, true);
+});
+
+test("parent unlink: the last ELIGIBLE guardian cannot be removed while another (inactive) account stays linked", async () => {
+  await seed({
+    "users/parent4": user("parent"),
+    "parentProfiles/parent4": { uid: "parent4", childrenIds: [] },
+  });
+  await linkChild("parent4", "student3"); // student3: parent3 + parent4
+  await setActive("admin1", "parent4", false); // parent4 inactive but still linked
+  assert.equal((await data("users/parent4")).isActive, false);
+
+  await expectCode(linkChild("parent3", "student3", "unlink"), "failed-precondition");
+  assert.ok((await data("parentProfiles/parent3")).childrenIds.includes("student3"));
+
+  // A second eligible guardian makes the unlink safe again.
+  await linkChild("parent2", "student3");
+  assert.equal((await linkChild("parent3", "student3", "unlink")).changed, true);
+});
+
+test("concurrency: Parent unlink racing Student admission never orphans the Student", async () => {
+  await linkChild("parent2", "student3"); // student3: parent3 + parent2
+  const [admit, unlink] = await Promise.allSettled([
+    membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId: "h2" }),
+    linkChild("parent3", "student3", "unlink"),
+  ]);
+  await assertGuardianInvariant("student3");
+  if (admit.status === "fulfilled") {
+    assert.deepEqual(await membershipsOf("student3"), ["h2"]);
+    assert.ok((await eligibleParentCount("student3")) > 0);
+  }
+  if (unlink.status === "fulfilled") {
+    assert.ok(!(await data("parentProfiles/parent3")).childrenIds.includes("student3"));
+  }
+});
+
+test("concurrency: Parent deactivation racing Student admission never orphans the Student", async () => {
+  await linkChild("parent2", "student3"); // student3: parent3 + parent2
+  const [admit] = await Promise.allSettled([
+    membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId: "h2" }),
+    setActive("admin1", "parent3", false),
+  ]);
+  await assertGuardianInvariant("student3");
+  if (admit.status === "fulfilled") {
+    assert.ok((await eligibleParentCount("student3")) > 0);
+  }
+});
+
+test("concurrency: Parent replacement racing Student admission never orphans the Student", async () => {
+  // student3 is guarded only by parent3; parent2 is a valid replacement.
+  const [admit, replace] = await Promise.allSettled([
+    membership.admitStudentToHalaqaCore(db, "admin1", { studentId: "student3", halaqaId: "h2" }),
+    parentLink.adminReplaceParentLinkCore(db, "admin1", {
+      studentId: "student3",
+      fromParentId: "parent3",
+      toParentId: "parent2",
+    }),
+  ]);
+  await assertGuardianInvariant("student3");
+  if (admit.status === "fulfilled") {
+    assert.ok((await eligibleParentCount("student3")) > 0);
+  }
+  if (replace.status === "fulfilled") {
+    assert.ok((await data("parentProfiles/parent2")).childrenIds.includes("student3"));
+    assert.ok(!(await data("parentProfiles/parent3")).childrenIds.includes("student3"));
+  }
+});
+
+test("concurrency: transfer while the previous Parent becomes ineligible never orphans the Student", async () => {
+  await linkChild("parent2", "student1"); // student1: parent1 + parent2
+  const [transfer] = await Promise.allSettled([
+    membership.adminTransferStudentCore(db, "admin1", {
+      studentId: "student1",
+      fromHalaqaId: "h1",
+      toHalaqaId: "h2",
+    }),
+    setActive("admin1", "parent1", false),
+  ]);
+  await assertGuardianInvariant("student1");
+  if (transfer.status === "fulfilled") {
+    assert.deepEqual(await membershipsOf("student1"), ["h2"]);
+    assert.ok((await eligibleParentCount("student1")) > 0);
+  }
+});
+
+test("concurrency: competing transfers of one Student move them exactly once", async () => {
+  const results = await Promise.allSettled([
+    membership.adminTransferStudentCore(db, "admin1", {
+      studentId: "student1",
+      fromHalaqaId: "h1",
+      toHalaqaId: "h2",
+    }),
+    membership.adminTransferStudentCore(db, "admin1", {
+      studentId: "student1",
+      fromHalaqaId: "h1",
+      toHalaqaId: "h3",
+    }),
+  ]);
+  assert.equal(
+    results.filter((r) => r.status === "fulfilled").length,
+    1,
+    results.map((r) => (r.status === "fulfilled" ? "ok" : `${r.reason?.code}`)).join(" | "),
+  );
+  const memberships = await membershipsOf("student1");
+  assert.equal(memberships.length, 1);
+  assert.ok(["h2", "h3"].includes(memberships[0]));
+  await assertGuardianInvariant("student1");
 });
 
 test("P1-5 getHalaqaAwards: only the halaqa's teacher/supervisor or Admin; multi-halaqa grants included", async () => {

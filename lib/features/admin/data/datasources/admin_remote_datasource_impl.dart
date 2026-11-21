@@ -736,58 +736,72 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   @override
   Future<List<RegistrationRequestEntity>> getRegistrationRequests() async {
     try {
-      // Still scans active students: a true filtered query needs a denormalized
-      // `needsHalaqaAssignment` (or equivalent) flag — deferred (schema).
-      // D2 reduces latency via chunked parallel profile reads (not N serial).
-      final usersSnap = await firestore
-          .collection(FirestoreCollections.users)
-          .where('role', isEqualTo: AppRoles.student)
-          .where('isActive', isEqualTo: true)
-          .get();
+      // Profiles-first: only students whose pointer is null/empty need a
+      // halaqa. Provisioning always writes studentProfiles (see
+      // adminProvisionUser / onboarding), so a full active-student scan is
+      // unnecessary. Residual: a legacy user with no profile doc is not
+      // listed here (callable/`needsHalaqaAssignment` would cover that).
+      final profiles = firestore.collection(
+        FirestoreCollections.studentProfiles,
+      );
+      final nullSnap = await profiles.where('halaqaId', isNull: true).get();
+      final emptySnap = await profiles.where('halaqaId', isEqualTo: '').get();
+      final profileById = <String, Map<String, dynamic>>{
+        for (final d in nullSnap.docs) d.id: d.data(),
+        for (final d in emptySnap.docs) d.id: d.data(),
+      };
+      if (profileById.isEmpty) return const [];
 
-      if (usersSnap.docs.isEmpty) return const [];
-
-      final profileById = <String, Map<String, dynamic>>{};
-      final studentIds = usersSnap.docs.map((d) => d.id).toList();
-      for (final chunk in FirestoreInQuery.chunkIds(studentIds)) {
-        final profilesSnap = await firestore
-            .collection(FirestoreCollections.studentProfiles)
+      final userById = <String, Map<String, dynamic>>{};
+      for (final chunk in FirestoreInQuery.chunkIds(profileById.keys)) {
+        final usersSnap = await firestore
+            .collection(FirestoreCollections.users)
             .where(FieldPath.documentId, whereIn: chunk)
             .get();
-        for (final doc in profilesSnap.docs) {
-          profileById[doc.id] = doc.data();
+        for (final doc in usersSnap.docs) {
+          userById[doc.id] = doc.data();
         }
       }
 
-      final pending = <RegistrationRequestEntity>[];
-      for (final userDoc in usersSnap.docs) {
-        final profileData =
-            profileById[userDoc.id] ?? const <String, dynamic>{};
-        final halaqaId = profileData['halaqaId'] as String?;
-        if (halaqaId != null && halaqaId.trim().isNotEmpty) continue;
+      final candidateIds = <String>[
+        for (final id in profileById.keys)
+          if (_isActiveStudentUser(userById[id])) id,
+      ];
+      if (candidateIds.isEmpty) return const [];
 
-        final userData = userDoc.data();
-        final createdRaw = userData['createdAt'] ?? profileData['createdAt'];
-        final privateEmail = await emailReader.emailOf(userDoc.id);
-        pending.add(
+      final emails = await emailReader.emailsOf(candidateIds);
+      final pending = <RegistrationRequestEntity>[
+        for (final id in candidateIds)
           RegistrationRequestEntity(
-            studentId: userDoc.id,
-            name: userData['name'] as String? ?? userDoc.id,
+            studentId: id,
+            name: (userById[id]?['name'] as String?)?.trim().isNotEmpty == true
+                ? (userById[id]!['name'] as String).trim()
+                : id,
             email: AdminPrivateEmailReader.preferPrivate(
-              privateEmail,
-              userData['email'],
+              emails[id],
+              userById[id]?['email'],
             ),
-            profileImageUrl: userData['profileImageUrl'] as String?,
-            registeredAt: createdRaw is Timestamp ? createdRaw.toDate() : null,
+            profileImageUrl: userById[id]?['profileImageUrl'] as String?,
+            registeredAt: () {
+              final createdRaw =
+                  userById[id]?['createdAt'] ?? profileById[id]?['createdAt'];
+              return createdRaw is Timestamp ? createdRaw.toDate() : null;
+            }(),
           ),
-        );
-      }
+      ];
 
       pending.sort((a, b) => a.name.compareTo(b.name));
       return pending;
     } catch (e) {
       throw ServerException(e.toString());
     }
+  }
+
+  static bool _isActiveStudentUser(Map<String, dynamic>? data) {
+    if (data == null) return false;
+    final role = (data['role'] as String?)?.trim() ?? '';
+    if (role != AppRoles.student) return false;
+    return data['isActive'] != false;
   }
 
   @override

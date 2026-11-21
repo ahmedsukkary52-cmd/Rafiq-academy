@@ -34,7 +34,8 @@ class ChatImageView extends StatefulWidget {
 
   const ChatImageView({super.key, required this.media, required this.loader});
 
-  static const double size = 200;
+  static const double maxWidth = 240;
+  static const double maxHeight = 280;
 
   @override
   State<ChatImageView> createState() => _ChatImageViewState();
@@ -61,7 +62,10 @@ class _ChatImageViewState extends State<ChatImageView> {
 
   void _openFullScreen() {
     final bytes = _bytes;
-    if (bytes == null) return;
+    if (bytes == null) {
+      _load();
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
@@ -77,7 +81,7 @@ class _ChatImageViewState extends State<ChatImageView> {
     if (bytes != null) {
       child = Image.memory(
         bytes,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => const _MediaPlaceholder(
           icon: Icons.broken_image_outlined,
@@ -102,17 +106,23 @@ class _ChatImageViewState extends State<ChatImageView> {
 
     return Semantics(
       image: true,
-      label: 'صورة',
-      button: bytes != null,
+      label: 'صورة — اضغط للعرض',
+      button: true,
       child: GestureDetector(
         onTap: _openFullScreen,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: ChatImageView.size,
-            height: ChatImageView.size,
-            color: AppColors.border.withValues(alpha: 0.35),
-            child: child,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: ChatImageView.maxWidth,
+              maxHeight: ChatImageView.maxHeight,
+              minWidth: 120,
+              minHeight: 120,
+            ),
+            child: ColoredBox(
+              color: AppColors.border.withValues(alpha: 0.25),
+              child: child,
+            ),
           ),
         ),
       ),

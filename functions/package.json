@@ -7,6 +7,7 @@
     "build:watch": "tsc --watch",
     "serve": "node scripts/serve-emulators.mjs",
     "seed:emulator": "node scripts/seed-emulator.mjs",
+    "seed:integration": "node scripts/seed-integration-fixture.mjs",
     "migrate:contact-fields": "node scripts/migrate-contact-fields.mjs",
     "migrate:email-backfill": "node scripts/migrate-email-backfill.mjs",
     "audit:contact-data": "node scripts/migrate-audit-contact-data.mjs",

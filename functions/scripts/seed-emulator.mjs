@@ -16,7 +16,7 @@
 //     marker also prints a read-only diagnosis of the partial seed
 // 10. writes (create-only, one bounded wait per step, no seeder retries)
 //                                       (exit 1 on failure or timeout, nothing deleted)
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,8 @@ import { REPO_ROOT } from "./deploy-functions.mjs";
 import {
   buildDemoDataset,
   classifyEmulatorState,
+  DEMO_ACCOUNTS,
+  DEMO_SEED_VERSION,
   diagnosePartialSeed,
   SEED_COMPLETION_PHASE,
   SEED_MARKER_PHASE,
@@ -271,6 +273,27 @@ export async function runSeed({
       return 1;
     }
     log("Seed complete.");
+    // Credentials file only — never print passwords to stdout (contract tests).
+    try {
+      const backupDir = join(REPO_ROOT, "_backups");
+      mkdirSync(backupDir, { recursive: true });
+      const credPath = join(backupDir, `SEED_v${DEMO_SEED_VERSION}_CREDENTIALS.txt`);
+      const lines = [
+        `BASMA emulator seed v${DEMO_SEED_VERSION}`,
+        "project: demo-rafiq-rules (local emulator ONLY)",
+        `generated: ${new Date().toISOString()}`,
+        "Do not use these passwords on rafiq-academy cloud.",
+        "",
+        ...DEMO_ACCOUNTS.map(
+          (a) => `${a.role.padEnd(11)} | ${a.email.padEnd(24)} | ${a.password} | ${a.name}`,
+        ),
+        "",
+      ];
+      writeFileSync(credPath, lines.join("\n"), "utf8");
+      log(`Credentials written under _backups/ (passwords not logged).`);
+    } catch {
+      log("Credentials file could not be written; seed data is still complete.");
+    }
     return 0;
   } finally {
     await withTimeout(Promise.resolve().then(() => admin.close?.()), "closing firebase-admin").catch(() => {});

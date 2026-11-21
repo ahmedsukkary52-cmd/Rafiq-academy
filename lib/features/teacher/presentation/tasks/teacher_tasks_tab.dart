@@ -11,7 +11,7 @@ import '../widgets/teacher_loading_skeletons.dart';
 import 'create_halaqa_activity_sheet.dart';
 import 'teacher_activity_detail_page.dart';
 
-/// Class Details → المهام — lightweight activities + entry to حفظ/مراجعة.
+/// Class Details → المهام — أنشطة الحلقة + مدخل لواجب الدرس.
 class TeacherTasksTab extends StatefulWidget {
   final String halaqaId;
   final bool canWrite;
@@ -98,43 +98,69 @@ class _TeacherTasksTabState extends State<TeacherTasksTab> {
         ),
         children: [
           Text('المهام', style: AppTextStyles.headlineMedium),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'أنشطة خفيفة للحلقة بالكامل — ليست تكليف الحفظ/المراجعة.',
+            'أنشطة تفاعلية للحلقة، وواجب الدرس بعد كل حصة.',
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: AppSizes.paddingM),
           if (widget.canWrite) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: _openCreate,
-                      icon: const Icon(Icons.add_rounded, size: 20),
-                      label: const Text('مهمة جديدة'),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryDark.withValues(alpha: 0.22),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openCreate,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusL),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_rounded, color: Colors.white),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'نشاط جديد للحلقة',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: widget.onOpenLessonAssignment,
-                      icon: const Icon(Icons.menu_book_outlined, size: 18),
-                      label: const Text('تكليف حفظ/مراجعة'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: widget.onOpenLessonAssignment,
+              icon: const Icon(Icons.menu_book_outlined, size: 18),
+              label: const Text('واجب الحصة (حفظ ومراجعة)'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryDark,
+                alignment: AlignmentDirectional.centerStart,
+              ),
             ),
           ] else
             Text(
@@ -143,26 +169,37 @@ class _TeacherTasksTabState extends State<TeacherTasksTab> {
                 color: AppColors.textSecondary,
               ),
             ),
-          const SizedBox(height: AppSizes.paddingL),
+          const SizedBox(height: 18),
           Row(
             children: [
               Text(
-                'المهام السابقة',
+                'سجل الأنشطة',
                 style: AppTextStyles.titleLarge.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const Spacer(),
               if (_status == ActivityListLoadState.loaded)
-                Text(
-                  '${_activities.length}',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.textHint,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  ),
+                  child: Text(
+                    '${_activities.length}',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           if (_status == ActivityListLoadState.loading)
             const TeacherTasksListSkeleton()
           else if (_status == ActivityListLoadState.error)
@@ -195,16 +232,24 @@ class _TasksEmptyState extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: AppSizes.paddingL),
         child: Column(
           children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: 40,
-              color: AppColors.primary.withValues(alpha: 0.7),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.assignment_outlined,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
             const SizedBox(height: 12),
-            Text('لا توجد مهام بعد', style: AppTextStyles.titleMedium),
+            Text('لا توجد أنشطة بعد', style: AppTextStyles.titleMedium),
             const SizedBox(height: 6),
             Text(
-              'أنشئ مهمة جديدة للحلقة، أو أرسل تكليف حفظ/مراجعة من الزر أعلاه.',
+              'ابدأ بنشاط تفاعلي، أو أرسل واجب الحصة بعد انتهاء الجلسة.',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
@@ -232,68 +277,59 @@ class _ActivityHistoryCard extends StatelessWidget {
 
     return AppCard(
       onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.chevron_left_rounded,
-                color: AppColors.textHint,
-                size: AppSizes.iconL,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      activity.prompt,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: AppTextStyles.titleMedium.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'أُنشئت ${formatDateDmy(activity.createdAt)}',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Text(
+            activity.prompt,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              height: 1.35,
+            ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            alignment: WrapAlignment.end,
-            children: [
-              _MetaChip(
-                icon: Icons.forum_outlined,
-                label: '${activity.responseCount} ردود',
-              ),
-              _MetaChip(icon: Icons.tune_rounded, label: types),
-              if (deadline != null)
-                _MetaChip(
-                  icon: Icons.event_outlined,
-                  label: 'حتى ${formatDateDmy(deadline)}',
-                ),
-              if (activity.sharedToPosts)
-                const _MetaChip(
-                  icon: Icons.campaign_outlined,
-                  label: 'نُشر في المنشورات',
-                  accent: AppColors.gradeGood,
-                ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            'أُنشئت ${formatDateDmy(activity.createdAt)}',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
+          if (deadline != null ||
+              activity.responseCount > 0 ||
+              types.isNotEmpty ||
+              activity.sharedToPosts) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
+              children: [
+                if (activity.responseCount > 0)
+                  _MetaChip(
+                    icon: Icons.forum_outlined,
+                    label: '${activity.responseCount} ردود',
+                  ),
+                if (types.isNotEmpty)
+                  _MetaChip(icon: Icons.tune_rounded, label: types),
+                if (deadline != null)
+                  _MetaChip(
+                    icon: Icons.event_outlined,
+                    label: 'حتى ${formatDateDmy(deadline)}',
+                  ),
+                if (activity.sharedToPosts)
+                  const _MetaChip(
+                    icon: Icons.campaign_outlined,
+                    label: 'نُشر في المنشورات',
+                    accent: AppColors.gradeGood,
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -319,6 +355,8 @@ class _MetaChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
           Text(
             label,
             style: AppTextStyles.labelSmall.copyWith(
@@ -326,8 +364,6 @@ class _MetaChip extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 4),
-          Icon(icon, size: 14, color: color),
         ],
       ),
     );

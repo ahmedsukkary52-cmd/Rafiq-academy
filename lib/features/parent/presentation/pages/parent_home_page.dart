@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/shared_widgets.dart';
+import '../../../../shared/widgets/app_floating_bottom_nav.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../chat/presentation/bloc/chat_conversations_bloc.dart';
@@ -47,7 +47,10 @@ class _ParentHomePageState extends State<ParentHomePage> {
     sl<NotificationsBloc>().add(
       StartWatchingNotificationsEvent(uid: uid, role: AppRoles.parent),
     );
-    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(uid));
+    sl<ChatConversationsBloc>().add(StartWatchingConversationsEvent(
+      uid,
+      pageSize: ChatConversationsBloc.defaultInboxPageSize,
+    ));
   }
 
   void _switchTab(int index) {
@@ -59,131 +62,57 @@ class _ParentHomePageState extends State<ParentHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _currentTab,
-        children: [
-          ParentDashboardTab(onSwitchTab: _switchTab),
-          const ParentChildrenPage(),
-          const ParentMessagesTab(),
-          ParentSubscriptionsPage(embedded: true, onSwitchTab: _switchTab),
-          ParentProfileTab(onSwitchTab: _switchTab),
-        ],
-      ),
-      bottomNavigationBar: _ParentBottomNav(
-        selected: _currentTab,
-        onChanged: _switchTab,
-      ),
-    );
-  }
-}
-
-class _ParentBottomNav extends StatelessWidget {
-  final int selected;
-  final ValueChanged<int> onChanged;
-
-  const _ParentBottomNav({required this.selected, required this.onChanged});
-
-  static const _icons = [
-    Icons.home_rounded,
-    Icons.groups_rounded,
-    Icons.chat_bubble_outline,
-    Icons.account_balance_wallet_outlined,
-    Icons.person_outline,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 12,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: AppSizes.bottomNavHeight,
-          child: Row(
-            children: List.generate(ParentHomeNav.labels.length, (i) {
-              final isSelected = i == selected;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (i == ParentHomeNav.messagesIndex)
-                        BlocSelector<
-                          ChatConversationsBloc,
-                          ChatConversationsState,
-                          int
-                        >(
-                          bloc: sl<ChatConversationsBloc>(),
-                          selector: (state) => state.totalUnreadCount,
-                          builder: (context, unread) {
-                            return NotificationBadge(
-                              count: unread,
-                              child: _NavIcon(
-                                icon: _icons[i],
-                                selected: isSelected,
-                              ),
-                            );
-                          },
-                        )
-                      else
-                        _NavIcon(icon: _icons[i], selected: isSelected),
-                      const SizedBox(height: 4),
-                      Text(
-                        ParentHomeNav.labels[i],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.labelSmall.copyWith(
-                          fontSize: 10,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
+      resizeToAvoidBottomInset: true,
+      extendBody: true,
+      body: AppFloatingBottomNav.padBody(
+        context,
+        child: IndexedStack(
+          index: _currentTab,
+          children: [
+            ParentDashboardTab(onSwitchTab: _switchTab),
+            const ParentChildrenPage(),
+            const ParentMessagesTab(),
+            ParentSubscriptionsPage(embedded: true, onSwitchTab: _switchTab),
+            ParentProfileTab(onSwitchTab: _switchTab),
+          ],
         ),
       ),
-    );
-  }
-}
-
-class _NavIcon extends StatelessWidget {
-  final IconData icon;
-  final bool selected;
-
-  const _NavIcon({required this.icon, required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: 42,
-      height: 32,
-      decoration: BoxDecoration(
-        color: selected ? AppColors.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Icon(
-        icon,
-        size: 22,
-        color: selected ? AppColors.onPrimary : AppColors.textSecondary,
+      bottomNavigationBar: BlocSelector<
+        ChatConversationsBloc,
+        ChatConversationsState,
+        int
+      >(
+        bloc: sl<ChatConversationsBloc>(),
+        selector: (state) => state.totalUnreadCount,
+        builder: (context, unread) {
+          final base = AppNavIcons.parent(ParentHomeNav.labels);
+          final destinations = [
+            for (var i = 0; i < base.length; i++)
+              if (i == ParentHomeNav.messagesIndex)
+                AppNavDestination(
+                  icon: base[i].icon,
+                  selectedIcon: base[i].selectedIcon,
+                  label: base[i].label,
+                  badge: unread > 0
+                      ? Container(
+                          width: 9,
+                          height: 9,
+                          decoration: const BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                      : null,
+                )
+              else
+                base[i],
+          ];
+          return AppFloatingBottomNav(
+            selected: _currentTab,
+            onChanged: _switchTab,
+            destinations: destinations,
+          );
+        },
       ),
     );
   }

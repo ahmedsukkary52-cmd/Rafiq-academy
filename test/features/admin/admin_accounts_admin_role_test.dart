@@ -16,11 +16,13 @@ import 'package:rafiq_academy/shared/domain/halaqa_entity.dart';
 
 class _Ops extends Fake implements AdminOperationsRepository {
   @override
-  Future<Either<Failure, List<AdminDirectoryUser>>> listUsersByRole(String role) async =>
-      const Right([]);
+  Future<Either<Failure, List<AdminDirectoryUser>>> listUsersByRole(
+    String role,
+  ) async => const Right([]);
 
   @override
-  Future<Either<Failure, List<HalaqaEntity>>> listHalaqat() async => const Right([]);
+  Future<Either<Failure, List<HalaqaEntity>>> listHalaqat() async =>
+      const Right([]);
 }
 
 class _Admin extends Fake implements AdminRepository {
@@ -74,7 +76,17 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: AdminAccountsPage()));
     await tester.pumpAndSettle();
 
-    expect(find.text('طالب'), findsOneWidget, reason: 'default is not admin');
+    expect(
+      find.text('ولي أمر'),
+      findsOneWidget,
+      reason: 'default is a supported standalone account role',
+    );
+    expect(
+      find.text('طالب'),
+      findsNothing,
+      reason: 'students are provisioned only with Parent and Halaqa links',
+    );
+    expect(find.textContaining('ولي أمر وحلقة'), findsOneWidget);
     expect(find.byKey(const Key('provision-admin-warning')), findsNothing);
 
     await tester.tap(find.byKey(const Key('provision-role')));
@@ -99,7 +111,9 @@ void main() {
     expect(admin.provisioned, ['admin']);
   });
 
-  testWidgets('switching away from admin clears the confirmation', (tester) async {
+  testWidgets('switching away from admin clears the confirmation', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);

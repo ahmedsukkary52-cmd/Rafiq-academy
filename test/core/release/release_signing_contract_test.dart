@@ -25,8 +25,8 @@ void main() {
     expect(prod, isNot(contains('"debug"')));
   });
 
-  test('dev and staging stay on the debug key', () {
-    for (final flavor in ['dev', 'staging']) {
+  test('dev, staging and trial stay on the debug key', () {
+    for (final flavor in ['dev', 'staging', 'trial']) {
       expect(
         _flavorBlock(gradle, flavor),
         contains('signingConfig = signingConfigs.getByName("debug")'),
@@ -77,11 +77,33 @@ void main() {
   );
 
   test('keystores and key.properties are git-ignored', () {
-    final ignore = File('android/.gitignore').readAsLinesSync();
+    final androidIgnore = File('android/.gitignore').readAsLinesSync();
     expect(
-      ignore,
+      androidIgnore,
       containsAll(['key.properties', '**/*.jks', '**/*.keystore']),
     );
+    // Defense in depth: root ignore also covers keystores dropped outside android/.
+    final rootIgnore = File('.gitignore').readAsStringSync();
+    expect(rootIgnore, contains('*.jks'));
+    expect(rootIgnore, contains('*.keystore'));
+    expect(rootIgnore, contains('key.properties'));
+  });
+
+  test('Codemagic prod workflow references the named upload keystore only', () {
+    final yaml = File('codemagic.yaml').readAsStringSync();
+    expect(yaml, contains('android-prod-release:'));
+    expect(yaml, contains('basma_upload_key'));
+    expect(
+      yaml,
+      contains('flutter build appbundle --flavor prod --release'),
+    );
+    // Artifacts are the AAB/mapping only — never keystore paths.
+    final prodBlock = yaml.split('android-prod-release:')[1].split(
+      RegExp(r'\n  [a-z]'),
+    )[0];
+    expect(prodBlock, contains('*.aab'));
+    expect(prodBlock, isNot(contains('.jks')));
+    expect(prodBlock, isNot(contains('key.properties')));
   });
 
   group('codemagic.yaml', () {

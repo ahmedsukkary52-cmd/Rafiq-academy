@@ -14,14 +14,14 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../auth/presentation/pages/first_login_page.dart'
     show firstLoginPasswordProblem;
+import '../../data/admin_change_own_password.dart';
 import '../widgets/admin_figma_widgets.dart';
 import 'admin_academy_import_page.dart';
-import '../../data/admin_change_own_password.dart';
 
 typedef PasswordChanger =
     Future<void> Function(String currentPassword, String newPassword);
 
-/// Re-authenticates with the current password, then sets the new one.
+/// Presentation default: DI Auth → data-layer password change.
 Future<void> changeOwnPassword(String currentPassword, String newPassword) =>
     changeOwnPasswordWithAuth(
       auth: sl<FirebaseAuth>(),
@@ -58,6 +58,7 @@ class AdminSettingsTab extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
+          bottom: false,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             child: Column(
@@ -142,7 +143,8 @@ class AdminSettingsTab extends StatelessWidget {
                 _SettingsTile(
                   icon: Icons.lock_open_rounded,
                   title: 'إعادة تفعيل الوصول',
-                  subtitle: 'رفع إيقاف الوصول بعد تسوية المدفوعات',
+                  subtitle:
+                      'فتح تطبيق ولي الأمر بعد إيقافه بسبب تأخر الدفع أو تعليق مؤقت',
                   onTap: () => context.push(AppRoutes.adminAccess),
                 ),
                 _SettingsTile(
@@ -182,9 +184,15 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8, right: 4),
-    child: Text(
-      text,
-      style: AppTextStyles.labelLarge.copyWith(color: AppColors.textSecondary),
+    child: Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(
+        text,
+        textAlign: TextAlign.right,
+        style: AppTextStyles.labelLarge.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
     ),
   );
 }
@@ -228,7 +236,7 @@ class _SettingsTile extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_left_rounded, color: AppColors.textHint),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
         ],
       ),
     ),

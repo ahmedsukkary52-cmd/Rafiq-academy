@@ -3,7 +3,7 @@ import 'package:hijri/hijri_calendar.dart';
 
 import '../../../../shared/theme/app_theme.dart';
 
-/// Student home header — Figma: teal header, avatar, Hijri date, soft icon chips, stats row.
+/// Student home header — RTL: avatar+name on the right, search+notifications left.
 class StudentHeaderWidget extends StatelessWidget {
   final String name;
   final String avatarEmoji;
@@ -40,141 +40,143 @@ class StudentHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(28),
+            bottomRight: Radius.circular(28),
+          ),
         ),
-      ),
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 10,
-        left: 16,
-        right: 16,
-        bottom: 20,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _HeaderCircleButton(
-                icon: Icons.notifications_outlined,
-                showDot: unreadNotificationsCount > 0,
-                onTap: onNotificationsTap,
-              ),
-              if (onSearchTap != null) ...[
-                const SizedBox(width: 8),
-                _HeaderCircleButton(
-                  icon: Icons.search_rounded,
-                  onTap: onSearchTap!,
-                ),
-              ],
-              // Audit fix: Spacer+Expanded split the row and pushed the avatar
-              // group off the header edge; Expanded alone + end alignment keeps it pinned.
-              const SizedBox(width: 8),
-              Expanded(
-                child: GestureDetector(
-                onTap: onAvatarTap,
-                behavior: HitTestBehavior.opaque,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Flexible(
-                      child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + 10,
+          left: 16,
+          right: 16,
+          bottom: 20,
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                // RIGHT (first in RTL): avatar + name
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onAvatarTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
                       children: [
-                        Text(
-                          '$name 👋',
-                          key: const Key('student-header-name'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.end,
-                          style: const TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
                             color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.14),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              avatarEmoji,
+                              style: const TextStyle(fontSize: 26),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _hijriToday(),
-                          key: const Key('student-header-hijri'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.end,
-                          style: TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.78),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$name 👋',
+                                key: const Key('student-header-name'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.right,
+                                style: AppTextStyles.titleMedium.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _hijriToday(),
+                                key: const Key('student-header-hijri'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.right,
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(avatarEmoji, style: const TextStyle(fontSize: 24)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _StatPill(
-                  icon: Icons.monetization_on_rounded,
-                  iconColor: const Color(0xFFFFD54F),
-                  value: _eastern('$coins'),
-                  label: 'عملة',
-                  onTap: onCoinsTap,
+                // LEFT: search + notifications
+                if (onSearchTap != null) ...[
+                  _HeaderCircleButton(
+                    icon: Icons.search_rounded,
+                    onTap: onSearchTap!,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                _HeaderCircleButton(
+                  icon: Icons.notifications_outlined,
+                  showDot: unreadNotificationsCount > 0,
+                  onTap: onNotificationsTap,
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatPill(
-                  icon: Icons.star_rounded,
-                  iconColor: const Color(0xFFFFD54F),
-                  value: _eastern('$totalStars'),
-                  label: 'نجمة',
-                  onTap: onStarsTap,
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatPill(
+                    icon: Icons.monetization_on_rounded,
+                    iconColor: const Color(0xFFFFD54F),
+                    value: _eastern('$coins'),
+                    label: 'عملة',
+                    onTap: onCoinsTap,
+                  ),
                 ),
-              ),
-              if (showStreak) ...[
                 const SizedBox(width: 8),
                 Expanded(
                   child: _StatPill(
-                    icon: Icons.local_fire_department_rounded,
-                    iconColor: const Color(0xFFFF8A65),
-                    value: _eastern('$streakDays'),
-                    label: 'يوم متواصل',
-                    onTap: onStreakTap,
+                    icon: Icons.star_rounded,
+                    iconColor: const Color(0xFFFFD54F),
+                    value: _eastern('$totalStars'),
+                    label: 'نجمة',
+                    onTap: onStarsTap,
                   ),
                 ),
+                if (showStreak) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatPill(
+                      icon: Icons.local_fire_department_rounded,
+                      iconColor: const Color(0xFFFF8A65),
+                      value: _eastern('$streakDays'),
+                      label: 'يوم متواصل',
+                      onTap: onStreakTap,
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -224,11 +226,12 @@ class _HeaderCircleButton extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
+              color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
             ),
             child: Icon(icon, color: Colors.white, size: 20),
           ),
@@ -276,6 +279,7 @@ class _StatPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         ),
         child: Column(
           children: [
@@ -285,11 +289,10 @@ class _StatPill extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: 'NotoNaskhArabic',
-                fontSize: 18,
+              style: AppTextStyles.titleLarge.copyWith(
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
+                fontSize: 18,
                 height: 1.1,
               ),
             ),
@@ -298,9 +301,7 @@ class _StatPill extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'NotoNaskhArabic',
-                fontSize: 11,
+              style: AppTextStyles.labelSmall.copyWith(
                 fontWeight: FontWeight.w600,
                 color: Colors.white.withValues(alpha: 0.85),
               ),

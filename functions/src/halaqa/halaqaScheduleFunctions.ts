@@ -355,8 +355,20 @@ export async function adminCreateHalaqaCore(
     }
 
     const teacherUser = await tx.get(teacherUserRef);
-    if (!teacherUser.exists || teacherUser.data()?.role !== "teacher") {
-      throw new HttpsError("failed-precondition", "المعلم المحدد غير صالح");
+    const teacherData = teacherUser.data();
+    // Provisional teachers: isActive=false + pendingHalaqaAssignment=true +
+    // empty staffStatus. Explicitly deactivated/archived/deleted staff must
+    // not auto-reactivate via halaqa create even if a client forged pending.
+    const staffStatus = text(teacherData?.staffStatus);
+    if (
+      !teacherUser.exists ||
+      teacherData?.role !== "teacher" ||
+      staffStatus === "deleted" ||
+      staffStatus === "deactivated" ||
+      staffStatus === "archived" ||
+      (teacherData?.isActive === false && teacherData?.pendingHalaqaAssignment !== true)
+    ) {
+      throw new HttpsError("failed-precondition", "المعلم المحدد غير صالح أو غير متاح للإسناد");
     }
     if (supervisorUserRef) {
       const sup = await tx.get(supervisorUserRef);
@@ -401,6 +413,13 @@ export async function adminCreateHalaqaCore(
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+    if (teacherData?.pendingHalaqaAssignment === true) {
+      tx.update(teacherUserRef, {
+        isActive: true,
+        pendingHalaqaAssignment: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
     const linkRef = db.collection(HALAQA_MEETING_LINKS_COLLECTION).doc(halaqaRef.id);
     if (meetingLink) {
       tx.set(linkRef, canonicalMeetingLinkData(meetingLink));

@@ -40,236 +40,254 @@ class _AvatarSelectionPageState extends State<AvatarSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<StudentBloc, StudentState>(
-      listenWhen: (p, c) => p.avatarUpdateStatus != c.avatarUpdateStatus,
-      listener: (context, state) {
-        if (state.avatarUpdateStatus == SectionStatus.loaded) {
-          AppSnackBar.showSuccess(context, 'تم تحديث شخصيتك بنجاح');
-        } else if (state.avatarUpdateStatus == SectionStatus.error) {
-          AppSnackBar.showError(
-            context,
-            state.avatarUpdateError ?? 'حدث خطأ، حاول مرة أخرى',
-          );
-        }
-      },
-      builder: (context, state) {
-        final profile = state.profile;
-        final selectedId = _pendingSelection ?? profile?.avatarId ?? 'fox';
-        final unlockedIds = profile?.unlockedAvatarIds ?? const ['fox'];
-        final coins = profile?.coins ?? 0;
-        final selected = AvatarCatalog.byId(selectedId);
-        final isUpdating = state.avatarUpdateStatus == SectionStatus.loading;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: BlocConsumer<StudentBloc, StudentState>(
+        listenWhen: (p, c) => p.avatarUpdateStatus != c.avatarUpdateStatus,
+        listener: (context, state) {
+          if (state.avatarUpdateStatus == SectionStatus.loaded) {
+            AppSnackBar.showSuccess(context, 'تم تحديث شخصيتك بنجاح');
+          } else if (state.avatarUpdateStatus == SectionStatus.error) {
+            AppSnackBar.showError(
+              context,
+              state.avatarUpdateError ?? 'حدث خطأ، حاول مرة أخرى',
+            );
+          }
+        },
+        builder: (context, state) {
+          final profile = state.profile;
+          final selectedId = _pendingSelection ?? profile?.avatarId ?? 'fox';
+          final unlockedIds = profile?.unlockedAvatarIds ?? const ['fox'];
+          final coins = profile?.coins ?? 0;
+          final selected = AvatarCatalog.byId(selectedId);
+          final isUpdating = state.avatarUpdateStatus == SectionStatus.loading;
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          body: Column(
-            children: [
-              // ── Header ────────────────────────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.paddingL,
-                  AppSizes.paddingXL,
-                  AppSizes.paddingL,
-                  AppSizes.paddingL,
-                ),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(32),
+                      bottomRight: Radius.circular(32),
+                    ),
                   ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => Navigator.of(context).maybePop(),
-                            icon: const Icon(
-                              Icons.chevron_right_rounded,
-                              color: Colors.white,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.15),
-                            ),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'اختر شخصيتك 🎭',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontFamily: 'NotoNaskhArabic',
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () =>
+                                  Navigator.of(context).maybePop(),
+                              icon: const Icon(
+                                Icons.chevron_left_rounded,
                                 color: Colors.white,
                               ),
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.18),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'اختر شخصيتك',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 40),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'شخصيتك ستمثلك في رحلة الحفظ',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.white.withValues(alpha: 0.88),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        Container(
+                          width: 108,
+                          height: 108,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withValues(alpha: 0.95),
+                                Colors.white.withValues(alpha: 0.75),
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              width: 3,
                             ),
                           ),
-                          const SizedBox(width: 40),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'شخصيتك ستمثلك في رحلة الحفظ',
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 13,
-                          color: Colors.white.withOpacity(0.85),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: 96,
-                        height: 96,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            selected.emoji,
-                            style: const TextStyle(fontSize: 48),
+                          child: Center(
+                            child: Text(
+                              selected.emoji,
+                              style: const TextStyle(fontSize: 52),
+                            ),
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        Text(
+                          selected.name,
+                          style: AppTextStyles.titleMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'الكل',
+                        selected: _filter == _CatalogFilter.all,
+                        onTap: () =>
+                            setState(() => _filter = _CatalogFilter.all),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'حيوانات',
+                        selected: _filter == _CatalogFilter.animals,
+                        onTap: () =>
+                            setState(() => _filter = _CatalogFilter.animals),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'مميزة ✨',
+                        selected: _filter == _CatalogFilter.premium,
+                        onTap: () =>
+                            setState(() => _filter = _CatalogFilter.premium),
                       ),
                     ],
                   ),
                 ),
-              ),
-
-              const SizedBox(height: AppSizes.paddingM),
-
-              // ── فلاتر ─────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.paddingL,
-                ),
-                child: Row(
-                  children: [
-                    _FilterChip(
-                      label: 'الكل',
-                      selected: _filter == _CatalogFilter.all,
-                      onTap: () => setState(() => _filter = _CatalogFilter.all),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
+                      childAspectRatio: 0.78,
                     ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'حيوانات',
-                      selected: _filter == _CatalogFilter.animals,
-                      onTap: () =>
-                          setState(() => _filter = _CatalogFilter.animals),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'مميزة ✨',
-                      selected: _filter == _CatalogFilter.premium,
-                      onTap: () =>
-                          setState(() => _filter = _CatalogFilter.premium),
-                    ),
-                  ],
-                ),
-              ),
+                    itemCount: _filtered.length,
+                    itemBuilder: (context, i) {
+                      final avatar = _filtered[i];
+                      final isUnlocked = unlockedIds.contains(avatar.id);
+                      final isSelected = avatar.id == selectedId;
+                      final isEquipped = avatar.id == profile?.avatarId;
 
-              const SizedBox(height: AppSizes.paddingM),
-
-              // ── شبكة الشخصيات ─────────────────────────────────────
-              Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.paddingL,
-                  ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: _filtered.length,
-                  itemBuilder: (context, i) {
-                    final avatar = _filtered[i];
-                    final isUnlocked = unlockedIds.contains(avatar.id);
-                    final isSelected = avatar.id == selectedId;
-                    final isEquipped = avatar.id == profile?.avatarId;
-
-                    return _AvatarCard(
-                      avatar: avatar,
-                      isUnlocked: isUnlocked,
-                      isSelected: isSelected,
-                      isEquipped: isEquipped,
-                      onTap: () {
-                        if (!isUnlocked && coins < avatar.unlockCost) {
-                          AppSnackBar.showInfo(
-                            context,
-                            'عملاتك مش كفاية لفتح ${avatar.name} (محتاج ${avatar.unlockCost} عملة)',
-                          );
-                          return;
-                        }
-                        setState(() => _pendingSelection = avatar.id);
-                      },
-                    );
-                  },
-                ),
-              ),
-
-              // ── رصيد العملات ──────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.all(AppSizes.paddingL),
-                child: Column(
-                  children: [
-                    AppCard(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: AppColors.secondaryBg,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Center(child: Text('🌙')),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '$coins عملة متاحة',
-                                  style: AppTextStyles.titleMedium,
-                                ),
-                                Text(
-                                  'يمكنك فتح المزيد من الشخصيات',
-                                  style: AppTextStyles.labelSmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    AppButton(
-                      label: 'تأكيد الاختيار ${selected.emoji}',
-                      isLoading: isUpdating,
-                      onPressed: selectedId == profile?.avatarId
-                          ? null
-                          : () => _confirmSelection(
+                      return _AvatarBubble(
+                        avatar: avatar,
+                        isUnlocked: isUnlocked,
+                        isSelected: isSelected,
+                        isEquipped: isEquipped,
+                        onTap: () {
+                          if (!isUnlocked && coins < avatar.unlockCost) {
+                            AppSnackBar.showInfo(
                               context,
-                              profile,
-                              selected,
-                              unlockedIds,
-                              coins,
-                            ),
-                    ),
-                  ],
+                              'عملاتك مش كفاية لفتح ${avatar.name} (محتاج ${avatar.unlockCost} عملة)',
+                            );
+                            return;
+                          }
+                          setState(() => _pendingSelection = avatar.id);
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: const BoxDecoration(
+                                color: AppColors.secondaryBg,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(child: Text('🌙')),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$coins عملة متاحة',
+                                    style: AppTextStyles.titleMedium.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    'افتح المزيد من الشخصيات الجميلة',
+                                    style: AppTextStyles.labelSmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AppButton(
+                        label: 'تأكيد الاختيار ${selected.emoji}',
+                        isLoading: isUpdating,
+                        onPressed: selectedId == profile?.avatarId
+                            ? null
+                            : () => _confirmSelection(
+                                  context,
+                                  profile,
+                                  selected,
+                                  unlockedIds,
+                                  coins,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -314,18 +332,20 @@ class _FilterChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surfaceGrey,
+          gradient: selected ? AppColors.primaryGradient : null,
+          color: selected ? null : AppColors.surface,
           borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+          border: Border.all(
+            color: selected ? Colors.transparent : AppColors.border,
+          ),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontFamily: 'NotoNaskhArabic',
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+          style: AppTextStyles.labelMedium.copyWith(
+            fontWeight: FontWeight.w700,
             color: selected ? Colors.white : AppColors.textSecondary,
           ),
         ),
@@ -334,14 +354,14 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _AvatarCard extends StatelessWidget {
+class _AvatarBubble extends StatelessWidget {
   final AvatarDefinition avatar;
   final bool isUnlocked;
   final bool isSelected;
   final bool isEquipped;
   final VoidCallback onTap;
 
-  const _AvatarCard({
+  const _AvatarBubble({
     required this.avatar,
     required this.isUnlocked,
     required this.isSelected,
@@ -353,54 +373,85 @@ class _AvatarCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSizes.radiusL),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 2.2 : 1,
           ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.22),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+          ],
         ),
         child: Stack(
+          alignment: Alignment.center,
           children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Opacity(
-                  opacity: isUnlocked ? 1 : 0.45,
-                  child: Text(
-                    avatar.emoji,
-                    style: const TextStyle(fontSize: 36),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primaryLight,
+                          AppColors.primary.withValues(alpha: 0.18),
+                        ],
+                      ),
+                    ),
+                    child: Opacity(
+                      opacity: isUnlocked ? 1 : 0.4,
+                      child: Text(
+                        avatar.emoji,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 34, height: 1),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  avatar.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.labelSmall.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                  const SizedBox(height: 8),
+                  Text(
+                    avatar.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isUnlocked ? 'مجاني' : '${avatar.unlockCost} عملة',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: isUnlocked ? AppColors.success : AppColors.textHint,
+                  const SizedBox(height: 2),
+                  Text(
+                    isUnlocked ? 'مجاني' : '${avatar.unlockCost} عملة',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: isUnlocked
+                          ? AppColors.primaryDark
+                          : AppColors.textHint,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             if (isEquipped)
               const Positioned(
                 top: 0,
                 left: 0,
                 child: CircleAvatar(
-                  radius: 10,
+                  radius: 11,
                   backgroundColor: AppColors.primary,
                   child: Icon(Icons.check, size: 14, color: Colors.white),
                 ),

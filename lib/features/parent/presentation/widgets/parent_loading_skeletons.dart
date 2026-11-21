@@ -276,30 +276,6 @@ class ParentListCardsSkeleton extends StatelessWidget {
   }
 }
 
-class ParentProfileHeaderSkeleton extends StatelessWidget {
-  const ParentProfileHeaderSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ParentPulse(
-      builder: (context, bone) {
-        return Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingM),
-          child: Column(
-            children: [
-              CircleAvatar(radius: 40, backgroundColor: bone),
-              const SizedBox(height: 12),
-              parentSkeletonBar(bone: bone, width: 160, height: 16),
-              const SizedBox(height: 8),
-              parentSkeletonBar(bone: bone, width: 120, height: 12),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// Account stats strip (أبناء / حضور / آية) while the household loads.
 class ParentAccountStatsSkeleton extends StatelessWidget {
   const ParentAccountStatsSkeleton({super.key, this.height = 72});

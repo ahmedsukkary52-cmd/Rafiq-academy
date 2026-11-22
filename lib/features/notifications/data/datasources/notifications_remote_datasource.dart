@@ -47,8 +47,9 @@ class NotificationsRemoteDatasourceImpl
     // whereIn بتغطي الحالات التلاتة مع بعض في query واحد بسيط:
     // إشعار شخصي ليّا (audience == uid)، إشعار لكل أصحاب دوري
     // (audience == role)، أو إشعار للكل (audience == 'all').
+    final audiences = {uid, role, 'all'}.toList();
     return _notificationsRef
-        .where('audience', whereIn: [uid, role, 'all'])
+        .where('audience', whereIn: audiences)
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
